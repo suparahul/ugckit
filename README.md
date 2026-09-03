@@ -8,12 +8,14 @@ to the agent; it runs the pipeline.
 
 ## Install
 
-    git clone <this-repo> && cd ugckit
+One line, nothing to clone:
+
+    curl -fsSL https://raw.githubusercontent.com/suparahul/ugckit/main/install.sh | sh -s -- my-video-project
+
+Or from a clone:
+
+    git clone https://github.com/suparahul/ugckit && cd ugckit
     ./install.sh ~/my-video-project
-
-Or into the current directory:
-
-    ./install.sh
 
 The installer checks for ffmpeg, python 3.9+, curl and git, scaffolds the project,
 creates a `.venv`, installs dependencies, and tells you how to wire up MCP. It is
