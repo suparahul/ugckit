@@ -1,0 +1,50 @@
+{
+  "_comment": "Copy to pipeline/05-prompt/<project>/insert.json. Its presence switches the pipeline to the complex (app-insert) flow. Absent = plain text-to-video and nothing else runs.",
+
+  "source": "pipeline/00-source/<project>/appclip.mp4",
+
+  "_plate_window_note": "Advisory only. The real insert range is taken from where the green screen actually exists, because the model does not cut exactly on the prompted times.",
+  "plate_window": [5.0, 15.0],
+
+  "_key_note": "Chroma tolerances. Widen hue_tol if screen edges fail to key; raise sat_min if parts of the room key by mistake.",
+  "key": {
+    "color": [0, 177, 64],
+    "hue_tol": 26,
+    "sat_min": 55,
+    "val_min": 35,
+    "dark_max": 105
+  },
+
+  "_prereq_note": "This only works if the plate cooperates. The phone must be held completely still (no drift, rotation, tilt or re-grip) or the tracked quad moves and the app slides against the bezel; and every thumb gesture in the plate must correspond to a real event in the source recording, in the same order and on the right part of the screen. Both are prompt problems, fixed in stage 5, not here. `ugckit qc` reports phone drift as a percentage of screen width -- under 8% is locked, over 20% will not composite cleanly.",
+
+  "_beats_note": "app_t = where the event sits in the source recording. plate_t = where the PROMPT asked the thumb to act. AFTER GENERATING, re-measure the thumb on the real plate and correct every plate_t. The compositor piecewise time-warps the source so each beat lands on the actual thumb frame — this is what makes the timing exact despite model drift, and skipping it is what makes an insert look pasted on.",
+  "beats": [
+    { "app_t": 0.00, "plate_t": 5.00,  "label": "start" },
+    { "app_t": 2.15, "plate_t": 7.10,  "label": "swipe up + tap" },
+    { "app_t": 5.53, "plate_t": 10.50, "label": "tap back" },
+    { "app_t": 9.83, "plate_t": 15.00, "label": "end" }
+  ],
+
+  "_patches_note": "Cover regions of the source that should not appear. Copies the region from from_t over the given window. Coordinates are in the SOURCE recording's own pixel space.",
+  "patches": [
+    {
+      "label": "notification banner",
+      "window": [8.4, 9.15],
+      "from_t": 8.25,
+      "region": [0, 0, 1770, 440]
+    }
+  ],
+
+  "_grade_note": "Sit the insert into the plate. A perfectly clean screen inside a phone-camera plate reads as fake.",
+  "grade": {
+    "blur": 0.5,
+    "brightness": 0.0,
+    "contrast": 1.04,
+    "saturation": 1.0,
+    "reflection": 0.05,
+    "noise": 5
+  },
+
+  "_smooth_note": "Savitzky-Golay window on the tracked quad. KEEP THIS SMALL. The generated phone morphs frame to frame and the app must deform with the bezel; over-smoothing makes the screen slide against the phone.",
+  "smooth": 7
+}

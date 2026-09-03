@@ -1,0 +1,204 @@
+{
+  "_comment": "Desired state for the Supagen workspace. The `setup` skill reads this and creates anything missing VIA MCP. Resolve model_slug -> model_id with list_models at setup time; the id hints here may go stale.",
+  "_architecture": "ONE generation template, MANY versions -- one per model. Switching model is activate_version, not a per-call argument. This was tested: the REST /api/v1/invoke endpoint SILENTLY IGNORES version_number (a request for version 99, which does not exist, ran the active version instead), while the MCP invoke_template tool honours it. Since generation must go over curl (rule 2), the active version is what runs. Treat activate_version as the model switch and keep pipeline.json's `model` field in step with it.",
+  "templates": [
+    {
+      "slug": "video-watching-layer",
+      "name": "video-watching-layer",
+      "output_type": "text",
+      "required": true,
+      "description": "Stage 2 watching layer. Takes a trimmed reference segment and returns the six-section scene report: verbatim transcript, delivery, shot list, physical details, audio, on-screen text.",
+      "versions": [
+        {
+          "name": "v1-gemini-3-8-flash",
+          "activate": true,
+          "model_slug": "gemini-3-8-flash",
+          "model_id_hint": "96ae6edd-49a6-4734-8b8f-a01f1b24993c",
+          "_model_note": "Measured against Gemini 3.1 Pro Preview on byte-identical instructions: 5x cheaper, faster, more detailed, and it does not misreport burned-in captions as speech -- 3.1 Pro did, consistently. Do not downgrade.",
+          "temperature": 0.2,
+          "max_tokens": 32768,
+          "system_instructions_file": "prompts/watching-layer.txt"
+        }
+      ]
+    },
+    {
+      "slug": "ugc-recreation",
+      "name": "ugc-recreation",
+      "output_type": "video",
+      "required": true,
+      "description": "Stage 6 generation. One template, one version per model. The ACTIVE version is the model that runs. Every version is messages-only -- no system_instructions, no variables -- so the prompt is sent exactly once and its quotes are not HTML-escaped.",
+      "_version_rules": "Every version here MUST keep system_instructions unset, variables empty, duration null, and the integer duration inside extensions. Those four together are AGENTS.md rules 4 and 6.",
+      "versions": [
+        {
+          "name": "v1-minimax-h3-max-15s-9x16",
+          "activate": true,
+          "default": true,
+          "model_slug": "minimax-h3-max-text-to-video",
+          "model_id_hint": "3c4a4c0c-c9b7-4626-8a1d-b078438c191b",
+          "_model_note": "DEFAULT. $0.04/s -- by far the cheapest that does the job, and a full 15s run costs $0.60 against $2.80 for 20s of Wan. Caps at 15s and 768p. Tuned for prompt adherence, which is what this pipeline leans on hardest.",
+          "video_settings": {
+            "aspect_ratio": "9:16",
+            "generate_audio": true,
+            "n": 1,
+            "duration": null,
+            "extensions": {
+              "duration": 15,
+              "resolution": "768P"
+            }
+          },
+          "_resolution_note": "resolution lives in extensions as '768P', NOT in top-level video_settings. Supagen lowercases the top-level field and fal rejects '768p' with \"Input should be '480P' or '768P'\". Verified against a working invocation. Same class of bug as duration."
+        },
+        {
+          "name": "v2-wan-3-prime-20s-9x16",
+          "activate": false,
+          "model_slug": "wan-3-prime-text-to-video",
+          "model_id_hint": "2e2b1be5-db36-49db-9c17-5589a4974bb7",
+          "_model_note": "Use when you need longer than 15s -- it is the only option that reaches 30s. $0.14/s, so 20s is $2.80. 720p.",
+          "video_settings": {
+            "aspect_ratio": "9:16",
+            "resolution": "720p",
+            "generate_audio": true,
+            "n": 1,
+            "duration": null,
+            "extensions": {
+              "duration": 20
+            }
+          }
+        },
+        {
+          "name": "v3-gemini-omni-1-1-10s-9x16",
+          "activate": false,
+          "model_slug": "gemini-omni-flash-1-1-text-to-video",
+          "model_id_hint": "c67f0a46-b311-424e-831a-cd879b8bc539",
+          "_model_note": "Best quality per second measured so far -- word-perfect dialogue, flatter green screen (within-frame G std 12.3 vs Wan's 14.6), genuine over-the-shoulder framing. Capped at 10s, so only for short pieces. $0.10/s.",
+          "video_settings": {
+            "aspect_ratio": "9:16",
+            "resolution": "720p",
+            "generate_audio": true,
+            "n": 1,
+            "duration": null,
+            "extensions": {
+              "duration": 10
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "ugc-continuation",
+      "name": "ugc-continuation",
+      "output_type": "video",
+      "required": false,
+      "description": "Continuation generator. Image-to-video seeded with the last frame of the previous segment, so a piece can exceed the per-model duration cap. Create it only when the target runtime is longer than the chosen model's cap.",
+      "_seed_frame_status": "UNVERIFIED MECHANISM. video_settings.source_image is IGNORED at invoke level -- tested with a deliberately bogus image URL, which generated anyway instead of failing. The documented alternative is a message content part {\"type\":\"image\",\"source\":{\"file_id\":...}} alongside the prompt text, which is what extend.sh sends, but that has NOT been confirmed to reach the model. Verify with one cheap generation before relying on this.",
+      "versions": [
+        {
+          "name": "v1-minimax-h3-max-i2v-15s-9x16",
+          "activate": true,
+          "default": true,
+          "model_slug": "minimax-h3-max-image-to-video",
+          "model_id_hint": "df5ae310-219f-49ca-86ed-f972b0ffe531",
+          "_model_note": "$0.04/s, 15s cap, 768p. Pair with the MiniMax generation version.",
+          "video_settings": {
+            "aspect_ratio": "9:16",
+            "generate_audio": true,
+            "n": 1,
+            "duration": null,
+            "extensions": {
+              "duration": 15,
+              "resolution": "768P"
+            }
+          }
+        },
+        {
+          "name": "v2-wan-3-prime-i2v-20s-9x16",
+          "activate": false,
+          "model_slug": "wan-3-prime-image-to-video",
+          "model_id_hint": "0d9f038d-a590-459b-97be-d7b99bbfdb04",
+          "_model_note": "$0.28/s -- DOUBLE the text-to-video price. A 20s continuation is $5.60. Reaches 30s.",
+          "video_settings": {
+            "aspect_ratio": "9:16",
+            "resolution": "720p",
+            "generate_audio": true,
+            "n": 1,
+            "duration": null,
+            "extensions": {
+              "duration": 20
+            }
+          }
+        },
+        {
+          "name": "v3-gemini-omni-1-1-i2v-10s-9x16",
+          "activate": false,
+          "model_slug": "gemini-omni-flash-1-1-image-to-video",
+          "model_id_hint": "bc2a0468-f87e-4fef-be45-5be0c2a253e7",
+          "_model_note": "$0.10/s, 10s cap. Also supports an end frame, so two seeds can bracket a segment.",
+          "video_settings": {
+            "aspect_ratio": "9:16",
+            "resolution": "720p",
+            "generate_audio": true,
+            "n": 1,
+            "duration": null,
+            "extensions": {
+              "duration": 10
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "known_model_limits": {
+    "_comment": "Measured against the provider, not taken from marketing copy. generate.sh reads this to reject an impossible request before it costs anything, and to compute cost from list price x seconds.",
+    "minimax-h3-max-text-to-video": {
+      "max_duration_s": 15,
+      "price_per_s": 0.04,
+      "max_resolution": "768p"
+    },
+    "wan-3-prime-text-to-video": {
+      "max_duration_s": 30,
+      "price_per_s": 0.14,
+      "max_resolution": "1080p"
+    },
+    "wan-3-prime-reference-to-video": {
+      "max_duration_s": 30,
+      "price_per_s": 0.14,
+      "max_resolution": "1080p"
+    },
+    "gemini-omni-flash-1-1-text-to-video": {
+      "max_duration_s": 10,
+      "price_per_s": 0.1,
+      "max_resolution": "4k"
+    },
+    "seedance-2-fast-text-to-video": {
+      "max_duration_s": 15,
+      "price_per_s": null,
+      "max_resolution": "720p"
+    },
+    "minimax-h3-max-image-to-video": {
+      "max_duration_s": 15,
+      "price_per_s": 0.04,
+      "max_resolution": "768P"
+    },
+    "wan-3-prime-image-to-video": {
+      "max_duration_s": 30,
+      "price_per_s": 0.28,
+      "max_resolution": "1080p"
+    },
+    "gemini-omni-flash-1-1-image-to-video": {
+      "max_duration_s": 10,
+      "price_per_s": 0.1,
+      "max_resolution": "4k"
+    }
+  },
+  "unsupported": {
+    "_comment": "Looks available, is not. Do not spend time rediscovering these.",
+    "gemini-omni-flash-1-1-reference-to-video": "Unreachable through Supagen. The adapter builds a fixed payload (aspect_ratio, duration, generate_audio, num_videos, prompt, resolution) and silently drops references sent as message parts, reference_images, source_video, or any extensions key; type:image is explicitly rejected. The fal endpoint requires image_url or reference_video_url, so the model cannot be invoked at all."
+  },
+  "provider_quirks": {
+    "_comment": "Field-level traps. Each cost a round trip or a wasted generation.",
+    "duration": "Never set video_settings.duration to an integer -- every fal model serialises it as \"20s\" and rejects its own string. Set it null and put the integer in extensions.duration.",
+    "minimax_resolution": "Put resolution in extensions as '768P' (uppercase). Supagen lowercases the top-level video_settings.resolution and fal rejects '768p'.",
+    "version_number": "The REST /api/v1/invoke endpoint silently ignores version_number and runs the ACTIVE version. Only the MCP tool honours it. Switch models with activate_version.",
+    "source_image": "Ignored at invoke level -- a bogus URL generated anyway instead of erroring. UNVERIFIED whether a message image content part works; test before relying on it."
+  }
+}

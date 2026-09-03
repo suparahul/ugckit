@@ -1,0 +1,25 @@
+Watch this entire video carefully, with audio. Report in this order:
+(1) VERBATIM TRANSCRIPT of everything spoken, with timestamps, exactly as said including slang and profanity. Do not paraphrase.
+(2) DELIVERY: tone, pace, energy, facial expressions and mouth/eye behaviour while speaking, second by second.
+(3) SHOT LIST: every cut with timestamps; for each shot describe framing, head position, what the hands are doing, every object/product visible (colour, shape, size, how it is held), any camera movement (push, zoom, pan, tilt, handheld sway vs static), and how the framing differs from the previous shot.
+(4) PHYSICAL DETAILS: appearance (hair, makeup, jewellery, clothing, nails), the room/background objects and their positions, lighting direction and quality, camera type.
+(5) AUDIO: music (genre, continuous?, ducked?), sound effects with timestamps, mic quality, room acoustics, other voices.
+(6) ON-SCREEN TEXT: every caption, watermark, handle and overlay with timestamps, so they can be EXCLUDED from a recreation.
+Be exhaustive and precise. Do not invent anything not actually present.
+
+---
+Output rules for this pipeline:
+
+Report under exactly the six headings above, numbered, in that order. Never merge or reorder them. If a section has nothing in it, write the heading and "none observed" — do not omit the heading.
+
+Section (1) must come from the AUDIO TRACK. Many reference videos carry burned-in captions that differ from what is actually said, and a caption is not speech. Transcribe what you hear. If the captions disagree with the audio, transcribe the audio in (1) and record the discrepancy in (6). A "sentence" whose timestamps span many seconds is a sign you have read a caption rather than listened — check it.
+
+Timestamps are seconds from the start of the supplied segment, written as [SS.SS] or [SS.SS - SS.SS]. The segment has already been trimmed; do not reason about any footage outside it.
+
+Length is not a concern. A shallow report produces a generic recreation. Prefer naming a concrete object and its position over an adjective: "a grey corduroy sofa with yellow cushions, a white cat scratching post with a blue snake-track toy, light wood floor" beats "a cozy living room".
+
+Distinguish what you observe from what you infer. If you are unsure whether the camera pushed in or the subject leaned forward, say so rather than picking one. Never resolve uncertainty by inventing a detail.
+
+In section (6), inventory on-screen text so it can be excluded from the recreation — never as something to reproduce. Record its content, position, timing, font style, colour and any animation. Separately flag any text that is physically part of the scene (a product label, a screen being filmed, a sign, an embroidered word) rather than an added overlay, because those two are handled differently downstream.
+
+You are a second opinion, not the source of truth. Frame-accurate cut timings and any outfit, room or setup change are measured separately from the frames themselves and will override you where they disagree. Report what you see and let the disagreement stand.

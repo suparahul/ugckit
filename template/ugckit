@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# ugckit — project-local command dispatcher.
+set -euo pipefail
+PROJ="$(cd "$(dirname "$0")" && pwd)"
+PY="$PROJ/.venv/bin/python3"
+[ -x "$PY" ] || PY=python3
+
+case "${1:-help}" in
+  doctor)   shift; exec "$PY" "$PROJ/scripts/doctor.py" "$@" ;;
+  ui)       shift; exec "$PY" "$PROJ/scripts/ui.py" "$@" ;;
+  state)    shift; exec "$PY" "$PROJ/scripts/state.py" "$@" ;;
+  qc)       shift; exec "$PY" "$PROJ/scripts/qc.py" "$@" ;;
+  ingest)   shift; exec "$PROJ/scripts/ingest.sh" "$@" ;;
+  watch)    shift; exec "$PROJ/scripts/watch.sh" "$@" ;;
+  transcribe) shift; exec "$PROJ/scripts/transcribe.sh" "$@" ;;
+  generate) shift; exec "$PROJ/scripts/generate.sh" "$@" ;;
+  composite) shift; exec "$PROJ/scripts/composite.sh" "$@" ;;
+  *)
+    cat <<'USAGE'
+ugckit — reference video in, recreation out.
+
+  ugckit doctor              preflight: tools, deps, credentials, live auth
+  ugckit ui [--port N]       local review UI (default http://127.0.0.1:7878)
+  ugckit state show <proj>   pipeline progress, spend and open feedback
+  ugckit state projects      list projects
+
+  ugckit ingest <video> <proj> [start] [len]
+  ugckit watch <proj>
+  ugckit transcribe <proj>
+  ugckit generate <proj>     (needs CONFIRM=1 — it spends money)
+  ugckit qc <proj>
+  ugckit composite <proj>
+
+Most of the time you should not run these by hand. Start an agent in this
+directory and let it drive:  claude   (or: codex)
+It reads AGENTS.md and runs the stages in order.
+USAGE
+    ;;
+esac

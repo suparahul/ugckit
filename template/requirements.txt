@@ -1,0 +1,10 @@
+# Stage 3 transcription
+faster-whisper>=1.0
+# Stage 7 QC and stage 8 compositing
+opencv-python>=4.9
+numpy>=1.26
+scipy>=1.11
+# Local review UI
+fastapi>=0.110
+uvicorn>=0.29
+pydantic>=2.6

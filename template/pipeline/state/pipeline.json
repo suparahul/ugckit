@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "projects": {},
+  "setup": {
+    "status": "pending"
+  },
+  "model": {
+    "slug": "minimax-h3-max-text-to-video",
+    "duration_s": 15,
+    "price_per_s": 0.04,
+    "ts": "2026-09-03T11:30:17Z"
+  }
+}

@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+
+# Generated media is large and reproducible from the prompt. Keep the prompts, the
+# breakdowns and the state; leave the renders out of git.
+pipeline/00-source/*/
+pipeline/06-generated/*/*.mp4
+pipeline/07-composite/*/
+!pipeline/*/.gitkeep
+*.bak
