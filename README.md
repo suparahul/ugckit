@@ -125,6 +125,15 @@ so you can stop and resume at any point. That matters most in the research half:
 over twenty accounts runs for a long time, and every stage of it is resumable — an account
 already scraped is not paid for twice, a cover already on disk is not fetched again.
 
+## Two screens
+
+- **Atlas** (`./ugckit atlas`, http://localhost:3210) — the research half. Opens after the
+  first harvest and after each teardown.
+- **Review UI** (`./ugckit ui`, http://127.0.0.1:7878) — the recreation half. Opens when a
+  prompt exists, after every generation, and at delivery.
+
+The agent starts both at the right moment and hands you the link.
+
 ## Two ways in
 
 - **You have a reference video.** Stage 1 measures it, and stage 5 `script` writes the

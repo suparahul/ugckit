@@ -94,5 +94,8 @@ drift.
     scripts/state.py set <project> script done
 
 Show the user the prompt and get agreement on the dialogue wording before generating.
+If `ugckit ui` is not already running, start it in the background and give the user
+http://127.0.0.1:7878 — the prompt is editable there, and the feedback box lands in
+`pipeline/state/feedback.jsonl`, which you read at every stage.
 Once approved, treat the words as frozen — change delivery direction, not wording, unless
 they ask.

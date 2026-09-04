@@ -39,4 +39,7 @@ Be straight. State:
 Do not describe a defect you did not look for, and do not call something good because
 the numbers passed. If you did not examine it, say you did not.
 
+Hand over the file path and the project's page in the review UI (`ugckit ui`,
+http://127.0.0.1:7878), where the video plays next to the prompt that made it.
+
     scripts/state.py set <project> deliver done

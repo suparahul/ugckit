@@ -229,6 +229,20 @@ The flow is about which files exist, not about how they were written. `script` a
 
 ---
 
+## TWO SCREENS
+
+Two local web apps, one per half. You start them; the user looks. Give URLs, not lists.
+
+| | **Atlas** — `scripts/atlas.sh` | **Review UI** — `ugckit ui` |
+|---|---|---|
+| Shows | everything the research scraped: the orb, an app, an account, a post | the recreation projects: assets, the video, the editable prompt, feedback |
+| Address | http://localhost:3210 | http://127.0.0.1:7878 |
+| Start it | after the first `harvest`; again after `teardown`; whenever they ask what was found | when a project reaches stage 5, so they can read and edit the prompt; after every `generate`, so they watch the result; at `deliver` |
+| Re-fresh | `scripts/atlas.sh --index` after a new scrape | it reads the pipeline live |
+
+Both run in the background and keep running. Say which one you are opening and why in
+one sentence.
+
 ## FEEDBACK
 
 The local UI (`ugckit ui`) writes to `pipeline/state/feedback.jsonl`. Each line is

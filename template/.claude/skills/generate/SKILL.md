@@ -53,5 +53,7 @@ Show the real error. The usual causes:
 
 ## Finish
 
-The script records state and cost itself. Then **go to the `review` skill.** Never
-report a generation as good before looking at it.
+The script records state and cost itself. Give the user the project's page in the
+review UI (`ugckit ui`, http://127.0.0.1:7878) so they watch the result while you
+measure it. Then **go to the `review` skill.** Never report a generation as good before
+looking at it.

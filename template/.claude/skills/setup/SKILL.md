@@ -141,11 +141,18 @@ Read `scripts/templates.json`. It is the desired state. **Two templates, and the
 generation one carries a version per model** — switching model later is
 `activate_version`, not a new template.
 
-1. `list_templates`. Skip any template whose slug already exists.
+This step is **idempotent**. A user who set up an earlier version already has these
+templates in their workspace; running setup again must create nothing that exists.
+
+1. `list_templates`. For a slug that already exists, do **not** create it again — but do
+   list its versions and create only the versions from `templates.json` that are missing.
+   Never delete or rename anything you did not create in this session.
 2. `list_models` to resolve each `model_slug` → a real model id. **Resolve by slug; the
    `model_id_hint` may be stale.**
-3. `create_template` with the given name, slug and output_type.
-4. `create_version` for **every** version listed, so switching later costs nothing:
+3. `create_template` only for a slug that does not exist, with the given name, slug and
+   output_type.
+4. `create_version` for **every** version listed that is not already there, so switching
+   later costs nothing:
    - **Watching layer**: `system_instructions` is the full contents of
      `scripts/prompts/watching-layer.txt`; set temperature and max_tokens as specified.
    - **Generation versions**: pass `video_settings` exactly as written. Leave

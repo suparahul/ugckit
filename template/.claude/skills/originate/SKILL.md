@@ -116,5 +116,8 @@ own delivery note. A flat read comes from a flat prompt.
 `originate` completes stage **`script`** — the same stage, the same artifact, a second
 producer. It does not get a stage of its own.
 
-Show the user the dialogue and the chosen hook with the evidence behind it. Once they
-agree the words are frozen: change delivery direction, not wording, unless they ask.
+Show the user the dialogue and the chosen hook with the evidence behind it. If `ugckit ui` is not already running, start it in the background and give the user
+http://127.0.0.1:7878 — the prompt is editable there, and the feedback box lands in
+`pipeline/state/feedback.jsonl`, which you read at every stage.
+Once they agree the words are frozen: change delivery direction, not wording, unless
+they ask.
