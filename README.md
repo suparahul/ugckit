@@ -54,16 +54,9 @@ Or from a clone:
 The installer checks for ffmpeg, python 3.9+, curl and git, scaffolds the project,
 creates a `.venv`, installs dependencies, and writes the Supagen MCP config. It is
 idempotent — re-running upgrades the scripts and skills and never touches your `.env`,
-your prompts, or anything you have generated.
-
-### Upgrading
-
-Run the same install command again, pointed at the same folder — from inside it,
-`sh -s -- .`. It replaces the scripts, the skills, `AGENTS.md` and the Atlas, removes
-anything this version retired, and never touches `.env`, your prompts, or anything you
-have generated or scraped. Then `./ugckit doctor`. If you set a Monid key before this
-version, doctor will tell you if the monid CLI still needs it: run `./ugckit key` once
-more and re-enter it — it now registers the key with the CLI as well.
+your prompts, or anything you have generated. Used it before? Paste the same prompt again
+and start fresh in a new folder; setup finds your existing Supagen templates and creates
+nothing twice.
 
 ## Then
 
