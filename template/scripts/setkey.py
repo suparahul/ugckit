@@ -51,6 +51,17 @@ def main():
         os.chmod(ENV, 0o600)
         print("created .env")
 
+    # A coding agent has no terminal, so this refuses to run inside one. That is the
+    # point: if the agent could pipe the value in, the value would have to be in the
+    # agent's context first -- which is exactly what we are avoiding. The agent's job
+    # is to print this command; the human's job is to run it.
+    if not sys.stdin.isatty():
+        die("this needs a real terminal — it will not read a key from a pipe.\n"
+            "If you are a coding agent: do not run this. Tell the user to run\n"
+            f"    ./ugckit key {name}\n"
+            "in their own terminal, and wait. In Claude Code they can prefix it\n"
+            "with ! to run it in the session.")
+
     print(f"\n{ALLOWED.get(name, name)}")
     print("Paste the value and press return. Nothing is echoed, and it is not")
     print("written to your shell history or shown to the agent.\n")

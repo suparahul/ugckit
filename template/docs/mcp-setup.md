@@ -64,6 +64,19 @@ Any MCP client that speaks Streamable HTTP can connect — point it at the serve
 above and check your agent's own MCP documentation for how it adds an HTTP transport
 server. Registration and approval happen over OAuth, so there is no key to copy.
 
+## Who does what
+
+| | Who | Why |
+|---|---|---|
+| Writes the config file | `install.sh` | plain file write, no login involved |
+| Tells you which steps apply to your agent | the agent, in the `setup` skill | it knows which client it is running in |
+| Approves the OAuth connection | **you, in your browser** | it is signed in as you; the agent has no browser and no session |
+| Confirms it worked | the agent | by calling `ping` — the only real proof |
+
+Same split for credentials: the agent prints `./ugckit key SUPAGEN_API_KEY`, **you** run
+it. It refuses a piped value on purpose, so an agent cannot feed it a key it should
+never have been given.
+
 ## Checking it worked
 
 Ask your agent to call `ping`, then `list_workspaces`. If `list_workspaces` returns your

@@ -29,10 +29,18 @@ plenty of people are not in an IDE and have no idea how.** Say this:
     ./ugckit key SUPAGEN_API_KEY
     ./ugckit key SUPAGEN_WORKSPACE_ID
 
-Each prompts for the value with echo off and writes it in place. This is the only
-route you should offer, because it also handles the three things that silently break
-a hand-edited `.env`: a missing trailing newline welding two variables together, the
+**You cannot run these yourself, and you must not try.** They refuse a piped value and
+exit non-zero, because for you to pipe a key in, the key would have to be in your
+context first — which is the thing being avoided. Print the two commands, say the
+values come from the Supagen dashboard, and **wait for the user to say they are done.**
+In Claude Code they can prefix a command with `!` to run it inside the session.
+
+Each prompts with echo off and writes the value in place. This is the only route you
+should offer, because it also handles the three things that silently break a
+hand-edited `.env`: a missing trailing newline welding two variables together, the
 quotes people copy along with the key, and a stray trailing space.
+
+When they say they are done, verify with `scripts/doctor.py` — never by reading `.env`.
 
 Where the values come from:
 
@@ -51,6 +59,11 @@ inspect `.env`, redact:
 actually running — not all of them.** You know which one you are.
 
 The essentials, so you do not get them wrong:
+
+**Approval is the user's to do, not yours.** It is an OAuth flow in their browser,
+signed in as them. You cannot complete it, and you cannot tell from inside the session
+whether they have — the only proof is a tool call succeeding. So: give the instructions,
+wait, then test with `ping`.
 
 - The server is **`https://mcp.supagen.dev/mcp`, Streamable HTTP, OAuth 2.1**.
 - There is **no npm package to install and no token to paste.** Any instruction
