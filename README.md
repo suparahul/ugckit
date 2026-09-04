@@ -18,19 +18,32 @@ Or from a clone:
     ./install.sh ~/my-video-project
 
 The installer checks for ffmpeg, python 3.9+, curl and git, scaffolds the project,
-creates a `.venv`, installs dependencies, and tells you how to wire up MCP. It is
+creates a `.venv`, installs dependencies, and writes the Supagen MCP config. It is
 idempotent — re-running upgrades the scripts and skills and never touches your `.env`,
 your prompts, or anything you have generated.
 
 ## Then
 
     cd ~/my-video-project
-    $EDITOR .env          # SUPAGEN_API_KEY, SUPAGEN_WORKSPACE_ID
-    ./ugckit doctor       # confirms tools, deps, credentials and live auth
-    claude                # or: codex — both read AGENTS.md
+    ./ugckit key SUPAGEN_API_KEY        # prompts; nothing echoed, no editor needed
+    ./ugckit key SUPAGEN_WORKSPACE_ID
+    ./ugckit doctor                     # tools, deps, credentials, live auth
+    claude                              # or: codex — both read AGENTS.md
 
 Ask the agent to run the **setup** skill first. It creates the required Supagen
 templates in your workspace. Nothing generates until that is done.
+
+### Connecting MCP
+
+Template management runs over Supagen's MCP server — `https://mcp.supagen.dev/mcp`,
+Streamable HTTP, OAuth. **There is no package to install and no token to paste.** The
+installer writes `.mcp.json` (Claude Code) and `.cursor/mcp.json` (Cursor) into the
+project, so all that is left is approving the connection: in Claude Code restart and
+run `/mcp`; in Cursor reload and approve on first use. Codex and everything else are
+covered in [`docs/mcp-setup.md`](template/docs/mcp-setup.md).
+
+Generation does *not* go over MCP — it uses `SUPAGEN_API_KEY` over curl, because a
+render runs for minutes and MCP calls abort at 60 seconds. You need both.
 
 ## The pipeline
 

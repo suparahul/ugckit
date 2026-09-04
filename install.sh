@@ -134,18 +134,22 @@ else
 fi
 
 # ---------------------------------------------------------------- mcp
+# Supagen's MCP server is Streamable HTTP with OAuth -- there is no package to install
+# and no token to paste. Both config files are project-scoped, so this touches nothing
+# outside $DEST; approval happens in the agent, in the browser, on first use.
 echo
 b "Supagen MCP"
+WROTE=""
+[ -e "$DEST/.mcp.json" ]        || WROTE=".mcp.json (Claude Code)"
+[ -e "$DEST/.cursor/mcp.json" ] || WROTE="${WROTE:+$WROTE, }.cursor/mcp.json (Cursor)"
+copy_once ".mcp.json"
+copy_once ".cursor/mcp.json"
+[ -z "$WROTE" ] || ok "wrote $WROTE"
+
 if command -v claude >/dev/null 2>&1; then
-  if claude mcp list 2>/dev/null | grep -qi supagen; then
-    ok "already configured"
-  else
-    hm "not configured. Register it with:"
-    echo "      claude mcp add supagen -- npx -y @supagen/mcp"
-    echo "    (template management runs over MCP; generation runs over curl)"
-  fi
+  hm "start Claude Code in $TARGET, then run /mcp to approve the connection"
 else
-  hm "claude CLI not found — install it, or use codex, which reads AGENTS.md too"
+  hm "Codex and other agents: see docs/mcp-setup.md for the config to add"
 fi
 
 # ---------------------------------------------------------------- git
@@ -161,10 +165,12 @@ $(b "installed.")
   Next:
 
     1.  cd $TARGET
-    2.  put your Supagen key in .env      (SUPAGEN_API_KEY, SUPAGEN_WORKSPACE_ID)
+    2.  ./ugckit key SUPAGEN_API_KEY      paste when prompted — no editor needed,
+        ./ugckit key SUPAGEN_WORKSPACE_ID nothing is echoed or kept in history
     3.  ./ugckit doctor                   confirm everything is wired up
     4.  claude                            the agent reads AGENTS.md and takes over
                                           — ask it to run the setup skill first
+        then /mcp                         approve the Supagen connection in the browser
 
   The agent drives the pipeline. You mostly watch, review and give feedback:
 

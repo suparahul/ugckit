@@ -8,6 +8,7 @@ PY="$PROJ/.venv/bin/python3"
 case "${1:-help}" in
   doctor)   shift; exec "$PY" "$PROJ/scripts/doctor.py" "$@" ;;
   ui)       shift; exec "$PY" "$PROJ/scripts/ui.py" "$@" ;;
+  key)      shift; exec "$PY" "$PROJ/scripts/setkey.py" "$@" ;;
   state)    shift; exec "$PY" "$PROJ/scripts/state.py" "$@" ;;
   qc)       shift; exec "$PY" "$PROJ/scripts/qc.py" "$@" ;;
   ingest)   shift; exec "$PROJ/scripts/ingest.sh" "$@" ;;
@@ -21,6 +22,7 @@ ugckit — reference video in, recreation out.
 
   ugckit doctor              preflight: tools, deps, credentials, live auth
   ugckit ui [--port N]       local review UI (default http://127.0.0.1:7878)
+  ugckit key <NAME>          write a credential into .env (no editor needed)
   ugckit state show <proj>   pipeline progress, spend and open feedback
   ugckit state projects      list projects
 

@@ -1,0 +1,74 @@
+# Connecting the Supagen MCP server
+
+ugckit talks to Supagen two different ways, and only one of them is MCP:
+
+- **MCP** — managing templates: `list_models`, `create_template`, `create_version`,
+  `activate_version`. Short calls, done at setup and when switching model.
+- **curl** — generation. A render runs for minutes and MCP tool calls abort at 60
+  seconds, so `scripts/generate.sh` goes over REST with `SUPAGEN_API_KEY`.
+
+So you need **both**: the MCP server connected *and* the key in `.env`. Neither
+substitutes for the other.
+
+## The server
+
+    Server URL:  https://mcp.supagen.dev/mcp
+    Transport:   Streamable HTTP
+    Auth:        OAuth 2.1, registered automatically
+
+There is **no token to copy and no npm package to install.** You add the URL, and the
+first time your agent uses it, it opens a browser for you to approve the connection.
+Supagen never shows you a token and you never paste one.
+
+## Claude Code
+
+`install.sh` already wrote `.mcp.json` in your project directory, so if you started
+Claude Code from that directory the server is registered. Otherwise:
+
+    claude mcp add supagen --transport http "https://mcp.supagen.dev/mcp"
+
+Then **restart Claude Code and run `/mcp`.** It opens your browser to approve the
+connection. Approve it, and the tools appear.
+
+`.mcp.json` is project-scoped — it applies in this directory only. For every project,
+add `--scope user` to the command above.
+
+## Cursor
+
+`install.sh` already wrote `.cursor/mcp.json`. **Reload Cursor.** On first use it opens
+your browser to approve the connection.
+
+For every project instead of just this one, put the same block in your global MCP
+settings (Settings → MCP → Add).
+
+## Codex
+
+Codex reads `~/.codex/config.toml`. Add:
+
+    [mcp_servers.supagen]
+    url = "https://mcp.supagen.dev/mcp"
+
+Then restart Codex and approve in the browser on first use.
+
+Codex's MCP support has changed shape across releases — **check `codex mcp --help`
+before assuming this works**, since some versions want the server added through that
+subcommand, and older ones speak stdio only. On a stdio-only version, bridge it:
+
+    [mcp_servers.supagen]
+    command = "npx"
+    args = ["-y", "mcp-remote", "https://mcp.supagen.dev/mcp"]
+
+## Any other agent
+
+Any MCP client that speaks Streamable HTTP can connect — point it at the server URL
+above and check your agent's own MCP documentation for how it adds an HTTP transport
+server. Registration and approval happen over OAuth, so there is no key to copy.
+
+## Checking it worked
+
+Ask your agent to call `ping`, then `list_workspaces`. If `list_workspaces` returns your
+workspace, MCP is connected. If the tools aren't there at all, the agent was started
+before the config was written — restart it.
+
+`./ugckit doctor` reports whether the config file exists, but it cannot see whether your
+agent has approved the OAuth connection. Only calling a tool proves that.

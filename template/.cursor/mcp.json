@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "supagen": {
+      "type": "url",
+      "url": "https://mcp.supagen.dev/mcp"
+    }
+  }
+}

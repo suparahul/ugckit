@@ -21,31 +21,56 @@ Fix everything it marks with a red ✗ before continuing. Common cases:
 
 ## 2. Credentials
 
-The user needs two values in `.env`:
+The user needs two values in `.env`: `SUPAGEN_API_KEY` and `SUPAGEN_WORKSPACE_ID`.
 
-    SUPAGEN_API_KEY=...
-    SUPAGEN_WORKSPACE_ID=...
+**Give them the exact command. Do not tell them to "edit .env" or "open the file" —
+plenty of people are not in an IDE and have no idea how.** Say this:
 
-**Never ask them to paste the key into the chat, and never print it.** Tell them to edit
-`.env` directly. If you must inspect the file, redact:
+    ./ugckit key SUPAGEN_API_KEY
+    ./ugckit key SUPAGEN_WORKSPACE_ID
+
+Each prompts for the value with echo off and writes it in place. This is the only
+route you should offer, because it also handles the three things that silently break
+a hand-edited `.env`: a missing trailing newline welding two variables together, the
+quotes people copy along with the key, and a stray trailing space.
+
+Where the values come from:
+
+- **API key** — Supagen dashboard → Settings → API keys.
+- **Workspace id** — the uuid in the dashboard URL, or `list_workspaces` over MCP once
+  it is connected.
+
+**Never ask them to paste the key into the chat, and never print it.** If you must
+inspect `.env`, redact:
 
     sed -E 's/(sk_[A-Za-z0-9]{6})[A-Za-z0-9_-]*/\1***REDACTED***/g' .env
 
-The workspace id comes from `list_workspaces` over MCP, or from the Supagen dashboard URL.
-
-**A specific failure to watch for:** appending with `echo VAR=x >> .env` when the previous
-line lacks a trailing newline welds two variables into one, and the symptom is a
-confusing 401. `doctor.py` checks for this by shape. If it fires, open `.env` and split
-the lines.
-
 ## 3. MCP
 
-Confirm the Supagen MCP server is connected — call `ping`, then `list_workspaces`.
-If it is not configured, the install script printed the command; re-run:
+**Read `docs/mcp-setup.md` and give the user the section for the agent they are
+actually running — not all of them.** You know which one you are.
 
-    claude mcp add supagen -- npx -y @supagen/mcp
+The essentials, so you do not get them wrong:
 
-MCP is for **managing templates only**. Generation goes over curl (AGENTS.md rule 2).
+- The server is **`https://mcp.supagen.dev/mcp`, Streamable HTTP, OAuth 2.1**.
+- There is **no npm package to install and no token to paste.** Any instruction
+  involving `npx @supagen/mcp` or an API key in a header is wrong.
+- `install.sh` already wrote `.mcp.json` (Claude Code) and `.cursor/mcp.json` (Cursor)
+  into the project directory, so in those two the server is usually already registered.
+- What is *not* automatic is **approval**. The user has to approve the OAuth connection
+  in their browser once:
+  - **Claude Code** — restart, then run `/mcp`.
+  - **Cursor** — reload; the browser opens on first use.
+  - **Codex** — add the block from `docs/mcp-setup.md` to `~/.codex/config.toml`,
+    restart, approve on first use.
+  - **Anything else** — give them the server URL and transport from the doc.
+
+Then prove it: call `ping`, then `list_workspaces`. If the tools are not available to
+you at all, the agent was started before the config existed — ask the user to restart it.
+If `list_workspaces` returns their workspace, MCP is connected.
+
+MCP is for **managing templates only**. Generation goes over curl (AGENTS.md rule 2),
+which is why the API key in `.env` is still required even once MCP works.
 
 ## 4. Ask which model
 
