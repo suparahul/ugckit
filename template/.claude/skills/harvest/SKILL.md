@@ -41,8 +41,25 @@ Original spelling, capitalisation, typos and emoji. A tidied hook is a useless h
 the misspellings are frequently what the post is.
 
 Batches are skipped when `hooks-NN.md` already exists, so a killed run resumes exactly
-where it stopped. If `claude` is not on PATH the script writes `hooks.todo` and carries
-on with the metrics; say so rather than reporting a complete harvest.
+where it stopped.
+
+## No `claude` CLI? Then you read the covers
+
+The headless sessions are a convenience that keeps 50 images an account out of your
+context. They are not the only way. When the script says `claude CLI not found`, the
+work is yours, and it is not optional — a harvest without hooks is metrics with nothing
+to learn from:
+
+1. Open `<handle>/hooks.todo`. It holds one block per missing batch: the twelve cover
+   files and the exact instructions, the same ones the headless session would get.
+2. For each block, look at the twelve covers with your own image reading, and write the
+   `hooks-NN.md` it names — one table, verbatim hooks, the `## Observations` paragraph.
+   One batch at a time; do not load an account's fifty covers at once.
+3. Re-run the same `harvest.sh` command. It rebuilds `HOOKS.md` from the batches and
+   clears the todo. Then run the `atlas` skill as usual.
+
+If a Claude Code user wants the cheaper path later, `npm install -g @anthropic-ai/claude-code`
+puts `claude` on PATH and the script goes back to headless batches.
 
 ## Then actually look
 

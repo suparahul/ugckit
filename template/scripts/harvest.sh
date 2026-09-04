@@ -88,11 +88,11 @@ PY
   # `|| true` because an unmatched glob makes ls fail, and under `set -e` with pipefail
   # a failing pipeline inside an assignment kills the run mid-account, silently.
   TOTAL=$(ls "$H/covers"/*.jpg 2>/dev/null | wc -l | tr -d ' ' || true)
-  if ! command -v claude >/dev/null 2>&1; then
-    echo "  claude CLI not found — no hook transcription (hooks.todo written)."
-    printf '%s\n' "$H/covers" > "$H/hooks.todo"
-    TOTAL=0
-  fi
+  # No claude CLI (Codex, Cursor, anything else): the job does not go away, it goes to
+  # the agent running this script. Every missing batch is written to hooks.todo with
+  # the exact instructions; the agent reads the covers itself and writes hooks-NN.md.
+  HEADLESS=1; command -v claude >/dev/null 2>&1 || HEADLESS=0
+  rm -f "$H/hooks.todo"
   [ "${TOTAL:-0}" -gt 0 ] || echo "  no covers to read"
   N=0; B=0
   while [ $((N * BATCH)) -lt "${TOTAL:-0}" ]; do
@@ -101,9 +101,7 @@ PY
     [ -s "$HB" ] && continue
     FILES=$(ls "$H/covers"/*.jpg 2>/dev/null | sed -n "$(( (N-1)*BATCH + 1 )),$(( N*BATCH ))p" | tr '\n' ' ' || true)
     [ -n "$FILES" ] || break
-    echo "  reading batch $N ($HOOK_MODEL)"
-    claude --model "$HOOK_MODEL" --allowedTools "Read,Write,Glob" -p \
-"Read each of these cover images with the Read tool: $FILES
+    PROMPT="Read each of these cover images with the Read tool: $FILES
 
 They are TikTok cover frames from @$HANDLE. The file number is the post rank; the metrics
 for that rank are in $H/index.tsv (rank is column 1, views column 2).
@@ -118,9 +116,21 @@ emoji and line breaks exactly as they appear. Do not translate, tidy or paraphra
 these accounts repost the same cover often and it matters.
 
 End the file with an '## Observations' section: two or three sentences on what the hooks
-of this batch have in common." >/dev/null 2>&1 || echo "  batch $N failed — re-run to retry"
+of this batch have in common."
+    if [ "$HEADLESS" = 1 ]; then
+      echo "  reading batch $N ($HOOK_MODEL)"
+      claude --model "$HOOK_MODEL" --allowedTools "Read,Write,Glob" -p "$PROMPT" >/dev/null 2>&1 \
+        || echo "  batch $N failed — re-run to retry"
+    else
+      { echo "### batch $N -> $HB"; echo; echo "$PROMPT"; echo; } >> "$H/hooks.todo"
+    fi
     [ -s "$HB" ] && B=$((B + 1))
   done
+  if [ -s "$H/hooks.todo" ]; then
+    echo "  claude CLI not found — $(grep -c '^### batch' "$H/hooks.todo") batch(es) for YOU to read:"
+    echo "  $H/hooks.todo holds the instructions. Read the covers, write each hooks-NN.md,"
+    echo "  then re-run this command: it rebuilds HOOKS.md and clears the todo."
+  fi
 
   # One bank per account, rebuilt from the batches every time so it never half-exists.
   if ls "$H"/hooks-*.md >/dev/null 2>&1; then

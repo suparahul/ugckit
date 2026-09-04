@@ -96,8 +96,12 @@ like success* — the run keeps going and leaves plausible files behind.
 
 13. **RUN MONID ONE BRAND AT A TIME.** Concurrent calls come back as HTML error pages that
     look exactly like running out of credit, and you will go looking for a billing problem
-    that does not exist. `scripts/monid.sh` takes a lock and validates that the response is
-    JSON. Do not run two research scripts at once to save wall time.
+    that does not exist. The same page also comes back, now and then, with nothing else
+    running: Monid or the upstream actor was busy. `scripts/monid.sh` takes a lock,
+    validates that the response is JSON, and on a bad response prints the real error,
+    checks the wallet once, and retries three times with a growing wait. When it still
+    gives up, wait a few minutes and re-run the exact command -- nothing is lost. Do not
+    run two research scripts at once to save wall time.
 
 14. **NEVER TRUST A FILE EXTENSION, AN EXIT CODE, OR A NON-EMPTY FOLDER.** Check the
     content — `ffprobe` the download and confirm it has a real video stream, count the

@@ -29,6 +29,11 @@ Per post, into `research/<project>/<app>/<handle>/<post-id>/`:
 The contact sheets are deleted once `notes.md` exists. The mp4 and the slides stay — for
 a photo post the slides *are* the asset, and every URL expires.
 
+Without a `claude` CLI on PATH the script leaves `<post-id>/notes.todo` beside the
+sheets or slides instead of `notes.md`. That is your job, not a blocker: read the frames
+yourself, write `notes.md` to the sections the todo gives, then re-run `deepen.sh` — it
+deletes the sheets and the todo once `notes.md` exists.
+
 ## Photo posts are not a footnote
 
 Read rule 10 before you touch this stage. A photo post has no video, TikTok hands you a

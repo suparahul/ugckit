@@ -72,32 +72,48 @@ monid_run() {
 
   monid_lock || return 1
   echo "  monid run -p $provider -e $endpoint"
-  local tmp="$out.part"
-  rm -f "$tmp"
-  # -o writes the file AND echoes the whole payload; a 50-post scrape down the terminal
-  # is thousands of lines of noise in the agent's context. The file is the output.
-  if ! NO_COLOR=1 monid run -p "$provider" -e "$endpoint" -i "$input" -w 120 -o "$tmp" >/dev/null; then
-    monid_unlock
+  local tmp="$out.part" err="$out.err" attempt=1 wait=20
+  # An HTML error page instead of JSON is transient: Monid or the upstream actor was
+  # busy. It also happens with nothing else running, so the lock alone is not enough.
+  # Retry, waiting longer each time. The wallet is checked once so an empty one is not
+  # mistaken for a bad moment (rule 13).
+  while :; do
     rm -f "$tmp"
-    # "Unexpected token '<'" above means the API answered with an HTML error page. That
-    # is the rule 13 symptom and it is NOT the same thing as an empty wallet, however
-    # much it looks like one. Wait, check the balance, then retry the same command --
-    # everything already downloaded is kept.
-    echo "  monid failed. If the error mentions '<html>' the API returned an error page:" >&2
-    echo "  wait a minute and re-run this exact command. Otherwise: monid balance" >&2
-    return 1
-  fi
+    # -o writes the file AND echoes the whole payload; a 50-post scrape down the terminal
+    # is thousands of lines of noise in the agent's context. The file is the output.
+    if NO_COLOR=1 monid run -p "$provider" -e "$endpoint" -i "$input" -w 120 -o "$tmp" >/dev/null 2>"$err" \
+       && [ -s "$tmp" ] && json_rows "$tmp" >/dev/null; then
+      rm -f "$err"
+      break
+    fi
+    # Why did it fail? Show the last real line of the CLI's message, or the start of
+    # the file if the CLI thought it succeeded (RULE 14: a non-empty file is not data).
+    local why
+    why=$(grep -v '^\s*$' "$err" 2>/dev/null | tail -1 | cut -c1-160)
+    [ -n "$why" ] || why=$(head -c 160 "$tmp" 2>/dev/null | tr '\n' ' ')
+    echo "  attempt $attempt failed: $why" >&2
+    if grep -qi 'unauthori\|401\|invalid.*key\|no api key' "$err" 2>/dev/null; then
+      echo "  that is the key, not the API. Fix it with: ./ugckit key" >&2
+      monid_unlock; rm -f "$tmp"; return 1
+    fi
+    if [ "$attempt" -eq 1 ]; then
+      local bal
+      bal=$(NO_COLOR=1 monid balance 2>/dev/null | grep -o 'Balance: .*' || true)
+      [ -n "$bal" ] && echo "  wallet: $bal" >&2
+      case "$bal" in *'$0.0'*) echo "  the wallet is empty -- top up at https://app.monid.ai, then re-run" >&2
+                              monid_unlock; rm -f "$tmp"; return 1 ;; esac
+    fi
+    if [ "$attempt" -ge 3 ]; then
+      monid_unlock; rm -f "$tmp"
+      echo "  gave up after 3 attempts. Monid is having a bad moment: wait a few minutes and" >&2
+      echo "  re-run this exact command. Everything already downloaded is kept." >&2
+      echo "  (full error: $err)" >&2
+      return 1
+    fi
+    echo "  waiting ${wait}s, then retrying ($((attempt + 1))/3)" >&2
+    sleep "$wait"; wait=$((wait * 3)); attempt=$((attempt + 1))
+  done
   monid_unlock
-
-  # RULE 14 / RULE 13: an overloaded Monid answers with an HTML error page. It is a
-  # non-empty file with a zero exit code and it is not data. Look at the content.
-  if [ ! -s "$tmp" ] || ! json_rows "$tmp" >/dev/null; then
-    echo "  the response is not JSON — first 200 characters:" >&2
-    head -c 200 "$tmp" >&2; echo >&2
-    echo "  if that is HTML, another Monid call was running. Retry, one at a time." >&2
-    rm -f "$tmp"
-    return 1
-  fi
   mv "$tmp" "$out"
   return 0
 }

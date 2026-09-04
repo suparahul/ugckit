@@ -130,8 +130,7 @@ PY
     fi
 
     NOTES="$P/notes.md"
-    [ -s "$NOTES" ] && continue
-    command -v claude >/dev/null 2>&1 || { echo "     claude CLI not found — no notes.md"; continue; }
+    [ -s "$NOTES" ] && { rm -f "$P/notes.todo"; continue; }
     # `|| true` on every glob-into-substitution: an unmatched glob makes ls fail, and
     # under `set -e` with pipefail that kills the whole run mid-account, silently.
     if [ "$KIND" = "photo" ]; then
@@ -142,9 +141,7 @@ PY
       EXTRA="These are 4x4 contact sheets at 1 frame per second, read left to right, top to bottom."
     fi
     [ -n "$FILES" ] || continue
-    echo "     writing notes.md ($HOOK_MODEL)"
-    claude --model "$HOOK_MODEL" --allowedTools "Read,Write,Glob" -p \
-"Read these with the Read tool: $FILES
+    PROMPT="Read these with the Read tool: $FILES
 
 $EXTRA They are one TikTok post by @$HANDLE with $VIEWS views ($ID).
 
@@ -167,10 +164,19 @@ shot type, setting, who is on camera, how it was filmed and cut, any app or UI o
 ## Notes
 why this one worked, in two or three sentences, grounded in what you can actually see.
 
-Add a '## Problems' section only if something is unreadable or missing." >/dev/null 2>&1 \
-      || echo "     notes failed — re-run to retry"
+Add a '## Problems' section only if something is unreadable or missing."
+    if command -v claude >/dev/null 2>&1; then
+      echo "     writing notes.md ($HOOK_MODEL)"
+      claude --model "$HOOK_MODEL" --allowedTools "Read,Write,Glob" -p "$PROMPT" >/dev/null 2>&1 \
+        || echo "     notes failed — re-run to retry"
+    else
+      # No claude CLI: the agent running this does the reading itself. The sheets stay
+      # until notes.md exists, because they are what it has to read.
+      printf '%s\n' "$PROMPT" > "$P/notes.todo"
+      echo "     claude CLI not found — notes.todo written: read the frames yourself, write notes.md"
+    fi
     # The frames were scaffolding. The mp4 and the slides are the asset and stay.
-    [ -s "$NOTES" ] && rm -f "$P"/sheet_*.png
+    [ -s "$NOTES" ] && rm -f "$P"/sheet_*.png "$P/notes.todo"
   done < "$H/shortlist.tsv"
 done
 
