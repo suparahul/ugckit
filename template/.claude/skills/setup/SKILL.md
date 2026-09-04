@@ -17,11 +17,23 @@ Fix everything it marks with a red ✗ before continuing. Common cases:
 
 - **ffmpeg missing** → `brew install ffmpeg` (macOS) or `apt install ffmpeg`.
 - **python deps missing** → `.venv/bin/pip install -r requirements.txt`.
-- **.env missing** → `cp .env.example .env`, then tell the user to paste their key.
+- **.env missing** → `./ugckit key` creates it (step 2).
+
+Two tools are yellow `!`, not red, because only part of the pipeline needs them. Ask
+the one question from AGENTS.md's quick start now — **a reference video, or a product,
+niche or app name?** — because the answer decides whether these matter today:
+
+- **monid missing** → `npm install -g @monid-ai/cli`. Needed for the research half
+  (R1–R5). Skip it for a user who has a reference video.
+- **node missing** → https://nodejs.org. Needed only for the Atlas, which is how a
+  research user sees what was found. Same rule.
 
 ## 2. Credentials
 
-Two values have to end up in `.env`: `SUPAGEN_API_KEY` and `SUPAGEN_WORKSPACE_ID`.
+Two values have to end up in `.env`: `SUPAGEN_API_KEY` and `SUPAGEN_WORKSPACE_ID`. A
+research user needs a third, `MONID_API_KEY`, from https://monid.ai → Keys; the same
+command asks for it and also registers it with the monid CLI, which keeps its own store
+and ignores `.env`. `doctor.py` checks both places.
 
 There is one command, and it takes no arguments:
 
@@ -40,7 +52,9 @@ not a terminal, because for you to pipe a value in, the value has to be in your 
 first — which is the thing being avoided. So:
 
 1. Tell them where the values are: **API key** — Supagen dashboard → Settings → API
-   keys. **Workspace id** — the long id in the dashboard web address.
+   keys. **Workspace id** — the long id in the dashboard web address. **Monid key**, if
+   they are doing research — monid.ai → Keys; they also need credit there, a few
+   dollars covers many teardowns.
 2. Give them `./ugckit key`. In Claude Code they can put `!` in front of it to run it
    inside the session.
 3. **Wait.** Do not move on until they say they are done.
@@ -155,8 +169,16 @@ Changing model later is always both:
 
 Then re-run `scripts/doctor.py` and confirm it is clean.
 
-## 8. Tell the user what they have
+## 8. Tell the user what they have, and where they go next
 
 Briefly: which templates were created, which model is active and what a run costs, how
-to switch model, and that they can now run the `ingest` skill with a reference video.
-Mention `ugckit ui`.
+to switch model. Then the fork, in one sentence each:
+
+- **They have a reference video** → the `ingest` skill. Mention `ugckit ui` for review.
+- **They have their own product** → the `product` skill (R0). It reads their website,
+  document or repo and settles the niche.
+- **They have a niche or an app name** → the `apps` skill (R1). Say what a first round
+  costs before running it.
+
+For either research path, say that after the first harvest the Atlas opens in their
+browser (`ugckit atlas`) and that is where they will see what was found.

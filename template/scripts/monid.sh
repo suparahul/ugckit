@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared plumbing for the research stages (R1-R5). Sourced, not run.
+# Shared plumbing for the research stages (R1-R5). Layout: research/<project>/<app>/<handle>/. Sourced, not run.
 #
 # Every guard in here exists because its absence cost money or left a silent empty
 # folder. See AGENTS.md rules 10-14. Do not route around them.

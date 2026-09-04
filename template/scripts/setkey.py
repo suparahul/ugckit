@@ -11,6 +11,8 @@ then sits in their shell history forever.
 import getpass
 import os
 import re
+import shutil
+import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -59,6 +61,23 @@ def put(lines, name, value):
             return lines, "updated"
     lines.append(f"{name}={value}")
     return lines, "added"
+
+
+def register_monid(value):
+    """The monid CLI keeps its own credential store and ignores the environment, so a
+    key that only lives in .env does nothing for `monid run`. Register it here, in the
+    one process that legitimately holds the value -- never through the agent."""
+    if not shutil.which("monid"):
+        print(f"{DIM}  monid CLI not installed yet -- when it is, run:  ./ugckit key  again{OFF}")
+        return
+    r = subprocess.run(["monid", "keys", "add", "-k", value, "-l", "ugckit"],
+                       capture_output=True, text=True, env={**os.environ, "NO_COLOR": "1"})
+    if r.returncode == 0:
+        print(f"{GREEN}  registered with the monid CLI{OFF} (label: ugckit)")
+    else:
+        msg = (r.stderr or r.stdout).strip().splitlines()
+        print(f"{RED}  could not register with the monid CLI:{OFF} {msg[-1] if msg else 'unknown error'}")
+        print("  the research scripts will fail until it is -- try: ./ugckit key  again")
 
 
 def clean(value):
@@ -145,7 +164,10 @@ def main():
         write_env(lines)
         changed += 1
         print(f"{GREEN}  saved{OFF} ({how}, {len(value)} characters, "
-              f"starts {value[:4]}…)\n")
+              f"starts {value[:4]}…)")
+        if name == "MONID_API_KEY":
+            register_monid(value)
+        print()
 
     if changed:
         print(f"Written to .env — {GREEN}done{OFF}. Next, check everything works:\n")

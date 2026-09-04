@@ -40,10 +40,19 @@ for tool, fix in [
     ("curl",    "preinstalled on macOS and most Linux"),
     ("python3", "https://www.python.org/downloads/"),
     ("monid",   "npm install -g @monid-ai/cli   (research stages R1-R5)"),
+    ("node",    "https://nodejs.org  (only the Atlas, `ugckit atlas`, needs it)"),
 ]:
     p = shutil.which(tool)
     if p:
         v = ""
+        if tool == "node":
+            try:
+                v = subprocess.run([p, "--version"], capture_output=True, text=True, timeout=10).stdout.strip()
+                if int(v.lstrip("v").split(".")[0]) < 18:
+                    warn(f"node {v} is too old for the Atlas", "need Node 18+ -- https://nodejs.org")
+                    continue
+            except Exception:
+                pass
         if tool == "ffmpeg":
             try:
                 out = subprocess.run([p, "-version"], capture_output=True, text=True, timeout=10).stdout
@@ -51,6 +60,8 @@ for tool, fix in [
             except Exception:
                 pass
         ok(tool, v)
+    elif tool in ("monid", "node"):
+        warn(f"{tool} not found", fix)         # optional: only part of the pipeline needs it
     else:
         bad(f"{tool} not found", fix)
 
@@ -115,6 +126,15 @@ else:
              "expected monid_<stage>_<secret> -- re-copy it")
     else:
         ok("MONID_API_KEY", f"{len(mk)} chars, starts {mk[:12]}…")
+        # The CLI has its own store; a key only in .env runs nothing.
+        if shutil.which("monid"):
+            r = subprocess.run(["monid", "keys", "list"], capture_output=True, text=True,
+                               env={**os.environ, "NO_COLOR": "1"})
+            if r.returncode != 0 or "monid_" not in (r.stdout + r.stderr):
+                warn("monid CLI has no stored key", "./ugckit key  -- re-enter the Monid key; "
+                                                    "it registers it with the CLI as well")
+            else:
+                ok("monid CLI has a stored key")
 
     lib = os.path.expanduser(env.get("LIBRARY_DIR", ""))
     if not lib:

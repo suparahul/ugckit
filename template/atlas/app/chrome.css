@@ -1,0 +1,343 @@
+/* The persistent chrome: top bar, command bar, ticker, breadcrumb, control layer. */
+
+body {
+  font-family: var(--font-inter), var(--sans);
+}
+
+.serif,
+.display em,
+.verbatim,
+.wordmark em {
+  font-family: var(--font-instrument), var(--serif);
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  z-index: 50;
+}
+.skip:focus {
+  left: var(--pad);
+  top: 8px;
+  padding: 8px 14px;
+  background: var(--slab);
+  color: var(--slab-ink);
+  border-radius: 3px;
+}
+
+/* ------------------------------------------------------------------- topbar */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 12px var(--pad) 0;
+  background: linear-gradient(to bottom, var(--paper) 62%, rgba(216, 201, 173, 0));
+  backdrop-filter: blur(2px);
+}
+
+.topbar__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(14px, 2.2vw, 34px);
+}
+
+.wordmark {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+.wordmark em {
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* -------------------------------------------------------------- command bar */
+
+.cmd {
+  position: relative;
+  min-width: 0;
+}
+
+.cmd__form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px 0 12px;
+  height: 38px;
+  border: 1px solid var(--rule-2);
+  border-radius: 999px;
+  background: rgba(255, 253, 245, 0.62);
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.cmd__form:focus-within {
+  border-color: var(--ember);
+  background: rgba(255, 253, 245, 0.95);
+}
+
+.cmd__prompt {
+  color: var(--ember);
+  font-weight: 600;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.cmd__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--ink);
+}
+.cmd__input::placeholder {
+  color: var(--ink-4);
+}
+
+.cmd__go {
+  flex: 0 0 auto;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--slab);
+  color: var(--slab-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.cmd__go:hover {
+  background: var(--ember-deep);
+}
+
+.cmd__results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 5px;
+  list-style: none;
+  border: 1px solid var(--rule-2);
+  border-radius: 8px;
+  background: #fffdf5;
+  box-shadow: 0 18px 42px rgba(57, 38, 19, 0.24);
+  max-height: 62vh;
+  overflow-y: auto;
+}
+
+.cmd__result {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink);
+}
+.cmd__result.is-active {
+  background: rgba(206, 93, 32, 0.12);
+}
+
+.cmd__kind {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.cmd__name {
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cmd__own {
+  color: var(--ember-deep);
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.cmd__meta {
+  font-size: 12px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------- ticker */
+
+.ticker {
+  display: flex;
+  gap: clamp(12px, 1.6vw, 26px);
+  margin: 0;
+}
+.ticker__cell {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  line-height: 1.1;
+}
+.ticker dt {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.ticker dd {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+@media (max-width: 940px) {
+  .topbar__row {
+    grid-template-columns: 1fr;
+  }
+  .ticker {
+    justify-content: space-between;
+  }
+}
+
+/* --------------------------------------------------------------- breadcrumb */
+
+.crumb {
+  padding: 7px 0 9px;
+  border-bottom: 1px solid var(--rule);
+}
+.crumb ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.crumb li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.crumb a:hover {
+  color: var(--ember-deep);
+}
+.crumb [aria-current="page"] {
+  color: var(--ink);
+  font-weight: 500;
+}
+.crumb__sep {
+  color: var(--ink-4);
+}
+
+/* ------------------------------------------------------------ control layer */
+
+/* Visually subdued but PRESENT — never display:none, because a driver has to be
+ * able to find and click these, and a screen read has to list them. */
+.control {
+  margin: 22px 0 0;
+  border-top: 1px solid var(--rule);
+  padding-top: 10px;
+}
+
+.control__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.control__toggle:hover {
+  color: var(--ember-deep);
+}
+.control__count {
+  padding: 1px 7px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  font-size: 10.5px;
+  letter-spacing: 0;
+}
+
+.control__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 84px;
+  overflow: hidden;
+}
+.control.is-expanded .control__list {
+  max-height: none;
+}
+
+.control__item {
+  display: inline-block;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: rgba(47, 34, 19, 0.045);
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  cursor: pointer;
+  text-align: left;
+}
+.control__item:hover,
+.control__item:focus-visible {
+  border-color: var(--ember);
+  background: rgba(255, 253, 245, 0.9);
+  color: var(--ink);
+}
+
+/* ----------------------------------------------------------------- layout */
+
+.page {
+  padding: clamp(22px, 3.2vw, 44px) var(--pad) clamp(60px, 9vh, 120px);
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(34px, 5vw, 78px);
+}
+
+.section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--rule);
+}

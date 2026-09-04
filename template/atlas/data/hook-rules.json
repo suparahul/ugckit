@@ -1,0 +1,178 @@
+{
+  "_comment": "Hook taxonomy. HEURISTIC, and deliberately transparent: every post tagged by a rule records the exact phrase that matched, and the app shows it. Anything unmatched stays `unclassified` rather than being guessed into a bucket. Rules run in order; a post can carry several hook tags. Patterns are JS regex source, matched case-insensitively against the transcribed on-screen hook first, then the caption. Text is normalised before matching (case folded, runs of 3+ repeated letters collapsed, so JUST NOWWW FINDING matches 'just now finding') but the recorded evidence is always the verbatim original slice.",
+  "rules": [
+    {
+      "id": "discovery-regret",
+      "label": "Discovery regret",
+      "note": "The single most-copied line in the corpus, and the shape of its biggest post. Near word-for-word across Potto, Stronger and roamy — three unrelated networks — and the brand accounts reuse the creators' captions verbatim.",
+      "patterns": [
+        "i wish i (had )?found (this|it|out about this) sooner",
+        "how am i just now (finding|hearing|learning)",
+        "why am i just now finding",
+        "where ha(s|ve) (this|you) been( my)?( whole| entire)?( adult)? life",
+        "how did i not know (this|it) existed",
+        "i (can'?t|cannot) believe i (didn'?t|did not) find (this|it)",
+        "why did no ?one (ever )?tell me",
+        "wdym there'?s an app",
+        "there'?s an app for (it|this)",
+        "how have i never heard of this",
+        "i'?m (so )?mad i didn'?t know",
+        "nobody told me about this",
+        "(years?|months?|weeks?|hours?|days?)[^.!?]{0,40}\\b(and|but)\\b[^.!?]{0,20}\\bnow+\\b[^.!?]{0,20}\\bfind(ing)?\\b",
+        "\\bjust now+\\b[^.!?]{0,15}\\bfind(ing)?\\b",
+        "\\bnow+ i find\\b",
+        "\\bnow+ find this\\b",
+        "and (now+|then) (i )?(find|found|see|saw) (this|it)",
+        "\\bi find this\\b.{0,10}\\?",
+        "how have i (never|not) (heard|known)",
+        "no ?one (ever )?told me"
+      ]
+    },
+    {
+      "id": "therapist-reframe",
+      "label": "Therapist reframe",
+      "note": "Quoted authority delivering a one-line reframe. Heavy in Vent Now.",
+      "patterns": [
+        "asked my therapist",
+        "my therapist (said|told|replied|asked)",
+        "(said|told me) ['‘“]?or you",
+        "in therapy (i|we) learned"
+      ]
+    },
+    {
+      "id": "psychology-authority",
+      "label": "Borrowed authority",
+      "note": "Opens by citing psychology or a study rather than a person.",
+      "patterns": [
+        "according to (psychology|psychologists|science|a study)",
+        "psychologists? say",
+        "studies show",
+        "research shows",
+        "science says",
+        "experts? say"
+      ]
+    },
+    {
+      "id": "overheard-anecdote",
+      "label": "Third-party anecdote",
+      "note": "The story happens to someone adjacent, never the poster. Lowers the stakes of the claim.",
+      "patterns": [
+        "overheard",
+        "my (coworker|cousin|sister|brother|friend|roommate|mom|mum)'?s?",
+        "a (girl|guy|friend|woman|man) i know",
+        "someone i know",
+        "my ex "
+      ]
+    },
+    {
+      "id": "realisation",
+      "label": "The day I realised",
+      "note": "Retrospective pivot structure.",
+      "patterns": [
+        "the day i (realized|realised|noticed|found out)",
+        "i just (realized|realised)",
+        "the moment i (realized|realised)",
+        "it hit me when"
+      ]
+    },
+    {
+      "id": "pov",
+      "label": "POV framing",
+      "patterns": [
+        "\\bpov\\b",
+        "^when you ",
+        "\\bimagine\\b.{0,30}\\bbut\\b"
+      ]
+    },
+    {
+      "id": "listicle",
+      "label": "Numbered list",
+      "patterns": [
+        "\\b\\d+ (things|reasons|ways|signs|tips|steps|mistakes|red flags)\\b",
+        "\\bthings? (i wish|nobody|no one) (told|tells)"
+      ]
+    },
+    {
+      "id": "red-flag-warning",
+      "label": "Warning / red flag",
+      "patterns": [
+        "red flags?",
+        "\\bsigns? (that|you|he|she|your)",
+        "\\bwarning\\b",
+        "if (he|she|they) does this"
+      ]
+    },
+    {
+      "id": "transformation",
+      "label": "Before and after",
+      "patterns": [
+        "before (vs|and|\\/) after",
+        "glow ?up",
+        "\\bday \\d+ of\\b",
+        "\\d+ (days|weeks|months) later",
+        "my transformation"
+      ]
+    },
+    {
+      "id": "demo",
+      "label": "Screen demo / how I do it",
+      "patterns": [
+        "how i (plan|track|use|make|meal ?prep|budget)",
+        "let me show you",
+        "watch me",
+        "here'?s how i",
+        "step by step"
+      ]
+    },
+    {
+      "id": "comment-cta",
+      "label": "Comment keyword",
+      "note": "The roamy mechanic — reach is bought with a comment rather than a link.",
+      "patterns": [
+        "comment ['‘“]?\\w+['’”]? (if|and|to)",
+        "comment .{0,20}(if you want|below)",
+        "drop a? ?['‘“]?\\w+['’”]? below"
+      ]
+    },
+    {
+      "id": "direct-address",
+      "label": "Direct address",
+      "patterns": [
+        "^(you|your) ",
+        "\\bif you'?re\\b",
+        "\\bstop (doing|scrolling)\\b",
+        "\\bdo this\\b"
+      ]
+    },
+    {
+      "id": "quoted-cold-open",
+      "label": "Quoted cold open",
+      "note": "Opens on a line of dialogue in quotation marks with no setup. Heavy in Stronger.",
+      "patterns": [
+        "^\\s*[\"“'‘][^\"”'’]{4,80}[\"”'’]"
+      ]
+    },
+    {
+      "id": "audience-callout",
+      "label": "Audience callout",
+      "note": "Names the viewer's tribe, then recommends. 'every gym girlie NEEDS this app'.",
+      "patterns": [
+        "every ?(single)? \\w+ (girlie|girl|guy|boy|gym ?rat|mom|student)s? (needs?|should)",
+        "\\b(girlies|gym girls|gym rats|besties)\\b.{0,25}(need|thank me|listen)",
+        "thank me later",
+        "if you (\\w+ ){0,3}(this is|you need)"
+      ]
+    },
+    {
+      "id": "insider-tip",
+      "label": "Insider tip / nobody tells you",
+      "patterns": [
+        "\\ba? ?\\w+ hack\\b",
+        "no ?one tells (you|beginners)",
+        "nobody talks about",
+        "\\bsecret\\b",
+        "\\bcheat code\\b"
+      ]
+    }
+  ]
+}

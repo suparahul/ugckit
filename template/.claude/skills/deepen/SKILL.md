@@ -1,22 +1,24 @@
 ---
 name: deepen
-description: Stage R4 — mark the top 5 accounts by total views and pull their best posts as real video or as slides. Costs no Monid; it reuses what harvest already paid for.
+description: Stage R4 — per app, mark the top 5 accounts by total views and pull their best posts as real video or as slides. Costs no Monid; it reuses what harvest already paid for.
 ---
 
 # Stage R4 — deepen
 
-    scripts/deepen.sh <project> --rank      rank the harvested accounts, mark the top 5
-    scripts/deepen.sh <project> --deep      pull the top 3 posts of each marked account
+    scripts/deepen.sh <project> <app> --rank      rank the app's harvested accounts, mark the top 5
+    scripts/deepen.sh <project> <app> --deep      pull the top 3 posts of each marked account
+
+One app at a time. The ranking is inside an app, never across apps.
 
 ## The ranking is arithmetic, not judgement
 
-Top 5 by **total network views** — not followers, not how good the content looks to you.
+Top 5 by **total account views** — not followers, not how good the content looks to you.
 Follower counts on seeded accounts are meaningless and your taste is not evidence. Run
 `--rank`, read the table, and only override it if the user asks.
 
 ## What a deep dive pulls
 
-Per post, into `research/<project>/<handle>/<post-id>/`:
+Per post, into `research/<project>/<app>/<handle>/<post-id>/`:
 
 - a **video post** → `video.mp4` from the signed CDN link in `posts.json`, ffprobed to
   prove it has a video stream, plus 4x4 contact sheets at 1 fps

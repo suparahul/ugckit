@@ -1,14 +1,15 @@
 ---
 name: harvest
-description: Stage R3 — the shallow pass. Metrics, cover frames and the verbatim on-screen hook off every cover, for every handle in the ledger. About two cents an account.
+description: Stage R3 — the shallow pass. Metrics, cover frames and the verbatim on-screen hook off every cover, for every handle of an app. About two cents an account.
 ---
 
 # Stage R3 — harvest
 
-    scripts/harvest.sh <project> --all [maxItems]
+    scripts/harvest.sh <project> <app> --all [maxItems]
 
-Runs the whole ledger, one account at a time. `maxItems` defaults to 50 posts.
-A single account: `scripts/harvest.sh <project> <handle>`.
+Runs every handle in that app's ledger, one account at a time. `maxItems` defaults to
+50 posts. A single account: `scripts/harvest.sh <project> <app> <handle>`. One app at a
+time; when it is done, the next app.
 
 ## Before you run it
 
@@ -19,7 +20,7 @@ This is a long serial job — twenty accounts is twenty Monid calls plus a few h
 image downloads and a headless read per twelve covers. **Start it in the background**
 and wait for the notification. Do not run two copies to go faster; see rule 13.
 
-## What it produces, per handle
+## What it produces, per handle, in `research/<project>/<app>/<handle>/`
 
     posts.json     the raw scrape — the only copy you will get at this price
     index.tsv      rank, views, likes, comments, shares, bookmarks, date, video|photo, caption
@@ -54,4 +55,6 @@ signal an account gives you about what it thinks worked.
     scripts/state.py set <project> harvest done
 
 Report: accounts harvested, posts indexed, covers on disk, computed spend, and the top
-three accounts by total views. Then run `scripts/deepen.sh <project> --rank`.
+three accounts by total views. This is the first moment there is something to look at:
+run the `atlas` skill so the user can see the covers and hooks, then continue with
+`scripts/deepen.sh <project> <app> --rank`.

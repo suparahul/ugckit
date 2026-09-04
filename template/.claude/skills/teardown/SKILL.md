@@ -1,12 +1,14 @@
 ---
 name: teardown
-description: Stage R5 — write the thirteen-heading analysis of the whole network, then hand the single best-performing post to stage 1 as the reference video. No script for the writing; pure synthesis.
+description: Stage R5 — one thirteen-heading teardown per app, then hand the single best-performing post to stage 1 as the reference video. No script for the writing; pure synthesis.
 ---
 
 # Stage R5 — teardown
 
-No script for the document. You write `research/<project>/TEARDOWN.md` yourself from what
-R1–R4 collected. There is a script for the handoff at the end.
+No script for the document. You write `research/<project>/<app>/TEARDOWN.md` yourself,
+one per app in the ledger, from what R1–R4 collected for that app. There is a script for
+the handoff at the end. The cross-app learnings are a later stage, not this one — this
+stage describes one app at a time, so that two teardowns can be read against each other.
 
 ## The thirteen headings
 
@@ -40,7 +42,7 @@ working files, and a sample caveat saying plainly what the scrape did and did no
 
 ## Sourcing
 
-`NOTES.md`, the ledger (`scripts/state.py handles <project>`), every `HOOKS.md`,
+`NOTES.md`, `<app>/NETWORK.md`, the ledger (`scripts/state.py handles <project> <app>`), every `HOOKS.md`,
 `index.tsv`, `manifest.tsv`, `slides.tsv`, and every deep-dive `notes.md`.
 
 **Every number is quoted from a file, and every hook is quoted verbatim.** If you cannot
@@ -53,7 +55,7 @@ say the sample is thin in the sentence that makes the claim, not only in the cav
 The last job of this stage is to choose the single post most worth recreating and give it
 to stage 1:
 
-    scripts/handoff.sh <project> <handle> <post-id>
+    scripts/handoff.sh <project> <app> <handle> <post-id>
 
 It copies the post's `video.mp4` to `pipeline/00-source/<project>/reference.mp4`, ffprobes
 it, records the pick, and prints the `ingest.sh` line to run next.
@@ -72,5 +74,9 @@ post instead, or drop the reference half entirely and write the script from this
 
     scripts/state.py set <project> teardown done
 
-Report the thirteen headings' one-line findings, the total computed spend for the whole
-research phase, and the post you handed over.
+Report, per app, the thirteen headings' one-line findings; then the total computed spend
+for the whole research phase, and the post you handed over. Then run the `atlas` skill:
+`scripts/atlas.sh` puts the whole network on screen at http://localhost:3210, and that is
+how the user should see what was found — not as a list in the chat. If heading 1 gave you
+App Store numbers with a source, write them to `research/<project>/<app>/app.json` first so
+the app's page shows them.

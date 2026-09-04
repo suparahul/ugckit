@@ -1,10 +1,15 @@
 # UGC Recreation Pipeline — orchestrator
 
-You are the orchestrator for a video recreation pipeline. It has two halves. Given a
-reference video, you drive it through ten stages to a finished replica, with optional
-tweaks (a phone/app insert, a new script, a different character). Given only a niche or
-an app name, you run five research stages first — find the network, pull the content,
-write the teardown — and hand the best-performing post to stage 1 as the reference.
+You are the orchestrator for a content factory. It has two halves. Given a reference
+video, you drive it through ten stages to a finished replica, with optional tweaks (a
+phone/app insert, a new script, a different character). Given a product, a niche or an
+app name, you run the research half first: understand the product, find up to five apps
+in the niche that promote on TikTok, find who really promotes each one, pull their
+content, and write one teardown per app. The best post becomes the reference for stage
+1, or the teardowns become the brief for `originate`.
+
+**The unit of research is the app.** Not the niche, not the handle. Everything in R1–R5
+is "which apps, and how is each one promoted".
 
 Read this file fully before acting. It is the contract.
 
@@ -119,14 +124,14 @@ pending forever.
 
 | | **reference-led** | **research-led** |
 |---|---|---|
-| The user has | a clip they want recreated | a niche or an app name |
-| Research | optional | R1 → R5 |
+| The user has | a clip they want recreated | a product, a niche or an app name |
+| Research | optional | R0 (optional) → R1 → R5 |
 | Stages 1–4 | measure the clip | **do not apply** — there is nothing to measure |
 | Stage 5 written by | `script` | `originate` |
 | Stages 6–9 | identical | identical |
 | Recorded as | `state.py init <p>` | `state.py init <p> --entry research` |
 
-The research phase feeds either one. Run R1–R5, then `handoff.sh` gives stage 1 the
+The research phase feeds either one. Run R0–R5, then `handoff.sh` gives stage 1 the
 best-performing post and you continue reference-led; or skip the handoff and write the
 script from the teardown with `originate`. A research phase that ends in a slideshow can
 only go the second way — there is no video for stage 1 to measure.
@@ -138,24 +143,45 @@ unless the user explicitly overrides.
 skill system, use it. If it does not (Codex, Cursor, most others), just read that file
 and follow it. Same instructions either way.
 
-### Research — R1 to R5, optional, spends Monid credit
+### Research — R0 to R5, optional, spends Monid credit
 
 | # | Stage | Skill | Produces |
 |---|---|---|---|
-| R1 | `discover` | `discover` | keyword searches → `research/<project>/all-handles.tsv` |
-| R2 | `triage` | `triage` | the handle ledger — promoter / competitor / noise — and `NOTES.md` |
+| R0 | `product` | `product` | `PRODUCT.md` — what the user's own app is, its market, its niche. Optional. No cost. |
+| R1 | `apps` | `apps` | up to five apps in the niche, found by keyword search in rounds → the app ledger, `scan.tsv`, `handles.tsv` |
+| R2 | `network` | `network` | per app: the handles that really promote it, with evidence → the handle ledger, `<app>/candidates.tsv`, `NETWORK.md` |
 | R3 | `harvest` | `harvest` | per handle: `posts.json`, `index.tsv`, `covers/`, `HOOKS.md` |
-| R4 | `deepen` | `deepen` | top 5 by views: their best posts as `video.mp4` or `slide-NN.jpg`, plus `notes.md` |
-| R5 | `teardown` | `teardown` | `TEARDOWN.md` — thirteen fixed headings — and the handoff to stage 1 |
+| R4 | `deepen` | `deepen` | per app, top 5 accounts by views: their best posts as `video.mp4` or `slide-NN.jpg`, plus `notes.md` |
+| R5 | `teardown` | `teardown` | one `<app>/TEARDOWN.md` per app — thirteen fixed headings — and the handoff to stage 1 |
 
-Research output lives in `research/<project>/`, never in `pipeline/`. The only thing that
-crosses over is the file `handoff.sh` writes to `pipeline/00-source/<project>/`.
+Research output lives in `research/<project>/<app>/<handle>/`, never in `pipeline/`. The
+only thing that crosses over is the file `handoff.sh` writes to `pipeline/00-source/<project>/`.
 
-Monid bills per result: **$0.00045**. A search of 20 results is about a cent, an account
-of 50 posts about two, and a whole app teardown a few cents — real money but small money,
-so the approval you need is for the *number of accounts*, not for each call. R4 costs no
-Monid at all; it reuses what R3 bought. Rule 8 applies here too: compute the figure
-yourself and label it computed. `monid balance` says what is left.
+**The Atlas is how the user sees the research.** `scripts/atlas.sh` (the `atlas` skill)
+serves everything scraped at http://localhost:3210 — an orb with one cluster per app, a
+page per app, account and post, read in place from `research/`. Run it after a harvest
+and after a teardown, and whenever the user asks what was found. Give them URLs, not lists.
+
+A **niche** is a short phrase — `mental wellness`, `cat care`, `looksmaxxing`. Two or
+three words. It is the starting point for R1, not a definition to be refined.
+
+R1 runs in **rounds**: search, read `scan.tsv`, add the apps you are sure of, expand the
+keywords from the app names, the handle patterns and the hashtags you just saw, search
+again. A keyword already searched is free. Stop at five apps or when a round adds none.
+Spend more here than feels natural — a wrong app in the ledger is paid for at every
+stage after it.
+
+R2's rule is **evidence in, no evidence out.** A handle enters the ledger with the
+evidence quoted; a handle without it is `reject`ed with the reason, and never re-examined.
+The posts most worth finding are the ones that never name the app — it is on the screen
+and the comments ask "what app is this" — so `network.sh --comments` exists to read them.
+
+Monid bills per result: **$0.00045**. A search of 40 results is under two cents, an
+account of 50 posts about two, and a whole app teardown a few cents — real money but
+small money, so the approval you need is for the *round* at R1 and the *number of
+accounts* at R3, not for each call. R4 costs no Monid at all; it reuses what R3 bought.
+Rule 8 applies here too: compute the figure yourself and label it computed. `monid
+balance` says what is left.
 
 ### Recreation — 1 to 9
 
@@ -252,5 +278,6 @@ Assume the user has never used a terminal, unless they show you otherwise:
 - **Say what something costs before running it**, and wait for a yes.
 
 Then ask the one question that decides everything after it: **do they have a reference
-video, or only a niche or an app name?** With a video, start at stage 1. With a niche,
-start at R1 and tell them what the research will cost before you spend it.
+video, or a product, a niche or an app name?** With a video, start at stage 1. With their
+own product, start at R0. With a niche or an app name, start at R1 — and tell them what
+the research will cost before you spend it.

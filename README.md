@@ -3,10 +3,11 @@
 Give it a reference video. Get back your own version of it — same structure, your script,
 your character, optionally with a real app demo playing on a phone in the shot.
 
-Or give it nothing but a niche or an app name. It finds who is promoting what, pulls their
-content, transcribes the on-screen hook off every post, writes a teardown of the whole
-network, and hands the best-performing post to the recreation pipeline as the reference.
-Niche in, finished video out.
+Or give it your product, a niche or an app name. It works out the niche, finds up to five
+apps in it that promote on TikTok, finds who really promotes each one, pulls their content,
+transcribes the on-screen hook off every post, and writes one teardown per app. The
+best-performing post becomes the reference for the recreation pipeline, or the teardowns
+become the brief for a script written from scratch. Niche in, finished video out.
 
 It is an agent, a set of skills, the scripts they drive, and a local review UI. You talk
 to the agent; it runs the pipeline.
@@ -42,21 +43,30 @@ That is all a first-time user needs. Everything below is the manual version.
 
 One line, nothing to clone:
 
-    curl -fsSL https://raw.githubusercontent.com/suparahul/ugckit/main/install.sh | sh -s -- my-video-project
+    curl -fsSL https://raw.githubusercontent.com/suparahul/ugckit/main/install.sh | sh -s -- ugc
 
 Or from a clone:
 
     git clone https://github.com/suparahul/ugckit && cd ugckit
-    ./install.sh ~/my-video-project
+    ./install.sh ~/ugc
 
 The installer checks for ffmpeg, python 3.9+, curl and git, scaffolds the project,
 creates a `.venv`, installs dependencies, and writes the Supagen MCP config. It is
 idempotent — re-running upgrades the scripts and skills and never touches your `.env`,
 your prompts, or anything you have generated.
 
+### Upgrading
+
+Run the same install command again, pointed at the same folder — from inside it,
+`sh -s -- .`. It replaces the scripts, the skills, `AGENTS.md` and the Atlas, removes
+anything this version retired, and never touches `.env`, your prompts, or anything you
+have generated or scraped. Then `./ugckit doctor`. If you set a Monid key before this
+version, doctor will tell you if the monid CLI still needs it: run `./ugckit key` once
+more and re-enter it — it now registers the key with the CLI as well.
+
 ## Then
 
-    cd ~/my-video-project
+    cd ~/ugc
     ./ugckit key                        # asks for each value it needs
     ./ugckit doctor                     # tools, deps, credentials, live auth
     claude                              # or: codex — both read AGENTS.md
@@ -83,11 +93,14 @@ want recreated.
 
 | Stage | What happens | Cost |
 |---|---|---|
-| R1 discover | keyword searches through Monid to find who is promoting what | ~$0.01 a search |
-| R2 triage | sort the handles into promoters, competitors and noise | — |
+| R0 product | read your website, doc or repo; write what the product is and which niche it is in | — |
+| R1 apps | keyword searches in rounds, expanding the keywords each round, until five apps are found | ~$0.04 a keyword |
+| R2 network | per app, the handles that really promote it — with evidence, or rejected | ~$0.02 a search |
 | R3 harvest | metrics, cover frames, and the on-screen hook off every cover | ~$0.02 an account |
-| R4 deepen | top 5 accounts by views, their best posts as video or slides | free — reuses R3 |
-| R5 teardown | the thirteen-heading analysis, then hand the winner to stage 1 | — |
+| R4 deepen | per app, top 5 accounts by views, their best posts as video or slides | free — reuses R3 |
+| R5 teardown | one thirteen-heading analysis per app, then hand the winner to stage 1 | — |
+
+The unit of research is the app. A niche is a short phrase — `cat care`, `looksmaxxing`.
 
 A full app teardown is a few cents of Monid. The expensive resources are turns and
 attention, not API calls.
@@ -115,9 +128,10 @@ already scraped is not paid for twice, a cover already on disk is not fetched ag
 
 - **You have a reference video.** Stage 1 measures it, and stage 5 `script` writes the
   prompt from those measurements.
-- **You have a niche or an app name.** R1–R5 find and analyse the network. Then either
-  hand the best post to stage 1 and carry on as above, or skip the reference half entirely
-  and let stage 5 `originate` write the prompt from the teardown and the hook library.
+- **You have a product, a niche or an app name.** R0 works out the niche, R1 finds the
+  apps, R2–R5 analyse how each one is promoted. Then either hand the best post to stage 1
+  and carry on as above, or skip the reference half entirely and let stage 5 `originate`
+  write the prompt from the teardowns and the hook library.
 
 Both meet at stage 5, and stages 6–9 do not know or care which route was taken.
 
@@ -130,6 +144,17 @@ Selected by which files exist in `pipeline/05-prompt/<project>/`:
   screen recording onto the phone, with the thumb correctly occluding it.
 - `+ refs.json` — **referenced**: hand reference clips to the model. Rarely what you want;
   read rule 1 in `AGENTS.md` first.
+
+## The Atlas
+
+    ./ugckit atlas     # http://localhost:3210
+
+Everything the research half scraped, on one surface: an orb with one cluster per app, a
+front door per app with its whole network in one carousel and the thirteen-heading
+teardown, a dossier per account, a page per post with the video or the slides and the
+verbatim hook, and threads that pull the same hook across every app you studied. It reads
+`research/` in place and starts empty; every app you harvest appears on the next run.
+Needs Node 18+, which nothing else in ugckit does. Lifted from the organic-social Atlas.
 
 ## The review UI
 
@@ -193,7 +218,7 @@ Length forces the choice. MiniMax unless you need more than 15 seconds.
 ## Requirements
 
 ffmpeg · python 3.9+ · curl · git · [monid](https://monid.ai) (`npm install -g @monid-ai/cli`) ·
-a Supagen account and workspace · Claude Code or Codex
+Node 18+ for the Atlas · a Supagen account and workspace · Claude Code or Codex
 
 ## Layout
 
@@ -203,10 +228,12 @@ a Supagen account and workspace · Claude Code or Codex
     .claude/skills/        one skill per stage
     scripts/               the tools the skills drive
       monid.sh             shared research plumbing — where rules 10-14 are enforced
+      apps.sh network.sh   R1 and R2: find the apps, then who promotes each one
       library.py           query the hook library rather than reading it
       templates.json       desired Supagen workspace state + known model limits
       prompts/             system instructions for the watching layer
       ui/                  the local review UI
     docs/                  annotated insert.json example
-    research/              what the research phase found, one folder per project
+    atlas/                 the research browser — `ugckit atlas`, Node 18+
+    research/              what the research phase found: <project>/<app>/<handle>/
     pipeline/              your work, stage by stage

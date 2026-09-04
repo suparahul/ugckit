@@ -53,6 +53,7 @@ need ffprobe "ships with ffmpeg"
 need curl    "preinstalled on macOS and most Linux"
 need git     "https://git-scm.com/downloads"
 want monid   "optional, only the research stages use it — npm install -g @monid-ai/cli"
+want node    "optional, only the Atlas (ugckit atlas) needs it — https://nodejs.org"
 
 if command -v python3 >/dev/null 2>&1; then
   PYV=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
@@ -97,14 +98,27 @@ copy_once() {
 }
 
 # -prune keeps a developer's local __pycache__ out of a fresh install.
-( cd "$SRC" && find scripts .claude docs \
-    \( -name __pycache__ -o -name .DS_Store \) -prune -o -type f -print ) | while read -r rel; do
+( cd "$SRC" && find scripts .claude docs atlas \
+    \( -name __pycache__ -o -name .DS_Store -o -name node_modules -o -name .next \) -prune -o -type f -print ) | while read -r rel; do
   copy_managed "$rel"
 done
-ok "scripts, skills and docs"
+ok "scripts, skills, docs and the atlas"
 
 for f in AGENTS.md CLAUDE.md ugckit; do copy_managed "$f"; done
 ok "AGENTS.md, CLAUDE.md, ugckit"
+
+# Files an earlier version shipped and this one does not. Left in place, a retired skill
+# is still a skill the agent can pick up, so they go. Only ever paths we authored.
+RETIRED="
+.claude/skills/discover
+.claude/skills/triage
+scripts/discover.sh
+"
+GONE=""
+for rel in $RETIRED; do
+  if [ -e "$DEST/$rel" ]; then rm -rf "$DEST/$rel"; GONE="${GONE:+$GONE, }$rel"; fi
+done
+[ -z "$GONE" ] || hm "removed retired: $GONE"
 
 for f in .env.example .gitignore requirements.txt; do copy_once "$f"; done
 
@@ -180,8 +194,9 @@ $(b "installed.")
                                           — ask it to run the setup skill first
         then /mcp                         approve the Supagen connection in the browser
 
-  Two ways in. Give it a reference video and it recreates that; give it a niche or an
-  app name and it finds the network first, then recreates the best post it found.
+  Two ways in. Give it a reference video and it recreates that; give it your product,
+  a niche or an app name and it finds the apps in the niche, studies how each one is
+  promoted, then recreates the best post it found.
 
   The agent drives the pipeline. You mostly watch, review and give feedback:
 

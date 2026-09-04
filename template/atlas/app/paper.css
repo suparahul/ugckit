@@ -1,0 +1,348 @@
+/*
+ * Warm cream paper — the environment, not a decoration.
+ *
+ * Lifted from the CharacterCarousel filmstrip's own backdrop and promoted to
+ * the whole app: fine concentric rings from an off-centre origin, a faint
+ * straight grid over them, soft vignette, visible grain. Every screen sits on
+ * it, so moving between the orb, a brand page and a post reads as travelling
+ * across one continuous surface rather than jumping between screens — which is
+ * the spatial claim the orb is making in the first place.
+ *
+ * The layers are fixed to the viewport, never to the document, so scrolling a
+ * long brand page moves the content over a stationary surface.
+ */
+
+:root {
+  /* The filmstrip's own palette, which is where the cream comes from. */
+  --paper: #d8c9ad;
+  --paper-hi: #e7d9bd;
+  --paper-lo: #c9b894;
+  --ink: #241d13;
+  --ink-2: #4a3d29;
+  --ink-3: #6d5c42;
+  --ink-4: rgba(36, 29, 19, 0.42);
+  --rule: rgba(47, 34, 19, 0.22);
+  --rule-2: rgba(47, 34, 19, 0.42);
+  --ember: #ce5d20;
+  --ember-deep: #a8410f;
+  --slab: #171612;
+  --slab-ink: #f0dfc2;
+
+  --ring-origin-x: 38%;
+  --ring-origin-y: 34%;
+
+  --pad: clamp(20px, 3.4vw, 52px);
+  --measure: 68ch;
+
+  --serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: -0.006em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---------------------------------------------------------------- the surface */
+
+.paper-surface {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Concentric rings, radiating from an off-centre origin. A repeating-radial
+ * gradient gives an exact ring pitch; the mask fades them out toward the edge so
+ * the sheet does not read as a target. */
+.paper-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-radial-gradient(
+    circle at var(--ring-origin-x) var(--ring-origin-y),
+    rgba(94, 74, 46, 0.075) 0px,
+    rgba(94, 74, 46, 0.075) 1px,
+    transparent 1px,
+    transparent 13px
+  );
+  -webkit-mask-image: radial-gradient(circle at var(--ring-origin-x) var(--ring-origin-y), #000 0%, #000 48%, transparent 88%);
+  mask-image: radial-gradient(circle at var(--ring-origin-x) var(--ring-origin-y), #000 0%, #000 48%, transparent 88%);
+}
+
+/* The straight grid, over the rings and fainter than them. */
+.paper-surface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(to right, rgba(74, 61, 41, 0.05) 0 1px, transparent 1px 64px),
+    repeating-linear-gradient(to bottom, rgba(74, 61, 41, 0.05) 0 1px, transparent 1px 64px);
+}
+
+/* Vignette and grain, in their own layer so they sit above both patterns.
+ * NOTE the vignette is *warm and light* here. On the orb page it inverts —
+ * see .orb-lit in orb.css — because OrbGallery is authored on near-black. */
+.paper-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 42%, transparent 42%, rgba(88, 64, 32, 0.16) 78%, rgba(70, 50, 24, 0.3) 100%);
+}
+
+.paper-grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.42;
+  mix-blend-mode: multiply;
+  /* A self-contained SVG turbulence — no asset, no network. */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23g)' opacity='0.5'/></svg>");
+}
+
+/* Everything the app draws sits above the surface. */
+.above {
+  position: relative;
+  z-index: 2;
+}
+
+/* ------------------------------------------------------------------ typography */
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.032em;
+  line-height: 1.04;
+}
+
+.display {
+  font-size: clamp(38px, 5.4vw, 76px);
+  letter-spacing: -0.042em;
+  line-height: 0.98;
+}
+
+.display em,
+.serif {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.008em;
+}
+
+.eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.lede {
+  font-size: clamp(15px, 1.15vw, 17px);
+  line-height: 1.55;
+  color: var(--ink-2);
+  max-width: var(--measure);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ------------------------------------------------------------------ primitives */
+
+.rule {
+  height: 1px;
+  background: var(--rule);
+  border: 0;
+  margin: 0;
+}
+
+/* A metric, printed. Used under carousel cards, on post pages, in totals. */
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metric-value {
+  font-size: clamp(20px, 2.4vw, 34px);
+  font-weight: 600;
+  letter-spacing: -0.036em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.metric-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* A tag chip. Always clickable — every tag is a thread. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: rgba(255, 253, 245, 0.5);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.chip:hover,
+.chip:focus-visible {
+  border-color: var(--ember);
+  background: rgba(255, 253, 245, 0.92);
+  color: var(--ink);
+}
+
+.chip--cross {
+  border-color: var(--ember);
+  color: var(--ember-deep);
+}
+
+.chip__count {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+/* Verbatim evidence. Anything a real person actually wrote is set in this. */
+.verbatim {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(17px, 1.6vw, 23px);
+  line-height: 1.35;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+/* A missing piece of the corpus, shown rather than hidden. */
+.pending {
+  border: 1px dashed var(--rule-2);
+  border-radius: 3px;
+  padding: 14px 16px;
+  color: var(--ink-3);
+  font-size: 13.5px;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 6px,
+    rgba(47, 34, 19, 0.035) 6px 12px
+  );
+}
+
+/* Focus is never invisible — the driver navigates by keyboard. */
+:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Screen-reader-only, but still focusable and still a real node — this is how
+ * the control layer stays present without being loud. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media print {
+  .paper-surface,
+  .paper-grain,
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
+}
+
+/* ------------------------------------------------ the orb as a title card
+   /orb is presented as one piece of type on paper, so the chrome and the orb's
+   control layer are taken out of SIGHT — and only out of sight. They stay in
+   the DOM, in the accessibility tree, focusable, with the same accessible
+   names, because the session is driven by an agent that cannot click a point on
+   a canvas: those buttons and that input are the only way into the sphere. Hence
+   the 1px clip rather than display:none, visibility:hidden, aria-hidden or an
+   unmount, all of which would take them out of the tree and end the session.
+   Pressing "/" or cmd-K sets data-reveal and brings the command bar back for a
+   human. */
+html[data-orb="1"] .orbctl,
+html[data-orb="1"]:not([data-reveal="1"]) .topbar {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+  pointer-events: none;
+}
+/* Focus is still real, so a keyboard human who tabs into the bar gets it back. */
+html[data-orb="1"] .topbar:focus-within {
+  position: sticky;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  white-space: normal;
+  pointer-events: auto;
+}

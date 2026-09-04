@@ -1,0 +1,57 @@
+/* The dossier. Sober, text-first, no motion. */
+
+.ahead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: clamp(24px, 4vw, 60px);
+  align-items: start;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--rule-2);
+}
+.ahead__name { margin: 8px 0 0; font-size: clamp(17px, 1.6vw, 22px); color: var(--ink-2); }
+.ahead__bio { margin: 12px 0 0; max-width: 52ch; font-size: 14.5px; line-height: 1.55; color: var(--ink-2); white-space: pre-wrap; }
+.ahead__links { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
+.ahead__stats { display: grid; grid-template-columns: repeat(2, minmax(120px, auto)); gap: 14px 26px; margin: 0; }
+.ahead__stats div { display: flex; flex-direction: column-reverse; }
+.ahead__stats dd { margin: 0; font-size: 21px; font-weight: 600; letter-spacing: -0.03em; }
+.ahead__stats dt { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
+.ahead__span { margin: 0; font-size: 13px; color: var(--ink-3); }
+
+@media (max-width: 860px) { .ahead { grid-template-columns: 1fr; } }
+
+/* the cover grid */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 7px; margin: 0; padding: 0; list-style: none; }
+.grid li a { position: relative; display: block; }
+.grid__views {
+  position: absolute; left: 5px; bottom: 5px; padding: 2px 6px;
+  background: rgba(23, 22, 18, 0.82); color: var(--slab-ink);
+  font-size: 11px; font-weight: 600; border-radius: 2px;
+}
+.grid__format {
+  position: absolute; right: 5px; top: 5px; padding: 2px 6px;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  border-radius: 2px; color: var(--slab-ink);
+}
+.grid__format--video { background: rgba(206, 93, 32, 0.86); }
+.grid__format--slideshow { background: rgba(23, 22, 18, 0.82); }
+.grid li a:hover .cover { filter: none; transform: scale(1.02); }
+
+/* the post table */
+.ptable__wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: rgba(255,253,245,0.5); }
+.ptable { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ptable th, .ptable td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.ptable thead th { position: sticky; top: 0; background: var(--paper-hi); border-bottom: 1px solid var(--rule-2); white-space: nowrap; z-index: 1; }
+.ptable thead button {
+  border: 0; background: none; font: inherit; font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); cursor: pointer; padding: 0;
+}
+.ptable thead button:hover, .ptable thead button.is-sorted { color: var(--ember-deep); }
+.ptable tbody tr:hover { background: rgba(255, 253, 245, 0.75); }
+.ptable__lead a { font-weight: 600; color: var(--ember-deep); }
+.ptable__hook {
+  max-width: 42ch; color: var(--ink-2);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.ptable__hook a:hover { color: var(--ember-deep); }
+.ptable__none { color: var(--ink-4); font-style: italic; }
+.ptable__sound { max-width: 20ch; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

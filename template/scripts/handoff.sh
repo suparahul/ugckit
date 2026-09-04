@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Stage R5 handoff: the winning post becomes the reference video for stage 1.
-# Usage: scripts/handoff.sh <project> <handle> <post-id>
+# Usage: scripts/handoff.sh <project> <app> <handle> <post-id>
 set -euo pipefail
 
-[ $# -ge 3 ] || { echo "usage: $0 <project> <handle> <post-id>" >&2; exit 2; }
-NAME=$1; HANDLE=${2#@}; ID=$3
+[ $# -ge 4 ] || { echo "usage: $0 <project> <app> <handle> <post-id>" >&2; exit 2; }
+NAME=$1; APP=$2; HANDLE=${3#@}; ID=$4
 
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPTS/monid.sh"
-DIR="$(research_dir "$NAME")"
+DIR="$(research_dir "$NAME")/$APP"
 SRC="$DIR/$HANDLE/$ID"
 DEST="$PROJ_ROOT/pipeline/00-source/$NAME"
 
@@ -33,7 +33,7 @@ if [ "${SLIDES:-0}" -gt 0 ]; then
   exit 1
 fi
 
-[ -s "$SRC/video.mp4" ] || { echo "no video.mp4 in $SRC — run: scripts/deepen.sh $NAME $HANDLE" >&2; exit 1; }
+[ -s "$SRC/video.mp4" ] || { echo "no video.mp4 in $SRC — run: scripts/deepen.sh $NAME $APP $HANDLE" >&2; exit 1; }
 verify_video "$SRC/video.mp4"
 
 mkdir -p "$DEST"
@@ -41,12 +41,12 @@ cp "$SRC/video.mp4" "$DEST/reference.mp4"
 ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate \
   -show_entries format=duration -of default=nw=1 "$DEST/reference.mp4"
 
-python3 "$SCRIPTS/state.py" handle-set "$NAME" "$HANDLE" winner "$ID" >/dev/null
-python3 "$SCRIPTS/state.py" note "$NAME" "reference = @$HANDLE/$ID (research-led pick)"
+python3 "$SCRIPTS/state.py" handle-set "$NAME" "$APP" "$HANDLE" winner "$ID" >/dev/null
+python3 "$SCRIPTS/state.py" note "$NAME" "reference = $APP @$HANDLE/$ID (research-led pick)"
 
 VIEWS=$(awk -F'\t' -v id="$ID" '$1==id {print $2}' "$DIR/$HANDLE/manifest.tsv" 2>/dev/null || true)
 echo
-echo "reference: @$HANDLE/$ID${VIEWS:+  ($VIEWS views)}"
+echo "reference: $APP @$HANDLE/$ID${VIEWS:+  ($VIEWS views)}"
 echo "wrote    : $DEST/reference.mp4"
 echo
 echo "next: scripts/ingest.sh pipeline/00-source/$NAME/reference.mp4 $NAME [start] [length]"

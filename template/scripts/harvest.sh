@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stage R3: the shallow pass. Metrics, cover frames and the on-screen hook off every
-# cover, for every handle in the ledger.
-# Usage: scripts/harvest.sh <project> [handle|--all] [maxItems]
+# cover, for every handle of one app.
+# Usage: scripts/harvest.sh <project> <app> [handle|--all] [maxItems]
 #   maxItems defaults to 50. Around $0.02 an account at that setting.
 #
 # Serial by design (RULE 13) and resumable at every step: an account with posts.json
@@ -9,22 +9,23 @@
 # hooks-NN.md is not re-read. Interrupt it whenever; re-run it to continue.
 set -euo pipefail
 
-[ $# -ge 1 ] || { echo "usage: $0 <project> [handle|--all] [maxItems]" >&2; exit 2; }
-NAME=$1
-WHO=${2:---all}
-MAX=${3:-50}
+[ $# -ge 2 ] || { echo "usage: $0 <project> <app> [handle|--all] [maxItems]" >&2; exit 2; }
+NAME=$1; APP=$2
+WHO=${3:---all}
+MAX=${4:-50}
 
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPTS/monid.sh"
-DIR="$(research_dir "$NAME")"
+DIR="$(research_dir "$NAME")/$APP"
 STATE="$SCRIPTS/state.py"
 BATCH=12
+python3 "$STATE" apps "$NAME" | cut -f1 | grep -qx "$APP" \
+  || { echo "'$APP' is not in the app ledger -- run: scripts/state.py app $NAME $APP" >&2; exit 1; }
 
 if [ "$WHO" = "--all" ]; then
-  # Noise is in the ledger so the decision is recorded, not so it gets scraped.
-  HANDLES=$( { python3 "$STATE" handles "$NAME" promoter;
-               python3 "$STATE" handles "$NAME" competitor; } | cut -f1 )
-  [ -n "$HANDLES" ] || { echo "no promoters or competitors in the ledger — run the triage skill first" >&2; exit 1; }
+  # Only handles with evidence are in the ledger. Rejected ones never reach here.
+  HANDLES=$(python3 "$STATE" handles "$NAME" "$APP" | cut -f1)
+  [ -n "$HANDLES" ] || { echo "no handles in the ledger for $APP — run the network skill first" >&2; exit 1; }
 else
   HANDLES=${WHO#@}
 fi
@@ -84,18 +85,17 @@ PY
 
   # The hook bank. A separate headless session per batch of 12 keeps the covers out of
   # the orchestrator's context — 50 images an account across 20 accounts does not fit.
-  if ! command -v claude >/dev/null 2>&1; then
-    echo "  claude CLI not found — no hook transcription."
-    printf '%s\n' "$H/covers" > "$H/hooks.todo"
-    continue
-  fi
-
   # `|| true` because an unmatched glob makes ls fail, and under `set -e` with pipefail
   # a failing pipeline inside an assignment kills the run mid-account, silently.
   TOTAL=$(ls "$H/covers"/*.jpg 2>/dev/null | wc -l | tr -d ' ' || true)
-  [ "${TOTAL:-0}" -gt 0 ] || { echo "  no covers to read"; continue; }
+  if ! command -v claude >/dev/null 2>&1; then
+    echo "  claude CLI not found — no hook transcription (hooks.todo written)."
+    printf '%s\n' "$H/covers" > "$H/hooks.todo"
+    TOTAL=0
+  fi
+  [ "${TOTAL:-0}" -gt 0 ] || echo "  no covers to read"
   N=0; B=0
-  while [ $((N * BATCH)) -lt "$TOTAL" ]; do
+  while [ $((N * BATCH)) -lt "${TOTAL:-0}" ]; do
     N=$((N + 1))
     HB=$(printf '%s/hooks-%02d.md' "$H" "$N")
     [ -s "$HB" ] && continue
@@ -130,18 +130,18 @@ of this batch have in common." >/dev/null 2>&1 || echo "  batch $N failed — re
     echo "  HOOKS.md: $(ls "$H"/hooks-*.md 2>/dev/null | wc -l | tr -d ' ' || true) batches"
   fi
 
-  python3 "$STATE" handle-set "$NAME" "$HANDLE" harvested yes >/dev/null
+  python3 "$STATE" handle-set "$NAME" "$APP" "$HANDLE" harvested yes >/dev/null
   VIEWS=$(python3 -c "
 import json,sys
 print(sum(r.get('views') or 0 for r in json.load(open(sys.argv[1])) if isinstance(r, dict)))" "$JSON")
-  python3 "$STATE" handle-set "$NAME" "$HANDLE" views "$VIEWS" >/dev/null
+  python3 "$STATE" handle-set "$NAME" "$APP" "$HANDLE" views "$VIEWS" >/dev/null
   echo "  total views: $VIEWS"
 done
 
 if [ "$COUNT" -gt 0 ]; then
   USD=$(python3 -c "print(f'{$COUNT * $MAX * $PER_RESULT:.4f}')")
-  spend "$NAME" "$USD" "R3 harvest: $COUNT accounts x $MAX posts"
+  spend "$NAME" "$USD" "R3 harvest/$APP: $COUNT accounts x $MAX posts"
 fi
 
 echo
-echo "next: scripts/deepen.sh $NAME --rank"
+echo "next: scripts/deepen.sh $NAME $APP --rank"

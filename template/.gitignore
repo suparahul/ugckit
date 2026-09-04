@@ -12,9 +12,20 @@ pipeline/07-composite/*/
 
 # Scraped media is large and re-buyable; the analysis written from it is neither.
 # Keep NOTES.md, TEARDOWN.md, the tsv tables and the hook banks. Leave the rest out.
-research/*/*/covers/
-research/*/*/*/
-research/*/*/posts.json
 research/*/searches/
+research/*/*/searches/
+research/*/*/comments/
+research/*/*/*/covers/
+research/*/*/*/*/
+research/*/*/*/posts.json
 research/.monid.lock/
+research/*/*/logo.jpg
+
+# The Atlas: installed and generated on first run of `ugckit atlas`.
+atlas/node_modules/
+atlas/.next/
+atlas/next-env.d.ts
+atlas/data/index.json
+atlas/public/search.json
+atlas/tsconfig.tsbuildinfo
 *.bak

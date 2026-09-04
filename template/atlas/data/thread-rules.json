@@ -1,0 +1,146 @@
+{
+  "_comment": "Rules for the non-hook threads. `format`, `sound` and `cadence` are computed arithmetically in build-index.mjs and are exact; the rules here cover the two that need pattern matching. The @-tag patterns and the handle conventions are derived from the app ledger and the handles themselves at index time, not written here. Every match records the phrase that produced it.",
+  "insertion": {
+    "_note": "Four mechanics were identified across the five networks. A post can carry more than one.",
+    "rules": [
+      {
+        "id": "hashtag-and-onscreen",
+        "label": "Hashtag + on-screen text",
+        "note": "Vent Now's mechanic: the app is named inside the spoken/overlaid line and again as a hashtag. No disclosure, no link, no tag.",
+        "requiresBrandInHashtag": true
+      },
+      {
+        "id": "brand-in-copy",
+        "label": "Brand name in the caption",
+        "note": "The app is named in prose in the caption body, outside the hashtag block."
+      },
+      {
+        "id": "account-tag",
+        "label": "@-tag as collaborator credit",
+        "note": "The brand account is tagged in the caption, which reads as a collaborator credit rather than an ad. Patterns are the app names in the ledger.",
+        "patterns": []
+      },
+      {
+        "id": "comment-keyword",
+        "label": "Comment-keyword CTA",
+        "note": "'comment Roamy if you want me to send you the app'. Buys comment volume and moves the link off-platform into DMs.",
+        "patterns": [
+          "comment ['‘“]?\\w+['’”]? if",
+          "comment .{0,25}(send you|i'?ll send|dm)",
+          "comment below and i"
+        ]
+      },
+      {
+        "id": "affiliate-code",
+        "label": "Discount / affiliate code",
+        "note": "Potto's @demi_does.it carries 'use c0de DEMI' — affiliate, not organic.",
+        "patterns": [
+          "\\bc0de\\b",
+          "\\bcode\\s+[A-Z0-9]{3,}\\b",
+          "discount code",
+          "promo code",
+          "\\d+% off"
+        ]
+      },
+      {
+        "id": "bio-link",
+        "label": "Link in bio",
+        "patterns": [
+          "link in (my )?bio",
+          "lien en bio",
+          "link in profile",
+          "in meiner bio"
+        ]
+      }
+    ]
+  },
+  "disclosure": {
+    "_note": "Disclosure phrases in captions and bios. Absence is as load-bearing as presence — the tag `none` is real.",
+    "rules": [
+      {
+        "id": "ad-hashtag",
+        "label": "#ad",
+        "patterns": [
+          "#ad\\b",
+          "#advert",
+          "#sponsored",
+          "#paidpartnership",
+          "#paid\\b"
+        ]
+      },
+      {
+        "id": "de",
+        "label": "German (Anzeige / Werbung)",
+        "patterns": [
+          "\\banzeige\\b",
+          "\\bwerbung\\b",
+          "#werbung",
+          "bezahlte partnerschaft"
+        ]
+      },
+      {
+        "id": "fr",
+        "label": "French (publicité / publi)",
+        "patterns": [
+          "publicit[ée]",
+          "\\bpubli\\b",
+          "#pub\\b",
+          "collaboration commerciale"
+        ]
+      },
+      {
+        "id": "es-pt-it",
+        "label": "Spanish / Portuguese / Italian",
+        "patterns": [
+          "\\bpublicidad\\b",
+          "\\bpublicidade\\b",
+          "\\bpubblicit[àa]\\b",
+          "#adv\\b"
+        ]
+      },
+      {
+        "id": "en-prose",
+        "label": "English, in prose",
+        "patterns": [
+          "paid partnership",
+          "sponsored by",
+          "in partnership with",
+          "\\bgifted\\b",
+          "this is an ad"
+        ]
+      },
+      {
+        "id": "partner-bio",
+        "label": "Declared in bio",
+        "note": "Vent Now personas carry 'partner of vent now' in the bio rather than on the post.",
+        "bioPatterns": [
+          "partner of",
+          "partnered with",
+          "ambassador",
+          "\\bugc\\b",
+          "sponsored"
+        ]
+      }
+    ]
+  },
+  "handleConvention": {
+    "_note": "Derived at index time: a suffix after the last dot shared by two or more handles in one app is a convention. `brand-shaped` is the fallback for an app's own account.",
+    "rules": []
+  },
+  "sound": {
+    "_note": "Computed, not matched: a sound is `original` when its title is the platform's auto-generated original-sound label in any language, otherwise `licensed`. `brand-original` is an original sound belonging to one of the brand's own handles.",
+    "originalPatterns": [
+      "^original sound",
+      "^âm thanh gốc",
+      "^son original",
+      "^sonido original",
+      "^som original",
+      "^suono originale",
+      "^originalton",
+      "^origineel geluid",
+      "^oryginalny dźwięk",
+      "^orijinal ses",
+      "^原声"
+    ]
+  }
+}

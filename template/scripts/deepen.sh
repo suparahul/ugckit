@@ -2,50 +2,50 @@
 # Stage R4: the deep dive. Top accounts by total views, their best posts pulled as real
 # video or as slides.
 #
-#   scripts/deepen.sh <project> --rank [topN=5]     rank the harvested accounts, mark the top N
-#   scripts/deepen.sh <project> <handle> [topN=3]   pull that account's top N posts
-#   scripts/deepen.sh <project> --deep [topN=3]     every account marked deep
+#   scripts/deepen.sh <project> <app> --rank [topN=5]     rank the app's harvested accounts, mark the top N
+#   scripts/deepen.sh <project> <app> <handle> [topN=3]   pull that account's top N posts
+#   scripts/deepen.sh <project> <app> --deep [topN=3]     every account marked deep
 #
 # Costs no Monid: it reuses the posts.json that R3 already paid for. RULE 12 applies
 # anyway — those urls expire, so run this in the same week as the harvest.
 set -euo pipefail
 
-[ $# -ge 2 ] || { echo "usage: $0 <project> <--rank|--deep|handle> [topN]" >&2; exit 2; }
-NAME=$1; WHO=$2; TOPN=${3:-}
+[ $# -ge 3 ] || { echo "usage: $0 <project> <app> <--rank|--deep|handle> [topN]" >&2; exit 2; }
+NAME=$1; APP=$2; WHO=$3; TOPN=${4:-}
 
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPTS/monid.sh"
-DIR="$(research_dir "$NAME")"
+DIR="$(research_dir "$NAME")/$APP"
 STATE="$SCRIPTS/state.py"
 
 # ---------------------------------------------------------------- ranking
 if [ "$WHO" = "--rank" ]; then
   TOPN=${TOPN:-5}
-  echo "== ranking by total network views =="
+  echo "== $APP: ranking by total account views =="
   # Total views, not followers and not judgement. The ledger already carries the totals
   # harvest computed; this only decides where the line falls.
-  python3 "$STATE" handles "$NAME" | awk -F'\t' '$4=="yes"' | sort -t$'\t' -k3,3nr \
+  python3 "$STATE" handles "$NAME" "$APP" | awk -F'\t' '$4=="yes"' | sort -t$'\t' -k3,3nr \
     > "$DIR/deep.tsv" || true
-  [ -s "$DIR/deep.tsv" ] || { echo "nothing harvested yet — run scripts/harvest.sh first" >&2; exit 1; }
+  [ -s "$DIR/deep.tsv" ] || { echo "nothing harvested yet — run: scripts/harvest.sh $NAME $APP" >&2; exit 1; }
   I=0
-  while IFS=$'\t' read -r H BUCKET VIEWS REST; do
+  while IFS=$'\t' read -r H _APP VIEWS REST; do
     I=$((I + 1))
     if [ "$I" -le "$TOPN" ]; then
-      python3 "$STATE" handle-set "$NAME" "$H" deep yes >/dev/null
+      python3 "$STATE" handle-set "$NAME" "$APP" "$H" deep yes >/dev/null
       printf '  %2d. %-28s %12s  deep\n' "$I" "$H" "$VIEWS"
     else
       printf '  %2d. %-28s %12s\n' "$I" "$H" "$VIEWS"
     fi
   done < "$DIR/deep.tsv"
   echo
-  echo "next: scripts/deepen.sh $NAME --deep"
+  echo "next: scripts/deepen.sh $NAME $APP --deep"
   exit 0
 fi
 
 TOPN=${TOPN:-3}
 if [ "$WHO" = "--deep" ]; then
-  HANDLES=$(python3 "$STATE" handles "$NAME" | awk -F'\t' '$5=="yes" {print $1}')
-  [ -n "$HANDLES" ] || { echo "no accounts marked deep — run: $0 $NAME --rank" >&2; exit 1; }
+  HANDLES=$(python3 "$STATE" handles "$NAME" "$APP" | awk -F'\t' '$5=="yes" {print $1}')
+  [ -n "$HANDLES" ] || { echo "no accounts marked deep — run: $0 $NAME $APP --rank" >&2; exit 1; }
 else
   HANDLES=${WHO#@}
 fi
@@ -55,7 +55,7 @@ for HANDLE in $HANDLES; do
   JSON="$H/posts.json"
   echo
   echo "===== $HANDLE ====="
-  [ -s "$JSON" ] || { echo "  no posts.json — run: scripts/harvest.sh $NAME $HANDLE" >&2; continue; }
+  [ -s "$JSON" ] || { echo "  no posts.json — run: scripts/harvest.sh $NAME $APP $HANDLE" >&2; continue; }
 
   # manifest.tsv is every post; slides.tsv is every photo post. Both come out of the
   # posts.json already on disk — RULE 10: the slides are in the images array, there is

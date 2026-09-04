@@ -16,10 +16,15 @@ attempt. Only this file counts.
     state.py model set <slug> <duration_s>          # record a model switch
 
     state.py entry <project> <reference|research>   # which half of the pipeline runs
-    state.py niche <project> <text>                 # what the research phase searched for
-    state.py handle <project> <handle> <promoter|competitor|noise> [note]
-    state.py handle-set <project> <handle> <key> <value>
-    state.py handles <project> [bucket]             # the ledger, as tsv
+    state.py niche <project> <text>                 # the niche: a short phrase
+    state.py app <project> <app> [note]             # an app in the niche (the unit of research)
+    state.py app-set <project> <app> <key> <value>  # round, posts, views, evidence, note
+    state.py apps <project>                         # the app ledger, as tsv
+    state.py handle <project> <app> <handle> [evidence]   # a handle that promotes that app
+    state.py handle-set <project> <app> <handle> <key> <value>
+    state.py handles <project> [app]                # the handle ledger, as tsv
+    state.py reject <project> <handle> <reason>     # a false positive, so it is never re-examined
+    state.py rejected <project>
 """
 import json, os, sys, time, uuid
 
@@ -27,7 +32,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE = os.path.join(ROOT, "pipeline", "state", "pipeline.json")
 FEEDBACK = os.path.join(ROOT, "pipeline", "state", "feedback.jsonl")
 
-RESEARCH = ["discover", "triage", "harvest", "deepen", "teardown"]
+RESEARCH = ["product", "apps", "network", "harvest", "deepen", "teardown"]
 STAGES = ["setup"] + RESEARCH + ["ingest", "watch", "transcribe", "breakdown",
           "script", "generate", "review", "composite", "deliver"]
 
@@ -35,14 +40,17 @@ STAGES = ["setup"] + RESEARCH + ["ingest", "watch", "transcribe", "breakdown",
 # reaches stage 5 through `originate` instead, and these never run.
 REFERENCE_ONLY = ["ingest", "watch", "transcribe", "breakdown"]
 
-# Display numbers. The research half is R1-R5; the recreation half keeps 1-9.
-NUM = {s: f"R{i}" for i, s in enumerate(RESEARCH, 1)}
+# Display numbers. The research half is R0-R5; the recreation half keeps 1-9.
+NUM = {s: f"R{i}" for i, s in enumerate(RESEARCH, 0)}
 NUM.update({s: str(i) for i, s in enumerate(
     ["ingest", "watch", "transcribe", "breakdown", "script",
      "generate", "review", "composite", "deliver"], 1)})
 NUM["setup"] = "0"
 
-BUCKETS = ("promoter", "competitor", "noise")
+HANDLE_KEYS = ("harvested", "deep", "views", "posts", "winner", "evidence", "note", "own")
+APP_KEYS = ("round", "posts", "views", "evidence", "note", "sound")
+
+EMPTY_RESEARCH = {"niche": "", "product": "", "apps": {}, "rejected": {}}
 
 
 def load():
@@ -77,27 +85,46 @@ def project(d, name, create=False):
         d["projects"][name] = {
             "created": now(), "flow": "simple", "entry": "reference",
             "stages": {s: {"status": "pending"} for s in STAGES},
-            "research": {"niche": "", "handles": {}},
+            "research": dict(EMPTY_RESEARCH, apps={}, rejected={}),
             "notes": [], "costs": [],
         }
     p = d["projects"][name]
     # A project written before the research stages existed is missing their keys. Fill
     # them in on read so an old state file resumes instead of crashing.
     p.setdefault("entry", "reference")
-    p.setdefault("research", {"niche": "", "handles": {}})
+    p.setdefault("research", {})
+    for k, v in EMPTY_RESEARCH.items():
+        p["research"].setdefault(k, dict(v) if isinstance(v, dict) else v)
     for s in STAGES:
         p["stages"].setdefault(s, {"status": "pending"})
     return p
 
 
-def handle_row(p, handle, create=False):
-    h = p["research"]["handles"]
+def app_row(p, app, create=False):
+    apps = p["research"]["apps"]
+    if app not in apps:
+        if not create:
+            sys.exit(f"'{app}' is not in the app ledger -- run: state.py app <project> {app}")
+        apps[app] = {"added": now(), "handles": {}}
+    apps[app].setdefault("handles", {})
+    return apps[app]
+
+
+def handle_row(p, app, handle, create=False):
+    h = app_row(p, app, create=create)["handles"]
     if handle not in h:
         if not create:
-            sys.exit(f"'{handle}' is not in the ledger -- run: state.py handle <project> "
-                     f"{handle} <promoter|competitor|noise>")
-        h[handle] = {"bucket": "promoter", "added": now()}
+            sys.exit(f"'{handle}' is not in the ledger for {app} -- run: "
+                     f"state.py handle <project> {app} {handle} \"<evidence>\"")
+        h[handle] = {"added": now()}
     return h[handle]
+
+
+def all_handles(p, app=None):
+    for a, row in p["research"]["apps"].items():
+        if app is None or a == app:
+            for h, r in row.get("handles", {}).items():
+                yield a, h, r
 
 
 def cmd_show(name):
@@ -109,12 +136,17 @@ def cmd_show(name):
     if m:
         print(f"model    {m.get('slug')}  {m.get('duration_s')}s  "
               f"${m.get('price_per_s', 0) * m.get('duration_s', 0):.2f}/run")
-    niche = p["research"].get("niche")
-    if niche:
-        ledger = p["research"]["handles"]
-        buckets = ", ".join(f"{sum(1 for h in ledger.values() if h['bucket'] == b)} {b}"
-                            for b in BUCKETS if any(h["bucket"] == b for h in ledger.values()))
-        print(f"niche    {niche}" + (f"   ({buckets})" if buckets else ""))
+    r = p["research"]
+    if r.get("niche"):
+        apps = r["apps"]
+        nh = sum(1 for _ in all_handles(p))
+        print(f"niche    {r['niche']}   ({len(apps)} apps, {nh} handles, "
+              f"{len(r['rejected'])} rejected)")
+        for a, row in apps.items():
+            hs = row.get("handles", {})
+            done = sum(1 for h in hs.values() if h.get("harvested") == "yes")
+            print(f"  app    {a:<20} {len(hs)} handles, {done} harvested"
+                  + (f"   {row['note']}" if row.get("note") else ""))
     print()
     for s in STAGES:
         if s == "setup":
@@ -261,29 +293,65 @@ def main():
         print(f"{a[0]}.niche = {' '.join(a[1:])}")
         return
 
+    if cmd == "app":
+        if len(a) < 2:
+            sys.exit("usage: state.py app <project> <app> [note]")
+        d = load()
+        row = app_row(project(d, a[0], create=True), a[1], create=True)
+        if len(a) > 2:
+            row["note"] = " ".join(a[2:])
+        save(d)
+        print(f"app {a[1]}  ({len(row['handles'])} handles)")
+        return
+
+    if cmd == "app-set":
+        if len(a) < 4:
+            sys.exit("usage: state.py app-set <project> <app> <key> <value>\n"
+                     f"  keys: {', '.join(APP_KEYS)}")
+        d = load()
+        row = app_row(project(d, a[0], create=True), a[1])
+        val = " ".join(a[3:])
+        row[a[2]] = int(val) if val.isdigit() else val
+        save(d)
+        print(f"{a[1]}.{a[2]} = {row[a[2]]}")
+        return
+
+    if cmd == "apps":
+        if not a:
+            sys.exit("usage: state.py apps <project>")
+        d = load()
+        p = project(d, a[0])
+        for name, row in p["research"]["apps"].items():
+            hs = row.get("handles", {})
+            views = sum(int(h.get("views") or 0) for h in hs.values()) or row.get("views", "")
+            print("\t".join(str(x) for x in [
+                name, len(hs), sum(1 for h in hs.values() if h.get("harvested") == "yes"),
+                views, row.get("round", ""), row.get("note", "")]))
+        return
+
     if cmd == "handle":
         if len(a) < 3:
-            sys.exit(f"usage: state.py handle <project> <handle> <{'|'.join(BUCKETS)}> [note]")
-        name, handle, bucket = a[0], a[1].lstrip("@"), a[2]
-        if bucket not in BUCKETS:
-            sys.exit(f"bucket must be {'|'.join(BUCKETS)}")
+            sys.exit("usage: state.py handle <project> <app> <handle> [evidence]")
+        name, app, handle = a[0], a[1], a[2].lstrip("@")
         d = load()
-        row = handle_row(project(d, name, create=True), handle, create=True)
-        row["bucket"] = bucket
+        p = project(d, name, create=True)
+        if handle in p["research"]["rejected"]:
+            del p["research"]["rejected"][handle]       # a reversed decision, on purpose
+        row = handle_row(p, app, handle, create=True)
         if len(a) > 3:
-            row["note"] = " ".join(a[3:])
+            row["evidence"] = " ".join(a[3:])
         save(d)
-        print(f"{handle}  {bucket}")
+        print(f"{handle}  -> {app}")
         return
 
     if cmd == "handle-set":
-        if len(a) < 4:
-            sys.exit("usage: state.py handle-set <project> <handle> <key> <value>\n"
-                     "  keys: harvested, deep, views, posts, winner, note")
-        name, handle, key = a[0], a[1].lstrip("@"), a[2]
-        val = " ".join(a[3:])
+        if len(a) < 5:
+            sys.exit("usage: state.py handle-set <project> <app> <handle> <key> <value>\n"
+                     f"  keys: {', '.join(HANDLE_KEYS)}")
+        name, app, handle, key = a[0], a[1], a[2].lstrip("@"), a[3]
+        val = " ".join(a[4:])
         d = load()
-        row = handle_row(project(d, name, create=True), handle)
+        row = handle_row(project(d, name, create=True), app, handle)
         row[key] = int(val) if val.isdigit() else val
         save(d)
         print(f"{handle}.{key} = {row[key]}")
@@ -291,17 +359,39 @@ def main():
 
     if cmd == "handles":
         if not a:
-            sys.exit("usage: state.py handles <project> [bucket]")
+            sys.exit("usage: state.py handles <project> [app]")
         d = load()
         p = project(d, a[0])
         want = a[1] if len(a) > 1 else None
-        rows = [(h, r) for h, r in p["research"]["handles"].items()
-                if want is None or r["bucket"] == want]
+        if want is not None and want not in p["research"]["apps"]:
+            sys.exit(f"'{want}' is not in the app ledger -- run: state.py apps {a[0]}")
+        rows = list(all_handles(p, want))
         # Sorted by views so the ranking that decides the deep dive is visible here too.
-        for h, r in sorted(rows, key=lambda kv: -int(kv[1].get("views") or 0)):
-            print("\t".join([h, r["bucket"], str(r.get("views", "")),
+        for app, h, r in sorted(rows, key=lambda t: -int(t[2].get("views") or 0)):
+            print("\t".join([h, app, str(r.get("views", "")),
                              str(r.get("harvested", "")), str(r.get("deep", "")),
-                             str(r.get("note", ""))]))
+                             str(r.get("evidence", "") or r.get("note", ""))]))
+        return
+
+    if cmd == "reject":
+        if len(a) < 3:
+            sys.exit("usage: state.py reject <project> <handle> <reason>")
+        d = load()
+        p = project(d, a[0], create=True)
+        handle = a[1].lstrip("@")
+        for app in p["research"]["apps"].values():
+            app.get("handles", {}).pop(handle, None)
+        p["research"]["rejected"][handle] = {"reason": " ".join(a[2:]), "ts": now()}
+        save(d)
+        print(f"{handle}  rejected: {' '.join(a[2:])}")
+        return
+
+    if cmd == "rejected":
+        if not a:
+            sys.exit("usage: state.py rejected <project>")
+        d = load()
+        for h, r in project(d, a[0])["research"]["rejected"].items():
+            print(f"{h}\t{r['reason']}")
         return
 
     if cmd == "set":

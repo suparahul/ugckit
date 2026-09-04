@@ -12,7 +12,9 @@ case "${1:-help}" in
   state)    shift; exec "$PY" "$PROJ/scripts/state.py" "$@" ;;
   qc)       shift; exec "$PY" "$PROJ/scripts/qc.py" "$@" ;;
   library)  shift; exec "$PY" "$PROJ/scripts/library.py" "$@" ;;
-  discover) shift; exec "$PROJ/scripts/discover.sh" "$@" ;;
+  atlas)    shift; exec "$PROJ/scripts/atlas.sh" "$@" ;;
+  apps)     shift; exec "$PROJ/scripts/apps.sh" "$@" ;;
+  network)  shift; exec "$PROJ/scripts/network.sh" "$@" ;;
   harvest)  shift; exec "$PROJ/scripts/harvest.sh" "$@" ;;
   deepen)   shift; exec "$PROJ/scripts/deepen.sh" "$@" ;;
   handoff)  shift; exec "$PROJ/scripts/handoff.sh" "$@" ;;
@@ -31,12 +33,15 @@ ugckit — a niche or a reference video in, a recreation out.
   ugckit state show <proj>   pipeline progress, spend and open feedback
   ugckit state projects      list projects
 
-  research (R1-R5), optional — costs Monid credit:
-  ugckit discover <proj> "<keyword>" ...
-  ugckit harvest <proj> --all [maxItems]
-  ugckit deepen <proj> --rank | --deep | <handle>
-  ugckit handoff <proj> <handle> <post-id>
+  research (R0-R5), optional — costs Monid credit:
+  ugckit apps <proj> "<keyword>" ...            find the apps in the niche
+  ugckit network <proj> <app> "<keyword>" ...   find who really promotes one app
+  ugckit network <proj> <app> --comments <url>  read a post's comments
+  ugckit harvest <proj> <app> --all [maxItems]
+  ugckit deepen <proj> <app> --rank | --deep | <handle>
+  ugckit handoff <proj> <app> <handle> <post-id>
   ugckit library <stats|templates|hooks|formats|mechanics|teardowns>
+  ugckit atlas [--index]                        explore everything scraped, at http://localhost:3210
 
   recreation (1-9):
   ugckit ingest <video> <proj> [start] [len]
