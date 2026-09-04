@@ -166,8 +166,11 @@ A **niche** is a short phrase — `mental wellness`, `cat care`, `looksmaxxing`.
 three words. It is the starting point for R1, not a definition to be refined.
 
 R1 runs in **rounds**: search, read `scan.tsv`, add the apps you are sure of, expand the
-keywords from the app names, the handle patterns and the hashtags you just saw, search
-again. A keyword already searched is free. Stop at five apps or when a round adds none.
+keywords from the apps just confirmed (`apps.sh --expand`: their names, the hashtags on
+their posts, the handle patterns of their promoters), search again. **Every keyword
+carries the word "app"** — `youth sports app`, not `how to film youth sports`; problem
+phrases return tutorials, and are for a later hidden-promoter round only. A keyword
+already searched is free. Stop at five apps or when a round adds none.
 Spend more here than feels natural — a wrong app in the ledger is paid for at every
 stage after it.
 

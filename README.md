@@ -90,7 +90,7 @@ want recreated.
 | Stage | What happens | Cost |
 |---|---|---|
 | R0 product | read your website, doc or repo; write what the product is and which niche it is in | — |
-| R1 apps | keyword searches in rounds, expanding the keywords each round, until five apps are found | ~$0.04 a keyword |
+| R1 apps | `<niche> app` searches in rounds, expanding the keywords from each confirmed app, until five apps are found | ~$0.04 a keyword |
 | R2 network | per app, the handles that really promote it — with evidence, or rejected | ~$0.02 a search |
 | R3 harvest | metrics, cover frames, and the on-screen hook off every cover | ~$0.02 an account |
 | R4 deepen | per app, top 5 accounts by views, their best posts as video or slides | free — reuses R3 |

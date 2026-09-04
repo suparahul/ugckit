@@ -6,6 +6,7 @@ description: Stage R1 — find up to five apps in the niche that are promoting o
 # Stage R1 — apps
 
     scripts/apps.sh <project> "<keyword>" ["<keyword>" ...]
+    scripts/apps.sh <project> --expand              # keywords for the next round
 
 Writes `research/<project>/searches/*.json`, then rebuilds three tables from every
 search ever run: `scan.tsv` (recurring terms), `handles.tsv` (one row per handle with
@@ -31,6 +32,26 @@ the point is to find its rivals.
     scripts/state.py init <project> --entry research
     scripts/state.py app <project> <app> "named by the user"
 
+## The first keyword list: every keyword carries the word "app"
+
+You are searching for products, so search the way a person who wants a product searches.
+Round 1 is four to six keywords built from the niche phrase and the word **app**:
+
+    "<niche> app"   "<niche> apps"   "best <niche> app"   "app for <niche>"
+
+plus one or two where the niche's main noun is swapped for its near neighbours —
+`youth sports app` also wants `sports video app` and `game film app`.
+
+Do **not** start from problem phrases. `how to film youth sports`, `best camera for
+soccer games`, `record basketball games` return tutorials, gear reviews and parents'
+highlight clips. They can run for a whole round and surface no app at all, at full cost.
+For Ballercam, `youth sports app` alone would have found it in the first search. The
+script warns when a round has no "app" in any keyword.
+
+Problem phrases have one job, later: a **hidden-promoter round**, after the ledger has
+apps, to catch posts where the app is only on the screen. Say that is what the round is
+for when you propose it.
+
 ## Rounds
 
 Each round is the same four steps. Expect two or three rounds; sometimes more.
@@ -47,15 +68,24 @@ Each round is the same four steps. Expect two or three rounds; sometimes more.
         scripts/state.py app <project> <app> "<evidence: N handles, hashtag #x, best post 1.2M>"
         scripts/state.py app-set <project> <app> round <n>
 
-4. **Expand the keywords for the next round.** New keywords come from three places, and
-   this is the part that finds the gold the first search missed:
-   - the names of the apps just found, and `<name> app`
-   - the pattern in the handles that promote them — `<firstname>.traveltips` means
-     search `traveltips`; `<something>.lifts` means search `lifts`
-   - the hashtags on the top posts that are not the niche word itself
+4. **Expand the keywords from the apps you just confirmed.** Run
 
-   A keyword already searched costs nothing again, so repeat the whole list plus the new
-   ones.
+        scripts/apps.sh <project> --expand
+
+   It reads every post that names each app in the ledger and prints the hashtags, the
+   `<x> app` phrases and the handle patterns around them, then a suggested list of
+   keywords not yet searched. That is the raw material; you choose. The confirmed apps
+   are the best guide to the words the niche's promoters use, because their posts were
+   written to be found by the same people you are looking for. New keywords come from:
+   - the app's own name, `<name> app`, `apps like <name>`, `<name> alternative` — the
+     rivals name each other in comparison posts
+   - the hashtags its posts carry that are not the niche word itself — turn each into
+     `<hashtag> app`
+   - the pattern in the handles that promote it — `<firstname>.traveltips` means search
+     `traveltips app`; `<something>.lifts` means `lifts app`
+
+   Keep the word "app" in the new keywords too. A keyword already searched costs nothing
+   again, so repeat the whole list plus the new ones.
 
 Stop when the ledger has five apps, or when a round adds no new app. Then say which.
 

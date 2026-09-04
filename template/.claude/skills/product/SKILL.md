@@ -34,9 +34,12 @@ Any of these, in any mix. Read all of what is given, not the first page of it.
 4. **Niche** — one short phrase, two or three words, in the language people type into
    TikTok search. Examples: `mental wellness`, `cat care`, `looksmaxxing`, `travel
    planning`, `gym split`. Not a category, not a sentence, not a demographic.
-5. **Search words** — five to ten phrases the *audience* would type to find this kind
-   of content. These become the first keyword list for R1. Audience words, not marketing
-   words: "why is my cat throwing up", not "pet wellness platform".
+5. **Search words** — four to six phrases that find *apps*, each carrying the word
+   "app": `<niche> app`, `<niche> apps`, `best <niche> app`, `app for <niche>`, and one
+   or two with the niche's main noun swapped for a neighbour (`sports video app` next
+   to `youth sports app`). These become the first keyword list for R1. Not problem
+   phrases: "how to film youth sports" finds tutorials, "youth sports app" finds apps.
+   Problem phrases are kept for a later hidden-promoter round in R1; list at most two.
 6. **What I could not find** — named gaps. Never fill a gap with a guess.
 
 Then record the niche where the scripts read it:

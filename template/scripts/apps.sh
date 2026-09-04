@@ -3,6 +3,13 @@
 # everything that came back: which names, hashtags and handles keep recurring.
 #
 #   scripts/apps.sh <project> <keyword> [keyword ...]
+#   scripts/apps.sh <project> --expand [app ...]      # keywords for the next round
+#
+# Keywords should carry the word "app": "<niche> app", "best <niche> app". A problem
+# phrase ("how to film youth sports") returns tutorials, not apps. --expand reads every
+# search already run, finds the posts that name each confirmed app (ledger by default)
+# and prints the hashtags, "<x> app" phrases and handle patterns around them -- that is
+# where the next round's keywords come from.
 #
 # Run it in rounds. Each round the agent reads scan.tsv, decides which apps are real,
 # expands the keyword list from what it saw, and runs again. A keyword that was already
@@ -20,6 +27,96 @@ mkdir -p "$DIR/searches"
 
 MAXITEMS="${MAXITEMS:-40}"
 CALLS=0
+
+if [ "${1:-}" = "--expand" ]; then
+  shift
+  if [ $# -eq 0 ]; then
+    # no names given: every app already in the ledger
+    set -- $(python3 "$(dirname "$0")/state.py" apps "$NAME" 2>/dev/null | cut -f1)
+    [ $# -gt 0 ] || { echo "no apps in the ledger yet -- scripts/state.py app $NAME <app>" >&2; exit 1; }
+  fi
+  python3 - "$DIR" "$@" <<'PY2'
+import collections, glob, json, os, re, sys
+d, apps = sys.argv[1], sys.argv[2:]
+STOP = {"fyp", "foryou", "foryoupage", "viral", "tiktok", "trending", "fy", "xyzbca",
+        "parati", "fypage", "foryourpage", "viralvideo", "capcut", "app", "apps", "the",
+        "this", "that", "best", "new", "free", "my", "an", "a", "your", "our", "one"}
+rows = []
+for f in glob.glob(os.path.join(d, "searches", "*.json")):
+    try:
+        rows += [r for r in json.load(open(f)) if isinstance(r, dict)]
+    except Exception:
+        pass
+seen = set()
+rows = [r for r in rows if not (r.get("id") in seen or seen.add(r.get("id")))]
+already = set()
+for f in glob.glob(os.path.join(d, "searches", "*.json")):
+    already.add(os.path.basename(f).split(".")[0])
+def tags(r):
+    return [h if isinstance(h, str) else str((h or {}).get("name") or "") for h in (r.get("hashtags") or [])]
+suggest = []
+for app in apps:
+    key = re.sub(r"[^a-z0-9]", "", app.lower())
+    if not key:
+        continue
+    hits = []
+    for r in rows:
+        ch = r.get("channel") or {}
+        blob = re.sub(r"[^a-z0-9]", "", " ".join([r.get("title") or "", ch.get("name") or "",
+                                                  ch.get("username") or ""] + tags(r)).lower())
+        if key in blob:
+            hits.append(r)
+    print(f"== {app}: {len(hits)} posts name it, {len({(r.get('channel') or {}).get('username') for r in hits})} handles ==")
+    if not hits:
+        print("   nothing in the searches so far names this app -- search its name first")
+        print()
+        continue
+    ht, ph, hn = collections.Counter(), collections.Counter(), collections.Counter()
+    for r in hits:
+        cap = r.get("title") or ""
+        u = (r.get("channel") or {}).get("username") or ""
+        for t in tags(r):
+            t = t.lower().strip()
+            if t and t not in STOP and key not in re.sub(r"[^a-z0-9]", "", t) and len(t) > 2:
+                ht[t] += 1
+        for m in re.finditer(r"\b([A-Za-z][A-Za-z0-9]{2,})\s+apps?\b", cap):
+            w = m.group(1).lower()
+            if key not in w and w not in STOP:
+                ph[w + " app"] += 1
+        # <name>.<word> / <name>_<word>: the word after the separator is a niche label
+        m = re.match(r"^[a-z0-9]+[._]([a-z]{4,})$", u)
+        if m and key not in m.group(1):
+            hn[m.group(1)] += 1
+    print("   hashtags on those posts:  " + "  ".join(f"#{t}({n})" for t, n in ht.most_common(12)))
+    if ph:
+        print("   '<x> app' in captions:    " + "  ".join(f"{t}({n})" for t, n in ph.most_common(8)))
+    if hn:
+        print("   handle patterns:          " + "  ".join(f"{t}({n})" for t, n in hn.most_common(6)))
+    for kw in [app, f"{app} app", f"apps like {app}", f"{app} alternative"]:
+        suggest.append(kw)
+    for t, n in ht.most_common(4):
+        if n >= 2:
+            suggest.append(t if "app" in t else f"{t} app")
+    for t, _ in ph.most_common(3):
+        suggest.append(t)
+    print()
+out = []
+for kw in suggest:
+    slug = re.sub(r"[^a-z0-9-]", "", kw.lower().replace(" ", "-"))
+    if slug not in already and kw not in out:
+        out.append(kw)
+print("suggested next round (not yet searched):")
+print("   " + "  ".join(f'"{k}"' for k in out[:12]))
+PY2
+  exit 0
+fi
+
+# A round with no "app" in any keyword finds tutorials and tips, not products.
+if ! printf '%s\n' "$@" | grep -qi '\bapps\?\b'; then
+  echo "note: none of these keywords contains the word \"app\". Problem phrases surface" >&2
+  echo "      tutorials; \"<niche> app\" surfaces apps. Add it unless this is a deliberate" >&2
+  echo "      hidden-promoter round." >&2
+fi
 
 for KW in "$@"; do
   SLUG=$(printf '%s' "$KW" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9-')
@@ -134,5 +231,6 @@ fi
 
 echo
 echo "next: read scan.tsv. A term that is an app, with several handles behind it, goes in"
-echo "      the ledger: scripts/state.py app $NAME <app>. Then expand the keywords and re-run,"
+echo "      the ledger: scripts/state.py app $NAME <app>. Then get the next round's keywords"
+echo "      from the apps you confirmed: scripts/apps.sh $NAME --expand"
 echo "      or move on: scripts/network.sh $NAME <app> \"<app name>\" ..."
