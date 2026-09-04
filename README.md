@@ -18,12 +18,12 @@ Open any coding agent — Claude Code, Cursor, Codex — and paste this. It inst
 everything and walks you through the rest, one step at a time.
 
 ```
-Set up ugckit for me in a new folder called ugc, then take me through setup.
+Set up ugckit for me in a new folder called organic-factory, then take me through setup.
 
 1. Run exactly this in the terminal:
-   curl -fsSL https://raw.githubusercontent.com/suparahul/ugckit/main/install.sh | sh -s -- ugc
+   curl -fsSL https://raw.githubusercontent.com/suparahul/ugckit/main/install.sh | sh -s -- organic-factory
 
-2. Go into the ugc folder, read AGENTS.md, and follow it.
+2. Go into the organic-factory folder, read AGENTS.md, and follow it.
 
 3. Read .claude/skills/setup/SKILL.md in that folder and do everything it
    says, in order.
@@ -43,12 +43,12 @@ That is all a first-time user needs. Everything below is the manual version.
 
 One line, nothing to clone:
 
-    curl -fsSL https://raw.githubusercontent.com/suparahul/ugckit/main/install.sh | sh -s -- ugc
+    curl -fsSL https://raw.githubusercontent.com/suparahul/ugckit/main/install.sh | sh -s -- organic-factory
 
 Or from a clone:
 
     git clone https://github.com/suparahul/ugckit && cd ugckit
-    ./install.sh ~/ugc
+    ./install.sh ~/organic-factory
 
 The installer checks for ffmpeg, python 3.9+, curl and git, scaffolds the project,
 creates a `.venv`, installs dependencies, and writes the Supagen MCP config. It is
@@ -66,7 +66,7 @@ more and re-enter it — it now registers the key with the CLI as well.
 
 ## Then
 
-    cd ~/ugc
+    cd ~/organic-factory
     ./ugckit key                        # asks for each value it needs
     ./ugckit doctor                     # tools, deps, credentials, live auth
     claude                              # or: codex — both read AGENTS.md
