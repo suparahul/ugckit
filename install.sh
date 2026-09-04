@@ -186,9 +186,9 @@ $(b "installed.")
   Next:
 
     1.  cd $TARGET
-    2.  ./ugckit key                      it asks for your Supagen key and
-                                          workspace id, and hides what you type
-                                          (and a Monid key, if you want research)
+    2.  ./ugckit key                      it asks for your Supagen key and your
+                                          Monid key, and hides what you type
+                                          (the agent sets the workspace id itself)
     3.  ./ugckit doctor                   confirm everything is wired up
     4.  claude                            the agent reads AGENTS.md and takes over
                                           — ask it to run the setup skill first

@@ -68,7 +68,7 @@ more and re-enter it — it now registers the key with the CLI as well.
 ## Then
 
     cd ~/organic-factory
-    ./ugckit key                        # asks for each value it needs
+    ./ugckit key                        # asks for your two secrets; the agent sets the workspace id
     ./ugckit doctor                     # tools, deps, credentials, live auth
     claude                              # or: codex — both read AGENTS.md
 

@@ -105,10 +105,11 @@ else:
             bad(f"{k} looks like two variables welded together ({len(v)} chars)",
                 "./ugckit key  -- it rewrites the lines cleanly")
 
-    for k, minlen in [("SUPAGEN_API_KEY", 20), ("SUPAGEN_WORKSPACE_ID", 36)]:
+    for k, minlen in [("SUPAGEN_API_KEY", 20), ("SUPAGEN_WORKSPACE_ID", 20)]:
         v = env.get(k, "")
         if not v:
-            bad(f"{k} not set", "./ugckit key")
+            bad(f"{k} not set", "./ugckit key" if k == "SUPAGEN_API_KEY" else
+                "agent: list_workspaces over MCP, then  ./ugckit workspace <id>")
         elif len(v) < minlen:
             bad(f"{k} is only {len(v)} chars, expected >= {minlen}",
                 "re-copy the whole value from Supagen, then ./ugckit key")
@@ -119,8 +120,8 @@ else:
     # user already has never touches Monid. Warn, never fail.
     mk = env.get("MONID_API_KEY", "")
     if not mk:
-        warn("MONID_API_KEY not set", "only for the research stages -- get a key at "
-                                      "https://monid.ai, then ./ugckit key")
+        warn("MONID_API_KEY not set", "the research stages need it -- key at "
+                                      "https://app.monid.ai/access/api-keys, then ./ugckit key")
     elif not mk.startswith("monid_"):
         warn(f"MONID_API_KEY does not start with 'monid_' ({len(mk)} chars)",
              "expected monid_<stage>_<secret> -- re-copy it")

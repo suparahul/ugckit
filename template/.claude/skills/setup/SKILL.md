@@ -17,7 +17,7 @@ Fix everything it marks with a red ✗ before continuing. Common cases:
 
 - **ffmpeg missing** → `brew install ffmpeg` (macOS) or `apt install ffmpeg`.
 - **python deps missing** → `.venv/bin/pip install -r requirements.txt`.
-- **.env missing** → `./ugckit key` creates it (step 2).
+- **.env missing** → `./ugckit workspace` and `./ugckit key` create it (steps 2–3).
 
 Two tools are yellow `!`, not red, but **install them anyway, now.** Setup is complete
 only when everything is in place; do not ask the user which path they want yet — that
@@ -27,48 +27,7 @@ question comes at the end, in step 8, when there is nothing left to install.
   and so does the next line.
 - **monid missing** → `npm install -g @monid-ai/cli`. The research half needs it.
 
-## 2. Credentials
-
-Three values have to end up in `.env`: `SUPAGEN_API_KEY`, `SUPAGEN_WORKSPACE_ID` and
-`MONID_API_KEY`. All three, every user — the command offers to skip Monid, and the user
-should say yes to setting it. It also registers the Monid key with the monid CLI, which
-keeps its own store and ignores `.env`. `doctor.py` checks both places.
-
-There is one command, and it takes no arguments:
-
-    ./ugckit key
-
-It asks for each value in turn and hides what the user types. **Give them exactly that,
-character for character.** Do not write `./ugckit key SUPAGEN_API_KEY` — a name after
-`key` reads like a blank to fill in, and what people fill it in with is the secret
-itself, which then sits in their shell history.
-
-**Do not tell them to "edit .env" or "open the file".** Many users are not in an editor
-and will not know how.
-
-**You cannot run this yourself, and must not try.** It exits non-zero when its input is
-not a terminal, because for you to pipe a value in, the value has to be in your context
-first — which is the thing being avoided. So:
-
-1. Tell them where the values are: **API key** — Supagen dashboard → Settings → API
-   keys. **Workspace id** — the long id in the dashboard web address. **Monid key** —
-   monid.ai → Keys; they also need credit there, a few dollars covers many teardowns.
-2. Give them `./ugckit key`. In Claude Code they can put `!` in front of it to run it
-   inside the session.
-3. **Wait.** Do not move on until they say they are done.
-4. Verify with `scripts/doctor.py` — never by reading `.env`.
-
-Besides hiding the value, the command fixes the three things that silently break a
-hand-edited `.env`: a missing trailing newline welding two variables into one, and the
-quotes or trailing space people copy along with the key. All three show up later as a
-401 with nothing pointing at the cause.
-
-**Never ask them to paste the key into the chat, and never print it.** If you must
-inspect `.env`, redact:
-
-    sed -E 's/(sk_[A-Za-z0-9]{6})[A-Za-z0-9_-]*/\1***REDACTED***/g' .env
-
-## 3. MCP
+## 2. MCP — first, because it hands you the workspace id
 
 **Work out where you are running first, then give only the steps for that.** The user
 may be in a terminal, or in a desktop app with no terminal at all. Do not read them a
@@ -102,15 +61,64 @@ first, then tell them what they should now be seeing.
 - **Anything else** — give them the server URL and transport from `docs/mcp-setup.md`
   and tell them to look for Connectors, MCP or Integrations in settings.
 
-### Then prove it
+### Then prove it, and take the workspace id
 
 Call `ping`, then `list_workspaces`. If `list_workspaces` returns their workspace, MCP
-is connected and you can continue. If the supagen tools are not available to you at all,
+is connected. **Write the workspace id yourself** — it is not a secret and the user
+should never be sent to find it in a web address:
+
+    ./ugckit workspace <id>
+
+If they have more than one workspace, show the names and ask which. Then continue. If the supagen tools are not available to you at all,
 the client was started before the config existed — ask them to restart it. Do not
 guess: `doctor.py` can see the config file but cannot see whether the login happened.
 
 MCP manages templates only. Generation goes over curl (AGENTS.md rule 2), which is why
 `SUPAGEN_API_KEY` is still needed after MCP works.
+
+## 3. Credentials
+
+Two secrets have to end up in `.env`: `SUPAGEN_API_KEY` and `MONID_API_KEY`. Both, every
+user. (The workspace id is already there from step 2.) The command also registers the
+Monid key with the monid CLI, which keeps its own store and ignores `.env`; `doctor.py`
+checks both places. Monid publishes its own agent instructions at
+https://monid.ai/SKILL.md — `./ugckit key` is their "keys add" step done safely; the
+optional `monid setup --client <your-agent-name> --email <their email>` signal you may
+run if they agree.
+
+There is one command, and it takes no arguments:
+
+    ./ugckit key
+
+It asks for each value in turn and hides what the user types. **Give them exactly that,
+character for character.** Do not write `./ugckit key SUPAGEN_API_KEY` — a name after
+`key` reads like a blank to fill in, and what people fill it in with is the secret
+itself, which then sits in their shell history.
+
+**Do not tell them to "edit .env" or "open the file".** Many users are not in an editor
+and will not know how.
+
+**You cannot run this yourself, and must not try.** It exits non-zero when its input is
+not a terminal, because for you to pipe a value in, the value has to be in your context
+first — which is the thing being avoided. So:
+
+1. Tell them where the values are: **Supagen API key** — Supagen dashboard → Settings
+   → API keys. **Monid key** — https://app.monid.ai/access/api-keys (an account at
+   app.monid.ai first); they also need credit there, a few dollars covers many teardowns.
+2. Give them `./ugckit key`. In Claude Code they can put `!` in front of it to run it
+   inside the session.
+3. **Wait.** Do not move on until they say they are done.
+4. Verify with `scripts/doctor.py` — never by reading `.env`.
+
+Besides hiding the value, the command fixes the three things that silently break a
+hand-edited `.env`: a missing trailing newline welding two variables into one, and the
+quotes or trailing space people copy along with the key. All three show up later as a
+401 with nothing pointing at the cause.
+
+**Never ask them to paste the key into the chat, and never print it.** If you must
+inspect `.env`, redact:
+
+    sed -E 's/(sk_[A-Za-z0-9]{6})[A-Za-z0-9_-]*/\1***REDACTED***/g' .env
 
 ## 4. Ask which model
 

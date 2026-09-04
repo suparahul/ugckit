@@ -9,6 +9,7 @@ case "${1:-help}" in
   doctor)   shift; exec "$PY" "$PROJ/scripts/doctor.py" "$@" ;;
   ui)       shift; exec "$PY" "$PROJ/scripts/ui.py" "$@" ;;
   key)      shift; exec "$PY" "$PROJ/scripts/setkey.py" "$@" ;;
+  workspace) shift; exec "$PY" "$PROJ/scripts/setkey.py" --workspace "$@" ;;
   state)    shift; exec "$PY" "$PROJ/scripts/state.py" "$@" ;;
   qc)       shift; exec "$PY" "$PROJ/scripts/qc.py" "$@" ;;
   library)  shift; exec "$PY" "$PROJ/scripts/library.py" "$@" ;;
@@ -29,7 +30,8 @@ ugckit — a niche or a reference video in, a recreation out.
 
   ugckit doctor              preflight: tools, deps, credentials, live auth
   ugckit ui [--port N]       local review UI (default http://127.0.0.1:7878)
-  ugckit key                 fill in .env — it asks you for each value
+  ugckit key                 fill in .env — it asks you for each secret
+  ugckit workspace <id>      the agent sets this from list_workspaces (MCP)
   ugckit state show <proj>   pipeline progress, spend and open feedback
   ugckit state projects      list projects
 

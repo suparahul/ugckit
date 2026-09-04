@@ -3,10 +3,15 @@
 
     ./ugckit key
 
-with nothing after it. It asks for each value in turn, hides what you type, and
+with nothing after it. It asks for each secret in turn, hides what you type, and
 writes the file. Taking no arguments is deliberate: a name after `key` reads like
 a blank to fill in, and the value people fill it in with is their secret, which
 then sits in their shell history forever.
+
+The workspace id is not a secret and the user should never have to find it: the
+agent reads it from `list_workspaces` over MCP and writes it with
+
+    ./ugckit workspace <id>
 """
 import getpass
 import os
@@ -22,12 +27,9 @@ ENV = os.path.join(ROOT, ".env")
 KEYS = [
     ("SUPAGEN_API_KEY", "your Supagen API key",
      "Supagen dashboard -> Settings -> API keys", 20, True),
-    ("SUPAGEN_WORKSPACE_ID", "your Supagen workspace id",
-     "the long id in your Supagen dashboard web address", 36, True),
-    # Only the research stages spend against this. Skipping it is the normal case
-    # for anyone who already has the reference video they want to recreate.
-    ("MONID_API_KEY", "your Monid key — only if you want the research stages",
-     "https://monid.ai -> Keys. Press return to skip it.", 20, False),
+    # The research stages spend against this. Setup asks every user for it.
+    ("MONID_API_KEY", "your Monid key",
+     "https://app.monid.ai/access/api-keys  (create an account at app.monid.ai first)", 20, False),
 ]
 
 RED, GREEN, DIM, OFF = "\033[31m", "\033[32m", "\033[2m", "\033[0m"
@@ -86,13 +88,36 @@ def clean(value):
     return value.strip().strip('"').strip("'").strip()
 
 
+def set_workspace(value):
+    """Not a secret, so it may arrive on the command line -- from the agent, which got
+    it from list_workspaces over MCP. Nobody should have to go looking for it."""
+    value = clean(value)
+    if not value or " " in value or len(value) < 20:
+        die("that does not look like a workspace id (expected the long id list_workspaces returns)")
+    if value.startswith(("sk_", "monid_")):
+        die("that looks like an API key, not a workspace id -- keys go through: ./ugckit key")
+    if not os.path.exists(ENV):
+        example = os.path.join(ROOT, ".env.example")
+        open(ENV, "w").write(open(example).read() if os.path.exists(example) else "")
+        os.chmod(ENV, 0o600)
+    lines, how = put(read_env(), "SUPAGEN_WORKSPACE_ID", value)
+    write_env(lines)
+    print(f"{GREEN}SUPAGEN_WORKSPACE_ID {how}{OFF} ({len(value)} characters)")
+    return 0
+
+
 def main():
     if len(sys.argv) > 1:
         arg = sys.argv[1]
-        known = {k for k, *_ in KEYS}
+        known = {k for k, *_ in KEYS} | {"SUPAGEN_WORKSPACE_ID"}
         if arg in ("-h", "--help"):
-            print("usage: ./ugckit key      (no arguments — it asks you for each value)")
+            print("usage: ./ugckit key                (no arguments — it asks you for each secret)\n"
+                  "       ./ugckit workspace <id>     (the agent sets this from list_workspaces)")
             return 0
+        if arg == "--workspace":
+            if len(sys.argv) < 3:
+                die("usage: ./ugckit workspace <id>")
+            return set_workspace(sys.argv[2])
         if arg in known:
             print(f"{DIM}note: you do not need to name the key. "
                   f"Just run: ./ugckit key{OFF}\n")
@@ -132,8 +157,9 @@ def main():
     for name, what, where, minlen, required in KEYS:
         have = existing.get(name, "")
         if not required and not have:
-            print(f"\n{name} is optional — the research stages use it, nothing else.")
-            if input("  Set it now? [y/N] ").strip().lower() not in ("y", "yes"):
+            print(f"\n{name} — the research stages spend against it. Setup wants it; only skip")
+            print("it if you know you will never run research from this folder.")
+            if input("  Set it now? [Y/n] ").strip().lower() in ("n", "no"):
                 print("  skipped.\n")
                 continue
         if have:
