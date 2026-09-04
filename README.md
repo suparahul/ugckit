@@ -25,7 +25,9 @@ Set up ugckit for me in a new folder called organic-factory, then take me throug
 
 2. Go into the organic-factory folder, read AGENTS.md, and follow it.
 
-3. Read .claude/skills/setup/SKILL.md in that folder and do everything it
+3. The stage instructions are plain markdown files, one per stage, under
+   .claude/skills/<stage>/SKILL.md. Any agent can read them; the folder name
+   is only where Claude Code looks. Read the setup one and do everything it
    says, in order. Install and set up everything it names, then stop and ask
    me whether I want to generate from a reference video or start research.
 
