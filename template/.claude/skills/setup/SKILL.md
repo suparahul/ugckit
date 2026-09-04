@@ -102,8 +102,9 @@ and will not know how.
 not a terminal, because for you to pipe a value in, the value has to be in your context
 first — which is the thing being avoided. So:
 
-1. Tell them where the values are: **Supagen API key** — Supagen dashboard → Settings
-   → API keys. **Monid key** — https://app.monid.ai/access/api-keys (an account at
+1. Tell them where the values are: **Supagen API key** — it is shown during Supagen
+   onboarding; afterwards, dashboard left menu → **Developer** → **API keys**. (Not
+   under Settings.) **Monid key** — https://app.monid.ai/access/api-keys (an account at
    app.monid.ai first); they also need credit there, a few dollars covers many teardowns.
 2. Give them `./ugckit key`. In Claude Code they can put `!` in front of it to run it
    inside the session.

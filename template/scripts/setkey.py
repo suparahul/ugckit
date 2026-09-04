@@ -26,7 +26,7 @@ ENV = os.path.join(ROOT, ".env")
 # name, what to call it, where to find it, how short is too short, required?
 KEYS = [
     ("SUPAGEN_API_KEY", "your Supagen API key",
-     "Supagen dashboard -> Settings -> API keys", 20, True),
+     "shown during Supagen onboarding, or: dashboard left menu -> Developer -> API keys", 20, True),
     # The research stages spend against this. Setup asks every user for it.
     ("MONID_API_KEY", "your Monid key",
      "https://app.monid.ai/access/api-keys  (create an account at app.monid.ai first)", 20, False),
