@@ -16,12 +16,16 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENV = os.path.join(ROOT, ".env")
 
-# name, what to call it, where to find it, how short is too short
+# name, what to call it, where to find it, how short is too short, required?
 KEYS = [
     ("SUPAGEN_API_KEY", "your Supagen API key",
-     "Supagen dashboard -> Settings -> API keys", 20),
+     "Supagen dashboard -> Settings -> API keys", 20, True),
     ("SUPAGEN_WORKSPACE_ID", "your Supagen workspace id",
-     "the long id in your Supagen dashboard web address", 36),
+     "the long id in your Supagen dashboard web address", 36, True),
+    # Only the research stages spend against this. Skipping it is the normal case
+    # for anyone who already has the reference video they want to recreate.
+    ("MONID_API_KEY", "your Monid key — only if you want the research stages",
+     "https://monid.ai -> Keys. Press return to skip it.", 20, False),
 ]
 
 RED, GREEN, DIM, OFF = "\033[31m", "\033[32m", "\033[2m", "\033[0m"
@@ -66,7 +70,7 @@ def clean(value):
 def main():
     if len(sys.argv) > 1:
         arg = sys.argv[1]
-        known = {k for k, _, _, _ in KEYS}
+        known = {k for k, *_ in KEYS}
         if arg in ("-h", "--help"):
             print("usage: ./ugckit key      (no arguments — it asks you for each value)")
             return 0
@@ -106,8 +110,13 @@ def main():
     print("is saved to your shell history.\n")
 
     changed = 0
-    for name, what, where, minlen in KEYS:
+    for name, what, where, minlen, required in KEYS:
         have = existing.get(name, "")
+        if not required and not have:
+            print(f"\n{name} is optional — the research stages use it, nothing else.")
+            if input("  Set it now? [y/N] ").strip().lower() not in ("y", "yes"):
+                print("  skipped.\n")
+                continue
         if have:
             print(f"{name} is already set ({len(have)} characters).")
             if input("  Replace it? [y/N] ").strip().lower() not in ("y", "yes"):

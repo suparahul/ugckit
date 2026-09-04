@@ -108,8 +108,8 @@ else:
     # user already has never touches Monid. Warn, never fail.
     mk = env.get("MONID_API_KEY", "")
     if not mk:
-        warn("MONID_API_KEY not set", "only needed for the research stages (R1-R5) -- "
-                                      "get a key at https://monid.ai")
+        warn("MONID_API_KEY not set", "only for the research stages -- get a key at "
+                                      "https://monid.ai, then ./ugckit key")
     elif not mk.startswith("monid_"):
         warn(f"MONID_API_KEY does not start with 'monid_' ({len(mk)} chars)",
              "expected monid_<stage>_<secret> -- re-copy it")
