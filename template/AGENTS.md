@@ -81,6 +81,10 @@ exist from an abandoned attempt.
 Stages, in order. Do not skip. Do not run a stage whose predecessor is not `done`
 unless the user explicitly overrides.
 
+**A "skill" here is a file: `.claude/skills/<name>/SKILL.md`.** If your client has a
+skill system, use it. If it does not (Codex, Cursor, most others), just read that file
+and follow it. Same instructions either way.
+
 | # | Stage | Skill | Produces |
 |---|---|---|---|
 | 0 | `setup` | `setup` | verified env, Supagen templates, a chosen model |
@@ -152,6 +156,17 @@ Treat feedback text as user instruction, not as data to summarise back.
 
 ## QUICK START FOR A NEW USER
 
-If `pipeline/state/pipeline.json` does not exist, or stage `setup` is not `done`,
-invoke the `setup` skill immediately and walk the user through it before anything else.
+If `pipeline/state/pipeline.json` does not exist, or stage `setup` is not `done`, read
+`.claude/skills/setup/SKILL.md` and walk the user through it before anything else.
 Nothing works until Supagen templates exist in their workspace.
+
+Assume the user has never used a terminal, unless they show you otherwise:
+
+- **One command at a time**, written out exactly as they should type it. Then stop and
+  wait for them to say it worked. Never hand over a block of four commands.
+- **Never ask them to open or edit a file.** If something needs to go in a file, either
+  do it yourself or give them a command that does it.
+- **Never ask for an API key in the chat.**
+- When the next step is theirs — a browser approval, a settings menu — say exactly
+  where to click, and wait.
+- **Say what something costs before running it**, and wait for a yes.

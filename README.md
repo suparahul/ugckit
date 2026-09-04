@@ -6,6 +6,33 @@ your character, optionally with a real app demo playing on a phone in the shot.
 It is an agent, a set of skills, the scripts they drive, and a local review UI. You talk
 to the agent; it runs the pipeline.
 
+## The easiest way in
+
+Open any coding agent — Claude Code, Cursor, Codex — and paste this. It installs
+everything and walks you through the rest, one step at a time.
+
+```
+Set up ugckit for me in a new folder called ugc, then take me through setup.
+
+1. Run exactly this in the terminal:
+   curl -fsSL https://raw.githubusercontent.com/suparahul/ugckit/main/install.sh | sh -s -- ugc
+
+2. Go into the ugc folder, read AGENTS.md, and follow it.
+
+3. Read .claude/skills/setup/SKILL.md in that folder and do everything it
+   says, in order.
+
+How to treat me while you do this:
+- Assume I have never used a terminal. Give me ONE command at a time, written out
+  exactly as I should type it, and wait until I say it worked.
+- Never ask me to paste my API key into this chat.
+- When I have to click something in a browser or a settings menu, tell me exactly
+  where to click.
+- Tell me before anything costs money, and how much.
+```
+
+That is all a first-time user needs. Everything below is the manual version.
+
 ## Install
 
 One line, nothing to clone:

@@ -41,6 +41,22 @@ your browser to approve the connection.
 For every project instead of just this one, put the same block in your global MCP
 settings (Settings → MCP → Add).
 
+## Claude desktop app, ChatGPT/Codex app, and other apps with no project folder
+
+Desktop apps do not read a config file from your project, so the installer cannot set
+them up. You add the server in the app's own settings:
+
+**Claude desktop app** — Settings → Connectors → **Add custom connector**. Paste
+`https://mcp.supagen.dev/mcp` as the URL, save, then click **Connect** next to it. Your
+browser opens; approve, and it says Connected.
+
+**Other apps** — look in Settings for **Connectors**, **MCP**, or **Integrations**, then
+for "add server by URL" or "custom connector". Paste the same URL. Approval opens in
+your browser.
+
+If you cannot find it, use Claude Code, Cursor or Codex instead — the installer sets
+those up for you.
+
 ## Codex
 
 Codex reads `~/.codex/config.toml`. Add:

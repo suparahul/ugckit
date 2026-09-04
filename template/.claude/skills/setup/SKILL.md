@@ -58,35 +58,47 @@ inspect `.env`, redact:
 
 ## 3. MCP
 
-**Read `docs/mcp-setup.md` and give the user the section for the agent they are
-actually running — not all of them.** You know which one you are.
+**Work out where you are running first, then give only the steps for that.** The user
+may be in a terminal, or in a desktop app with no terminal at all. Do not read them a
+list of four options.
 
-The essentials, so you do not get them wrong:
-
-**Approval is the user's to do, not yours.** It is an OAuth flow in their browser,
-signed in as them. You cannot complete it, and you cannot tell from inside the session
-whether they have — the only proof is a tool call succeeding. So: give the instructions,
-wait, then test with `ping`.
+The facts, so you do not get them wrong:
 
 - The server is **`https://mcp.supagen.dev/mcp`, Streamable HTTP, OAuth 2.1**.
-- There is **no npm package to install and no token to paste.** Any instruction
-  involving `npx @supagen/mcp` or an API key in a header is wrong.
-- `install.sh` already wrote `.mcp.json` (Claude Code) and `.cursor/mcp.json` (Cursor)
-  into the project directory, so in those two the server is usually already registered.
-- What is *not* automatic is **approval**. The user has to approve the OAuth connection
-  in their browser once:
-  - **Claude Code** — restart, then run `/mcp`.
-  - **Cursor** — reload; the browser opens on first use.
-  - **Codex** — add the block from `docs/mcp-setup.md` to `~/.codex/config.toml`,
-    restart, approve on first use.
-  - **Anything else** — give them the server URL and transport from the doc.
+- There is **no npm package and no token to paste.** Any instruction mentioning
+  `npx @supagen/mcp`, or an API key in a header, is wrong.
+- `install.sh` already wrote `.mcp.json` and `.cursor/mcp.json` into the project, so in
+  Claude Code and Cursor the server is registered. **Registered is not connected.**
 
-Then prove it: call `ping`, then `list_workspaces`. If the tools are not available to
-you at all, the agent was started before the config existed — ask the user to restart it.
-If `list_workspaces` returns their workspace, MCP is connected.
+### You cannot do the approval
 
-MCP is for **managing templates only**. Generation goes over curl (AGENTS.md rule 2),
-which is why the API key in `.env` is still required even once MCP works.
+It is a browser login as the user. You have no browser. What you *can* do is make the
+client ask for it: **call `ping`.** If the connection is not approved, that call fails,
+and the client itself shows a login or Authenticate button. Use that. Call `ping`
+first, then tell them what they should now be seeing.
+
+### Where they click
+
+- **Claude Code** — restart it, then type `/mcp`, select supagen, choose Authenticate.
+  The browser opens; approve; return to the terminal.
+- **Cursor** — reload the window. The browser opens on first use.
+- **Codex** — the block from `docs/mcp-setup.md` goes in `~/.codex/config.toml`; give
+  them `./ugckit key`-style precision here too, one step at a time. Restart, approve.
+- **A desktop app with no project folder** (Claude desktop, and similar) — the installer
+  could not configure it. Settings → Connectors → Add custom connector → paste
+  `https://mcp.supagen.dev/mcp` → save → Connect → approve in the browser.
+- **Anything else** — give them the server URL and transport from `docs/mcp-setup.md`
+  and tell them to look for Connectors, MCP or Integrations in settings.
+
+### Then prove it
+
+Call `ping`, then `list_workspaces`. If `list_workspaces` returns their workspace, MCP
+is connected and you can continue. If the supagen tools are not available to you at all,
+the client was started before the config existed — ask them to restart it. Do not
+guess: `doctor.py` can see the config file but cannot see whether the login happened.
+
+MCP manages templates only. Generation goes over curl (AGENTS.md rule 2), which is why
+`SUPAGEN_API_KEY` is still needed after MCP works.
 
 ## 4. Ask which model
 
