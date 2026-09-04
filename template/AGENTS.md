@@ -1,8 +1,10 @@
 # UGC Recreation Pipeline — orchestrator
 
-You are the orchestrator for a video recreation pipeline. Given a reference video, you
-drive it through ten stages to a finished replica, with optional tweaks (a phone/app
-insert, a new script, a different character).
+You are the orchestrator for a video recreation pipeline. It has two halves. Given a
+reference video, you drive it through ten stages to a finished replica, with optional
+tweaks (a phone/app insert, a new script, a different character). Given only a niche or
+an app name, you run five research stages first — find the network, pull the content,
+write the teardown — and hand the best-performing post to stage 1 as the reference.
 
 Read this file fully before acting. It is the contract.
 
@@ -25,9 +27,9 @@ Do not relitigate them. If you think one is wrong, say so and stop — do not ac
    through `scripts/generate.sh`, which uses REST curl in a background task. MCP is for
    *managing* templates and versions only — never for invoking a video generation.
 
-3. **NEVER PASTE THE API KEY INTO THE CONVERSATION.**
-   It lives in `.env`. When grepping config, redact:
-   `sed -E 's/(sk_[A-Za-z0-9]{6})[A-Za-z0-9_-]*/\1***REDACTED***/g'`
+3. **NEVER PASTE AN API KEY INTO THE CONVERSATION.**
+   They live in `.env`. When grepping config, redact:
+   `sed -E 's/((sk_|monid_)[A-Za-z0-9_]{6})[A-Za-z0-9_-]*/\1***REDACTED***/g'`
 
 4. **THE PROMPT GOES IN EXACTLY ONE PLACE.**
    Supagen *concatenates* `system_instructions` with message text parts rather than
@@ -65,6 +67,37 @@ Do not relitigate them. If you think one is wrong, say so and stop — do not ac
    generation costs real money. Re-runs need fresh approval — approval of one run is
    not approval of the next.
 
+Rules 10 to 14 govern the research stages. Every one of them is a failure that *looks
+like success* — the run keeps going and leaves plausible files behind.
+
+10. **A PHOTO POST IS NOT A VIDEO, AND TIKTOK WILL STILL HAND YOU A `video.url` FOR IT.**
+    What is behind that URL is the sound — an m4a with an `.mp4` name. ffmpeg extracts no
+    frames and you are left with a silent audio file that reads as a video on disk.
+    **There is no carousel endpoint: the slides are already in `posts.json`, in the post's
+    `images` array**, one full-resolution URL per slide. That is the only correct source.
+    This is not an edge case — in the reference corpus the single biggest post, 41.8M
+    views, is a photo post, and so are the next two on that handle. An account's best
+    work is often its slideshows.
+
+11. **NEVER USE YT-DLP WHEN MONID HAS ALREADY RETURNED A LINK.** `.video.url` is a direct
+    signed CDN link; `fetch_cdn` takes it. yt-dlp re-solves the page every time and has
+    failed on *every* TikTok download, leaving every folder created and empty, silently,
+    because the loop just moves on. Fallback only.
+
+12. **EVERY URL IN `posts.json` IS SIGNED AND EXPIRES.** Cover, slide and video URLs all
+    die within weeks. Anything not downloaded before then is gone unless the account is
+    re-scraped at full cost. Pull covers, slides and videos in the same session as the
+    metrics.
+
+13. **RUN MONID ONE BRAND AT A TIME.** Concurrent calls come back as HTML error pages that
+    look exactly like running out of credit, and you will go looking for a billing problem
+    that does not exist. `scripts/monid.sh` takes a lock and validates that the response is
+    JSON. Do not run two research scripts at once to save wall time.
+
+14. **NEVER TRUST A FILE EXTENSION, AN EXIT CODE, OR A NON-EMPTY FOLDER.** Check the
+    content — `ffprobe` the download and confirm it has a real video stream, count the
+    bytes against what you expected. `verify_video` exists for this and deletes what fails.
+
 ---
 
 ## STATE
@@ -78,12 +111,53 @@ exist from an abandoned attempt.
     scripts/state.py set <project> <stage> done  # mark a stage complete
     scripts/state.py note <project> "..."        # append a note
 
+## ENTRY PATHS
+
+Two ways a project starts. Ask which one you are in before doing anything, and record it —
+`state.py show` renders the stages that do not apply as `n/a` rather than leaving them
+pending forever.
+
+| | **reference-led** | **research-led** |
+|---|---|---|
+| The user has | a clip they want recreated | a niche or an app name |
+| Research | optional | R1 → R5 |
+| Stages 1–4 | measure the clip | **do not apply** — there is nothing to measure |
+| Stage 5 written by | `script` | `originate` |
+| Stages 6–9 | identical | identical |
+| Recorded as | `state.py init <p>` | `state.py init <p> --entry research` |
+
+The research phase feeds either one. Run R1–R5, then `handoff.sh` gives stage 1 the
+best-performing post and you continue reference-led; or skip the handoff and write the
+script from the teardown with `originate`. A research phase that ends in a slideshow can
+only go the second way — there is no video for stage 1 to measure.
+
 Stages, in order. Do not skip. Do not run a stage whose predecessor is not `done`
 unless the user explicitly overrides.
 
 **A "skill" here is a file: `.claude/skills/<name>/SKILL.md`.** If your client has a
 skill system, use it. If it does not (Codex, Cursor, most others), just read that file
 and follow it. Same instructions either way.
+
+### Research — R1 to R5, optional, spends Monid credit
+
+| # | Stage | Skill | Produces |
+|---|---|---|---|
+| R1 | `discover` | `discover` | keyword searches → `research/<project>/all-handles.tsv` |
+| R2 | `triage` | `triage` | the handle ledger — promoter / competitor / noise — and `NOTES.md` |
+| R3 | `harvest` | `harvest` | per handle: `posts.json`, `index.tsv`, `covers/`, `HOOKS.md` |
+| R4 | `deepen` | `deepen` | top 5 by views: their best posts as `video.mp4` or `slide-NN.jpg`, plus `notes.md` |
+| R5 | `teardown` | `teardown` | `TEARDOWN.md` — thirteen fixed headings — and the handoff to stage 1 |
+
+Research output lives in `research/<project>/`, never in `pipeline/`. The only thing that
+crosses over is the file `handoff.sh` writes to `pipeline/00-source/<project>/`.
+
+Monid bills per result: **$0.00045**. A search of 20 results is about a cent, an account
+of 50 posts about two, and a whole app teardown a few cents — real money but small money,
+so the approval you need is for the *number of accounts*, not for each call. R4 costs no
+Monid at all; it reuses what R3 bought. Rule 8 applies here too: compute the figure
+yourself and label it computed. `monid balance` says what is left.
+
+### Recreation — 1 to 9
 
 | # | Stage | Skill | Produces |
 |---|---|---|---|
@@ -92,7 +166,7 @@ and follow it. Same instructions either way.
 | 2 | `watch` | `watch` | `analysis.md` — the six-section scene report |
 | 3 | `transcribe` | `transcribe` | verbatim transcript + prosody numbers |
 | 4 | `breakdown` | `breakdown` | `breakdown.md` — reconciled shot-by-shot spec |
-| 5 | `script` | `script` | `prompt.txt` (+ optional `insert.json`) |
+| 5 | `script` | `script` *or* `originate` | `prompt.txt` (+ optional `insert.json`) |
 | 6 | `generate` | `generate` | the plate, in `pipeline/06-generated/<project>/` |
 | 7 | `review` | `review` | QC measurements + a verdict |
 | 8 | `composite` | `composite` | app inserted onto the green screen (complex flow only) |
@@ -124,6 +198,9 @@ Selected entirely by which files exist in `pipeline/05-prompt/<project>/`:
 
 Never create `refs.json` on your own initiative.
 
+The flow is about which files exist, not about how they were written. `script` and
+`originate` can each produce any of the three.
+
 ---
 
 ## FEEDBACK
@@ -149,7 +226,10 @@ Treat feedback text as user instruction, not as data to summarise back.
   Never report a video as good without having examined it.
 - **Report failures with the evidence.** If a stage fails, show the actual error.
 - **Long jobs go in the background.** Generation and compositing run for minutes; start
-  them with `run_in_background` and wait for the notification rather than polling.
+  them with `run_in_background` and wait for the notification rather than polling. A
+  harvest over twenty accounts runs far longer than that — it is serial on purpose
+  (rule 13), and it is resumable, so let it run and re-run it if it dies rather than
+  parallelising it.
 - **When the user asks for a change, find the stage that owns it** and re-run from
   there. A wording change is stage 5. A framing problem is stage 5. A key-colour
   problem is stage 5. Almost everything is stage 5 — the prompt is the product.
@@ -170,3 +250,7 @@ Assume the user has never used a terminal, unless they show you otherwise:
 - When the next step is theirs — a browser approval, a settings menu — say exactly
   where to click, and wait.
 - **Say what something costs before running it**, and wait for a yes.
+
+Then ask the one question that decides everything after it: **do they have a reference
+video, or only a niche or an app name?** With a video, start at stage 1. With a niche,
+start at R1 and tell them what the research will cost before you spend it.

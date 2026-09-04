@@ -3,6 +3,11 @@
 Give it a reference video. Get back your own version of it — same structure, your script,
 your character, optionally with a real app demo playing on a phone in the shot.
 
+Or give it nothing but a niche or an app name. It finds who is promoting what, pulls their
+content, transcribes the on-screen hook off every post, writes a teardown of the whole
+network, and hands the best-performing post to the recreation pipeline as the reference.
+Niche in, finished video out.
+
 It is an agent, a set of skills, the scripts they drive, and a local review UI. You talk
 to the agent; it runs the pipeline.
 
@@ -52,7 +57,7 @@ your prompts, or anything you have generated.
 ## Then
 
     cd ~/my-video-project
-    ./ugckit key                        # asks for your key and workspace id
+    ./ugckit key                        # asks for each value it needs
     ./ugckit doctor                     # tools, deps, credentials, live auth
     claude                              # or: codex — both read AGENTS.md
 
@@ -73,6 +78,20 @@ render runs for minutes and MCP calls abort at 60 seconds. You need both.
 
 ## The pipeline
 
+Two halves. The research half is optional — skip it when you already have the video you
+want recreated.
+
+| Stage | What happens | Cost |
+|---|---|---|
+| R1 discover | keyword searches through Monid to find who is promoting what | ~$0.01 a search |
+| R2 triage | sort the handles into promoters, competitors and noise | — |
+| R3 harvest | metrics, cover frames, and the on-screen hook off every cover | ~$0.02 an account |
+| R4 deepen | top 5 accounts by views, their best posts as video or slides | free — reuses R3 |
+| R5 teardown | the thirteen-heading analysis, then hand the winner to stage 1 | — |
+
+A full app teardown is a few cents of Monid. The expensive resources are turns and
+attention, not API calls.
+
 | Stage | What happens | Cost |
 |---|---|---|
 | 0 setup | verify environment, create Supagen templates | — |
@@ -81,13 +100,26 @@ render runs for minutes and MCP calls abort at 60 seconds. You need both.
 | 3 transcribe | local Whisper transcript + prosody numbers | free, local |
 | 4 breakdown | reconcile all three into one spec | — |
 | 5 script | write `prompt.txt` (+ `insert.json`) | — |
+| 5 originate | *or* write it from research instead of from a video | — |
 | 6 generate | make the video | $0.60 default |
 | 7 review | measure cuts, green screen, dialogue, pitch | free, local |
 | 8 composite | put a real app screen on the phone | free, local |
 | 9 deliver | final check and handover | — |
 
 Progress lives in `pipeline/state/pipeline.json`. The agent reads it before every action,
-so you can stop and resume at any point.
+so you can stop and resume at any point. That matters most in the research half: a harvest
+over twenty accounts runs for a long time, and every stage of it is resumable — an account
+already scraped is not paid for twice, a cover already on disk is not fetched again.
+
+## Two ways in
+
+- **You have a reference video.** Stage 1 measures it, and stage 5 `script` writes the
+  prompt from those measurements.
+- **You have a niche or an app name.** R1–R5 find and analyse the network. Then either
+  hand the best post to stage 1 and carry on as above, or skip the reference half entirely
+  and let stage 5 `originate` write the prompt from the teardown and the hook library.
+
+Both meet at stage 5, and stages 6–9 do not know or care which route was taken.
 
 ## Three flows
 
@@ -110,7 +142,7 @@ only and has no auth; do not expose it.
 
 ## Why the guardrails exist
 
-`AGENTS.md` carries eight hard rules. Each cost real money or a wasted round trip to
+`AGENTS.md` carries fourteen hard rules. Each cost real money or a wasted round trip to
 learn, and the scripts enforce them rather than trusting anyone to remember:
 
 - **Text-to-video is the default.** Reference-to-video cannot reproduce text — app UI
@@ -131,6 +163,21 @@ learn, and the scripts enforce them rather than trusting anyone to remember:
 - **The prompt is sent exactly once.** Supagen concatenates `system_instructions` with
   message content rather than choosing, so the templates are messages-only.
 
+Five of the fourteen are about the research half, and they share a shape: the failure
+looks like success and the run carries on.
+
+- **A photo post is not a video**, and TikTok hands you a `video.url` for it anyway —
+  what is behind it is the sound. The slides are in `posts.json`, in the `images` array.
+  In the reference corpus the single biggest post, at 41.8M views, is a photo post.
+- **Never yt-dlp a link Monid already returned**; it re-solves the page, fails, and leaves
+  every folder created and empty.
+- **Every URL in `posts.json` expires**, so covers, slides and videos are pulled in the
+  same session as the metrics.
+- **One Monid call at a time.** Concurrent calls return HTML error pages that look exactly
+  like running out of credit. `monid.sh` takes a lock and checks the response is JSON.
+- **Never trust an extension or a non-empty folder.** Every download is ffprobed for a real
+  video stream and deleted if it has none.
+
 ## Models
 
 One template, one version per model. Switch with `activate_version` + `state.py model set`.
@@ -145,8 +192,8 @@ Length forces the choice. MiniMax unless you need more than 15 seconds.
 
 ## Requirements
 
-ffmpeg · python 3.9+ · curl · git · a Supagen account and workspace ·
-Claude Code or Codex
+ffmpeg · python 3.9+ · curl · git · [monid](https://monid.ai) (`npm install -g @monid-ai/cli`) ·
+a Supagen account and workspace · Claude Code or Codex
 
 ## Layout
 
@@ -155,8 +202,11 @@ Claude Code or Codex
     ugckit                 command dispatcher
     .claude/skills/        one skill per stage
     scripts/               the tools the skills drive
+      monid.sh             shared research plumbing — where rules 10-14 are enforced
+      library.py           query the hook library rather than reading it
       templates.json       desired Supagen workspace state + known model limits
       prompts/             system instructions for the watching layer
       ui/                  the local review UI
     docs/                  annotated insert.json example
+    research/              what the research phase found, one folder per project
     pipeline/              your work, stage by stage

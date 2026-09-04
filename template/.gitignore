@@ -9,4 +9,12 @@ pipeline/00-source/*/
 pipeline/06-generated/*/*.mp4
 pipeline/07-composite/*/
 !pipeline/*/.gitkeep
+
+# Scraped media is large and re-buyable; the analysis written from it is neither.
+# Keep NOTES.md, TEARDOWN.md, the tsv tables and the hook banks. Leave the rest out.
+research/*/*/covers/
+research/*/*/*/
+research/*/*/posts.json
+research/*/searches/
+research/.monid.lock/
 *.bak

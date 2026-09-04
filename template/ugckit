@@ -11,6 +11,11 @@ case "${1:-help}" in
   key)      shift; exec "$PY" "$PROJ/scripts/setkey.py" "$@" ;;
   state)    shift; exec "$PY" "$PROJ/scripts/state.py" "$@" ;;
   qc)       shift; exec "$PY" "$PROJ/scripts/qc.py" "$@" ;;
+  library)  shift; exec "$PY" "$PROJ/scripts/library.py" "$@" ;;
+  discover) shift; exec "$PROJ/scripts/discover.sh" "$@" ;;
+  harvest)  shift; exec "$PROJ/scripts/harvest.sh" "$@" ;;
+  deepen)   shift; exec "$PROJ/scripts/deepen.sh" "$@" ;;
+  handoff)  shift; exec "$PROJ/scripts/handoff.sh" "$@" ;;
   ingest)   shift; exec "$PROJ/scripts/ingest.sh" "$@" ;;
   watch)    shift; exec "$PROJ/scripts/watch.sh" "$@" ;;
   transcribe) shift; exec "$PROJ/scripts/transcribe.sh" "$@" ;;
@@ -18,7 +23,7 @@ case "${1:-help}" in
   composite) shift; exec "$PROJ/scripts/composite.sh" "$@" ;;
   *)
     cat <<'USAGE'
-ugckit — reference video in, recreation out.
+ugckit — a niche or a reference video in, a recreation out.
 
   ugckit doctor              preflight: tools, deps, credentials, live auth
   ugckit ui [--port N]       local review UI (default http://127.0.0.1:7878)
@@ -26,6 +31,14 @@ ugckit — reference video in, recreation out.
   ugckit state show <proj>   pipeline progress, spend and open feedback
   ugckit state projects      list projects
 
+  research (R1-R5), optional — costs Monid credit:
+  ugckit discover <proj> "<keyword>" ...
+  ugckit harvest <proj> --all [maxItems]
+  ugckit deepen <proj> --rank | --deep | <handle>
+  ugckit handoff <proj> <handle> <post-id>
+  ugckit library <stats|templates|hooks|formats|mechanics|teardowns>
+
+  recreation (1-9):
   ugckit ingest <video> <proj> [start] [len]
   ugckit watch <proj>
   ugckit transcribe <proj>

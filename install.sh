@@ -44,10 +44,15 @@ MISSING=0
 need() {
   if command -v "$1" >/dev/null 2>&1; then ok "$1"; else no "$1 not found — $2"; MISSING=1; fi
 }
+# Optional: absence is reported but never blocks the install.
+want() {
+  if command -v "$1" >/dev/null 2>&1; then ok "$1"; else hm "$1 not found — $2"; fi
+}
 need ffmpeg  "brew install ffmpeg   (macOS)  |  sudo apt install ffmpeg   (Debian/Ubuntu)"
 need ffprobe "ships with ffmpeg"
 need curl    "preinstalled on macOS and most Linux"
 need git     "https://git-scm.com/downloads"
+want monid   "optional, only the research stages use it — npm install -g @monid-ai/cli"
 
 if command -v python3 >/dev/null 2>&1; then
   PYV=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
@@ -91,7 +96,9 @@ copy_once() {
   cp "$SRC/$rel" "$DEST/$rel"
 }
 
-( cd "$SRC" && find scripts .claude docs -type f ) | while read -r rel; do
+# -prune keeps a developer's local __pycache__ out of a fresh install.
+( cd "$SRC" && find scripts .claude docs \
+    \( -name __pycache__ -o -name .DS_Store \) -prune -o -type f -print ) | while read -r rel; do
   copy_managed "$rel"
 done
 ok "scripts, skills and docs"
@@ -101,11 +108,11 @@ ok "AGENTS.md, CLAUDE.md, ugckit"
 
 for f in .env.example .gitignore requirements.txt; do copy_once "$f"; done
 
-( cd "$SRC" && find pipeline -type d ) | while read -r d; do
+( cd "$SRC" && find pipeline research -type d ) | while read -r d; do
   mkdir -p "$DEST/$d"
   [ -f "$DEST/$d/.gitkeep" ] || touch "$DEST/$d/.gitkeep"
 done
-ok "pipeline/ directories"
+ok "pipeline/ and research/ directories"
 
 chmod +x "$DEST/ugckit" "$DEST"/scripts/*.sh "$DEST"/scripts/*.py 2>/dev/null || true
 
@@ -167,10 +174,14 @@ $(b "installed.")
     1.  cd $TARGET
     2.  ./ugckit key                      it asks for your Supagen key and
                                           workspace id, and hides what you type
+                                          (and a Monid key, if you want research)
     3.  ./ugckit doctor                   confirm everything is wired up
     4.  claude                            the agent reads AGENTS.md and takes over
                                           — ask it to run the setup skill first
         then /mcp                         approve the Supagen connection in the browser
+
+  Two ways in. Give it a reference video and it recreates that; give it a niche or an
+  app name and it finds the network first, then recreates the best post it found.
 
   The agent drives the pipeline. You mostly watch, review and give feedback:
 

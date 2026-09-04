@@ -5,7 +5,7 @@ A file existing on disk is not proof a stage completed -- it may be from an aban
 attempt. Only this file counts.
 
     state.py show <project>
-    state.py init <project> [--flow simple|complex|referenced]
+    state.py init <project> [--flow simple|complex|referenced] [--entry reference|research]
     state.py set <project> <stage> <pending|running|done|failed> [note]
     state.py note <project> <text>
     state.py cost <project> <usd> <what>
@@ -14,6 +14,12 @@ attempt. Only this file counts.
     state.py projects
     state.py model                                  # which generation model is active
     state.py model set <slug> <duration_s>          # record a model switch
+
+    state.py entry <project> <reference|research>   # which half of the pipeline runs
+    state.py niche <project> <text>                 # what the research phase searched for
+    state.py handle <project> <handle> <promoter|competitor|noise> [note]
+    state.py handle-set <project> <handle> <key> <value>
+    state.py handles <project> [bucket]             # the ledger, as tsv
 """
 import json, os, sys, time, uuid
 
@@ -21,8 +27,22 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE = os.path.join(ROOT, "pipeline", "state", "pipeline.json")
 FEEDBACK = os.path.join(ROOT, "pipeline", "state", "feedback.jsonl")
 
-STAGES = ["setup", "ingest", "watch", "transcribe", "breakdown",
+RESEARCH = ["discover", "triage", "harvest", "deepen", "teardown"]
+STAGES = ["setup"] + RESEARCH + ["ingest", "watch", "transcribe", "breakdown",
           "script", "generate", "review", "composite", "deliver"]
+
+# Stages that only mean something when a reference clip exists. A research-led project
+# reaches stage 5 through `originate` instead, and these never run.
+REFERENCE_ONLY = ["ingest", "watch", "transcribe", "breakdown"]
+
+# Display numbers. The research half is R1-R5; the recreation half keeps 1-9.
+NUM = {s: f"R{i}" for i, s in enumerate(RESEARCH, 1)}
+NUM.update({s: str(i) for i, s in enumerate(
+    ["ingest", "watch", "transcribe", "breakdown", "script",
+     "generate", "review", "composite", "deliver"], 1)})
+NUM["setup"] = "0"
+
+BUCKETS = ("promoter", "competitor", "noise")
 
 
 def load():
@@ -44,40 +64,78 @@ def now():
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
+def usd(v):
+    # A research call costs fractions of a cent. Rounding those to "$0.00" reads as
+    # free, which is the wrong thing to tell someone about money they are spending.
+    return f"${v:.2f}" if v >= 0.01 else f"${v:.4f}"
+
+
 def project(d, name, create=False):
     if name not in d["projects"]:
         if not create:
             sys.exit(f"unknown project '{name}' -- run: state.py init {name}")
         d["projects"][name] = {
-            "created": now(), "flow": "simple",
+            "created": now(), "flow": "simple", "entry": "reference",
             "stages": {s: {"status": "pending"} for s in STAGES},
+            "research": {"niche": "", "handles": {}},
             "notes": [], "costs": [],
         }
-    return d["projects"][name]
+    p = d["projects"][name]
+    # A project written before the research stages existed is missing their keys. Fill
+    # them in on read so an old state file resumes instead of crashing.
+    p.setdefault("entry", "reference")
+    p.setdefault("research", {"niche": "", "handles": {}})
+    for s in STAGES:
+        p["stages"].setdefault(s, {"status": "pending"})
+    return p
+
+
+def handle_row(p, handle, create=False):
+    h = p["research"]["handles"]
+    if handle not in h:
+        if not create:
+            sys.exit(f"'{handle}' is not in the ledger -- run: state.py handle <project> "
+                     f"{handle} <promoter|competitor|noise>")
+        h[handle] = {"bucket": "promoter", "added": now()}
+    return h[handle]
 
 
 def cmd_show(name):
     d = load()
     p = project(d, name)
     m = d.get("model") or {}
-    print(f"project  {name}   flow={p['flow']}   created {p['created']}")
+    print(f"project  {name}   flow={p['flow']}   entry={p['entry']}   created {p['created']}")
     print(f"setup    {d['setup']['status']}")
     if m:
         print(f"model    {m.get('slug')}  {m.get('duration_s')}s  "
               f"${m.get('price_per_s', 0) * m.get('duration_s', 0):.2f}/run")
+    niche = p["research"].get("niche")
+    if niche:
+        ledger = p["research"]["handles"]
+        buckets = ", ".join(f"{sum(1 for h in ledger.values() if h['bucket'] == b)} {b}"
+                            for b in BUCKETS if any(h["bucket"] == b for h in ledger.values()))
+        print(f"niche    {niche}" + (f"   ({buckets})" if buckets else ""))
     print()
     for s in STAGES:
         if s == "setup":
             continue
         st = p["stages"][s]
+        # Under a research-led entry there is no reference clip, so stages 1-4 are not
+        # pending work -- they are not applicable. Say that rather than showing them
+        # unchecked forever.
+        if p["entry"] == "research" and s in REFERENCE_ONLY:
+            print(f"  [-] {NUM[s]:<3} {s:<12} n/a       no reference clip")
+            continue
         mark = {"done": "[x]", "running": "[~]", "failed": "[!]"}.get(st["status"], "[ ]")
         extra = f"   {st.get('note','')}" if st.get("note") else ""
-        print(f"  {mark} {s:<12} {st['status']:<9}{extra}")
+        print(f"  {mark} {NUM[s]:<3} {s:<12} {st['status']:<9}{extra}")
+        if s == "teardown":
+            print()
     total = sum(c["usd"] for c in p["costs"])
     if p["costs"]:
-        print(f"\nspend (computed): ${total:.2f}")
+        print(f"\nspend (computed): {usd(total)}")
         for c in p["costs"]:
-            print(f"   ${c['usd']:.2f}  {c['what']}")
+            print(f"   {usd(c['usd']):>9}  {c['what']}")
     if p["notes"]:
         print("\nnotes:")
         for n in p["notes"][-10:]:
@@ -153,9 +211,12 @@ def main():
 
     if cmd == "projects":
         d = load()
-        for n, p in d["projects"].items():
-            done = sum(1 for s in STAGES[1:] if p["stages"][s]["status"] == "done")
-            print(f"{n:<24} {p['flow']:<12} {done}/{len(STAGES)-1} stages")
+        for n in list(d["projects"]):
+            p = project(d, n)
+            applicable = [s for s in STAGES[1:]
+                          if not (p["entry"] == "research" and s in REFERENCE_ONLY)]
+            done = sum(1 for s in applicable if p["stages"][s]["status"] == "done")
+            print(f"{n:<24} {p['flow']:<12} {p['entry']:<10} {done}/{len(applicable)} stages")
         return
 
     if cmd == "show":
@@ -165,13 +226,82 @@ def main():
 
     if cmd == "init":
         if not a:
-            sys.exit("usage: state.py init <project> [--flow simple|complex|referenced]")
+            sys.exit("usage: state.py init <project> [--flow simple|complex|referenced] "
+                     "[--entry reference|research]")
         d = load()
         p = project(d, a[0], create=True)
         if "--flow" in a:
             p["flow"] = a[a.index("--flow") + 1]
+        if "--entry" in a:
+            e = a[a.index("--entry") + 1]
+            if e not in ("reference", "research"):
+                sys.exit("entry must be reference|research")
+            p["entry"] = e
         save(d)
-        print(f"initialised {a[0]} (flow={p['flow']})")
+        print(f"initialised {a[0]} (flow={p['flow']}, entry={p['entry']})")
+        return
+
+    if cmd == "entry":
+        if len(a) < 2 or a[1] not in ("reference", "research"):
+            sys.exit("usage: state.py entry <project> <reference|research>")
+        d = load()
+        project(d, a[0], create=True)["entry"] = a[1]
+        save(d)
+        print(f"{a[0]}.entry = {a[1]}")
+        if a[1] == "research":
+            print("stages 1-4 do not apply -- stage 5 is written by the `originate` skill")
+        return
+
+    if cmd == "niche":
+        if len(a) < 2:
+            sys.exit("usage: state.py niche <project> <text>")
+        d = load()
+        project(d, a[0], create=True)["research"]["niche"] = " ".join(a[1:])
+        save(d)
+        print(f"{a[0]}.niche = {' '.join(a[1:])}")
+        return
+
+    if cmd == "handle":
+        if len(a) < 3:
+            sys.exit(f"usage: state.py handle <project> <handle> <{'|'.join(BUCKETS)}> [note]")
+        name, handle, bucket = a[0], a[1].lstrip("@"), a[2]
+        if bucket not in BUCKETS:
+            sys.exit(f"bucket must be {'|'.join(BUCKETS)}")
+        d = load()
+        row = handle_row(project(d, name, create=True), handle, create=True)
+        row["bucket"] = bucket
+        if len(a) > 3:
+            row["note"] = " ".join(a[3:])
+        save(d)
+        print(f"{handle}  {bucket}")
+        return
+
+    if cmd == "handle-set":
+        if len(a) < 4:
+            sys.exit("usage: state.py handle-set <project> <handle> <key> <value>\n"
+                     "  keys: harvested, deep, views, posts, winner, note")
+        name, handle, key = a[0], a[1].lstrip("@"), a[2]
+        val = " ".join(a[3:])
+        d = load()
+        row = handle_row(project(d, name, create=True), handle)
+        row[key] = int(val) if val.isdigit() else val
+        save(d)
+        print(f"{handle}.{key} = {row[key]}")
+        return
+
+    if cmd == "handles":
+        if not a:
+            sys.exit("usage: state.py handles <project> [bucket]")
+        d = load()
+        p = project(d, a[0])
+        want = a[1] if len(a) > 1 else None
+        rows = [(h, r) for h, r in p["research"]["handles"].items()
+                if want is None or r["bucket"] == want]
+        # Sorted by views so the ranking that decides the deep dive is visible here too.
+        for h, r in sorted(rows, key=lambda kv: -int(kv[1].get("views") or 0)):
+            print("\t".join([h, r["bucket"], str(r.get("views", "")),
+                             str(r.get("harvested", "")), str(r.get("deep", "")),
+                             str(r.get("note", ""))]))
         return
 
     if cmd == "set":
@@ -210,7 +340,7 @@ def main():
         p = project(d, a[0], create=True)
         p["costs"].append({"ts": now(), "usd": float(a[1]), "what": " ".join(a[2:])})
         save(d)
-        print(f"recorded ${float(a[1]):.2f}; project total ${sum(c['usd'] for c in p['costs']):.2f}")
+        print(f"recorded {usd(float(a[1]))}; project total {usd(sum(c['usd'] for c in p['costs']))}")
         return
 
     if cmd == "feedback":

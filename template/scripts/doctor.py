@@ -39,6 +39,7 @@ for tool, fix in [
     ("ffprobe", "ships with ffmpeg"),
     ("curl",    "preinstalled on macOS and most Linux"),
     ("python3", "https://www.python.org/downloads/"),
+    ("monid",   "npm install -g @monid-ai/cli   (research stages R1-R5)"),
 ]:
     p = shutil.which(tool)
     if p:
@@ -103,6 +104,28 @@ else:
         else:
             ok(k, f"{len(v)} chars, starts {v[:6]}…")
 
+    # The research half is optional -- a project that starts from a reference video the
+    # user already has never touches Monid. Warn, never fail.
+    mk = env.get("MONID_API_KEY", "")
+    if not mk:
+        warn("MONID_API_KEY not set", "only needed for the research stages (R1-R5) -- "
+                                      "get a key at https://monid.ai")
+    elif not mk.startswith("monid_"):
+        warn(f"MONID_API_KEY does not start with 'monid_' ({len(mk)} chars)",
+             "expected monid_<stage>_<secret> -- re-copy it")
+    else:
+        ok("MONID_API_KEY", f"{len(mk)} chars, starts {mk[:12]}…")
+
+    lib = os.path.expanduser(env.get("LIBRARY_DIR", ""))
+    if not lib:
+        warn("LIBRARY_DIR not set", "only needed by the `originate` skill (research-led "
+                                    "stage 5) -- point it at a research corpus checkout")
+    elif not os.path.exists(os.path.join(lib, "library", "hooks.jsonl")):
+        warn(f"LIBRARY_DIR has no library/hooks.jsonl ({lib})", "check the path")
+    else:
+        n = sum(1 for _ in open(os.path.join(lib, "library", "hooks.jsonl")))
+        ok("LIBRARY_DIR", f"{n} hooks")
+
 say("\nlive auth")
 key, ws = env.get("SUPAGEN_API_KEY"), env.get("SUPAGEN_WORKSPACE_ID")
 if key and ws:
@@ -132,6 +155,39 @@ if key and ws:
         warn(f"could not reach Supagen ({e})", "check your network, then re-run")
 else:
     warn("skipping live auth check", "credentials incomplete")
+
+mk = env.get("MONID_API_KEY", "")
+if mk:
+    # whoami is the cheapest authenticated call; balance is worth printing because
+    # every research stage spends against it and an empty wallet fails as an HTML
+    # error page that reads like something else entirely (AGENTS.md rule 13).
+    def monid_get(path):
+        req = urllib.request.Request(f"https://api.monid.ai/v1{path}",
+                                     headers={"Authorization": f"Bearer {mk}"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.loads(r.read())
+    try:
+        who = monid_get("/auth/whoami")
+        ws, user = who.get("workspace") or {}, who.get("user") or {}
+        ok("Monid API key accepted",
+           ws.get("name") or ws.get("slug") or user.get("email") or user.get("userId") or "")
+        try:
+            b = (monid_get("/wallet/balance") or {}).get("balance") or {}
+            val = b.get("value")
+            if val is not None:
+                (ok if val > 0.10 else warn)(
+                    f"Monid balance ${val:.2f} {b.get('currency','')}".rstrip(),
+                    "top up at https://api.monid.ai/wallet")
+        except Exception:
+            pass                              # balance is a nicety, not a gate
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            bad(f"Monid rejected the API key ({e.code})",
+                "check .env for a mangled key -- see the welded-variable check above")
+        else:
+            bad(f"Monid returned HTTP {e.code}", e.read()[:200].decode(errors="replace"))
+    except Exception as e:
+        warn(f"could not reach Monid ({e})", "check your network, then re-run")
 
 say("\nMCP")
 # We can see whether the server is configured. We cannot see whether the user has
