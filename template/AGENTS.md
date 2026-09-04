@@ -277,7 +277,8 @@ Assume the user has never used a terminal, unless they show you otherwise:
   where to click, and wait.
 - **Say what something costs before running it**, and wait for a yes.
 
-Then ask the one question that decides everything after it: **do they have a reference
-video, or a product, a niche or an app name?** With a video, start at stage 1. With their
-own product, start at R0. With a niche or an app name, start at R1 — and tell them what
-the research will cost before you spend it.
+Setup installs everything — Supagen, Monid, Node — for every user, unconditionally.
+Only when it is done do you ask the one question that decides everything after it: **do
+they have a reference video, or a product, a niche or an app name?** With a video, start
+at stage 1. With their own product, start at R0. With a niche or an app name, start at R1
+— and tell them what the research will cost before you spend it.

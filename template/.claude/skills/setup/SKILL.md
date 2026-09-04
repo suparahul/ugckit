@@ -19,21 +19,20 @@ Fix everything it marks with a red ✗ before continuing. Common cases:
 - **python deps missing** → `.venv/bin/pip install -r requirements.txt`.
 - **.env missing** → `./ugckit key` creates it (step 2).
 
-Two tools are yellow `!`, not red, because only part of the pipeline needs them. Ask
-the one question from AGENTS.md's quick start now — **a reference video, or a product,
-niche or app name?** — because the answer decides whether these matter today:
+Two tools are yellow `!`, not red, but **install them anyway, now.** Setup is complete
+only when everything is in place; do not ask the user which path they want yet — that
+question comes at the end, in step 8, when there is nothing left to install.
 
-- **monid missing** → `npm install -g @monid-ai/cli`. Needed for the research half
-  (R1–R5). Skip it for a user who has a reference video.
-- **node missing** → https://nodejs.org. Needed only for the Atlas, which is how a
-  research user sees what was found. Same rule.
+- **node missing** → https://nodejs.org, or `brew install node`. The Atlas needs it,
+  and so does the next line.
+- **monid missing** → `npm install -g @monid-ai/cli`. The research half needs it.
 
 ## 2. Credentials
 
-Two values have to end up in `.env`: `SUPAGEN_API_KEY` and `SUPAGEN_WORKSPACE_ID`. A
-research user needs a third, `MONID_API_KEY`, from https://monid.ai → Keys; the same
-command asks for it and also registers it with the monid CLI, which keeps its own store
-and ignores `.env`. `doctor.py` checks both places.
+Three values have to end up in `.env`: `SUPAGEN_API_KEY`, `SUPAGEN_WORKSPACE_ID` and
+`MONID_API_KEY`. All three, every user — the command offers to skip Monid, and the user
+should say yes to setting it. It also registers the Monid key with the monid CLI, which
+keeps its own store and ignores `.env`. `doctor.py` checks both places.
 
 There is one command, and it takes no arguments:
 
@@ -52,9 +51,8 @@ not a terminal, because for you to pipe a value in, the value has to be in your 
 first — which is the thing being avoided. So:
 
 1. Tell them where the values are: **API key** — Supagen dashboard → Settings → API
-   keys. **Workspace id** — the long id in the dashboard web address. **Monid key**, if
-   they are doing research — monid.ai → Keys; they also need credit there, a few
-   dollars covers many teardowns.
+   keys. **Workspace id** — the long id in the dashboard web address. **Monid key** —
+   monid.ai → Keys; they also need credit there, a few dollars covers many teardowns.
 2. Give them `./ugckit key`. In Claude Code they can put `!` in front of it to run it
    inside the session.
 3. **Wait.** Do not move on until they say they are done.
@@ -169,10 +167,11 @@ Changing model later is always both:
 
 Then re-run `scripts/doctor.py` and confirm it is clean.
 
-## 8. Tell the user what they have, and where they go next
+## 8. Tell the user what they have, then ask the one question
 
 Briefly: which templates were created, which model is active and what a run costs, how
-to switch model. Then the fork, in one sentence each:
+to switch model. Then — and only now — the fork, in one sentence each, and wait for
+the answer:
 
 - **They have a reference video** → the `ingest` skill. Mention `ugckit ui` for review.
 - **They have their own product** → the `product` skill (R0). It reads their website,

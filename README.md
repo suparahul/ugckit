@@ -26,7 +26,8 @@ Set up ugckit for me in a new folder called organic-factory, then take me throug
 2. Go into the organic-factory folder, read AGENTS.md, and follow it.
 
 3. Read .claude/skills/setup/SKILL.md in that folder and do everything it
-   says, in order.
+   says, in order. Install and set up everything it names, then stop and ask
+   me whether I want to generate from a reference video or start research.
 
 How to treat me while you do this:
 - Assume I have never used a terminal. Give me ONE command at a time, written out
