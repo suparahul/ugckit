@@ -165,8 +165,8 @@ $(b "installed.")
   Next:
 
     1.  cd $TARGET
-    2.  ./ugckit key SUPAGEN_API_KEY      paste when prompted — no editor needed,
-        ./ugckit key SUPAGEN_WORKSPACE_ID nothing is echoed or kept in history
+    2.  ./ugckit key                      it asks for your Supagen key and
+                                          workspace id, and hides what you type
     3.  ./ugckit doctor                   confirm everything is wired up
     4.  claude                            the agent reads AGENTS.md and takes over
                                           — ask it to run the setup skill first

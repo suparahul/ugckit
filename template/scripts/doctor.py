@@ -74,7 +74,7 @@ say("\ncredentials")
 ENV = os.path.join(ROOT, ".env")
 env = {}
 if not os.path.exists(ENV):
-    bad(".env missing", "./ugckit key SUPAGEN_API_KEY   (it creates the file for you)")
+    bad(".env missing", "./ugckit key   -- it creates the file and asks you for the values")
 else:
     raw = open(ENV).read()
     for i, line in enumerate(raw.splitlines(), 1):
@@ -91,15 +91,15 @@ else:
     for k, v in env.items():
         if len(v) > 120 and "=" in v:
             bad(f"{k} looks like two variables welded together ({len(v)} chars)",
-                f"./ugckit key {k}  -- it rewrites the line cleanly")
+                "./ugckit key  -- it rewrites the lines cleanly")
 
     for k, minlen in [("SUPAGEN_API_KEY", 20), ("SUPAGEN_WORKSPACE_ID", 36)]:
         v = env.get(k, "")
         if not v:
-            bad(f"{k} not set", f"./ugckit key {k}")
+            bad(f"{k} not set", "./ugckit key")
         elif len(v) < minlen:
             bad(f"{k} is only {len(v)} chars, expected >= {minlen}",
-                f"re-copy it from Supagen, then ./ugckit key {k}")
+                "re-copy the whole value from Supagen, then ./ugckit key")
         else:
             ok(k, f"{len(v)} chars, starts {v[:6]}…")
 

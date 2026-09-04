@@ -22,7 +22,7 @@ ugckit — reference video in, recreation out.
 
   ugckit doctor              preflight: tools, deps, credentials, live auth
   ugckit ui [--port N]       local review UI (default http://127.0.0.1:7878)
-  ugckit key <NAME>          write a credential into .env (no editor needed)
+  ugckit key                 fill in .env — it asks you for each value
   ugckit state show <proj>   pipeline progress, spend and open feedback
   ugckit state projects      list projects
 

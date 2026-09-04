@@ -25,8 +25,7 @@ your prompts, or anything you have generated.
 ## Then
 
     cd ~/my-video-project
-    ./ugckit key SUPAGEN_API_KEY        # prompts; nothing echoed, no editor needed
-    ./ugckit key SUPAGEN_WORKSPACE_ID
+    ./ugckit key                        # asks for your key and workspace id
     ./ugckit doctor                     # tools, deps, credentials, live auth
     claude                              # or: codex — both read AGENTS.md
 

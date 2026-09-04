@@ -21,32 +21,35 @@ Fix everything it marks with a red ✗ before continuing. Common cases:
 
 ## 2. Credentials
 
-The user needs two values in `.env`: `SUPAGEN_API_KEY` and `SUPAGEN_WORKSPACE_ID`.
+Two values have to end up in `.env`: `SUPAGEN_API_KEY` and `SUPAGEN_WORKSPACE_ID`.
 
-**Give them the exact command. Do not tell them to "edit .env" or "open the file" —
-plenty of people are not in an IDE and have no idea how.** Say this:
+There is one command, and it takes no arguments:
 
-    ./ugckit key SUPAGEN_API_KEY
-    ./ugckit key SUPAGEN_WORKSPACE_ID
+    ./ugckit key
 
-**You cannot run these yourself, and you must not try.** They refuse a piped value and
-exit non-zero, because for you to pipe a key in, the key would have to be in your
-context first — which is the thing being avoided. Print the two commands, say the
-values come from the Supagen dashboard, and **wait for the user to say they are done.**
-In Claude Code they can prefix a command with `!` to run it inside the session.
+It asks for each value in turn and hides what the user types. **Give them exactly that,
+character for character.** Do not write `./ugckit key SUPAGEN_API_KEY` — a name after
+`key` reads like a blank to fill in, and what people fill it in with is the secret
+itself, which then sits in their shell history.
 
-Each prompts with echo off and writes the value in place. This is the only route you
-should offer, because it also handles the three things that silently break a
-hand-edited `.env`: a missing trailing newline welding two variables together, the
-quotes people copy along with the key, and a stray trailing space.
+**Do not tell them to "edit .env" or "open the file".** Many users are not in an editor
+and will not know how.
 
-When they say they are done, verify with `scripts/doctor.py` — never by reading `.env`.
+**You cannot run this yourself, and must not try.** It exits non-zero when its input is
+not a terminal, because for you to pipe a value in, the value has to be in your context
+first — which is the thing being avoided. So:
 
-Where the values come from:
+1. Tell them where the values are: **API key** — Supagen dashboard → Settings → API
+   keys. **Workspace id** — the long id in the dashboard web address.
+2. Give them `./ugckit key`. In Claude Code they can put `!` in front of it to run it
+   inside the session.
+3. **Wait.** Do not move on until they say they are done.
+4. Verify with `scripts/doctor.py` — never by reading `.env`.
 
-- **API key** — Supagen dashboard → Settings → API keys.
-- **Workspace id** — the uuid in the dashboard URL, or `list_workspaces` over MCP once
-  it is connected.
+Besides hiding the value, the command fixes the three things that silently break a
+hand-edited `.env`: a missing trailing newline welding two variables into one, and the
+quotes or trailing space people copy along with the key. All three show up later as a
+401 with nothing pointing at the cause.
 
 **Never ask them to paste the key into the chat, and never print it.** If you must
 inspect `.env`, redact:

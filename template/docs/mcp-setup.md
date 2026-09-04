@@ -73,9 +73,9 @@ server. Registration and approval happen over OAuth, so there is no key to copy.
 | Approves the OAuth connection | **you, in your browser** | it is signed in as you; the agent has no browser and no session |
 | Confirms it worked | the agent | by calling `ping` — the only real proof |
 
-Same split for credentials: the agent prints `./ugckit key SUPAGEN_API_KEY`, **you** run
-it. It refuses a piped value on purpose, so an agent cannot feed it a key it should
-never have been given.
+Same split for credentials: the agent prints `./ugckit key`, **you** run it. It takes no
+arguments, so there is no blank to fill in with your key by mistake, and it refuses a
+piped value so an agent cannot feed it a key it should never have been given.
 
 ## Checking it worked
 
