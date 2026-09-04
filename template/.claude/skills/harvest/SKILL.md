@@ -25,6 +25,7 @@ and wait for the notification. Do not run two copies to go faster; see rule 13.
     posts.json     the raw scrape — the only copy you will get at this price
     index.tsv      rank, views, likes, comments, shares, bookmarks, date, video|photo, caption
     covers/NNN.jpg the cover frame of every post, rank 1 = newest = 001.jpg
+                   (or the video's first frame, when the cover CDN is blocked here)
     hooks-NN.md    a batch of twelve covers, read and transcribed
     HOOKS.md       the account's hook bank, rebuilt from the batches
 

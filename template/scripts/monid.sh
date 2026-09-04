@@ -119,14 +119,51 @@ monid_run() {
 }
 
 # RULE 11: the CDN link Monid already returned, fetched directly. Never yt-dlp.
+#
+# Some networks block one TikTok CDN host and not another (seen Sep 2026: tiktokcdn.com
+# hangs, tiktokcdn-us.com answers, from the same machine). A blocked host never refuses,
+# it just never answers, so a 180s timeout per file turns one account into hours of
+# nothing. Connect fails fast, and after three connect failures in a row a host is
+# marked dead for the rest of the run and skipped without waiting.
+DEAD_HOSTS=""
+_host_of() { printf '%s' "$1" | sed -E 's#^[a-z]+://([^/]+).*#\1#'; }
 fetch_cdn() {
-  local url="$1" out="$2"
+  local url="$1" out="$2" host rc
   [ -s "$out" ] && return 0
   [ -n "$url" ] && [ "$url" != "null" ] || { echo "  no url" >&2; return 1; }
-  curl -sfL --max-time 180 -A "Mozilla/5.0" -H "Referer: https://www.tiktok.com/" \
-       -o "$out.part" "$url" || { rm -f "$out.part"; return 1; }
-  [ -s "$out.part" ] || { rm -f "$out.part"; return 1; }
+  host=$(_host_of "$url")
+  case " $DEAD_HOSTS " in *" $host "*) return 1 ;; esac
+  curl -sfL --connect-timeout 10 --max-time 180 -A "Mozilla/5.0" \
+       -H "Referer: https://www.tiktok.com/" -o "$out.part" "$url"
+  rc=$?
+  if [ "$rc" -ne 0 ] || [ ! -s "$out.part" ]; then
+    rm -f "$out.part"
+    # 28 = timed out, 7 = could not connect, 6 = could not resolve: the network, not
+    # the URL. Three in a row from one host and it is dead for this run.
+    if [ "$rc" = 28 ] || [ "$rc" = 7 ] || [ "$rc" = 6 ]; then
+      _CDN_FAILS="${_CDN_FAILS:-} $host"
+      if [ "$(printf '%s\n' $_CDN_FAILS | grep -cx "$host")" -ge 3 ]; then
+        DEAD_HOSTS="$DEAD_HOSTS $host"
+        echo "  $host does not answer from this network -- skipping it for the rest of this run." >&2
+        echo "  (a VPN or another network fixes it; the paid data is saved, re-run to fetch later)" >&2
+      fi
+    fi
+    return 1
+  fi
+  _CDN_FAILS=$(printf '%s\n' ${_CDN_FAILS:-} | grep -vx "$host" | tr '\n' ' ')
   mv "$out.part" "$out"
+}
+
+# A cover frame taken from the video itself, for when the cover CDN is blocked but the
+# video CDN is not. Reads only the first frame, so it moves a few hundred KB, not the clip.
+frame_from_video() {
+  local url="$1" out="$2" host
+  [ -n "$url" ] && [ "$url" != "null" ] || return 1
+  host=$(_host_of "$url")
+  case " $DEAD_HOSTS " in *" $host "*) return 1 ;; esac
+  ffmpeg -v error -y -rw_timeout 15000000 -user_agent "Mozilla/5.0" \
+         -headers $'Referer: https://www.tiktok.com/\r\n' \
+         -i "$url" -frames:v 1 -q:v 3 "$out" 2>/dev/null && [ -s "$out" ]
 }
 
 # RULE 14: an .mp4 that is really an m4a of the sound is the single most expensive

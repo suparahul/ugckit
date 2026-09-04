@@ -65,23 +65,35 @@ with open(os.path.join(h, "index.tsv"), "w") as f, \
         cover = ((r.get("video") or {}).get("cover")) or ""
         if not cover and photo:
             cover = (r["images"][0] or {}).get("url") or ""
-        c.write(f"{i:03d}\t{cover}\n")
+        # the video url is the fallback source for a cover when the cover CDN is blocked
+        vurl = "" if photo else (((r.get("video") or {}).get("url")) or "")
+        c.write(f"{i:03d}\t{cover}\t{vurl}\n")
 print(f"  {len(rows)} posts -> index.tsv")
 PY
 
-  GOT=0; MISS=0
-  while IFS=$'\t' read -r RANK URL; do
+  GOT=0; MISS=0; FRAMES=0
+  while IFS=$'\t' read -r RANK URL VURL; do
     OUTJ="$H/covers/$RANK.jpg"
     [ -s "$OUTJ" ] && { GOT=$((GOT + 1)); continue; }
     if [ -n "$URL" ] && fetch_cdn "$URL" "$H/covers/$RANK.src" && \
        to_jpg "$H/covers/$RANK.src" "$OUTJ" 700; then
       GOT=$((GOT + 1))
+    elif [ -n "${VURL:-}" ] && frame_from_video "$VURL" "$H/covers/$RANK.src" && \
+         to_jpg "$H/covers/$RANK.src" "$OUTJ" 700; then
+      # the cover host is blocked here but the video host is not: first frame instead
+      GOT=$((GOT + 1)); FRAMES=$((FRAMES + 1))
     else
       MISS=$((MISS + 1))
     fi
     rm -f "$H/covers/$RANK.src"
   done < "$H/covers.tsv"
   echo "  covers: $GOT downloaded, $MISS missing"
+  [ "$FRAMES" -gt 0 ] && echo "  ($FRAMES are first frames from the video, because the cover CDN did not answer)"
+  if [ "$MISS" -gt 0 ] && [ -n "$DEAD_HOSTS" ]; then
+    echo "  $MISS covers could not be fetched: this network blocks$DEAD_HOSTS."
+    echo "  The paid data is in posts.json. Re-run this command on a VPN or another network"
+    echo "  soon -- the urls expire (rule 12)."
+  fi
 
   # The hook bank. A separate headless session per batch of 12 keeps the covers out of
   # the orchestrator's context — 50 images an account across 20 accounts does not fit.

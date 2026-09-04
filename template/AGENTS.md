@@ -92,7 +92,11 @@ like success* — the run keeps going and leaves plausible files behind.
 12. **EVERY URL IN `posts.json` IS SIGNED AND EXPIRES.** Cover, slide and video URLs all
     die within weeks. Anything not downloaded before then is gone unless the account is
     re-scraped at full cost. Pull covers, slides and videos in the same session as the
-    metrics.
+    metrics. Some networks block one TikTok CDN host and not another (`tiktokcdn.com`
+    hangs, `tiktokcdn-us.com` answers): `monid.sh` gives up on a host after three
+    timeouts and harvest takes a cover from the video's first frame instead. When it
+    reports covers it could not fetch, the fix is a VPN or another network, then the
+    same command again -- soon, before the urls die. Never rewrite a signed url.
 
 13. **RUN MONID ONE BRAND AT A TIME.** Concurrent calls come back as HTML error pages that
     look exactly like running out of credit, and you will go looking for a billing problem
