@@ -4,7 +4,9 @@ The orchestrator contract lives in **[AGENTS.md](AGENTS.md)**. Read it fully bef
 acting on anything in this project — it carries hard rules that exist because breaking
 them cost real money.
 
-Skills for each pipeline stage are in `.claude/skills/`. Invoke them by name.
+Skills for each pipeline stage are in `.claude/skills/`. Invoke them by name. (Codex
+reads the same folder through `.agents/skills`, a link the installer makes; both agents
+read this AGENTS.md at the project root.)
 
 Research, R0–R5, when the user has a product, a niche or an app name rather than a
 video (`product`, `apps`, `network`, `harvest`, `deepen`, `teardown`). The unit of

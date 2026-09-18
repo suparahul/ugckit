@@ -49,6 +49,11 @@ How to treat me while you do this:
 
 That is all a first-time user needs. Everything below is the manual version.
 
+Claude Code and Codex both work. The skills are one set of files under `.claude/skills/`;
+the installer links `.agents/skills` to it, which is where Codex looks (tested on
+codex-cli 0.154: Codex found and followed the `setup` skill through the link, and saw
+none of them without it). Both agents read `AGENTS.md` at the project root.
+
 ## Install
 
 One line, nothing to clone:
@@ -72,7 +77,7 @@ nothing twice.
     cd ~/organic-factory
     ./ugckit key                        # asks for your two secrets; the agent sets the workspace id
     ./ugckit doctor                     # tools, deps, credentials, live auth
-    claude                              # or: codex — both read AGENTS.md
+    claude                              # or: codex — both read AGENTS.md and the same skills
 
 Ask the agent to run the **setup** skill first. It creates the required Supagen
 templates in your workspace. Nothing generates until that is done.

@@ -244,6 +244,11 @@ if cx:
         say(f"  - codex found; login status not read ({e})")
 else:
     say("  - codex not found (npm install -g @openai/codex -- needed only for the pictures, at the first image run)")
+link = os.path.join(ROOT, ".agents", "skills")
+if os.path.islink(link) and os.path.isdir(os.path.join(ROOT, ".claude", "skills")):
+    say("  - .agents/skills -> .claude/skills: Codex sees the same skills")
+else:
+    say("  - .agents/skills link missing: Codex will not list the skills (re-run install.sh, or: mkdir -p .agents && ln -s ../.claude/skills .agents/skills)")
 
 say("\nMCP")
 # We can see whether the server is configured. We cannot see whether the user has

@@ -32,6 +32,14 @@ the brain (`brain/learnings-slideshows.md`, `SLIDESHOW-ANATOMY.md`,
 `ACCOUNT-ARCHITECTURE.md`) is present, and Node is 22.18 or newer. A missing brain means
 an older kit installed this workspace: re-run `install.sh`.
 
+**Which agent is reading this.** Claude Code found this file in `.claude/skills/`;
+Codex found it through `.agents/skills`, the link `install.sh` makes to the same folder
+(`doctor.py` prints its state under "codex"). Tested 2026-09-18 on codex-cli 0.154.0:
+without the link Codex lists none of the kit's skills; with it, `codex exec "take me
+through setup"` picked this skill by name, read `AGENTS.md` for the rules, ran the
+preflight and stopped where told. If the link is missing, the one command is
+`mkdir -p .agents && ln -s ../.claude/skills .agents/skills`, then restart Codex.
+
 **Two things are not checked here, on purpose.** The Codex login (the pictures) and the
 posting service (Post Bridge or another scheduler) are connected the first time they are
 needed, in production, by the `images` and `posting-provider` skills. `doctor.py` prints

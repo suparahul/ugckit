@@ -107,6 +107,17 @@ ok "scripts, skills, docs and the atlas"
 for f in AGENTS.md CLAUDE.md ugckit; do copy_managed "$f"; done
 ok "AGENTS.md, CLAUDE.md, ugckit"
 
+# Codex reads skills from .agents/skills (the repo-level folder of codex-cli 0.154), not
+# from .claude/skills. One link, so there is one copy of every skill to maintain. A real
+# folder already there is the user's; it is left alone and said.
+if [ -L "$DEST/.agents/skills" ]; then
+  :
+elif [ -e "$DEST/.agents/skills" ]; then
+  hm ".agents/skills exists and is not a link; Codex will not see .claude/skills through it"
+else
+  mkdir -p "$DEST/.agents" && ln -s ../.claude/skills "$DEST/.agents/skills" && ok ".agents/skills -> .claude/skills (Codex reads the same skills)"
+fi
+
 # The brain: three learnings files, replaced on every upgrade and read-only on disk so
 # nobody edits the copy the next upgrade overwrites. The user's own findings go beside
 # it, under apps/<slug>/niche/ (see apps/README.md).

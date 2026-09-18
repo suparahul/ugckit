@@ -151,8 +151,10 @@ Stages, in order. Do not skip. Do not run a stage whose predecessor is not `done
 unless the user explicitly overrides.
 
 **A "skill" here is a file: `.claude/skills/<name>/SKILL.md`.** If your client has a
-skill system, use it. If it does not (Codex, Cursor, most others), just read that file
-and follow it. Same instructions either way.
+skill system, use it: Claude Code reads `.claude/skills/`, Codex reads `.agents/skills/`,
+which the installer links to the same folder (one copy, tested on codex-cli 0.154:
+Codex lists `.claude/skills` only through that link). If it has none (Cursor, most
+others), just read that file and follow it. Same instructions either way.
 
 ### Research — R0 to R5, optional, spends Monid credit
 
