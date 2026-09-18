@@ -23,7 +23,7 @@ function Series({ reads, postedAt }: { reads: { at: string; views: number }[]; p
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Views at each read: ${pts.map((p) => `${p.at.slice(0, 16).replace("T", " ")} UTC ${n(p.v)}`).join(", ")}`}>
       <line className="series__base" x1="0" y1={base} x2={W} y2={base} />
       <polyline className="series__line" points={line} />
-      {pts.map((p, i) => <circle key={i} className={`series__dot${i === pts.length - 1 ? " is-last" : ""}`} cx={x(p.t).toFixed(1)} cy={y(p.v).toFixed(1)} r="4.5"><title>{p.at.slice(0, 16).replace("T", " ")} UTC · {n(p.v)} views</title></circle>)}
+      {pts.map((p, i) => <circle key={i} className={`series__dot${i === pts.length - 1 ? " is-last" : ""}`} cx={x(p.t).toFixed(1)} cy={y(p.v).toFixed(1)} r="4.5"><title>{`${p.at.slice(0, 16).replace("T", " ")} UTC · ${n(p.v)} views`}</title></circle>)}
       {pts.length > 1 ? <text className="series__lbl" x={x(pts[0].t).toFixed(1)} y={(y(pts[0].v) - 8).toFixed(1)} textAnchor="middle">{n(pts[0].v)}</text> : null}
       <text className="series__lbl is-last" x={x(pts[pts.length - 1].t).toFixed(1)} y={(y(pts[pts.length - 1].v) - 8).toFixed(1)} textAnchor="end">{n(pts[pts.length - 1].v)}</text>
       <text className="series__t" x={x(t0).toFixed(1)} y={base + 13} textAnchor="start">posted {hhmm(postedAt)}</text>
