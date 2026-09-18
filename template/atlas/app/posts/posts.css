@@ -1,0 +1,995 @@
+/* The all-posts explorer.
+ *
+ * Depth 3 idiom: paper, ink, no motion. Since 2026-09-10 the grid itself is
+ * media-first — a tile is the video or the carousel at 9:16, and the text is
+ * hidden until the tile is expanded — so the reading styles below now dress the
+ * tile's panel rather than a card body sitting beside a thumbnail.
+ *
+ * Two visual rules carry meaning and must not be softened:
+ *   .tile--recovered   the 52 posts no scrape contains. Edged with a dashed
+ *                      rule so they can never be read as scraped.
+ *   .is-promo          a promoting post. The default view has none of these, so
+ *                      when one appears it should be obvious.
+ */
+
+.xp {
+  --card: rgba(255, 252, 244, 0.5);
+}
+
+/* ------------------------------------------------------------------- head */
+
+.xhead {
+  max-width: var(--measure);
+}
+
+.xhead__lede {
+  margin-top: 0.6rem;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.xhead__note {
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+.xhead__note code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
+
+/* ---------------------------------------------------------------- filters */
+
+.xf {
+  margin-top: 1.6rem;
+  border: 1px solid var(--rule-2);
+  border-radius: 4px;
+  background: var(--card);
+  padding: 1rem 1.1rem 0.9rem;
+}
+
+.xf__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.9rem 1.4rem;
+}
+
+.xf__set {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.xf__set--wide {
+  grid-column: span 2;
+}
+
+@media (max-width: 620px) {
+  .xf__set--wide { grid-column: span 1; }
+}
+
+.xf__set legend {
+  padding: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 0.42rem;
+}
+
+.xf__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+}
+
+.xf__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  border: 1px solid var(--rule-2);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem 0.22rem 0.45rem;
+  font-size: 0.78rem;
+  color: var(--ink-2);
+  cursor: pointer;
+  background: rgba(255, 253, 247, 0.55);
+}
+
+.xf__chip:hover {
+  border-color: var(--ink-3);
+}
+
+.xf__chip input {
+  accent-color: var(--accent, var(--ember));
+  margin: 0;
+}
+
+.xf__chip:has(input:checked) {
+  border-color: var(--accent, var(--ember));
+  box-shadow: inset 0 0 0 1px var(--accent, var(--ember));
+  color: var(--ink);
+}
+
+.xf__hint {
+  margin-top: 0.34rem;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--ink-4);
+}
+
+.xf select,
+.xf input[type="date"],
+.xf input[type="number"],
+.xf input[type="search"] {
+  width: 100%;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--ink);
+  background: rgba(255, 253, 247, 0.7);
+  border: 1px solid var(--rule-2);
+  border-radius: 3px;
+  padding: 0.3rem 0.4rem;
+}
+
+/* .xf__pair and .xf__dash are gone with the views and date boxes they paired:
+   they were the only two-input rows in this form, and no markup uses them now. */
+
+.xf__foot {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 0.9rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--rule);
+}
+
+.xf__go {
+  font: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  border: 1px solid var(--ink-3);
+  background: var(--slab);
+  color: var(--slab-ink);
+  border-radius: 3px;
+  padding: 0.28rem 0.9rem;
+  cursor: pointer;
+}
+
+.xf__reset {
+  font-size: 0.78rem;
+  color: var(--ink-3);
+}
+
+/* ------------------------------------------------------------------ count */
+
+.xcount {
+  margin-top: 1.1rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.xcount strong {
+  font-size: 1.15rem;
+}
+
+.xcount__split {
+  color: var(--ember-deep);
+}
+
+.xcount__page {
+  color: var(--ink-4);
+}
+
+.xempty {
+  margin-top: 1.4rem;
+  color: var(--ink-3);
+}
+
+/* ------------------------------------------------------------------- grid */
+
+/* ------------------------------------------------------ the media-first grid
+ *
+ * Rahul's instruction of 2026-09-10: the explore tab is a grid of content he
+ * can play, not a wall of text. So a tile is the media at 9:16 with a quiet
+ * identity bar under it, and everything else is hidden until the tile is
+ * expanded.
+ *
+ * THE EXPANSION IS DONE WITH SPANS, NOT WITH POSITION. An open tile spans
+ * three columns and ONE row of the same grid, so the tiles after it flow around
+ * it exactly as the grid already flows. Nothing is lifted out and nothing
+ * overlays anything. The media itself does not change at all: its column inside
+ * the open tile is set to the width of one grid track, so it keeps the width,
+ * the height and the place on screen that it had while collapsed.
+ *
+ * `grid-auto-flow` is deliberately NOT `dense`. Dense packing would pull later
+ * tiles up into the gap an expansion leaves, which reorders the grid under the
+ * reader's eye — the jumping Rahul asked not to have. Leaving it sparse means
+ * an expansion pushes the rest down, in order, which is predictable.
+ */
+.xgrid {
+  list-style: none;
+  margin: 1.1rem 0 0;
+  padding: 0;
+  display: grid;
+  /* The column is sized for a 9:16 tile that is watchable, not a thumbnail. */
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-auto-rows: auto;
+  /* An open tile rebuilds one track width from this, so it is a variable. */
+  --gap: 1rem;
+  gap: var(--gap);
+  align-items: start;
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--rule-2);
+  border-radius: 4px;
+  background: var(--card);
+  overflow: hidden;
+  /* Only the border and the shadow animate. Width, height and grid position do
+     not, because animating a grid span is what makes a grid jump. */
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.tile:focus-within {
+  border-color: var(--ember-deep);
+}
+
+/* The 52 posts no scrape contains. Never let one read as a scraped post. */
+.tile--recovered {
+  border-style: dashed;
+  border-color: var(--ember-deep);
+}
+
+.tile__media {
+  position: relative;
+  aspect-ratio: 9 / 16;
+  background: rgba(36, 29, 19, 0.1);
+  overflow: hidden;
+}
+
+.tile__img,
+.tile__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #14120e;
+}
+
+/* Tab two, and no cover either: say what it is rather than draw a grey hole. */
+.tile__blank {
+  height: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.4rem;
+  padding: 0.9rem;
+  text-align: center;
+  background:
+    repeating-linear-gradient(135deg, rgba(206, 93, 32, 0.06) 0 6px, transparent 6px 14px),
+    var(--card);
+}
+
+.tile__blankhandle {
+  font-family: var(--font-instrument), Georgia, serif;
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.tile__blanknote {
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.tile__play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: rgba(20, 18, 14, 0.18);
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.tile__play:hover,
+.tile__play:focus-visible {
+  background: rgba(20, 18, 14, 0.38);
+}
+
+.tile__play span {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding-left: 4px;
+  border-radius: 50%;
+  background: rgba(20, 18, 14, 0.62);
+  box-shadow: 0 1px 10px rgba(0, 0, 0, 0.3);
+}
+
+.tile__kind {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.3rem;
+  border-radius: 2px;
+  background: rgba(23, 22, 18, 0.7);
+  color: var(--slab-ink);
+}
+
+.tile__steps {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.25rem;
+  border-radius: 3px;
+  background: rgba(23, 22, 18, 0.72);
+}
+
+.tile__step {
+  border: 0;
+  background: transparent;
+  color: var(--slab-ink);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.1rem 0.35rem;
+  cursor: pointer;
+}
+
+.tile__step:hover {
+  color: #fff;
+}
+
+.tile__count {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  color: var(--slab-ink);
+}
+
+/* The identity bar, and the expand control, are the same element. */
+.tile__bar {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.42rem 0.55rem;
+  border: 0;
+  border-top: 1px solid var(--rule-2);
+  background: transparent;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--ink-2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tile__bar:hover {
+  background: rgba(206, 93, 32, 0.06);
+}
+
+.tile__handle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--accent, var(--rule-2));
+}
+
+.tile__views {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--ink-3);
+}
+
+.tile__chev {
+  font-family: var(--mono);
+  color: var(--ink-4);
+}
+
+/* ------------------------------------------------------------ the expansion */
+
+/* RAHUL, 2026-09-10: "the explorer expansion should happen to 3 columns with
+   the post retaining its width and height."
+
+   So the open tile is three tracks wide and one row tall, and its inner grid
+   gives the media a column of exactly one track. `--mediaw` rebuilds that track
+   from the tile's own width: the tile spans k tracks and k-1 gaps and loses two
+   pixels to its border, so one track is (width + 2px - gaps) / k, and the media
+   box inside the border is that less the same two pixels. The panel takes
+   whatever is left. The media therefore keeps its width to the pixel, keeps its
+   9/16 box, and never moves.
+
+   The row is pinned in the markup as well as the columns. That is what lets a
+   tile in the last two columns grow to the LEFT: a definitely placed item is
+   laid out before the auto-placed ones, so the neighbours move aside instead of
+   pushing it down a row. */
+
+.tile.is-open {
+  border-color: var(--ember-deep);
+  box-shadow: 0 2px 18px rgba(36, 29, 19, 0.14);
+  display: grid;
+  /* Media on top, bar under it — the collapsed stack, untouched. */
+  grid-template-rows: auto auto;
+}
+
+.tile.is-open[data-sub="3"] {
+  --mediaw: calc((100% + 2px - 2 * var(--gap)) / 3 - 2px);
+}
+
+.tile.is-open[data-sub="2"] {
+  --mediaw: calc((100% + 2px - var(--gap)) / 2 - 2px);
+}
+
+/* Room to the right: the media keeps the left column, the text opens beside it. */
+.tile.is-open[data-side="right"] {
+  grid-template-columns: var(--mediaw) minmax(0, 1fr);
+}
+
+.tile.is-open[data-side="right"] .tile__media,
+.tile.is-open[data-side="right"] .tile__bar {
+  grid-column: 1;
+}
+
+.tile.is-open[data-side="right"] .tile__panel {
+  grid-column: 2;
+  border-left: 1px solid var(--rule-2);
+}
+
+/* The last two columns of a row: the tile grows the other way instead. */
+.tile.is-open[data-side="left"] {
+  grid-template-columns: minmax(0, 1fr) var(--mediaw);
+}
+
+.tile.is-open[data-side="left"] .tile__media,
+.tile.is-open[data-side="left"] .tile__bar {
+  grid-column: 2;
+}
+
+.tile.is-open[data-side="left"] .tile__panel {
+  grid-column: 1;
+  border-right: 1px solid var(--rule-2);
+}
+
+.tile.is-open .tile__media {
+  grid-row: 1;
+  /* Unchanged from the collapsed tile. Nothing here scales or re-crops it. */
+  aspect-ratio: 9 / 16;
+}
+
+.tile.is-open .tile__bar {
+  grid-row: 2;
+}
+
+.tile.is-open[data-sub="3"] .tile__panel,
+.tile.is-open[data-sub="2"] .tile__panel {
+  grid-row: 1 / span 2;
+}
+
+.tile__panel {
+  position: relative;
+  min-height: 0;
+}
+
+/* Out of flow, so the length of the text can never set the height of the tile.
+   The tile is as tall as the media and the bar, which is what it was collapsed,
+   and long text scrolls inside that. */
+.tile.is-open[data-sub="3"] .tile__panelinner,
+.tile.is-open[data-sub="2"] .tile__panelinner {
+  position: absolute;
+  inset: 0;
+}
+
+.tile__panelinner {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* A `display` of any kind beats the `hidden` attribute, so a collapsed tile
+   would keep the whole text block in layout — 1,399px of tile for a 455px
+   video. The attribute is honoured explicitly instead, and it is what the tile
+   toggles, so the panel is out of layout whenever it is not being read. */
+.tile__panel[hidden] {
+  display: none;
+}
+
+.tile__panelscroll {
+  min-height: 0;
+  overflow: auto;
+  padding: 0.7rem 0.8rem 0.2rem;
+}
+
+.tile__panelfoot {
+  display: flex;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0.4rem 0.8rem 0.6rem;
+  font-size: 0.74rem;
+}
+
+/* ONE COLUMN, OR NO MEASUREMENT. There is no width to open into, so the text
+   stacks under the media. The media still keeps its width and its height; this
+   is the only case where the tile becomes taller than one row, and there is no
+   other place on a one-column grid to put the words. */
+.tile.is-open:not([data-sub="2"]):not([data-sub="3"]) {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+}
+
+.tile.is-open:not([data-sub="2"]):not([data-sub="3"]) .tile__media,
+.tile.is-open:not([data-sub="2"]):not([data-sub="3"]) .tile__bar,
+.tile.is-open:not([data-sub="2"]):not([data-sub="3"]) .tile__panel {
+  grid-column: 1;
+}
+
+.tile.is-open:not([data-sub="2"]):not([data-sub="3"]) .tile__panel {
+  grid-row: 3;
+  border-left: 0;
+  border-right: 0;
+  border-top: 1px solid var(--rule-2);
+  max-height: 60vh;
+}
+
+/* .xcard, .xcard__cover, .xcard__nocover and .xcard__views are gone with the
+   text-first card: the tile above is the cover now, at tile size, and it plays.
+   Everything below still styles the text, which now lives in the tile's panel. */
+
+.xcard__body {
+  min-width: 0;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.xcard__id {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.42rem;
+  margin-bottom: 0.3rem;
+}
+
+.xcard__brand {
+  font-size: 0.64rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent, var(--ink-3));
+}
+
+.xcard__handle {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.xcard__date {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--ink-4);
+}
+
+.xcard__bio {
+  margin: 0 0 0.34rem;
+  font-size: 0.75rem;
+  color: var(--ink-3);
+  border-left: 2px solid var(--rule-2);
+  padding-left: 0.5rem;
+}
+
+.xcard__bio.is-named {
+  border-left-color: var(--ember);
+  color: var(--ink-2);
+}
+
+.xcard__biolabel {
+  font-size: 0.62rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  margin-right: 0.3rem;
+}
+
+.xcard__bioflag {
+  color: var(--ember-deep);
+  font-style: normal;
+}
+
+.xcard__verdict {
+  margin: 0.3rem 0;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.xcard__verdict.is-promo {
+  color: var(--ember-deep);
+}
+
+.xcard__sub {
+  font-weight: 400;
+  font-size: 0.74rem;
+  color: var(--ink-4);
+}
+
+.xcard__basis {
+  margin: 0 0 0.34rem;
+  padding-left: 1rem;
+  font-size: 0.74rem;
+  color: var(--ink-3);
+}
+
+.xcard__rivals,
+.xcard__recovered {
+  margin: 0.34rem 0;
+  font-size: 0.72rem;
+  color: var(--ember-deep);
+}
+
+.xcard__recovered code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
+
+.xcard__field {
+  margin: 0.34rem 0;
+  overflow-wrap: anywhere;
+}
+
+.xcard__label {
+  font-size: 0.62rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  margin-right: 0.3rem;
+}
+
+.xcard__tags {
+  margin: 0.2rem 0;
+  font-size: 0.72rem;
+  color: var(--ink-4);
+  overflow-wrap: anywhere;
+}
+
+.xcard__missing {
+  margin: 0.24rem 0;
+  font-size: 0.7rem;
+  color: var(--ink-4);
+  font-style: italic;
+}
+
+.xcard__tr {
+  margin: 0.4rem 0;
+  border-top: 1px solid var(--rule);
+  padding-top: 0.34rem;
+}
+
+.xcard__tr summary {
+  cursor: pointer;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.xcard__trtext {
+  margin: 0.4rem 0 0;
+  font-size: 0.76rem;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.xcard__lang {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  padding: 0.04rem 0.26rem;
+  border: 1px solid var(--rule-2);
+  border-radius: 2px;
+  margin-right: 0.3rem;
+}
+
+.xcard__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.72rem;
+}
+
+.xcard__format {
+  color: var(--ink-3);
+  border: 1px dashed var(--rule-2);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+}
+
+.xcard__out {
+  margin-left: auto;
+  color: var(--ember-deep);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ pager */
+
+.xpager {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  margin: 1.6rem 0 3rem;
+  font-size: 0.85rem;
+  color: var(--ink-3);
+}
+
+/* ------------------------------------------------- the owned-account rule
+ *
+ * Rahul's ruling: a post on the brand's own handle is promotional by
+ * definition. It is applied on this page only, so it is styled as an
+ * annotation over the card rather than as part of the verdict line, and the
+ * TSV's own answer always sits inside it.
+ */
+
+.xhead__rule {
+  margin-top: 0.7rem;
+  padding: 0.55rem 0.7rem;
+  border-left: 3px solid var(--ember);
+  background: rgba(206, 93, 32, 0.06);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.xcard__owned {
+  margin: 0.34rem 0;
+  padding: 0.34rem 0.5rem;
+  border: 1px dashed var(--ember);
+  border-radius: 3px;
+  background: rgba(206, 93, 32, 0.06);
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.xcard__tsv {
+  display: block;
+  margin-top: 0.24rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--ink-3);
+}
+
+.xcard__dup {
+  margin: 0.34rem 0;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--ink-4);
+}
+
+.xcount__rows {
+  color: var(--ink-3);
+}
+
+/* A post on the brand's own handle. The tile no longer carries this: a mark on
+ * a collapsed tile would be text on a tile that is meant to be media. It marks
+ * the panel instead, where the annotation explaining it is. */
+.xcard__body.is-owned {
+  box-shadow: inset 3px 0 0 var(--ember);
+  padding-left: 0.5rem;
+}
+
+.xcard__badge {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--slab-ink);
+  background: var(--ember-deep);
+  border-radius: 2px;
+  padding: 0.08rem 0.34rem;
+}
+
+.xcard__detail {
+  color: var(--ink);
+  border: 1px solid var(--rule-2);
+  border-radius: 3px;
+  padding: 0.1rem 0.5rem;
+}
+
+.xcard__detail:hover {
+  border-color: var(--ember);
+  color: var(--ember-deep);
+}
+
+/* Landing back on the card that was clicked. */
+.xcard:target {
+  outline: 2px solid var(--ember);
+  outline-offset: 3px;
+  scroll-margin-top: 90px;
+}
+
+/* ------------------------------------------------------- the target-set rule */
+
+.xf__set--lead legend {
+  color: var(--ember-deep);
+}
+
+.xf__chip--lead {
+  font-size: 0.84rem;
+  padding: 0.26rem 0.75rem 0.28rem 0.55rem;
+}
+
+/* Held or not held, on the cover of every card. It is what decides whether a
+ * post still needs fetching, so it is readable before anything else is. */
+.xcard__held {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  max-width: calc(100% - 8px);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.32rem;
+  border-radius: 2px;
+  background: rgba(23, 22, 18, 0.78);
+  color: var(--slab-ink);
+}
+
+.xcard__held.is-held {
+  background: #2f6b3a;
+}
+
+.xcard__reason {
+  margin: 0.2rem 0 0.34rem;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+/* ------------------------------------------------------------- handle view */
+
+.hv {
+  margin-top: 1.3rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--rule-2);
+  border-left: 4px solid var(--accent, var(--ember));
+  border-radius: 4px;
+  background: rgba(255, 252, 244, 0.6);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.9rem 1.6rem;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .hv { grid-template-columns: minmax(0, 1fr); }
+}
+
+.hv__handle {
+  margin: 0.2rem 0 0;
+  font-family: var(--serif);
+  font-size: 1.7rem;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.hv__name {
+  margin: 0.16rem 0 0;
+  font-size: 0.9rem;
+  color: var(--ink-2);
+}
+
+.hv__bio {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--ink-2);
+  border-left: 2px solid var(--rule-2);
+  padding-left: 0.6rem;
+}
+
+.hv__meta {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  color: var(--ink-3);
+}
+
+.hv__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.1rem;
+  margin: 0;
+}
+
+.hv__stats dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.hv__stats dt {
+  margin-top: 0.14rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.hv__stats .is-gap dd {
+  color: var(--ember-deep);
+}
+
+.hv__links {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.82rem;
+}
+
+.hv__links a {
+  color: var(--ember-deep);
+}
+
+/* Newly recovered by the three-month gap fill. Provenance, not a verdict, so it
+ * is an outline rather than a filled badge and it never competes with the
+ * owned-account mark beside it. */
+.xcard__new {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  border: 1px solid var(--ink-3);
+  border-radius: 2px;
+  padding: 0.06rem 0.32rem;
+}
+
+.xcard__gap {
+  margin: 0.24rem 0 0.34rem;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--ink-4);
+}
+
+/* Deleted from TikTok. It reads as missing work otherwise, and it is not. */
+.xcard__gone {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--slab-ink);
+  background: #6d5c42;
+  border-radius: 2px;
+  padding: 0.06rem 0.32rem;
+}
+
+.xcard__gapgone {
+  margin: 0.24rem 0 0.34rem;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--rule-2);
+  border-radius: 3px;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
