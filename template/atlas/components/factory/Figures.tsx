@@ -44,7 +44,7 @@ export function Figures({ slug, states, handles, q, base }: { slug: string; stat
     if (v.period !== "day") u.set("period", v.period);
     u.set("day", v.day);
     if (v.account) u.set("account", v.account);
-    return `${base}?${u.toString()}#figures`;
+    return `${base}?${u.toString()}`;
   };
   const step = (k: number) => (period === "month" ? new Date(Date.UTC(p.y, p.m - 1 + k, 1)).toISOString().slice(0, 10) : addDays(day, period === "week" ? 7 * k : k));
   const posted = shown.filter(isPosted).length;
@@ -59,23 +59,23 @@ export function Figures({ slug, states, handles, q, base }: { slug: string; stat
         <span className="figures__whens">
           <span className="figures__when">
             <nav className="prod__nav" aria-label={period}>
-              <Link href={href({ day: step(-1) })} aria-label={`Previous ${period}`}>‹</Link>
+              <Link href={href({ day: step(-1) })} scroll={false} aria-label={`Previous ${period}`}>‹</Link>
               <span className="is-here">{label}</span>
-              <Link href={href({ day: step(1) })} aria-label={`Next ${period}`}>›</Link>
+              <Link href={href({ day: step(1) })} scroll={false} aria-label={`Next ${period}`}>›</Link>
             </nav>
           </span>
         </span>
         <div className="settoggle" aria-label="Period">
           {(["day", "week", "month"] as Period[]).map((k) => (
-            <Link key={k} className={`settoggle__opt${k === period ? " is-on" : ""}`} href={href({ period: k })} aria-current={k === period ? "true" : undefined}>{k}</Link>
+            <Link key={k} className={`settoggle__opt${k === period ? " is-on" : ""}`} href={href({ period: k })} scroll={false} aria-current={k === period ? "true" : undefined}>{k}</Link>
           ))}
         </div>
         <details className={`pick${account ? " is-set" : ""}`}>
           <summary aria-label={`Accounts: ${acctWord}`}>{acctWord}</summary>
           <ul className="pick__list">
-            <li><Link href={href({ account: null })} aria-current={!account ? "true" : undefined}>all accounts<span className="n">{nOf(null)}</span></Link></li>
+            <li><Link href={href({ account: null })} scroll={false} aria-current={!account ? "true" : undefined}>all accounts<span className="n">{nOf(null)}</span></Link></li>
             {handles.map((h) => (
-              <li key={h.short}><Link href={href({ account: h.short })} aria-current={account === h.short ? "true" : undefined}>{h.handle}<span className="n">{nOf(h.short)}</span></Link></li>
+              <li key={h.short}><Link href={href({ account: h.short })} scroll={false} aria-current={account === h.short ? "true" : undefined}>{h.handle}<span className="n">{nOf(h.short)}</span></Link></li>
             ))}
           </ul>
         </details>
