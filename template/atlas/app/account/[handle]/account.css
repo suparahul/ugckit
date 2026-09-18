@@ -55,3 +55,24 @@
 .ptable__hook a:hover { color: var(--ember-deep); }
 .ptable__none { color: var(--ink-4); font-style: italic; }
 .ptable__sound { max-width: 20ch; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Confirmed posts that no scrape of this handle contained. A short list, not a
+   grid: there is no cover and no row behind them, and pretending otherwise
+   would make them look like the tiles above. */
+.outside {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+.outside li a {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  text-decoration: none;
+  border-bottom: 1px dotted var(--rule, #cdc3b4);
+  padding: 0.25rem 0;
+}
+.outside li a:hover { border-bottom-style: solid; }
+.outside .tabular { min-width: 4.5rem; opacity: 0.75; }
