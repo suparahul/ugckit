@@ -83,12 +83,39 @@ if [ "$DEST" = "$SRC" ]; then
   no "refusing to install the template over itself"; exit 1
 fi
 
+# An upgrade is the same command in the same folder. A managed file the user changed
+# (an atlas/ tweak, a reworded skill) is copied to .ugckit-backup/<old version>/<path>
+# before it is replaced, so nothing they typed is lost and nothing asks.
+# "Changed by the user" is decided against .ugckit-manifest, the checksums of the files
+# the previous install shipped; a folder installed before the manifest existed falls
+# back to "differs from the file shipping now", which also counts the kit's own updates.
+FIRST=1; [ -e "$DEST/AGENTS.md" ] && FIRST=0
+OLD="$(cat "$DEST/.ugckit-version" 2>/dev/null || echo unknown)"
+BACKUP="$DEST/.ugckit-backup/$OLD"
+OLDMAN="$DEST/.ugckit-manifest"
+SAVED="$(mktemp)"; NEWMAN="$(mktemp)"
+sum() { cksum < "$1" | cut -d' ' -f1; }
+
 # Files we replace on upgrade: code and instructions.
 # Files we never clobber: anything the user authored or generated.
 copy_managed() {
   rel="$1"
   mkdir -p "$DEST/$(dirname "$rel")"
+  if [ "$FIRST" = 0 ] && [ -f "$DEST/$rel" ]; then
+    shipped=""
+    if [ -f "$OLDMAN" ]; then shipped="$(awk -v r="$rel" 'substr($0, index($0, " ") + 1) == r { print $1 }' "$OLDMAN")"; fi
+    changed=0
+    if [ -n "$shipped" ]; then
+      if [ "$(sum "$DEST/$rel")" != "$shipped" ]; then changed=1; fi
+    elif ! cmp -s "$SRC/$rel" "$DEST/$rel"; then changed=1; fi
+    if [ "$changed" = 1 ]; then
+      mkdir -p "$BACKUP/$(dirname "$rel")"
+      cp "$DEST/$rel" "$BACKUP/$rel"
+      echo "$rel" >> "$SAVED"
+    fi
+  fi
   cp "$SRC/$rel" "$DEST/$rel"
+  echo "$(sum "$SRC/$rel") $rel" >> "$NEWMAN"
 }
 copy_once() {
   rel="$1"
@@ -157,6 +184,17 @@ if [ ! -f "$DEST/.env" ]; then
   ok ".env created from template (empty — you fill it in)"
 else
   hm "kept your existing .env"
+fi
+
+printf '%s\n' "$VERSION" > "$DEST/.ugckit-version"
+mv "$NEWMAN" "$OLDMAN"
+N="$(wc -l < "$SAVED" | tr -d ' ')"; rm -f "$SAVED"
+if [ "$N" -gt 0 ]; then
+  if [ "$OLD" = unknown ]; then
+    hm "$N managed file(s) differed from this version and were replaced; the old versions are in .ugckit-backup/$OLD/ (an atlas/ tweak lives there too, under the same path; most of these are the kit's own updates, since this folder predates the manifest)"
+  else
+    hm "$N file(s) you had changed were replaced; your versions are in .ugckit-backup/$OLD/ (an atlas/ tweak lives there too, under the same path)"
+  fi
 fi
 
 # ---------------------------------------------------------------- python env

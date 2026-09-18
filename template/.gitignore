@@ -1,5 +1,8 @@
 .env
 .venv/
+.ugckit-backup/
+.ugckit-manifest
+.ugckit-version
 __pycache__/
 *.pyc
 

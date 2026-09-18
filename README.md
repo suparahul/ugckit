@@ -72,6 +72,22 @@ your prompts, or anything you have generated. Used it before? Paste the same pro
 and start fresh in a new folder; setup finds your existing Supagen templates and creates
 nothing twice.
 
+## Upgrading
+
+The same command in the same folder. No new folder, no data move:
+
+    curl -fsSL https://raw.githubusercontent.com/suparahul/ugckit/main/install.sh | sh -s -- organic-factory
+
+**Replaced:** the scripts, the skills, `AGENTS.md`, `CLAUDE.md`, `ugckit`, `docs/`,
+`atlas/` and `brain/` — the code and the instructions. **Kept:** `.env`, `.mcp.json`,
+`research/`, `pipeline/`, `apps/`, `.venv`, your prompts and everything you generated.
+A managed file you had changed by hand (a tweak in `atlas/`, a reworded skill) is
+copied to `.ugckit-backup/<old version>/<same path>` before it is replaced, and the
+installer's last line says how many and where. On the next session the agent offers
+the migrate step of the `setup` skill: it reads the files whose place moved
+(`research/<project>/PRODUCT.md` → `apps/<slug>/APP.md` plus the callout facts),
+writes the new ones, and leaves the old ones in place.
+
 ## Then
 
     cd ~/organic-factory

@@ -9,6 +9,32 @@ Runs once per machine + workspace, not once per project. Work through it in orde
 stop at the first thing that fails. Do not proceed to any other stage until
 `scripts/state.py` reports setup done.
 
+## 0. After an update: migrate, once
+
+Skip this on a fresh install (no `research/` project folders yet). On the first session
+after `install.sh` ran over an existing folder, check every path that moved between the
+old layout and this one. One moved:
+
+| Old (kept in place) | New | How |
+|---|---|---|
+| `research/<project>/PRODUCT.md` | `apps/<slug>/APP.md`, `product.json`, `icon.jpg` | read the old file; `<slug>` is the project name lowercased (the `product` skill's rule); write `APP.md` in the `product` skill's shape (the head lines, then its six sections from the old file's six headings: "What it does" → "What it is", the niche and the search words into the head line and § Market and language, the gaps kept); the hero-features table is written from what the old file says, blank last column; then `scripts/product-facts.sh <slug> --id <id>` when the old file names an App Store id (that writes `icon.jpg` too), else `--typed "<name>" "<subtitle>"`, which records the source as typed and says the icon is missing: the user uploads it on the app page |
+
+Checked and unchanged, so nothing to do: `research/<project>/<app>/…` (the ledger,
+`NETWORK.md`, `TEARDOWN.md`, the handle folders), `research/<project>/searches/`,
+`research/<project>/NOTES.md`, `pipeline/` (every stage folder, `state/pipeline.json`,
+`feedback.jsonl`), `.env` and `.mcp.json`. New folders the installer made:
+`brain/` (read-only), `apps/README.md`, `.agents/skills`. Retired skills it removed:
+`discover`, `triage`.
+
+Do it for every `research/<project>/PRODUCT.md` whose `apps/<slug>/APP.md` does not
+exist yet. The old file stays where it is; nothing under `research/`, `pipeline/` or
+`.env` is touched. Then say, in one line per project, what was read and what was
+written. A user with no `PRODUCT.md` is told "nothing to migrate" and setup goes on.
+
+The installer's own summary line names `.ugckit-backup/<old version>/`: a managed file
+the user had changed (an `atlas/` tweak, a reworded skill) sits there under its old
+path. Say once where it is; do not merge it back unless asked.
+
 ## 1. Preflight
 
     scripts/doctor.py
