@@ -17,13 +17,18 @@
  *   hook: discovery regret    thread on a dimension
  *   thread hook discovery     the same, spelled out
  *   post 7669281434133187870  a post by id
- *   orb / map                 named views
+ *   orb / map / atlas         named views
+ *   home / canvas / studio / niche / handles / strategy / posts
+ *                             the current app's sections (the app is the
+ *                             route's, else ?app=, else the first app)
+ *   @handle identity          the handle's identity page under the app
  *   open @handle              opens the real TikTok page in a new tab
  *   anything else             fuzzy search across everything
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { slugOf, type ShellApp } from "@/components/Shell";
 
 type Entry = {
   kind: "brand" | "account" | "thread" | "post";
@@ -43,10 +48,26 @@ type Manifest = { entries: Entry[]; corpus: Record<string, number> };
 const VERBS: Record<string, string> = {
   orb: "/orb",
   globe: "/orb",
-  home: "/orb",
   map: "/map",
   index: "/map",
+  atlas: "/atlas",
 };
+
+/** The current app's sections. `s` is the encoded slug; no app means the front door. */
+function sectionVerbs(s: string | null): Record<string, string> {
+  if (!s) return { home: "/", canvas: "/", studio: "/production", niche: "/", handles: "/", strategy: "/", posts: "/posts" };
+  return {
+    home: `/app/${s}`,
+    canvas: `/app/${s}/canvas`,
+    studio: `/production/${s}`,
+    production: `/production/${s}`,
+    niche: `/app/${s}/niche`,
+    handles: `/app/${s}/handles`,
+    strategy: `/app/${s}/strategy`,
+    plan: `/app/${s}/strategy`,
+    posts: `/posts?app=${s}`,
+  };
+}
 
 const DIMENSIONS = ["hook", "insertion", "disclosure", "sound", "format", "handleConvention", "cadence"];
 
@@ -82,8 +103,12 @@ function fuzzy(needle: string, hay: string): number {
   return -1;
 }
 
-export default function CommandBar() {
+export default function CommandBar({ apps = [] }: { apps?: ShellApp[] }) {
   const router = useRouter();
+  const pathname = usePathname() ?? "/";
+  const params = useSearchParams();
+  const appSlug = slugOf(pathname, params?.get("app") ?? null, apps);
+  const s = appSlug ? encodeURIComponent(appSlug) : null;
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -152,6 +177,12 @@ export default function CommandBar() {
       const lower = input.toLowerCase();
 
       if (VERBS[lower]) return { href: VERBS[lower] };
+      const section = sectionVerbs(s);
+      if (section[lower]) return { href: section[lower] };
+
+      // @handle identity — the handle's page under the current app.
+      const identity = lower.match(/^@?([\w.]+)\s+identity$/);
+      if (identity && s) return { href: `/app/${s}/handle/${encodeURIComponent(identity[1])}` };
 
       // open @handle — the live moves leave the app on purpose.
       const openMatch = lower.match(/^open\s+@?([\w.]+)$/);
@@ -182,7 +213,7 @@ export default function CommandBar() {
 
       return results[active] ? { href: results[active].href } : results[0] ? { href: results[0].href } : null;
     },
-    [manifest, results, active]
+    [manifest, results, active, s]
   );
 
   const go = useCallback(
@@ -217,8 +248,8 @@ export default function CommandBar() {
         }}
       >
         <label className="sr-only" htmlFor="atlas-command">
-          Atlas command bar. Type an app, an @handle, a thread such as “hook: discovery regret”, a post id, or one of
-          orb, map.
+          Command bar. Type an app, an @handle, a thread such as “hook: discovery regret”, a post id, a section such
+          as home, canvas, studio, niche, handles, strategy or posts, “@handle identity”, or one of orb, map, atlas.
         </label>
         <span className="cmd__prompt" aria-hidden="true">
           &rsaquo;

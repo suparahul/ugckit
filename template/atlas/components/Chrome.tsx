@@ -73,7 +73,8 @@ export function Breadcrumb() {
   }, []);
 
   const parts = pathname.split("/").filter(Boolean);
-  const trail: { href: string; label: string }[] = [{ href: "/orb", label: "Atlas" }];
+  const app = params.get("app");
+  const trail: { href: string; label: string }[] = [{ href: app ? `/atlas?app=${encodeURIComponent(app)}` : "/atlas", label: "Atlas" }];
 
   if (parts[0] === "orb") {
     const cluster = params.get("cluster");

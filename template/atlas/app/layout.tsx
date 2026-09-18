@@ -56,7 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="topbar topbar--row above">
               <div className="topbar__row">
                 <Suspense fallback={<div className="cmd" />}>
-                  <CommandBar />
+                  <CommandBar apps={apps} />
                 </Suspense>
                 <Ticker corpus={corpus} />
               </div>
