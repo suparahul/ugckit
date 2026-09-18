@@ -124,7 +124,7 @@ export function Deck({ state, deck, deckFile, initial, src, overlayOff, readOnly
     <section className="rep" aria-label={plan ? "The deck as written" : "The deck as it will appear"}>
       <div className="rep__top">
         <button type="button" className="rep__arrow" onClick={() => setN((k) => Math.max(1, k - 1))} disabled={n <= 1} aria-label="Previous slide">‹</button>
-        <ol className="strip" aria-label="Every slide">
+        <ol className="rep__strip" aria-label="Every slide">
           {deck.slides.map((s, i) => {
             const st = state.slides[i];
             return (
