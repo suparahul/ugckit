@@ -68,15 +68,43 @@ Or from a clone:
 The installer checks for ffmpeg, python 3.9+, curl and git, scaffolds the project,
 creates a `.venv`, installs dependencies, and writes the Supagen MCP config. It is
 idempotent — re-running upgrades the scripts and skills and never touches your `.env`,
-your prompts, or anything you have generated. Used it before? Paste the same prompt again
-and start fresh in a new folder; setup finds your existing Supagen templates and creates
-nothing twice.
+your prompts, or anything you have generated. Used it before? Do not start a new folder:
+see [Upgrading](#upgrading) below.
 
 ## Upgrading
 
-The same command in the same folder. No new folder, no data move:
+The same command in the same folder. No new folder, no data move. Two ways to run it —
+from the parent folder, with the folder name as the argument:
 
     curl -fsSL https://raw.githubusercontent.com/suparahul/ugckit/main/install.sh | sh -s -- organic-factory
+
+or from inside the folder, with no argument:
+
+    cd organic-factory
+    curl -fsSL https://raw.githubusercontent.com/suparahul/ugckit/main/install.sh | sh
+
+Then open your agent in the same folder and paste this:
+
+```
+I have upgraded ugckit in this folder. Take me through the update.
+
+1. Read AGENTS.md.
+
+2. The stage instructions are plain markdown files under .claude/skills/<stage>/SKILL.md.
+   Read the setup one and do only its migrate step, "After an update: migrate, once".
+   Tell me what moved and what stayed where it was.
+
+3. Then tell me where my work is: which app, which handles, and which phase of the
+   pipeline is next. Stop there and ask me before anything that costs money.
+
+How to treat me while you do this:
+- Assume I have never used a terminal. Give me ONE command at a time, written out
+  exactly as I should type it, and wait until I say it worked.
+- Never ask me to paste my API key into this chat.
+- When I have to click something in a browser or a settings menu, tell me exactly
+  where to click.
+- Tell me before anything costs money, and how much.
+```
 
 **Replaced:** the scripts, the skills, `AGENTS.md`, `CLAUDE.md`, `ugckit`, `docs/`,
 `atlas/` and `brain/` — the code and the instructions. **Kept:** `.env`, `.mcp.json`,
