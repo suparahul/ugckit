@@ -13,6 +13,10 @@
  *                                                                Post Bridge, where nobody types it in TikTok. The slide's text
  *                                                                flag reads "baked" for this render only; the log is not touched.
  *
+ * A deck whose item table says `| Slide style | illustrated |` has its text drawn into the
+ * picture by the image generator: no text layer on any slide, --burn-cover included; the
+ * callout card is still pasted on the product slide. An absent row, or `photo`, is the path above.
+ *
  * Writes to ../production/files/<post>/final/:
  *   slide-NN.png     the approved picture, cover-fitted to the canvas (a 9:16
  *                    picture on a 3:4 deck is centre-cropped, and the log line says so), with
@@ -258,6 +262,7 @@ async function renderPost(key, { force = false, override = {}, burnCover = false
   const missing = pics.filter((p) => !p.approved);
   if (missing.length && !force) { console.log(`${key}: skipped — slide${missing.length === 1 ? "" : "s"} ${missing.map((p) => p.n).join(", ")} not approved (use --force to draw the current picture)`); return false; }
   const cardPath = cardOf(key);
+  const illustrated = /^illustrated/i.test(deck.items?.["Slide style"] ?? "");
   FR = frameOf(deck.dimension ?? "3:4");
   H = FR.h;
   mkdirSync(outDir, { recursive: true });
@@ -273,8 +278,10 @@ async function renderPost(key, { force = false, override = {}, burnCover = false
     const base = sharp(srcPath).resize(W, H, { fit: "cover", position: "centre" });
     const layers = [];
     const hasCard = slide.cards.length > 0 && !!cardPath;
-    /* Direct mode: the cover carries its text, in the deck's slide-1 style (or its locked layout), since no hand types it. */
-    const flag = burnCover && slide.n === 1 ? "baked" : textFlagOf(slide.n, events);
+    /* Direct mode: the cover carries its text, in the deck's slide-1 style (or its locked layout), since no hand types it.
+     * An illustrated deck (the item row `Slide style: illustrated`) has its text drawn into the picture by the generator:
+     * no text layer on any slide, the callout card still on the product slide. An absent row, or `photo`, is today's path. */
+    const flag = illustrated ? "overlay" : burnCover && slide.n === 1 ? "baked" : textFlagOf(slide.n, events);
 
     if (flag === "baked") {
       const layout = layoutOf(slide.n, events);
@@ -300,7 +307,7 @@ async function renderPost(key, { force = false, override = {}, burnCover = false
     }
     const out = join(outDir, `slide-${String(slide.n).padStart(2, "0")}.png`);
     await base.composite(layers).png().toFile(out);
-    const note = flag === "overlay" ? "cover, no text" : `${layoutOf(slide.n, events) ? "locked layout" : "deck layout"}${burnCover && slide.n === 1 ? ", cover text burned for a direct post" : ""}`;
+    const note = illustrated ? "illustrated: text in the picture" : flag === "overlay" ? "cover, no text" : `${layoutOf(slide.n, events) ? "locked layout" : "deck layout"}${burnCover && slide.n === 1 ? ", cover text burned for a direct post" : ""}`;
     console.log(`${key}: wrote ${out} (${FR.dimension} ${W}×${H}, ${note}${hasCard ? `, product callout${cardNote ? ` (${cardNote})` : ""}` : ""}${cropped ? `, ${cropped}` : ""}${override[slide.n] ? `, picture overridden: ${override[slide.n]}` : ""})`);
   }
 
