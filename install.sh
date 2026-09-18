@@ -74,10 +74,41 @@ if [ "$MISSING" = 1 ]; then
 fi
 
 # ---------------------------------------------------------------- scaffold
+# A ugckit install is a folder with AGENTS.md, .claude/skills and the ugckit file.
+is_kit() { [ -e "$1/AGENTS.md" ] && [ -d "$1/.claude/skills" ] && [ -e "$1/ugckit" ]; }
+
+# Data is a project under research/, an app under apps/, or the pipeline ledger.
+has_data() {
+  [ -n "$(find "$1/research" "$1/apps" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)" ] \
+    || [ -f "$1/pipeline/state/pipeline.json" ]
+}
+
+# The upgrade trap: running the install command with the folder name as the argument
+# while already inside that folder would make <name>/<name> and upgrade the empty copy.
+# If this folder is already a ugckit install and the argument names nothing that exists,
+# or names only the empty nested copy an earlier run made, the argument was the folder we
+# are in. An existing install elsewhere is used as named.
+if [ "$TARGET" != "." ] && is_kit "."; then
+  if ! [ -e "$TARGET" ]; then
+    hm "this folder is already a ugckit install and $TARGET does not exist here — upgrading this folder"
+    TARGET="."
+  elif [ "$TARGET" = "$(basename "$PWD")" ] && is_kit "$TARGET" && ! has_data "$TARGET"; then
+    hm "this folder is already a ugckit install and $TARGET is only its empty nested copy — upgrading this folder"
+    TARGET="."
+  fi
+fi
+
 echo
 b "scaffolding into $TARGET"
 mkdir -p "$TARGET"
 DEST="$(cd "$TARGET" && pwd)"
+
+# A nested copy from an earlier run of that trap: <name>/<name>, a ugckit install with
+# no data in it. Say so; the user removes it, not the installer.
+NESTED="$DEST/$(basename "$DEST")"
+if [ -d "$NESTED" ] && is_kit "$NESTED" && ! has_data "$NESTED"; then
+  hm "found a nested copy at $NESTED (a ugckit install with no research, pipeline or apps data) — you can remove it"
+fi
 
 if [ "$DEST" = "$SRC" ]; then
   no "refusing to install the template over itself"; exit 1

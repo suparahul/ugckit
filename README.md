@@ -73,15 +73,16 @@ see [Upgrading](#upgrading) below.
 
 ## Upgrading
 
-The same command in the same folder. No new folder, no data move. Two ways to run it —
-from the parent folder, with the folder name as the argument:
-
-    curl -fsSL https://raw.githubusercontent.com/suparahul/ugckit/main/install.sh | sh -s -- organic-factory
-
-or from inside the folder, with no argument:
+Go into your folder and run the install command with no argument:
 
     cd organic-factory
     curl -fsSL https://raw.githubusercontent.com/suparahul/ugckit/main/install.sh | sh
+
+No new folder, no data move. (If you pass the folder name while already inside the
+folder, the installer notices that the folder is a ugckit install and upgrades it in
+place, instead of making `organic-factory/organic-factory`. If an earlier run left
+such an empty nested copy, the installer names it so you can remove it; it does not
+remove anything itself.)
 
 Then open your agent in the same folder and paste this:
 
