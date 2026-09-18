@@ -19,6 +19,22 @@ and sizes are the deck's blocks, or the layout the user locked on the post page
 (`slide.layout` in the log). The product slide gets the callout from `cards/1-*.png` in
 the lower third with the callout sentence above it.
 
+The numbers, as the Atlas draws them (a change to one is a change to both): the font
+is Helvetica Neue Bold, white, black outline; the sizes are a share of the width —
+big 7.4%, medium 5.1% (5.6% on 9:16), small 4.3% (3.9% on 9:16), a boxed block 3.7%
+in medium weight on a translucent brown box. The safe area is 4% top and bottom on
+3:4, 8% top and 82% bottom on 9:16: TikTok lays the caption block over roughly the
+lower 30% of a 9:16 photo in the feed and cuts it in the contained layout (measured
+on two phones, 2026-09-16), which is why 3:4 is the default — a 3:4 slide shows whole
+with the caption under it. The top stack starts at the top of the safe area, the
+bottom stack ends at its bottom, the callout stack above the card. A 9:16 picture on
+a 3:4 deck is centre-cropped, not regenerated.
+
+The cover is the one slide that changes with the send: draft mode leaves it text-free
+and writes `cover-text.txt` for the user to type; direct mode burns it (`--burn-cover`,
+run inside the send). The SEO handle's cover is always typed, whatever the mode: the
+keyword must be in TikTok's own text layer.
+
 Text-free slides (the words typed in TikTok) are the post page's export control
 (`slide.text` = overlay); the compositor reads it from the log.
 

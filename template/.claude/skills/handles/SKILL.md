@@ -67,9 +67,14 @@ persona bio never names the app; the brand bio is the search instruction ("Searc
 (`bio.approve`), sets both on TikTok by hand, and ticks "set on TikTok".
 
 **5. Defaults.** Propose from the brain and the findings, and write the head lines
-`Format:`, `Dimension:` (3:4 unless the user chooses 9:16), `Slots:` with `Posting
-zone:`, `Cadence:`, `Sound:`, `Warm-up:` (as the user states it; "not recorded" is
-fine), then `## Defaults` (product slot, last-slide ask, caption rule, image origin,
+`Format:`, `Dimension:` (3:4 unless the user chooses 9:16: the camera-roll shape, shown
+whole with the caption under it, while TikTok covers or cuts the lower ~30% of a 9:16
+photo; 109 of 191 cat-niche covers were 3:4), `Slots:` with `Posting zone:` (two a day:
+the first 9 AM–1 PM, the last 3–8 PM in the audience's zone, 5–7 hours apart; the kit's
+default pair is 11 AM by hand and 7 PM scheduled; measured on 16,165 posts, 2026-09-16,
+cross-niche), `Cadence:`, `Sound:` (one library track kept across the account, or an
+uploaded clip; never the brand's own sound), `Warm-up:` (as the user states it; "not
+recorded" is fine), then `## Defaults` (product slot, last-slide ask, caption rule, image origin,
 named reader, with a source each), `## Style prefix` (the `>` line the deck copies, the
 shared phone-photo prefix plus the identity clause naming the subjects and their
 reference files), `## Identity rule`, `## Post-process step`. The user approves

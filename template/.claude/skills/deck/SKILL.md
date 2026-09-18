@@ -89,6 +89,18 @@ row decides the canvas (3:4 when absent). The `Cards:` list marks the callout.
 
 - The source's hook line stays on slide 1 with the fewest changes; only the items the
   plan names are swapped. No step invented from outside the source's argument.
+- One idea per slide sets the count; nothing else does. In the cat niche 12–14 slides
+  had the best median save rate (1.7%) and the worst views (397K against 1.8M for two
+  slides, 195 posts, 2026-09-16); across every app niche two-slide posts dominate and
+  no 12+ deck reached 1M. A long deck costs pictures and views: on a fresh handle it
+  waits until the handle clears about 500 views on a shorter one.
+- The caption's first line repeats the cover text (4 of the 9 biggest tip posts of the
+  scrolled batch do; search reads the caption for certain), then the plan row's five
+  tags. The sync matches the posted link by that first line, so keep it exact.
+- The SEO handle (the search-keyword tier, when `ACCOUNTS.md` has one): slide 1's text
+  is the keyword and nothing else, and the keyword sits in the caption too; its cover is
+  typed in TikTok, never burned, because search reads TikTok's own text layer. Its tags
+  come from the keyword, not from the rotation.
 - The app mention or the CTA no later than slide 3 unless the plan row says otherwise
   (the user's rule of 2026-09-17: many viewers never reach slide 5); never on slide 1,
   never in the caption of a persona handle, no download instruction anywhere.

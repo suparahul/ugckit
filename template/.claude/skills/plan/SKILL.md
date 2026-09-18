@@ -20,7 +20,10 @@ are $0.06, a hand-picked list of 20 is $0.03. Say the figure, wait for the yes, 
 It writes `strategy/HASHTAG-POOL.md` with the volumes and an empty tier column: fill the
 tiers (G general, N niche, P post-specific, x out), then the Tags column below follows
 the rotation rule: five per post, two general, two niche, one post-specific, no handle
-repeating a set on consecutive posts.
+repeating a set on consecutive posts; a persona-only tag stays on the persona handle
+(#catmom went on Hannah alone); the SEO handle is outside the rotation, its tags come
+from its keyword. Measured 2026-09-16: the general tags are one to three orders of
+magnitude bigger than the niche ones (#cat 1.2T against #newcatowner 60M).
 
 ## Write `apps/<slug>/production/PLAN.md`
 
@@ -38,7 +41,9 @@ The Atlas reads this file by these exact conventions:
     | Rule | Value | Source |
     (below 3K views kill the format; above 10–15K replicate; a format under 3K gets a second
      try on another handle before it is dropped; zero views on the first 2–3 posts is not a
-     verdict; day 7 is a format read, not an account read)
+     verdict; day 7 is a format read, not an account read; no heavy bet — a deck over
+     nine slides — on a handle until it clears about 500 views; no content idea repeats
+     across handles in the same week)
 
     Rules that hold on every post: <one line; the callout on every post; the app never on
     slide 1; no download instruction; …>

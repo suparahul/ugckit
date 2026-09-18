@@ -12,7 +12,11 @@ description: Phase 8, the product callout — the one image the compositor paste
 
 Runs once per post, before the render. The facts come from `apps/<slug>/product.json`
 (the `product` skill wrote it: name, subtitle, button, icon, source); the card is
-evidence, so its source is printed with it. Writes
+evidence, so its source is printed with it, and it is drawn from SVG, never by an
+image model (a generated store card comes back with nonsense strings). The sentence
+above it, in the deck, is personal, what the app did for the persona's own cat, not
+what the app is. A post with no card is "no callout", said as missing, never as "being
+added". Writes
 `files/<post>/cards/1-<template>.png`, 834×204, the size the compositor expects.
 
 ## The three templates

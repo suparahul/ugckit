@@ -31,6 +31,19 @@ description: Phase 8, the send — one post through the provider PLAN.md names, 
   cover text is burned in (`render --burn-cover` runs inside the send). Comments on,
   public. Use it for the PM slot when nobody is on the phone.
 
+## The slots
+
+The plan's slots are the handle's `Slots:` line, in the posting zone; the default
+pair is **11 AM** by hand (draft mode, the chosen sound, the typed cover) and **7 PM**
+scheduled (direct mode, TikTok's sound, the burned cover). Keep the hour once chosen:
+accounts with a tight routine outperform loose ones by about 30%, the hour itself by
+about 4×. The sound in draft mode is the handle's `Sound:` line (a library track, or
+an uploaded clip that shows as "original sound"); in direct mode nobody chooses it.
+
+A caption edited on the phone (a word dropped, the tags removed) happens; it does not
+break the send, but it lowers the `sync` match, so say once: post the caption as
+exported.
+
 ## What it writes
 
 `posting.sent` in the log with `data.provider`, `data.mode`, the media ids and
