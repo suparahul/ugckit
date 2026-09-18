@@ -30,6 +30,13 @@ with the caption under it. The top stack starts at the top of the safe area, the
 bottom stack ends at its bottom, the callout stack above the card. A 9:16 picture on
 a 3:4 deck is centre-cropped, not regenerated.
 
+**Slide style.** The compositor reads the deck's `Slide style` row and, for
+`illustrated`, the handle's `Slide style:` line (font, colour, backing) and draws the
+text in that look; absent or `photo`, the default above. The font must be installed on
+the machine; a font that is not found falls back to Helvetica and the line says so.
+(The Atlas's compositor holds this change; until it lands, every deck renders in the
+default look — see the BUILD-LOG note of 2026-09-18.)
+
 The cover is the one slide that changes with the send: draft mode leaves it text-free
 and writes `cover-text.txt` for the user to type; direct mode burns it (`--burn-cover`,
 run inside the send). The SEO handle's cover is always typed, whatever the mode: the

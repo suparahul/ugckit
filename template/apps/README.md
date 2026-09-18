@@ -23,8 +23,8 @@ is a pending slot on the canvas, never an error.
         APP-FIT.md               every parameter of both brain sheets, one value each, with a source and a status
         HASHTAG-POOL.md          optional: the measured hashtag pool
       handles/<handle>/
-        HANDLE.md                the identity: head lines, Persona, Bio, References, Defaults, Style prefix,
-                                 Identity rule, Post-process step
+        HANDLE.md                the identity: head lines (…, Dimension:, Slide style:), Persona, Bio,
+                                 References, Defaults, Style prefix, Identity rule, Post-process step
         references/              face.png, subject-<name>.png, style.png, profile.png
       production/
         PLAN.md                  the plan: App:, App Store id:, Posting zone:, Home zone:, Posting service:, the posts table

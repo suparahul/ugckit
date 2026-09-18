@@ -42,6 +42,7 @@ conventions; keep them exactly.
     | Source | `@mias.diary7` 7657658973415410977, 151,103 views, 9 slides, https://www.tiktok.com/@mias.diary7/photo/7657658973415410977 |
     | Slides | 8: hook → step ×2 → Catwise slide → step ×3 → save ask |
     | Dimension | 3:4 (1080×1440) |
+    | Slide style | photo |
     | Density | headline + 2–3 lines per step |
     | Text position | headline in the upper third, the lines under it; the subject in the lower two thirds |
     | Text size | slide 1 big; slides 2–8 headline medium, lines small |
@@ -83,7 +84,15 @@ product slide; text blocks are the fenced block after a bold label; the word "bo
 placement sentence boxes every block of the slide; a top block is medium only when its
 label says "(headline)" and the Text size row names "headline medium"; the image prompt
 is the sentence after `**Image prompt:**`, with `[style prefix]` first; the Dimension
-row decides the canvas (3:4 when absent). The `Cards:` list marks the callout.
+row decides the canvas (3:4 when absent); the Slide style row (`photo` when absent) is
+copied from the handle's `Slide style:` line and carried into the index as an item, so
+the compositor can pick the handle's text look. The `Cards:` list marks the callout.
+
+An illustrated handle changes two things and nothing else: the style prefix in the
+prompts is the illustration prefix from `HANDLE.md` (so `images` draws illustrations
+with the same references), and the on-image text is drawn in the handle's font,
+colour and backing instead of the white-with-outline default. The blocks, the sizes
+and the positions are written the same way.
 
 ## Rules of the deck
 
