@@ -56,6 +56,8 @@ export function Pbar({ apps }: { apps: ShellApp[] }) {
   const slug = slugOf(pathname, params?.get("app") ?? null, apps);
   const app = apps.find((a) => a.slug === slug) ?? null;
   const cur = currentSection(pathname);
+  /* Framed inside another page (the Atlas tab's orb view): no chrome. */
+  if (params?.get("embed") === "1") return null;
   return (
     <header className="pbar above">
       <Link className="wordmark" href="/">
@@ -94,6 +96,7 @@ export function Pbar({ apps }: { apps: ShellApp[] }) {
 /** Renders its children only on the research leaf pages. */
 export function ResearchRow({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "/";
-  if (!RESEARCH_LEAF.test(pathname)) return null;
+  const params = useSearchParams();
+  if (!RESEARCH_LEAF.test(pathname) || params?.get("embed") === "1") return null;
   return <>{children}</>;
 }

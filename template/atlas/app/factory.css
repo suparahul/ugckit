@@ -17,3 +17,8 @@
    not in the right-hand column the plain cell keeps. */
 .cell--thumb .cell__read { grid-column: 2; grid-row: auto; flex-direction: row; align-items: baseline; gap: 10px; text-align: left; margin-top: 6px; }
 .cell--thumb .cell__read b { font-size: 16px; }
+
+/* The Atlas tab: the four numbers of an app card stay on one row. */
+.rcard .stats { gap: 14px; flex-wrap: nowrap; }
+.rcard .stats dd { font-size: 17px; }
+.rcard .stats dt { font-size: 9.5px; letter-spacing: 0.06em; }

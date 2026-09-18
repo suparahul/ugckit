@@ -11,7 +11,7 @@
  */
 
 import type { Metadata } from "next";
-import { getCorpus, getOrb } from "@/lib/data";
+import { brandsOf, getCorpus, getOrb } from "@/lib/data";
 import { buildOrbSource, planPlates } from "@/lib/orb-source";
 import AtlasOrb from "@/components/orb/AtlasOrb";
 import "./orb.css";
@@ -21,10 +21,12 @@ export const metadata: Metadata = { title: "The Atlas" };
 export default async function OrbPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cluster?: string }>;
+  searchParams: Promise<{ cluster?: string; app?: string }>;
 }) {
-  const { cluster } = await searchParams;
-  const clusters = getOrb();
+  const { cluster, app } = await searchParams;
+  /* `app` scopes the sphere to the apps researched for one workspace app. */
+  const mine = app ? new Set(brandsOf(app).map((b) => b.id)) : null;
+  const clusters = getOrb().filter((c) => !mine || mine.has(c.centre.brand));
   const corpus = getCorpus();
 
   if (!clusters.length) {

@@ -13,22 +13,22 @@ export type PickOpt = { v: string; label: string; n?: number };
 export type Pick = { key: string; label: string; def: string; opts: PickOpt[] };
 export type Check = { key: string; label: string };
 
-export function NicheFilters({ picks, checks, values, sort }: { picks: Pick[]; checks: Check[]; values: Record<string, string>; sort: Pick }) {
+export function NicheFilters({ picks, checks, values, sort, anchor = "wins", keep = [] }: { picks: Pick[]; checks: Check[]; values: Record<string, string>; sort?: Pick; anchor?: string; /** Params kept as they are, outside the picks (the app, the view). */ keep?: string[] }) {
   const router = useRouter();
   const path = usePathname();
   const bar = useRef<HTMLDivElement>(null);
-  const defs = Object.fromEntries([...picks, sort].map((p) => [p.key, p.def]));
+  const defs = Object.fromEntries([...picks, ...(sort ? [sort] : [])].map((p) => [p.key, p.def]));
   const go = (key: string, v: string) => {
     const u = new URLSearchParams();
     const next = { ...values, [key]: v };
     for (const [k, val] of Object.entries(next)) {
       if (k === "n") continue;
       const def = defs[k] ?? "";
-      if (val && val !== def) u.set(k, val);
+      if (val && (val !== def || keep.includes(k))) u.set(k, val);
     }
     bar.current?.querySelectorAll("details[open]").forEach((d) => d.removeAttribute("open"));
     const q = u.toString();
-    router.push(`${path}${q ? `?${q}` : ""}#wins`, { scroll: false });
+    router.push(`${path}${q ? `?${q}` : ""}#${anchor}`, { scroll: false });
   };
   const one = (p: Pick) => {
     const cur = values[p.key] ?? p.def;
@@ -39,7 +39,7 @@ export function NicheFilters({ picks, checks, values, sort }: { picks: Pick[]; c
         <ul className="pick__list">
           {p.opts.map((o) => (
             <li key={o.v}>
-              <a href="#wins" aria-current={o.v === cur ? "true" : undefined} onClick={(e) => { e.preventDefault(); go(p.key, o.v); }}>
+              <a href={`#${anchor}`} aria-current={o.v === cur ? "true" : undefined} onClick={(e) => { e.preventDefault(); go(p.key, o.v); }}>
                 {o.label}{o.n != null ? <span className="n">{o.n.toLocaleString("en-US")}</span> : null}
               </a>
             </li>
@@ -56,7 +56,7 @@ export function NicheFilters({ picks, checks, values, sort }: { picks: Pick[]; c
           <input type="checkbox" checked={values[c.key] === "1"} onChange={(e) => go(c.key, e.target.checked ? "1" : "")} /> {c.label}
         </label>
       ))}
-      <div className="filt__sort">{one(sort)}</div>
+      {sort ? <div className="filt__sort">{one(sort)}</div> : null}
     </div>
   );
 }
