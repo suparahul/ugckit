@@ -89,8 +89,20 @@ next.
    process per slide is needed.
 9. Two `codex exec` processes ran at the same time without a slowdown (one three-slide
    run and one one-slide run, 299 s and 108 s). The kit still runs one post per call.
-10. Codex inline (the Codex agent following the instruction without the bridge): not
-    tested; this machine's agent was Claude. The instruction text is the same.
+10. Codex inline (the Codex agent following this skill, no bridge): tested once on one
+    slide, `codex exec` given only "read this skill, follow it as Codex, slide 3 of
+    this post". It said the cost line, ran `codex login status`, ran `images.sh …
+    --only 3`, read the job file, read its own imagegen skill, made one picture with
+    the four references attached (the golden British Longhair came back with the
+    reference's coat, ruff and green eyes), copied the raw render from
+    `~/.codex/generated_images/<thread>/` to `slide-03/codex-<stamp>.png`, made the
+    `-post.png` with ffmpeg, wrote `images-result.md` by hand, then ran `images.sh …
+    --verify`, which passed (`1 of 1 slides have a valid picture`) and appended the
+    `slide.upload` line. 173 s in all, about a minute of reading and checks around
+    the 106 s picture. The log line came from `--verify`, as this skill says; Codex
+    did not write it by hand, and it must not: the verify is the one writer. One
+    stray: it tried `identify` (ImageMagick, not installed) to print the sizes; the
+    files were fine. Its own `sips` check passed.
 Two more facts: `-i` takes a list of files, so the prompt must come on stdin (`-`),
 never as the argument after `-i`; and `codex exec` reads stdin when it is not a
 terminal, so a run with no stdin hangs on "Reading prompt from stdin". The bridge
