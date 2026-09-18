@@ -86,13 +86,17 @@ label says "(headline)" and the Text size row names "headline medium"; the image
 is the sentence after `**Image prompt:**`, with `[style prefix]` first; the Dimension
 row decides the canvas (3:4 when absent); the Slide style row (`photo` when absent) is
 copied from the handle's `Slide style:` line and carried into the index as an item, so
-the compositor can pick the handle's text look. The `Cards:` list marks the callout.
+the compositor knows whether to burn the text. The `Cards:` list marks the callout.
 
-An illustrated handle changes two things and nothing else: the style prefix in the
-prompts is the illustration prefix from `HANDLE.md` (so `images` draws illustrations
-with the same references), and the on-image text is drawn in the handle's font,
-colour and backing instead of the white-with-outline default. The blocks, the sizes
-and the positions are written the same way.
+An illustrated handle puts the text in the picture. Each slide's image prompt carries,
+after the style prefix and the scene, the slide's text word for word in quotation
+marks, where it sits, the lettering feel and the text colour (`… the words "How to stop
+your cat waking you at 5am" hand-lettered across the top in warm cream`). The
+**On-image text** block is still written (the post page, `cover-text.txt` and the
+caption need it), but the compositor draws nothing on an illustrated slide except the
+callout on the product slide: the picture is the finished slide. The product slide's
+prompt keeps the lower third plain, as for a photo handle. Look at every picture for
+the spelling: a generator's text is a candidate to reject, not to fix.
 
 ## Rules of the deck
 

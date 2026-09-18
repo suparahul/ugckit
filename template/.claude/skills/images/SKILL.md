@@ -12,6 +12,12 @@ description: Phase 8, the pictures — every candidate picture of one post, from
 `<post>` is the post key, `2026-09-17/hannah/1`. One post per call, serial. The deck
 must exist and the plan approved (`plan.approve`) before the first picture.
 
+The prompts come from the deck as written. A photo handle's prompts hold no text (the
+compositor burns it); an illustrated handle's prompts hold the slide's words, so the
+picture that comes back is the finished slide. For those, the verify checks the file
+and the size as always; you check the spelling of every word in the picture, and a
+misspelt slide is re-run with `--only`, never patched.
+
 ## Before the first run of a session: the cost and the check
 
 Say once: **"The pictures are made by Codex on your Codex plan; the kit does not

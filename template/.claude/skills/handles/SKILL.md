@@ -74,15 +74,15 @@ the first 9 AM–1 PM, the last 3–8 PM in the audience's zone, 5–7 hours apa
 default pair is 11 AM by hand and 7 PM scheduled; measured on 16,165 posts, 2026-09-16,
 cross-niche), `Cadence:`, `Sound:` (one library track kept across the account, or an
 uploaded clip; never the brand's own sound), `Warm-up:` (as the user states it; "not
-recorded" is fine), `Slide style:` (`photo`, the default, or `illustrated`; an
-illustrated handle adds its text look on the same line after semicolons: `illustrated;
-font Fredoka; colour #2b1d0e; backing cream card` — a display or decorative font
-installed on the machine (`fc-list | grep -i <name>` finds it), a colour, and a backing
-of `none`, `card` or `band`; a photo handle writes `photo` and nothing more), then `## Defaults` (product slot, last-slide ask, caption rule, image origin,
+recorded" is fine), `Slide style:` (`photo`, the default: the compositor burns the
+text; or `illustrated`: the image generator draws the text as part of the picture and
+the compositor burns nothing but the callout. The value alone, no fields; the look lives
+in the style prefix), then `## Defaults` (product slot, last-slide ask, caption rule, image origin,
 named reader, with a source each), `## Style prefix` (the `>` line the deck copies: for a photo handle the shared
 phone-photo prefix, for an illustrated one the illustration's look — the medium, the
-line, the palette, the paper — in one sentence, then in both cases the identity clause
-naming the subjects and their reference files), `## Identity rule`, `## Post-process step`. The user approves
+line, the palette, the paper, and the text's feel: the lettering style and its colour —
+in one sentence, then in both cases the identity clause naming the subjects and their
+reference files), `## Identity rule`, `## Post-process step`. The user approves
 (`defaults.approve`).
 
 The head lines and sections are the ones `apps/README.md` lists; the Atlas reads them by
