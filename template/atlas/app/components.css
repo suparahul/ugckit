@@ -135,3 +135,139 @@
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
 .pcard__date { font-size: 10.5px; color: var(--ink-4); }
+
+/* ------------------------------------------------ the widen control, shared
+ *
+ * The same control, in the same words, on every screen that lists posts: the
+ * account page, the thread pages, and the explorer. Rahul moves between them,
+ * and a control that reads differently on each is one he has to think about.
+ */
+
+.settoggle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.7rem 0 1rem;
+}
+
+.settoggle__label {
+  font-size: 0.66rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  margin-right: 0.2rem;
+}
+
+.settoggle__opt {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.36rem;
+  border: 1px solid var(--rule-2);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem 0.22rem;
+  font-size: 0.78rem;
+  color: var(--ink-2);
+  background: rgba(255, 253, 247, 0.55);
+}
+
+.settoggle__opt:hover {
+  border-color: var(--ink-3);
+  color: var(--ink);
+}
+
+.settoggle__opt.is-on {
+  border-color: var(--ember);
+  box-shadow: inset 0 0 0 1px var(--ember);
+  color: var(--ink);
+}
+
+.settoggle__n {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--ink-4);
+}
+
+.settoggle__opt.is-on .settoggle__n {
+  color: var(--ember-deep);
+}
+
+/* Held or not held, and newly recovered, on a cover in the account grid — the
+ * same two facts the explorer marks on a card. */
+
+.grid__held {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  padding: 0.08rem 0.3rem;
+  border-radius: 2px;
+  background: rgba(23, 22, 18, 0.78);
+  color: var(--slab-ink);
+}
+
+.grid__held.is-held {
+  background: #2f6b3a;
+}
+
+.grid__new {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.06rem 0.3rem;
+  border-radius: 2px;
+  border: 1px solid rgba(240, 223, 194, 0.75);
+  color: var(--slab-ink);
+  background: rgba(23, 22, 18, 0.55);
+}
+
+/* Nothing met the rule. Said in words, never as an empty shelf. */
+
+.thread__none,
+.post__siblingsnone {
+  margin: 0.6rem 0 1rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+.thread__none a,
+.post__siblingsnone a {
+  color: var(--ember-deep);
+}
+
+/* The two tabs. The only control on any list of posts, so it reads as the
+   page's own spine rather than as one filter among several. */
+.tabs {
+  display: flex;
+  gap: 0;
+  margin: 0.7rem 0 1rem;
+  border-bottom: 1px solid var(--rule, #cdc3b4);
+}
+.tabs__tab {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.5rem 0.95rem;
+  text-decoration: none;
+  color: inherit;
+  opacity: 0.6;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  font-size: 0.94rem;
+}
+.tabs__tab:hover { opacity: 0.85; }
+.tabs__tab.is-on {
+  opacity: 1;
+  font-weight: 600;
+  border-bottom-color: currentColor;
+}
+.tabs__n {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85em;
+  opacity: 0.7;
+}

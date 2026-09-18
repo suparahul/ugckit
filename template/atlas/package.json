@@ -2,13 +2,14 @@
   "name": "ugckit-atlas",
   "private": true,
   "version": "1.0.0",
-  "description": "The Atlas \u2014 explore everything the research half scraped, read in place from ../research",
+  "description": "Organic Factory: a home base for each of your apps, read in place from the workspace",
   "scripts": {
-    "index": "node scripts/build-index.mjs",
+    "index": "node scripts/build-index.mjs && node scripts/build-production.mjs",
     "dev": "npm run index && next dev -p 3210",
     "dev:fast": "next dev -p 3210",
     "build": "npm run index && next build",
-    "start": "next start -p 3210"
+    "start": "next start -p 3210",
+    "test": "node --test lib/when.test.ts lib/postbridge.test.ts lib/tiktok-link.test.ts"
   },
   "dependencies": {
     "next": "15.5.4",

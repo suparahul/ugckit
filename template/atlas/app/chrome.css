@@ -341,3 +341,43 @@ body {
   padding-bottom: 9px;
   border-bottom: 1px solid var(--rule);
 }
+
+/* The working surfaces' entry points in the top bar: the explorer and the production board. */
+.topbar__links {
+  display: flex;
+  gap: 14px;
+}
+.topbar__link {
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.topbar__link:hover {
+  color: var(--ember-deep);
+}
+
+/* ------------------------------------------------- production chrome (one line) */
+
+.pbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: baseline;
+  gap: clamp(14px, 2.2vw, 34px);
+  padding: 12px var(--pad) 10px;
+  background: linear-gradient(to bottom, var(--paper) 62%, rgba(216, 201, 173, 0));
+}
+.pbar__app { flex: 1 1 auto; min-width: 0; font-size: 0.86rem; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pbar__app a { color: var(--ink-3); }
+.pbar__app a:hover { color: var(--ember-deep); }
+.pbar__app b { font-weight: 600; color: var(--ink); }
+.pbar__links { display: flex; gap: 14px; }
+.pbar__links a { font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; }
+.pbar__links a:hover { color: var(--ember-deep); }
+@media (max-width: 600px) {
+  .pbar__app .pbar__word { display: none; }
+}

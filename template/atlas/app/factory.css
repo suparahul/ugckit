@@ -1,0 +1,14 @@
+/*
+ * Organic Factory: the few rules the end-product pages need on top of the
+ * stylesheets they share (paper, chrome, components, production, reporting,
+ * endproduct). No new colour, face or texture.
+ */
+
+/* The research leaf pages keep the command bar and the corpus counter on a
+   second row under the one chrome; the wordmark is not repeated. */
+.topbar--row { top: 44px; padding-top: 10px; }
+.topbar--row .topbar__row { grid-template-columns: minmax(0, 1fr) auto; }
+@media (max-width: 720px) {
+  .topbar--row { position: static; }
+  .topbar--row .topbar__row { grid-template-columns: 1fr; }
+}

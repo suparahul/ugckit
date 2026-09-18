@@ -1,0 +1,299 @@
+/*
+ * Reporting layer for the production pages — PROPOSED additions to
+ * atlas/app/production/production.css. Nothing here is in the app yet.
+ *
+ * Three things, all read from `outcome.sync` lines in production/log.jsonl:
+ *   .read       the period's read on the board: the totals as one count line,
+ *               set large, and the week's columns beside them. Under the toolbar,
+ *               above the grid. Every column is a link to its day.
+ *   .day__read  the handle's numbers, under its name in the handle column the
+ *               day grid already has. No new structure.
+ *   .cell__read the post's numbers in the right-hand column every cell has kept
+ *               empty since the first cut ("room is drawn, not filled" — filled now).
+ *   .reads      the post page's read: the five counts, the reads over time, the
+ *               sentence that names the source and the day-7 date.
+ *
+ * Rules kept: Ember on the board marks only what waits for Rahul, so every
+ * number on the board is ink. On the post page views take Ember Deep, as view
+ * counts do on cards elsewhere in the Atlas. Every comparable number is tabular.
+ * A day that has posts but no read yet is drawn as a hatched slot, not as zero.
+ */
+
+/* ---------------------------------------------------------------- the read */
+
+.read {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px clamp(24px, 4vw, 64px);
+  margin-top: 16px;
+  padding: 14px 0 12px;
+  border-bottom: 1px solid var(--rule);
+}
+.read__totals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px clamp(16px, 2.2vw, 34px);
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.read__totals b {
+  font-size: clamp(22px, 2.3vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.036em;
+  line-height: 1;
+  color: var(--ink);
+  margin-right: 5px;
+}
+.read__totals .is-zero b { color: var(--ink-4); }
+.read__totals .is-ratio b { font-size: clamp(18px, 1.8vw, 22px); }
+.read__line {
+  grid-column: 1;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+.read__line a { color: var(--ink-3); text-decoration: underline; text-underline-offset: 3px; }
+.read__line a:hover { color: var(--ember-deep); }
+.read__again {
+  padding: 3px 10px;
+  border: 1px solid var(--rule-2);
+  border-radius: 999px;
+  background: rgba(255, 253, 245, 0.5);
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease;
+}
+.read__again:hover { border-color: var(--ember); color: var(--ink); }
+.read__again:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+/* Nothing posted in the period: the strip says so in words and draws no columns. */
+.read__none { margin: 0; font-size: 13px; color: var(--ink-3); }
+
+/* The week's columns: one per day, views of the posts posted that day (latest
+   read per post). The shown day is ink; the others Ink 3. A day with posts and
+   no read is a hatched slot at the baseline. A day with nothing planned is bare.
+   Each column is a link to the day board. */
+.days {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 46px;
+  gap: 0 4px;
+  align-items: stretch;
+  height: 96px;
+  grid-row: 1 / span 2;
+  grid-column: 2;
+}
+.days__col {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 3px;
+}
+.days__col:hover .days__bar { background: var(--ink); }
+.days__col:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.days__val {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink-2);
+  text-align: center;
+  line-height: 1;
+  padding-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+  min-height: 15px;
+}
+.days__bar {
+  align-self: end;
+  justify-self: center;
+  width: 22px;
+  border-radius: 3px 3px 0 0;
+  background: var(--ink-3);
+  transition: background 0.18s ease;
+}
+.days__col.is-shown .days__bar { background: var(--ink); }
+.days__col.is-shown .days__val { color: var(--ink); }
+.days__col.is-unread .days__bar {
+  height: 10px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(135deg, rgba(47, 34, 19, 0.16) 0 3px, transparent 3px 6px);
+  border: 1px dashed var(--rule-2);
+  border-bottom: 0;
+}
+.days__col.is-none .days__bar { height: 0; visibility: hidden; }
+.days__d {
+  padding-top: 5px;
+  border-top: 1px solid var(--rule-2);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.days__col.is-shown .days__d { color: var(--ink); }
+.days__d small { display: block; font-size: 9px; font-weight: 400; letter-spacing: 0.02em; text-transform: none; color: var(--ink-4); }
+
+/* The strip stacks under 760px: totals, then the sentence, then the columns full width. */
+@media (max-width: 760px) {
+  .read { grid-template-columns: 1fr; align-items: start; }
+  .days { grid-row: auto; grid-column: 1; grid-auto-columns: minmax(0, 1fr); width: 100%; height: 80px; }
+}
+
+/* ----------------------------------------------------- the handle column */
+
+/* The handle's numbers, under its name in the day grid's first column. */
+.day__read {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.day__read b {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.024em;
+  line-height: 1.1;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+.day__read .is-zero { color: var(--ink-4); }
+/* Under 650px the handle column becomes a row above the posts: numbers inline. */
+@media (max-width: 650px) {
+  .day__read { margin-top: 2px; display: flex; flex-wrap: wrap; gap: 0 10px; }
+  .day__read b { display: inline; font-size: 12.5px; }
+}
+
+/* --------------------------------------------------------------- the cell */
+
+/* The reserved right-hand column, filled. Views lead; the three counts under;
+   the read stamp at the foot. Zero is printed, in Ink 4. */
+.cell { grid-template-columns: minmax(0, 1fr) 92px; }
+.cell__read {
+  grid-column: 2;
+  grid-row: 1 / span 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.cell__read b {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.036em;
+  line-height: 1;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.cell__read .is-zero { color: var(--ink-4); }
+/* Under 650px the cell is one column (the incumbent kept an 18px column for the
+   room; the room is filled now, so the column goes) and the numbers move to one
+   line under the state. */
+@media (max-width: 650px) {
+  .cell { grid-template-columns: minmax(0, 1fr); }
+  .cell__read { grid-column: 1; grid-row: auto; flex-direction: row; flex-wrap: wrap; justify-content: flex-start; align-items: baseline; gap: 0 10px; margin-top: 6px; text-align: left; }
+  .cell__read b { font-size: 15px; margin: 0; }
+}
+
+/* The list view: the reserved column becomes four tabular columns and a stamp. */
+.plist__num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.plist__num.is-zero { color: var(--ink-4); }
+.plist td.plist__num:first-of-type { font-weight: 600; color: var(--ink); }
+
+/* The month grid: the reserved line under the sentence carries the day's views. */
+.month__read { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.month__read b { color: var(--ink); font-weight: 600; }
+
+/* ----------------------------------------------------------- post page */
+
+/* The post's read: sits under the decision band in the head. */
+.reads {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 36px;
+  margin-top: 10px;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: rgba(255, 253, 245, 0.5);
+}
+.reads__nums {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px clamp(16px, 2.2vw, 32px);
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.reads__nums b {
+  font-size: clamp(24px, 2.4vw, 32px);
+  font-weight: 600;
+  letter-spacing: -0.036em;
+  line-height: 1;
+  color: var(--ink);
+  margin-right: 5px;
+}
+.reads__nums .is-lead b { color: var(--ember-deep); }
+.reads__nums .is-zero b { color: var(--ink-4); }
+.reads__nums .is-ratio b { font-size: clamp(18px, 1.8vw, 22px); }
+.reads__line {
+  grid-column: 1;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+.reads__line a { color: var(--ink-3); text-decoration: underline; text-underline-offset: 3px; }
+.reads__line a:hover { color: var(--ember-deep); }
+.reads__line em { font-family: var(--font-instrument), var(--serif); font-style: italic; font-size: 14px; color: var(--ink-2); }
+
+/* The reads over time: one dot per sync, views on the vertical, time on the
+   horizontal, a 2px line between them. Ink 3 line, ink dots with a 2px paper ring;
+   the last dot Ember Deep. Labels are the first and last values with their hour. */
+.series {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 2px;
+  width: 280px;
+  max-width: 100%;
+}
+.series svg { display: block; width: 100%; height: 78px; overflow: visible; }
+.series__line { fill: none; stroke: var(--ink-3); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.series__dot { fill: var(--ink-2); stroke: #fffdf5; stroke-width: 2; }
+.series__dot.is-last { fill: var(--ember-deep); }
+.series__base { stroke: var(--rule-2); stroke-width: 1; }
+.series__lbl { font-size: 10.5px; font-weight: 600; fill: var(--ink-2); font-variant-numeric: tabular-nums; }
+.series__lbl.is-last { fill: var(--ink); }
+.series__t { font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; fill: var(--ink-4); }
+.series__one { font-size: 11.5px; color: var(--ink-4); align-self: end; }
+@media (max-width: 760px) {
+  .reads { grid-template-columns: 1fr; }
+  .series { grid-column: 1; grid-row: auto; width: 100%; }
+}

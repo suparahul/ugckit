@@ -62,7 +62,7 @@ export function Breadcrumb() {
   const [labels, setLabels] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    fetch("/search.json")
+    fetch("/api/search")
       .then((r) => r.json())
       .then((m: { entries: { id: string; name: string; href: string }[] }) => {
         const map: Record<string, string> = {};

@@ -1,5 +1,5 @@
 /**
- * Streams files straight out of ../research.
+ * Streams files straight out of ../research, and the served parts of ../apps.
  *
  * research/ is the source of truth and is read IN PLACE — nothing is ever copied
  * into public/. Scrapes are writing into that tree while the app is running, so
@@ -14,7 +14,13 @@ import { createReadStream, statSync } from "node:fs";
 import { join, normalize, resolve, sep } from "node:path";
 import type { NextRequest } from "next/server";
 
-const MEDIA_ROOT = resolve(process.cwd(), "..", "research");
+import { APPS_DIR, RESEARCH_DIR } from "@/lib/root";
+
+const MEDIA_ROOT = resolve(RESEARCH_DIR);
+/* apps/<slug>/… is served too, read-only: the app's icon, a handle's
+ * references, the niche covers and the scrolled batches. Only those folders. */
+const APPS_ROOT = resolve(APPS_DIR);
+const APP_SERVED = /^[^/]+\/(icon\.(jpg|jpeg|png|webp)$|handles\/[^/]+\/references\/|niche\/(covers|batches)\/)/;
 
 const TYPES: Record<string, string> = {
   jpg: "image/jpeg",
@@ -30,13 +36,46 @@ const TYPES: Record<string, string> = {
   txt: "text/plain; charset=utf-8",
 };
 
+/**
+ * A Node file stream as a web ReadableStream, safe against a client hanging up.
+ *
+ * Casting the Node stream straight to a ReadableStream works until the client
+ * disconnects mid-body — a video scrubbed, a page navigated away from. The
+ * adapter's controller is closed by then, the file stream pushes one more
+ * chunk into it, and the throw lands as an `uncaughtException` in the server
+ * process. So every controller call is guarded, the file handle is destroyed
+ * when the reader cancels, and backpressure is honoured.
+ */
+function fileStream(node: ReturnType<typeof createReadStream>): ReadableStream {
+  return new ReadableStream({
+    start(controller) {
+      node.on("data", (chunk) => {
+        try {
+          controller.enqueue(new Uint8Array(chunk as Buffer));
+        } catch {
+          node.destroy();
+          return;
+        }
+        if ((controller.desiredSize ?? 1) <= 0) node.pause();
+      });
+      node.on("end", () => { try { controller.close(); } catch { /* already closed */ } });
+      node.on("error", (err) => { try { controller.error(err); } catch { /* already closed */ } });
+    },
+    pull() { node.resume(); },
+    cancel() { node.destroy(); },
+  });
+}
+
 export async function GET(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
 
   // Contain every request inside media/. A decoded `..` must not escape it.
-  const rel = normalize(path.map(decodeURIComponent).join("/"));
-  const abs = join(MEDIA_ROOT, rel);
-  if (!abs.startsWith(MEDIA_ROOT + sep)) {
+  const raw = normalize(path.map(decodeURIComponent).join("/"));
+  const inApps = raw.startsWith("apps/");
+  const rel = inApps ? raw.slice(5) : raw;
+  const root = inApps ? APPS_ROOT : MEDIA_ROOT;
+  const abs = join(root, rel);
+  if (!abs.startsWith(root + sep) || (inApps && !APP_SERVED.test(rel))) {
     return new Response("Forbidden", { status: 403 });
   }
 
@@ -73,15 +112,14 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pat
       if (start >= stat.size || end >= stat.size || start > end) {
         return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${stat.size}` } });
       }
-      const stream = createReadStream(abs, { start, end });
-      return new Response(stream as unknown as ReadableStream, {
+      return new Response(fileStream(createReadStream(abs, { start, end })), {
         status: 206,
         headers: { ...headers, "Content-Range": `bytes ${start}-${end}/${stat.size}`, "Content-Length": String(end - start + 1) },
       });
     }
   }
 
-  return new Response(createReadStream(abs) as unknown as ReadableStream, {
+  return new Response(fileStream(createReadStream(abs)), {
     status: 200,
     headers: { ...headers, "Content-Length": String(stat.size) },
   });

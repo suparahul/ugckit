@@ -37,7 +37,8 @@ import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ATLAS = resolve(HERE, "..");
-const ROOT = resolve(ATLAS, "..");
+/* ATLAS_ROOT points the build at another workspace for a check; nothing else reads it. */
+const ROOT = process.env.ATLAS_ROOT ? resolve(process.env.ATLAS_ROOT) : resolve(ATLAS, "..");
 const MEDIA = join(ROOT, "research");
 const STATE = join(ROOT, "pipeline", "state", "pipeline.json");
 /* research/ is the source of truth and is read IN PLACE — nothing is ever copied,
