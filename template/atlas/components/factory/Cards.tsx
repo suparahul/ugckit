@@ -99,7 +99,7 @@ export function HandleCard({ h, states, href }: { h: Handle; states: PostState[]
       <span className={`hcard__dot${h.connected ? " is-ok" : ""}`} role="img" aria-label={h.connected ? "Connected to the posting service" : "Not connected yet"} title={h.connected ? "Connected to the posting service · turns ember when the connection needs you" : "Not connected to the posting service yet"} />
       <Face src={h.profile} name={h.handle} />
       <span className="hcard__name">{h.handle}</span>
-      <span className="hcard__role">{h.role ?? "handle"} · {h.complete ? "complete" : `step ${h.next?.n ?? 6} of 6`}</span>
+      <span className="hcard__role">{h.role ?? "handle"} · {h.complete ? "complete" : `step ${h.next?.n ?? 5} of 5`}</span>
       <dl className="stats stats--sm">
         <div><dd>{n(views)}</dd><dt>views</dt></div>
         <div><dd>{posted.length}</dd><dt>posted</dt></div>
@@ -115,13 +115,13 @@ export function HandleCardLater({ name, role, line, href }: { name: string; role
       <span className="face face--none" role="img" aria-label={`${name}: not created yet`}>not yet</span>
       <span className="hcard__name">{name}</span>
       <span className="hcard__role">{role}</span>
-      <span className="state" style={{ marginTop: 8 }}>{line ?? "Create it on TikTok, then the six steps start."}</span>
+      <span className="state" style={{ marginTop: 8 }}>{line ?? "Create it on TikTok, then the five steps start."}</span>
     </Link>
   );
 }
 
-/** The six-step marks of a handle in one row. */
+/** The five-step marks of a handle in one row. */
 export function StepMarks({ h }: { h: Handle }) {
   const states = h.steps.map((s) => (s.state === "done" ? "approved" : s.state === "you" ? "waiting" : s.state === "agent" ? "inhand" : "open")) as ("approved" | "waiting" | "inhand" | "open")[];
-  return <MarkRow states={states} label={h.complete ? "six steps done" : `step ${h.next?.n ?? 6} of 6`} />;
+  return <MarkRow states={states} label={h.complete ? "five steps done" : `step ${h.next?.n ?? 5} of 5`} />;
 }

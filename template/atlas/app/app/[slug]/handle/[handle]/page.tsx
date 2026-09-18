@@ -4,7 +4,7 @@
  * Complete: the research account page's shape — the head with the face, the
  * bio and the numbers; the grid of its posts, playable where posted, drawn as
  * slots where planned; the read; the post table; the identity folded under.
- * In creation: the same head, the one decision that waits for you, the six
+ * In creation: the same head, the one decision that waits for you, the five
  * steps, and every part of the identity — filled as ink, or as a pending slot
  * that names the step that fills it.
  */
@@ -128,7 +128,7 @@ export default async function HandlePage({ params }: { params: Promise<P> }) {
             <Face src={h.profile} name={h.handle} size=" face--lg" word={next ? `no picture · step ${next.n}` : "no picture"} />
             <div>
               <h1 className="prod__title">{h.handle}</h1>
-              <p className="prod__counts">{[h.role ?? "handle", h.created ? `created ${h.created}` : null, h.connected ? `connected through ${provider}` : "not connected"].filter(Boolean).join(" · ")} · {next ? <span className={next.state === "you" ? "is-waiting" : undefined}>step {next.n} of 6 · {next.state === "you" ? "your turn" : next.state === "agent" ? "the agent’s turn" : "open"}</span> : <b>complete</b>}</p>
+              <p className="prod__counts">{[h.role ?? "handle", h.created ? `created ${h.created}` : null, h.connected ? `connected through ${provider}` : h.connection].filter(Boolean).join(" · ")} · {next ? <span className={next.state === "you" ? "is-waiting" : undefined}>step {next.n} of 5 · {next.state === "you" ? "your turn" : next.state === "agent" ? "the agent’s turn" : "open"}</span> : <b>complete</b>}</p>
             </div>
           </>
         )}
@@ -137,8 +137,8 @@ export default async function HandlePage({ params }: { params: Promise<P> }) {
           <div className="ahead__links">
             <a className="chip" href={`https://www.tiktok.com/${h.handle}`} target="_blank" rel="noreferrer">TikTok ↗</a>
             {h.tier ? <span className="chip">{h.tier}</span> : null}
-            <span className="chip">{h.connected ? `connected · ${provider}` : "not connected"}</span>
-            <span className="chip">complete · 6 of 6 steps</span>
+            <span className="chip">{h.connected ? `connected · ${provider}` : h.connection}</span>
+            <span className="chip">complete · 5 of 5 steps</span>
             {h.format ? <Link className="chip" href={`/app/${s}/strategy`}>format: {h.format.split("(")[0].trim()}</Link> : null}
           </div>
         ) : null}
@@ -192,7 +192,7 @@ export default async function HandlePage({ params }: { params: Promise<P> }) {
         </details>
       ) : null}
       <details className="anatomy" open={!h.complete || undefined}>
-        <summary>The six steps · {h.complete ? "complete" : `${h.steps.filter((x) => x.state === "done").length} of 6 done`}</summary>
+        <summary>The five steps · {h.complete ? "complete" : `${h.steps.filter((x) => x.state === "done").length} of 5 done`}</summary>
         <Steps h={h} />
       </details>
     </>

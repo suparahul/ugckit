@@ -127,7 +127,7 @@ export default async function HomeBase({ params, searchParams }: { params: Promi
         </Section>
       ) : S("accounts") !== "todo" ? (
         <Section title="Handles" small="handle identities" link={{ href: `/app/${s}/handles`, label: "All handles" }}>
-          <Room text="The handles are created one at a time, in six steps, once the account architecture names them." small="fills at handle identities" />
+          <Room text="The handles are created one at a time, in five steps, once the account architecture names them." small="fills at handle identities" />
         </Section>
       ) : (
         <Section title="Handles" small="handle identities">

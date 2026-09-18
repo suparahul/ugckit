@@ -13,6 +13,7 @@ import { join } from "node:path";
 
 import { getApp, type App } from "./apps";
 import { ledgerApps, readLedger } from "./ledger";
+import { day7Rows } from "./findings";
 import { listHandles } from "./handles";
 import { getProduction, readLog, today } from "./production";
 import { appDir, exists, listDirs, listFiles, mtimeOf, newestIn, readJson, readText, RESEARCH_DIR, STATE_FILE } from "./root";
@@ -75,8 +76,7 @@ function handleAsk(handle: string, step: number): string {
     case 2: return `a look at ${handle}’s persona, on the handle page`;
     case 3: return `a look at ${handle}’s references, on the handle page`;
     case 4: return `a look at ${handle}’s profile picture and bio, then both set on TikTok by hand`;
-    case 5: return `a look at ${handle}’s defaults, on the handle page`;
-    default: return `${handle} connected in the posting service`;
+    default: return `a look at ${handle}’s defaults, on the handle page`;
   }
 }
 const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
@@ -157,6 +157,12 @@ export function canvasOf(slug: string): Canvas {
   const fDate = findingsDate(ndir);
   const nicheDone = batchesRead.length > 0 && trio.length === 3;
   const nicheStarted = exists(ndir) && (nSearchFiles > 0 || batches.length > 0 || exists(join(ndir, "NICHE.md")) || trio.length > 0);
+  /* The day-7 rows of ours in the post table: added by production, not a change to the findings. anatomy.md's
+     mtime is left out of the phase's time once they exist, so nothing downstream reads "changed upstream" from them. */
+  const ownRows = day7Rows(slug, listDirs(join(dir, "handles")).map((h) => (h.startsWith("@") ? h : `@${h}`)));
+  const nicheAt = ownRows.length
+    ? Math.max(mtimeOf(ndir), ...listFiles(ndir).filter((f) => f !== "anatomy.md").map((f) => mtimeOf(join(ndir, f))), ...listDirs(ndir).map((d) => newestIn(join(ndir, d))))
+    : Math.max(newestIn(ndir), newestIn(join(ndir, "batches")));
   const searchedFacts = nicheJson?.totals ? [`${n(nicheJson.totals.slideshows ?? 0)} slideshows`, `${n(nicheJson.totals.videos ?? 0)} videos`] : nSearchFiles ? [`${plural(nSearchFiles, "search page")}`] : [];
   const nichePhase: Omit<Phase, "state" | "changedUpstream"> = {
     key: "niche", n: 4, title: PHASES[3].title, line: PHASES[3].line,
@@ -167,9 +173,9 @@ export function canvasOf(slug: string): Canvas {
         : nSearchFiles
           ? "The searches ran. The read waits for links from your scroll."
           : "Two searches, then the posts you bring from your scroll, read slide by slide.",
-    facts: [...searchedFacts, ...(batches.length ? [`${n(linksBrought)} links brought`, `${n(batchesRead.length)} of ${n(batches.length)} batches read`] : nSearchFiles ? ["scroll: waiting"] : []), ...(fDate ? [`findings of ${fDate}`] : [])],
+    facts: [...searchedFacts, ...(batches.length ? [`${n(linksBrought)} links brought`, `${n(batchesRead.length)} of ${n(batches.length)} batches read`] : nSearchFiles ? ["scroll: waiting"] : []), ...(fDate ? [`findings of ${fDate}`] : []), ...(ownRows.length ? [`${plural(ownRows.length, "day-7 row")} added`] : [])],
     ask: nicheStarted && !nicheDone && !batches.length ? "up to ten links from your own scroll, pasted in the conversation; the recipe is printed there" : null,
-    page: { label: "Niche", href: `/app/${s}/niche` }, what: W.niche, at: Math.max(newestIn(ndir), newestIn(join(ndir, "batches"))),
+    page: { label: "Niche", href: `/app/${s}/niche` }, what: W.niche, at: nicheAt,
   };
 
   /* ---- account architecture */
@@ -191,8 +197,8 @@ export function canvasOf(slug: string): Canvas {
   const handlesPhase: Omit<Phase, "state" | "changedUpstream"> = {
     key: "handles", n: 6, title: PHASES[5].title, line: PHASES[5].line,
     sentence: handles.length
-      ? `${complete.length ? `${plural(complete.length, "handle")} complete` : "No handle complete yet"}${inHand.length ? `; ${inHand.map((h) => `${h.handle} at step ${h.next?.n ?? 6} of 6`).join(", ")}` : ""}.${complete.length === 1 ? " The plan recommends at least two handles at two posts a day; one is allowed." : ""}`
-      : "One handle at a time, in six steps. The accounts are created on TikTok by you when the agent asks.",
+      ? `${complete.length ? `${plural(complete.length, "handle")} complete` : "No handle complete yet"}${inHand.length ? `; ${inHand.map((h) => `${h.handle} at step ${h.next?.n ?? 5} of 5`).join(", ")}` : ""}.${complete.length === 1 ? " The plan recommends at least two handles at two posts a day; one is allowed." : ""}`
+      : "One handle at a time, in five steps. The accounts are created on TikTok by you when the agent asks; the posting service connects at the first send.",
     facts: handles.length ? [`${n(complete.length)} complete`, ...(inHand.length ? [`${n(inHand.length)} in hand`] : []), `${n(handles.filter((h) => h.connected).length)} connected`] : [],
     ask: waitingHandles.length ? waitingHandles.map((h) => handleAsk(h.handle, h.next!.n)).join("; ") : null,
     page: { label: "Handles", href: `/app/${s}/handles` }, what: W.handles, at: newestIn(join(dir, "handles")),
@@ -237,7 +243,7 @@ export function canvasOf(slug: string): Canvas {
       : prodStarted
         ? `${decks ? `${plural(decks, "deck")} written; ` : ""}nothing posted yet.`
         : "Opens with the plan: decks, pictures, callout, render, post, sync, the read on day 7.",
-    facts: prodStarted ? [`${n(posted)} posted`, ...(todayRows.length ? [`${n(todayRows.length)} planned today`] : []), ...(decks ? [`${n(decks)} decks`] : [])] : [],
+    facts: prodStarted ? [`${n(posted)} posted`, ...(todayRows.length ? [`${n(todayRows.length)} planned today`] : []), ...(decks ? [`${n(decks)} decks`] : []), ...(ownRows.length ? [`${plural(ownRows.length, "day-7 row")} added`] : [])] : [],
     ask: null,
     page: { label: "Studio", href: `/production/${s}` }, what: W.production, at: Math.max(mtimeOf(join(dir, "production", "log.jsonl")), newestIn(join(dir, "production", "decks"))),
   };

@@ -1,6 +1,6 @@
 /**
  * /app/<slug>/handles — every handle of the app as one card: the face, the
- * role, the six-step marks, four numbers, its posts so far as thumbnails.
+ * role, the five-step marks, four numbers, its posts so far as thumbnails.
  * The recommended handle not yet created is dashed. Before the phase starts
  * the page shows its state band and the room the cards will take.
  */
@@ -43,9 +43,9 @@ export default async function HandlesPage({ params }: { params: Promise<{ slug: 
     return (
       <div className="page stack">
         <header className="prod__head"><div><h1 className="prod__title">Handles</h1><p className="prod__counts">No handle yet</p></div></header>
-        <StateBand state={phase.state === "done" ? "done" : phase.state} text="The handle identities phase fills this page, one handle at a time in six steps: role and name, persona, references, picture and bio, defaults, connect. It starts once the account architecture names the handles." ask={phase.ask ?? "the accounts created on TikTok, when the agent asks; a look at each persona and its references"} phase="phase 6 · handle identities" />
+        <StateBand state={phase.state === "done" ? "done" : phase.state} text="The handle identities phase fills this page, one handle at a time in five steps: role and name, persona, references, picture and bio, defaults. The posting service connects at the first send. It starts once the account architecture names the handles." ask={phase.ask ?? "the accounts created on TikTok, when the agent asks; a look at each persona and its references"} phase="phase 6 · handle identities" />
         <Section title="Handles">
-          <Room text="One card per handle: the face, the state of its six steps, its numbers, its posts." small="fills at handle identities" />
+          <Room text="One card per handle: the face, the state of its five steps, its numbers, its posts." small="fills at handle identities" />
         </Section>
       </div>
     );
@@ -70,7 +70,7 @@ export default async function HandlesPage({ params }: { params: Promise<{ slug: 
             const saves = mp.reduce((t, st) => t + (numbersOf(st)?.saves ?? 0), 0);
             const top = Math.max(0, ...mp.map((st) => numbersOf(st)?.views ?? 0));
             const plannedMine = mine.filter((st) => !st.posted && !st.killed);
-            const stateWord = h.complete ? `complete${h.connected ? ` · connected${h.account?.provider ? ` through ${h.account.provider === "postbridge" ? "Post Bridge" : h.account.provider}` : ""}` : ""}` : `step ${h.next?.n ?? 6} of 6 · ${h.next?.fact ?? ""}`;
+            const stateWord = h.complete ? `complete${h.connected ? ` · connected${h.account?.provider ? ` through ${h.account.provider === "postbridge" ? "Post Bridge" : h.account.provider}` : ""}` : ""}` : `step ${h.next?.n ?? 5} of 5 · ${h.next?.fact ?? ""}`;
             return (
               <li key={h.dir}>
                 <Link className={`hbig${h.complete ? "" : " hbig--later"}`} href={`/app/${s}/handle/${encodeURIComponent(h.dir)}`}>
@@ -102,7 +102,7 @@ export default async function HandlesPage({ params }: { params: Promise<{ slug: 
                 <span className="face face--none face--lg" role="img" aria-label="A second persona: not created yet">not yet</span>
                 <span className="hbig__name">@a second persona</span>
                 <span className="hbig__role">persona handle · recommended by the architecture, not created</span>
-                <span className="hbig__state"><span className="state">Create it on TikTok, then the six steps start. The plan recommends at least two handles at two posts a day; one is allowed.</span></span>
+                <span className="hbig__state"><span className="state">Create it on TikTok, then the five steps start. The plan recommends at least two handles at two posts a day; one is allowed.</span></span>
               </span>
             </li>
           ) : null}

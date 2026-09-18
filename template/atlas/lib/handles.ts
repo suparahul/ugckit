@@ -1,6 +1,6 @@
 /**
  * The handle identities of an app: apps/<slug>/handles/<handle>/HANDLE.md and
- * the references beside it, read live. The six steps that create a handle are
+ * the references beside it, read live. The five steps that create a handle are
  * derived from the files (which exist), the log (which approvals were given)
  * and the posting-service account map (which handle is connected). Nothing
  * here records a state: the file is its own proof.
@@ -45,6 +45,8 @@ export type Handle = {
   /** The profile picture as a /media URL, or null. */
   profile: string | null;
   connected: boolean;
+  /** The posting-service connection in words: it is made at the first send, not as a step. */
+  connection: string;
   account: { provider: string; id: string | number | null; username: string | null } | null;
   steps: Step[];
   complete: boolean;
@@ -120,26 +122,25 @@ function readHandle(slug: string, dir: string, log: Event[], accounts: AccountsF
   const approvals = { persona: approvedAt("persona.approve"), bio: approvedAt("bio.approve"), defaults: approvedAt("defaults.approve") };
   const taskDone = (task: string) => mine.some((e) => e.kind === "task.done" && String(e.data?.task ?? e.task ?? "") === task);
 
-  /* The six steps. Done is decided from the files; the fact names the approval when the log has it. */
+  /* The five steps. Done is decided from the files; the fact names the approval when the log has it.
+     Connecting the posting service is not a step: it happens at the first send, and `connected` says so. */
   const s1 = !!(head["Role"] && head["Tier"] && head["Created"]);
   const s2 = !!personaBody;
   const s3 = identityRefs.length > 0;
   const s4 = !!profileRef && !!bioQuote;
   const s5 = !!(head["Format"] && dimension && head["Slots"] && head["Cadence"]);
-  const s6 = connected;
-  const done = [s1, s2, s3, s4, s5, s6];
+  const done = [s1, s2, s3, s4, s5];
   const facts = [
     s1 ? `done${head["Created"] ? ` ${head["Created"]}` : ""}` : head["Role"] ? "the account is created on TikTok by you, then the date is written" : "the role and the name come first",
     s2 ? (approvals.persona ? `approved ${approvals.persona}` : "written · a look from you is asked") : "drafted by the agent from the findings",
     s3 ? `${references.filter((r) => r.approved).length ? `${references.filter((r) => r.approved).length} approved` : `${identityRefs.length} drawn`}${references.some((r) => r.exists && !r.approved && /identity|face|subject/i.test(r.role)) ? " · a look from you is asked" : ""}` : "the face and the subjects are drawn after the persona",
     s4 ? `${approvals.bio ? `approved ${approvals.bio}` : "written"}${taskDone("set on TikTok") ? " · set on TikTok" : ""}` : profileRef ? "the picture is here; the bio is next" : bioQuote ? "the bio is here; the picture is next" : "after the references",
     s5 ? (approvals.defaults ? `approved ${approvals.defaults}` : "written") : "proposed by the agent from the app fit",
-    s6 ? `connected${connectedAt ? ` ${connectedAt}` : ""}${acct?.provider || acct?.platform ? ` · ${acct.provider ?? "Post Bridge"}` : ""}` : acct ? "needs a reconnect" : "connected at the first send",
   ];
   /* Whose turn: the first step not done. A step whose file exists waits for a look from you; one whose file is missing is the agent's. */
   const firstOpen = done.findIndex((d) => !d);
-  const userSteps = new Set([1, 3, 4, 6]);
-  const steps: Step[] = ["Role and name", "Persona", "References", "Profile picture and bio", "Defaults", "Connect"].map((name, i) => {
+  const userSteps = new Set([1, 3, 4]);
+  const steps: Step[] = ["Role and name", "Persona", "References", "Profile picture and bio", "Defaults"].map((name, i) => {
     const n = i + 1;
     let state: StepState = done[i] ? "done" : i === firstOpen ? (userSteps.has(n) ? "you" : "agent") : "open";
     if (i === firstOpen && n === 2 && personaBody) state = "you";
@@ -152,7 +153,7 @@ function readHandle(slug: string, dir: string, log: Event[], accounts: AccountsF
     format: head["Format"] ?? null, dimension, slots: head["Slots"] ?? null, postingZone: head["Posting zone"] ?? null, cadence: head["Cadence"] ?? null, sound: head["Sound"] ?? null, warmup: head["Warm-up"] ?? null,
     persona: personaBody, bio: bioQuote, bioRule, references, defaults: defaultsRows,
     stylePrefix, identityRule: sectionOf(md, /^Identity rule/i), postProcess: sectionOf(md, /^Post-process/i),
-    profile: profileRef?.url ?? null, connected, account: acct ? { provider: acct.provider ?? (acct.platform ? "Post Bridge" : "unknown"), id: acct.id ?? null, username: acct.username ?? null } : null,
+    profile: profileRef?.url ?? null, connected, connection: connected ? `connected${connectedAt ? ` ${connectedAt}` : ""}${acct?.provider || acct?.platform ? ` · ${acct.provider ?? "Post Bridge"}` : ""}` : acct ? "needs a reconnect" : "connects at the first send", account: acct ? { provider: acct.provider ?? (acct.platform ? "Post Bridge" : "unknown"), id: acct.id ?? null, username: acct.username ?? null } : null,
     steps, complete: done.every(Boolean), next: steps.find((s) => s.state !== "done") ?? null, approvals,
   };
 }

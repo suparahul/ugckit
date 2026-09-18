@@ -14,7 +14,8 @@ import Link from "next/link";
 
 import { getApp, listApps } from "@/lib/apps";
 import { canvasOf } from "@/lib/canvas";
-import { readAccountTable, readFindings, readPostTable, readValues, type FindingBlock } from "@/lib/findings";
+import { day7Rows, readAccountTable, readFindings, readPostTable, readValues, type FindingBlock } from "@/lib/findings";
+import { listHandles } from "@/lib/handles";
 import { getNiche, listBatches, type BatchPost, type NichePost } from "@/lib/niche";
 import { dmy, n, pct, Room, Section } from "@/components/factory/Bits";
 import { Anat } from "@/components/factory/Anat";
@@ -131,6 +132,7 @@ export default async function NichePage({ params, searchParams }: { params: Prom
   const postTable = readPostTable(slug);
   const values = readValues(slug);
   const accounts = readAccountTable(slug);
+  const ours = postTable ? day7Rows(slug, listHandles(slug).map((h) => h.handle)).length : 0;
 
   const band = phase.state !== "done" ? (
     <StateBand
@@ -284,7 +286,7 @@ export default async function NichePage({ params, searchParams }: { params: Prom
                 </Fold>
               ))}
               {postTable ? (
-                <Fold id="posts-read" title={`The ${postTable.rows.length} posts, one row each`} gist="who posts, slides, the hook, the text density, what is kept, where the product sits, the last slide’s ask, the numbers">
+                <Fold id="posts-read" title={`The ${postTable.rows.length - ours} posts, one row each${ours ? ` · ${ours} day-7 ${ours === 1 ? "row" : "rows"} of ours` : ""}`} gist="who posts, slides, the hook, the text density, what is kept, where the product sits, the last slide’s ask, the numbers">
                   <Anat head={postTable.head} rows={postTable.rows} keys={["#", "Handle / post", "Persona", "Slides", "Hook shape", "Text density", "Keepable", "Product slot", "Last-slide ask", "Views", "Saves/view"]} lede="One row per post read, one column per part of the post: who posts, how many slides, the hook, how dense the text is, what the viewer keeps, where the product sits, what the last slide asks. Blank means the slides do not say. After every post of ours goes out, one row is added seven days later, and it is compared with the rows that differ in one part only." />
                 </Fold>
               ) : null}

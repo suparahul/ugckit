@@ -95,3 +95,22 @@ export function readAccountTable(slug: string): Table | null {
   const t = tableOf(sec);
   return t.head.length ? t : null;
 }
+
+/**
+ * The day-7 rows: the rows of the post table that are ours, appended by the
+ * day-7 read seven days after each of our posts went out. A row is ours when
+ * its handle cell names one of the app's handles, or the row says so ("own
+ * post", "ours"). Appending them is production's work, not a change to the
+ * findings; the canvas reads them that way.
+ */
+export function day7Rows(slug: string, handles: string[]): string[][] {
+  const t = readPostTable(slug);
+  if (!t) return [];
+  const mine = new Set(handles.map((h) => h.replace(/^@/, "").toLowerCase()));
+  const col = t.head.findIndex((h) => /handle/i.test(h));
+  return t.rows.filter((r) => {
+    const cell = (col >= 0 ? r[col] : r.join(" ")) ?? "";
+    const named = cell.match(/@([\w.]+)/)?.[1]?.toLowerCase();
+    return (named && mine.has(named)) || /\b(own post|ours)\b/i.test(r.join(" "));
+  });
+}
