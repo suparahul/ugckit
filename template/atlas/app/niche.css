@@ -1,0 +1,80 @@
+/* /niche — the throwaway niche explorer. Own styles, nothing shared. */
+
+.niche { padding: 0 var(--pad) 48px; }
+
+.niche-head { padding: 18px 0 10px; border-bottom: 1px solid var(--rule); }
+.niche-head h1 { font: italic 400 2rem var(--serif); margin: 0 0 6px; color: var(--ink); }
+.niche-totals { margin: 0; font: 500 0.9rem var(--sans); color: var(--ink-2); }
+.niche-totals strong { color: var(--ink); }
+
+.niche-filters {
+  display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: flex-end;
+  padding: 14px 0; border-bottom: 1px solid var(--rule); margin-bottom: 18px;
+}
+.niche-filters label {
+  display: flex; flex-direction: column; gap: 4px;
+  font: 500 0.72rem var(--sans); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3);
+}
+.niche-filters select, .niche-filters input {
+  font: 400 0.9rem var(--sans); color: var(--ink); background: var(--paper-hi);
+  border: 1px solid var(--rule-2); border-radius: 4px; padding: 5px 8px; min-width: 120px;
+}
+.niche-filters__count { font: 500 0.85rem var(--mono); color: var(--ink-2); padding-bottom: 6px; }
+
+.niche-empty { font: 400 1rem var(--sans); color: var(--ink-2); max-width: var(--measure); }
+
+.niche-grid {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px;
+}
+
+.niche-tile {
+  display: flex; flex-direction: column; background: var(--paper-hi);
+  border: 1px solid var(--rule); border-radius: 6px; overflow: hidden;
+}
+.niche-tile--slideshow { border-color: var(--ember); }
+
+.niche-tile__cover {
+  position: relative; display: block; aspect-ratio: 3 / 4; background: var(--paper-lo);
+}
+.niche-tile__cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.niche-tile__nocover {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font: italic 400 1rem var(--serif); color: var(--ink-3);
+}
+.niche-tile__badge {
+  position: absolute; left: 8px; top: 8px; padding: 2px 7px; border-radius: 3px;
+  background: var(--slab); color: var(--slab-ink); font: 500 0.7rem var(--mono);
+}
+.niche-tile--slideshow .niche-tile__badge { background: var(--ember-deep); }
+
+.niche-tile__body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.niche-tile__head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.niche-tile__head a {
+  font: 500 0.85rem var(--sans); color: var(--ink); text-decoration: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.niche-tile__head a:hover { text-decoration: underline; }
+.niche-tile__head strong { font: 600 1.05rem var(--sans); color: var(--ember-deep); }
+
+.niche-tile__stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 0;
+}
+.niche-tile__stats div { display: flex; flex-direction: column; }
+.niche-tile__stats dt { font: 500 0.62rem var(--sans); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-4); }
+.niche-tile__stats dd { margin: 0; font: 500 0.82rem var(--mono); color: var(--ink-2); }
+
+.niche-tile__caption { margin: 0; font: 400 0.82rem var(--sans); color: var(--ink-2); line-height: 1.35; }
+
+.niche-tile__foot {
+  display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: space-between;
+  font: 400 0.7rem var(--mono); color: var(--ink-3);
+}
+.niche-tile__foot a { color: var(--ember-deep); text-decoration: none; }
+.niche-tile__foot a:hover { text-decoration: underline; }
+
+.niche-filters__check {
+  flex-direction: row !important; align-items: center; gap: 6px !important;
+  padding-bottom: 6px; text-transform: none !important; letter-spacing: 0 !important;
+  font: 400 0.9rem var(--sans) !important; color: var(--ink) !important;
+}

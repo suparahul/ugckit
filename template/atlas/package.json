@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Organic Factory: a home base for each of your apps, read in place from the workspace",
   "scripts": {
-    "index": "node scripts/build-index.mjs && node scripts/build-production.mjs",
+    "index": "node scripts/build-index.mjs && node scripts/build-niche.mjs && node scripts/build-production.mjs",
     "dev": "npm run index && next dev -p 3210",
     "dev:fast": "next dev -p 3210",
     "build": "npm run index && next build",

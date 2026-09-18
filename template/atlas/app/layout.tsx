@@ -8,6 +8,7 @@ import "./components.css";
 import "./production.css";
 import "./reporting.css";
 import "./endproduct.css";
+import "./niche.css";
 import "./factory.css";
 import CommandBar from "@/components/CommandBar";
 import { Breadcrumb, RouteFlag, Ticker } from "@/components/Chrome";
