@@ -144,7 +144,7 @@ export function canvasOf(slug: string): Canvas {
           : "Apps in the niche are found from the niche phrase, their networks harvested, each torn down.",
     facts: apps.length ? [`${n(apps.length)} apps`, `${n(handlesInLedger)} handles`, `${n(teardowns)} of ${n(apps.length)} teardowns`] : searches ? [`${n(searches)} searches`] : [],
     ask: appsStarted && !appsDone ? "a yes on each round’s cost" : null,
-    page: { label: "Atlas", href: `/atlas?app=${s}` }, what: W.apps, at: Math.max(mtimeOf(STATE_FILE), newestIn(join(RESEARCH_DIR, slug))),
+    page: { label: "Atlas", href: `/atlas?app=${s}` }, what: W.apps, at: newestIn(join(RESEARCH_DIR, slug)),
   };
 
   /* ---- the niche */
