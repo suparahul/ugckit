@@ -73,7 +73,9 @@ function readHandle(slug: string, dir: string, log: Event[], accounts: AccountsF
   const fromTitle = title.match(/@([\w.]+)/)?.[1];
   const handle = `@${(head["Handle"] ?? "").replace(/^@/, "") || fromTitle || dir.replace(/^@/, "")}`;
   const mine = log.filter((e) => e.handle === handle || e.handle === handle.slice(1));
-  const approvedAt = (kind: Event["kind"], file?: string) => day(last(mine.filter((e) => e.kind === kind && (!file || e.file === file)))?.at);
+  /* readLog() prefixes every `file` with the slug for the production files; a reference line names its file bare, so match the tail. */
+  const sameFile = (a: string | undefined, b: string) => !!a && (a === b || a.endsWith(`/${b}`));
+  const approvedAt = (kind: Event["kind"], file?: string) => day(last(mine.filter((e) => e.kind === kind && (!file || sameFile(e.file, file))))?.at);
 
   const refDir = join(base, "references");
   const refRows = tableRows(sectionOf(md, /^References/i) ?? "");
@@ -126,14 +128,17 @@ function readHandle(slug: string, dir: string, log: Event[], accounts: AccountsF
      Connecting the posting service is not a step: it happens at the first send, and `connected` says so. */
   const s1 = !!(head["Role"] && head["Tier"] && head["Created"]);
   const s2 = !!personaBody;
-  const s3 = identityRefs.length > 0;
+  /* A brand handle or a theme page has style references only, by design: its step 3 is done once one reference is approved. */
+  const styleOnly = /brand handle|theme page/i.test(head["Tier"] ?? "");
+  const approvedRefs = references.filter((r) => r.approved).length;
+  const s3 = identityRefs.length > 0 || (styleOnly && approvedRefs > 0);
   const s4 = !!profileRef && !!bioQuote;
   const s5 = !!(head["Format"] && dimension && head["Slots"] && head["Cadence"]);
   const done = [s1, s2, s3, s4, s5];
   const facts = [
     s1 ? `done${head["Created"] ? ` ${head["Created"]}` : ""}` : head["Role"] ? "the account is created on TikTok by you, then the date is written" : "the role and the name come first",
     s2 ? (approvals.persona ? `approved ${approvals.persona}` : "written · a look from you is asked") : "drafted by the agent from the findings",
-    s3 ? `${references.filter((r) => r.approved).length ? `${references.filter((r) => r.approved).length} approved` : `${identityRefs.length} drawn`}${references.some((r) => r.exists && !r.approved && /identity|face|subject/i.test(r.role)) ? " · a look from you is asked" : ""}` : "the face and the subjects are drawn after the persona",
+    s3 ? `${approvedRefs ? `${approvedRefs} approved` : `${identityRefs.length} drawn`}${references.some((r) => r.exists && !r.approved && /identity|face|subject/i.test(r.role)) ? " · a look from you is asked" : ""}` : styleOnly ? (references.some((r) => r.exists) ? "the style references are here · a look from you is asked" : "the style references are drawn after the persona") : "the face and the subjects are drawn after the persona",
     s4 ? `${approvals.bio ? `approved ${approvals.bio}` : "written"}${taskDone("set on TikTok") ? " · set on TikTok" : ""}` : profileRef ? "the picture is here; the bio is next" : bioQuote ? "the bio is here; the picture is next" : "after the references",
     s5 ? (approvals.defaults ? `approved ${approvals.defaults}` : "written") : "proposed by the agent from the app fit",
   ];
