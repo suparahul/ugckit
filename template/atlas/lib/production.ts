@@ -598,11 +598,18 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
   const ideaRaw = pointState(log, "idea.approve", "idea.sendback", null);
   const idea: PointState = ideaRaw.status === "open" && deck ? { status: "approved", at: null, note: null } : ideaRaw;
 
-  /* The plan never goes stale. A deck edit after approval is shown as
-   * `changed` (which slides, from the per-slide hashes on the latest approval
-   * line) and re-asked only through the final point, and only after that was
-   * given. See deckChange(). */
-  const plan = pointState(log, "plan.approve", "plan.sendback", null);
+  /* A deck on disk is the plan, and the plan is read through its pictures:
+   * the agent writes the deck and makes the pictures in one run, and Rahul's
+   * look is at the slides, not at a gate before them (2026-09-18). So the plan
+   * counts as approved once the deck exists, with no line, unless it was sent
+   * back; a send-back holds until the deck is rewritten (its hash differs from
+   * the one on the send-back line) or Rahul approves the plan by hand. The
+   * plan never goes stale: a deck edit after approval is shown as `changed`
+   * and re-asked only through the final point. See deckChange(). */
+  const planRaw = pointState(log, "plan.approve", "plan.sendback", null);
+  const planBack = last(log.filter((e) => e.kind === "plan.approve" || e.kind === "plan.sendback"));
+  const rewritten = planRaw.status === "sentback" && !!deck && !!planBack?.hash && planBack.hash !== deck.hash;
+  const plan: PointState = deck && (planRaw.status === "open" || rewritten) ? { status: "approved", at: null, note: null } : planRaw;
   const postedEv = last(log.filter((e) => e.kind === "posted"));
   const changed = deckChange(deck, log, plan, !!postedEv);
   const changedSlides = new Set(changed?.slides ?? []);
@@ -659,10 +666,8 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
       else { sentence = "idea: waiting for you"; waiting = true; }
       break;
     case "planned": sentence = "deck being written"; break;
-    case "plan":
-      if (plan.status === "sentback") { sentence = `plan: sent back${q(plan.note)}`; }
-      else { sentence = "plan: waiting for you"; waiting = true; }
-      break;
+    /* Only a sent-back plan stops here: a deck on disk is otherwise the plan, approved. */
+    case "plan": sentence = `plan: sent back${q(plan.note)}`; break;
     case "final": {
       const missing = slides.filter((s) => s.status === "empty" || s.status === "needsnew").length;
       const cardsMissing = cards.filter((c) => !c.file).length;
@@ -792,6 +797,7 @@ export function primaryAction(s: PostState): { kind: EventKind | "posted" | "out
   switch (s.stage) {
     case "idea": return { kind: "idea.approve", label: "Approve idea", disabled: null };
     case "planned": return { kind: null, label: "", disabled: null };
+    /* Reached only after a send-back: the button clears it by hand; a rewritten deck clears it alone. */
     case "plan": return { kind: "plan.approve", label: "Approve plan", disabled: null };
     case "final": return { kind: "final.approve", label: "Approve for posting", disabled: finalBlock(s) };
     case "ready": return { kind: "posted", label: "Mark posted", disabled: null };
@@ -815,17 +821,14 @@ export function nextStep(s: PostState): { who: "you" | "agent" | "nobody"; text:
         ? say("agent", "Sent back with your note. The idea comes back here when it is reworked.")
         : say("you", "Read the idea. Approve it, or send it back with a note. The deck is written after that.");
     case "planned": return say("agent", "The idea is approved. The deck is not written yet; it appears here when it is.");
-    case "plan":
-      return s.plan.status === "sentback"
-        ? say("agent", "Sent back with your note. The plan comes back here when the deck is rewritten.")
-        : say("you", `Read the ${s.deck?.slides.length ?? 0} slides. Approve the plan, or send it back with a note.`);
+    case "plan": return say("agent", "Sent back with your note. The plan comes back here when the deck is rewritten.");
     case "final": {
-      if (s.final.status === "sentback") return say("agent", "Sent back with your note. It comes back here when the pictures are remade.");
+      if (s.final.status === "sentback") return say("agent", "Sent back with your note. It comes back here when the deck or the pictures are reworked.");
       const empty = s.slides.filter((x) => x.status === "empty").length;
       const needs = s.slides.filter((x) => x.status === "needsnew").length;
       const cards = s.cards.filter((c) => !c.file).length;
       const firstOpen = s.slides.find((x) => x.status === "candidate")?.n ?? null;
-      if (empty || needs) return say("agent", `${empty + needs} slide${empty + needs === 1 ? " has" : "s have"} no picture yet. Judge the ones here; approve for posting once every slide has one.`, firstOpen);
+      if (empty || needs) return say("agent", `${empty + needs} slide${empty + needs === 1 ? " has" : "s have"} no picture yet. Read the deck and judge the pictures here; approve for posting once every slide has one.`, firstOpen);
       if (cards) return say("agent", `Every picture is here. The product callout is missing: ${cards} image${cards === 1 ? "" : "s"} not made yet.`, firstOpen);
       if (s.final.status === "stale") {
         const which = s.changed?.slides.length ? `Slide${s.changed.slides.length === 1 ? "" : "s"} ${s.changed.slides.join(", ")} changed` : "Something changed";

@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   if (NEEDS_NOTE.has(body.kind) && !note) return NextResponse.json({ error: "Say what to change." }, { status: 400 });
 
   const actor = typeof body.actor === "string" && body.actor && body.actor !== "demo" ? body.actor.slice(0, 40) : undefined;
-  const state = body.kind.startsWith("slide.") || body.kind === "plan.approve" || body.kind === "final.approve" ? allStates(slug).find((x) => x.row.key === body.post) : undefined;
+  const state = body.kind.startsWith("slide.") || body.kind === "plan.approve" || body.kind === "plan.sendback" || body.kind === "final.approve" ? allStates(slug).find((x) => x.row.key === body.post) : undefined;
 
   /* A slide approval belongs to a picture: the line always names the file. The
    * client sends the candidate in view; when it does not, the current one. */
@@ -55,13 +55,15 @@ export async function POST(request: NextRequest) {
     if (!file) return NextResponse.json({ error: "No picture to approve." }, { status: 400 });
   }
 
-  /* The two gates that cover a deck record what they covered. */
+  /* The two gates that cover a deck record what they covered. A plan send-back
+   * records the deck it refused, so a rewritten deck (a new hash) clears it. */
   let hash: string | undefined = typeof body.hash === "string" ? body.hash : undefined;
   let data = body.data && typeof body.data === "object" ? { ...body.data } : undefined;
   if ((body.kind === "plan.approve" || body.kind === "final.approve") && state?.deck) {
     hash = state.deck.hash;
     data = { ...(data ?? {}), slides: slideHashes(state.deck) };
   }
+  if (body.kind === "plan.sendback" && state?.deck) hash = state.deck.hash;
   if (body.kind === "slide.layout") {
     if (typeof body.slide !== "number" || !parseLayout(data?.layout)) return NextResponse.json({ error: "slide and data.layout (JSON) are required." }, { status: 400 });
     if (!state?.slides.some((s) => s.n === body.slide)) return NextResponse.json({ error: "No such slide." }, { status: 400 });

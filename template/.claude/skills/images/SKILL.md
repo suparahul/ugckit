@@ -10,7 +10,12 @@ description: Phase 8, the pictures — every candidate picture of one post, from
     scripts/images.sh <slug> <post> --verify          the check of every slide's file; images-result.json; the log lines
 
 `<post>` is the post key, `2026-09-17/hannah/1`. One post per call, serial. The deck
-must exist and the plan approved (`plan.approve`) before the first picture.
+must exist before the first picture; no plan approval is waited for. The Atlas counts
+the plan done once the deck exists, shows the post at the pictures stage, and reads
+"final: waiting for you" once every slide has a candidate — the user's look is at the
+slides, one by one, not at a gate before them. The one stop: a `plan.sendback` line
+for this post in `log.jsonl` whose `hash` equals the deck's current hash. Then the deck
+is refused; rewrite it (the `deck` skill) before any picture.
 
 The prompts come from the deck as written. A photo handle's prompts hold no text (the
 compositor burns it); an illustrated handle's prompts hold the slide's words, so the

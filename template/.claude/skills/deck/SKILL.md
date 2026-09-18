@@ -124,6 +124,11 @@ the spelling: a generator's text is a candidate to reject, not to fix.
 ## Finish
 
 Rebuild the index (`cd atlas && ATLAS_ROOT=.. node scripts/build-production.mjs`) and read
-what it could not parse. Point the user at the post page,
-http://localhost:3210/app/<slug>/post/<date>-<short>-<n>, for the plan approval
-(`plan.approve` in the log). Then run the `images` skill for that post.
+what it could not parse. A deck on disk is the plan: the Atlas counts the plan stage
+done the moment the deck exists, and the user reads the deck through its pictures on
+the post page, http://localhost:3210/production/<slug>/<date>/<short>/<n> (the written
+deck alone is at `?as=plan`). Do not wait for a `plan.approve` line; run the `images`
+skill for that post at once. The one stop: a `plan.sendback` line for this post in
+`log.jsonl` whose `hash` is the deck's current hash — the user refused this deck, so
+rewrite it from the note before any picture. A rewritten deck (a new hash) clears the
+send-back by itself.
