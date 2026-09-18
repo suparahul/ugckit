@@ -108,6 +108,10 @@ export function Deck({ state, deck, deckFile, initial, src, overlayOff, readOnly
 
   const slide = deck.slides[n - 1];
   const ss = state.slides[n - 1];
+  /* An illustrated deck (the item row `Slide style: illustrated`): the generator drew the text into the picture, so the
+   * replica shows the picture as the finished slide — no text blocks, no layout to lock — with the callout card on the
+   * product slide where the compositor pastes it. An absent row, or `photo`, is the replica as before. */
+  const illustrated = /^illustrated/i.test(deck.items?.["Slide style"] ?? "");
   const empty = state.slides.filter((s) => !s.current).length;
   const srcThumb = deck.sourceSlides[n - 1] ?? null;
   const captionBody = deck.caption ? deck.caption.replace(/#[\w]+/g, "").trim() : "";
@@ -125,7 +129,7 @@ export function Deck({ state, deck, deckFile, initial, src, overlayOff, readOnly
             const st = state.slides[i];
             return (
               <li key={s.n}>
-                <button type="button" className={`${plan ? (noted.has(s.n) ? "is-noted" : "is-plain") : `is-${st.status}`}${st.changed ? " is-changed" : ""}${st.layout ? " is-locked" : ""}${s.n === n ? " is-here" : ""}`} aria-current={s.n === n ? "true" : undefined} aria-label={plan ? `slide ${s.n}, ${s.label}${noted.has(s.n) ? ", has a note" : ""}` : `slide ${s.n}, ${st.status === "needsnew" ? "needs a new picture" : st.status === "candidate" ? "candidate" : st.status === "approved" ? "approved" : "no picture"}${st.changed ? `, text changed since the ${state.changed?.since === "final" ? "post" : "plan"} was approved` : ""}${st.layout ? ", saved layout" : ""}`} title={!plan && st.layout ? "saved layout" : undefined} onClick={() => setN(s.n)}>
+                <button type="button" className={`${plan ? (noted.has(s.n) ? "is-noted" : "is-plain") : `is-${st.status}`}${st.changed ? " is-changed" : ""}${st.layout && !illustrated ? " is-locked" : ""}${s.n === n ? " is-here" : ""}`} aria-current={s.n === n ? "true" : undefined} aria-label={plan ? `slide ${s.n}, ${s.label}${noted.has(s.n) ? ", has a note" : ""}` : `slide ${s.n}, ${st.status === "needsnew" ? "needs a new picture" : st.status === "candidate" ? "candidate" : st.status === "approved" ? "approved" : "no picture"}${st.changed ? `, text changed since the ${state.changed?.since === "final" ? "post" : "plan"} was approved` : ""}${st.layout && !illustrated ? ", saved layout" : ""}`} title={!plan && st.layout && !illustrated ? "saved layout" : undefined} onClick={() => setN(s.n)}>
                   {s.n}
                 </button>
               </li>
@@ -138,9 +142,13 @@ export function Deck({ state, deck, deckFile, initial, src, overlayOff, readOnly
         ) : (
           <>
             <p className="rep__count tabular">{state.approvedSlides} of {total} approved{empty ? ` · ${empty} without a picture` : ""}</p>
-            <button type="button" className={`rep__overlay${overlay ? " is-on" : ""}`} aria-pressed={overlay} onClick={() => setOverlay((v) => !v)} title="Show or hide the text drawn over the pictures">
-              text {overlay ? "on" : "off"}
-            </button>
+            {illustrated ? (
+              <span className="rep__overlay" title="The text is part of the picture: the generator drew it">text in the picture</span>
+            ) : (
+              <button type="button" className={`rep__overlay${overlay ? " is-on" : ""}`} aria-pressed={overlay} onClick={() => setOverlay((v) => !v)} title="Show or hide the text drawn over the pictures">
+                text {overlay ? "on" : "off"}
+              </button>
+            )}
           </>
         )}
       </div>
@@ -199,9 +207,9 @@ export function Deck({ state, deck, deckFile, initial, src, overlayOff, readOnly
           {draft ? (
             <LayoutEditor post={row.key} slide={slide} state={ss} cards={state.cards} total={total} layout={draft} onChange={setDraft} dimension={state.dimension} onSave={lock} onCancel={() => setDraft(null)} busy={busy} error={lockErr} />
           ) : (
-            <Replica slide={slide} state={ss} cards={state.cards} total={total} text={!overlay ? "off" : "on"} layout={ss.layout} dimension={state.dimension} />
+            <Replica slide={slide} state={ss} cards={state.cards} total={total} text={illustrated || !overlay ? "off" : "on"} layout={illustrated ? null : ss.layout} dimension={state.dimension} />
           )}
-          {canDecide && ss.text === "baked" && !draft ? (
+          {canDecide && ss.text === "baked" && !draft && !illustrated ? (
             <p className="rep__lockrow">
               {ss.layout ? (
                 <>
@@ -221,8 +229,8 @@ export function Deck({ state, deck, deckFile, initial, src, overlayOff, readOnly
           {ss.current ? (
             <p className="rep__textflag">
               <strong>Exported image:</strong>{" "}
-              {ss.text === "baked" ? "text burned in, as drawn here" : `text-free, you type the words in TikTok${n === 1 ? " (the cover's default)" : ""}`}
-              {canDecide ? <> · <SlideTextFlag post={row.key} slide={n} text={ss.text} /></> : "."}
+              {illustrated ? "the picture as it is; the text is drawn in it by the generator, nothing is burned" : ss.text === "baked" ? "text burned in, as drawn here" : `text-free, you type the words in TikTok${n === 1 ? " (the cover's default)" : ""}`}
+              {canDecide && !illustrated ? <> · <SlideTextFlag post={row.key} slide={n} text={ss.text} /></> : "."}
             </p>
           ) : null}
         </div>
