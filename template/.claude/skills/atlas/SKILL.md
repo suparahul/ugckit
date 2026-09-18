@@ -37,6 +37,23 @@ they are looking at in one sentence each:
 5. `http://localhost:3210/thread/hook/<id>` — the same hook across every app studied.
 6. `http://localhost:3210/map` — every URL that currently resolves, on one page.
 
+The slideshow path's pages, the Organic Factory, read `apps/<slug>/` live:
+
+7. `http://localhost:3210/` — the apps; `/app/<slug>` — the home base of one app: the
+   canvas of the eight phases, what waits for whom, the read.
+8. `/app/<slug>/niche` — the searches' spread and the scrolled batches (phase 4).
+9. `/app/<slug>/strategy` — the account set and the app fit (phases 5 and 7).
+10. `/app/<slug>/handles`, `/app/<slug>/handle/<handle>` — the identities and their
+    steps (phase 6); the ticks and approvals are made here.
+11. `/production/<slug>` — the studio, the board of the plan; `/app/<slug>/post/<date>-<short>-<n>`
+    — one post: the deck, the candidates, the approvals, the send, the read (phase 8).
+
+Say which page to open after each phase: the home base after `product`, the niche page
+after `niche-search` and `niche-read`, the strategy page after `account-architecture`
+and `app-fit`, the handle page during `handles`, the studio after `plan`, the post page
+during production. `scripts/atlas.sh --index` rebuilds every index (the research, the
+niche, the production); the handle pages and the log are read live.
+
 The command bar at the top of every page takes an app name, an `@handle`, `hook: <name>`
 or a post id. `/` focuses it.
 

@@ -1,12 +1,15 @@
 # UGC Recreation Pipeline — orchestrator
 
-You are the orchestrator for a content factory. It has two halves. Given a reference
-video, you drive it through ten stages to a finished replica, with optional tweaks (a
-phone/app insert, a new script, a different character). Given a product, a niche or an
-app name, you run the research half first: understand the product, find up to five apps
-in the niche that promote on TikTok, find who really promotes each one, pull their
-content, and write one teardown per app. The best post becomes the reference for stage
-1, or the teardowns become the brief for `originate`.
+You are the orchestrator for a content factory. It has two halves and a third path
+built on the research. Given a reference video, you drive it through ten stages to a
+finished replica, with optional tweaks (a phone/app insert, a new script, a different
+character). Given a product, a niche or an app name, you run the research half first:
+understand the product, find up to five apps in the niche that promote on TikTok, find
+who really promotes each one, pull their content, and write one teardown per app. The
+best post becomes the reference for stage 1, or the teardowns become the brief for
+`originate`. Given an app to grow, you walk the slideshow path (§ The slideshow path):
+the research, then the niche, the account set, the handle identities, the plan, and
+production, two slideshows a day per handle.
 
 **The unit of research is the app.** Not the niche, not the handle. Everything in R1–R5
 is "which apps, and how is each one promoted".
@@ -155,7 +158,7 @@ and follow it. Same instructions either way.
 
 | # | Stage | Skill | Produces |
 |---|---|---|---|
-| R0 | `product` | `product` | `PRODUCT.md` — what the user's own app is, its market, its niche. Optional. No cost. |
+| R0 | `product` | `product` | `apps/<slug>/APP.md`, `product.json`, `icon.jpg` — what the user's own app is, its market, its niche, the callout facts. Optional for a video project; phase 2 of the slideshow path. No cost. |
 | R1 | `apps` | `apps` | up to five apps in the niche, found by keyword search in rounds → the app ledger, `scan.tsv`, `handles.tsv` |
 | R2 | `network` | `network` | per app: the handles that really promote it, with evidence → the handle ledger, `<app>/candidates.tsv`, `NETWORK.md` |
 | R3 | `harvest` | `harvest` | per handle: `posts.json`, `index.tsv`, `covers/`, `HOOKS.md` |
@@ -167,7 +170,9 @@ only thing that crosses over is the file `handoff.sh` writes to `pipeline/00-sou
 
 **The Atlas is how the user sees the research.** `scripts/atlas.sh` (the `atlas` skill)
 serves everything scraped at http://localhost:3210 — an orb with one cluster per app, a
-page per app, account and post, read in place from `research/`. Run it after a harvest
+page per app, account and post, read in place from `research/`. The same app is the
+Organic Factory of the slideshow path: the home base, the canvas, the niche page, the
+strategy page, the handle pages and the studio, read in place from `apps/<slug>/`. Run it after a harvest
 and after a teardown, and whenever the user asks what was found. Give them URLs, not lists.
 
 A **niche** is a short phrase — `mental wellness`, `cat care`, `looksmaxxing`. Two or
@@ -193,6 +198,69 @@ small money, so the approval you need is for the *round* at R1 and the *number o
 accounts* at R3, not for each call. R4 costs no Monid at all; it reuses what R3 bought.
 Rule 8 applies here too: compute the figure yourself and label it computed. `monid
 balance` says what is left.
+
+### The slideshow path — an app in, two slideshows a day per handle out
+
+Eight phases, each a compartment of the Organic Factory's canvas (http://localhost:3210/app/<slug>).
+Phases 1 to 3 are the setup, the app and the research above; the rest is new. Files are
+the interface: each phase writes fixed paths under `apps/<slug>/` (see `apps/README.md`),
+the Atlas reads them in place, and "filled" is derived from the files, never recorded.
+
+| # | Phase | Skill(s) | Produces | Filled when |
+|---|---|---|---|---|
+| 1 | Setup | `setup` | the state file, the keys, the brain in place | `setup` done |
+| 2 | The app | `product` (`product-facts.sh`) | `apps/<slug>/APP.md`, `product.json`, `icon.jpg` | both exist and `product.json` has a source |
+| 3 | Competitor apps | `apps` → `teardown` as above, then `apps-learnings` | the ledger, the teardowns; the first sections of `niche/{learnings,anatomy,architecture}.md`, marked `competitor apps` | every ledger app has a teardown |
+| 4 | The niche | `niche-search` (`niche-search.sh`), `niche-hunt`, `niche-fetch` (`niche-fetch.sh`), `niche-read` (`niche-stats.py`) | `niche/NICHE.md`, `searches/`, `covers/`, `batches/<date>/{LINKS.md, …, BATCH.md}`; the `niche` sections and rows of the findings trio | one batch read and the trio exists |
+| 5 | Account architecture | `account-architecture` | `strategy/ACCOUNTS.md` | it exists; the user approves on the strategy page |
+| 6 | Handle identities | `handles`, `persona-identity` | `handles/<handle>/HANDLE.md`, `references/` | one handle complete at five steps; two recommended |
+| 7 | App fit and plan | `app-fit`, `plan` (`hashtag-pool.sh`) | `strategy/APP-FIT.md`, `production/PLAN.md`, optionally `strategy/HASHTAG-POOL.md` | the fit exists and the plan parses with a handle and a row |
+| 8 | Production | per post: `deck`, `images` (`images.sh`, `codex-images.sh`), `callout` (`render-callout.mjs`), `render` (`render-slides.mjs`), `post` (`posting-send.mjs`; `posting-provider` once, `posting-accounts.mjs`), `sync` (`posting-sync.mjs`); per week: `read` | `production/decks/`, `files/<post>/`, the log lines, `posting-accounts.json`; the day-7 rows in `niche/anatomy.md` | the first `posted` line |
+
+**The state.** `pipeline.json` carries the stages `product`, `apps-learnings`, `niche`,
+`accounts`, `handles`, `strategy`, `production` per project (`state.py set <slug> niche
+done`, S1 to S6 in `state.py show`). The canvas does not read them; it reads files. The
+state is your own "what is done" record, set when a phase's skill finishes.
+
+**The slug.** The app's name in lowercase is the folder under `apps/` and the project
+name in `pipeline.json`; `product` decides it once.
+
+**The read order at every phase from 4 on.** The brain first
+(`brain/learnings-slideshows.md`, `SLIDESHOW-ANATOMY.md`, `ACCOUNT-ARCHITECTURE.md`,
+read-only); the findings trio second (`apps/<slug>/niche/{learnings,anatomy,architecture}.md`,
+both sources, `competitor apps` and `niche`, slideshow and video rows, the same shape as
+the brain); the app third. Every value you propose names its source. Nothing is ever
+written into `brain/`; the findings are the only place a niche fact is written, and the
+day-7 read writes `own posts` rows there too.
+
+**Money.** The slideshow path spends through Monid in phases 3, 4 and 8 only, in cents:
+the keyword rounds (about $0.75 for a full phase 3), the niche search (about $0.20), a
+scrolled batch (about $0.03), the hashtag pool if measured ($0.0015 a tag), the sync
+(under a cent a day). Say the figure before each spend and wait for the yes, as rule 9;
+compute it and label it computed, as rule 8. The pictures run on the user's Codex plan;
+the kit does not compute that. The posting service has its own subscription. Nothing
+else costs.
+
+**The manual steps are recipes with a tick box, never tasks you wait on silently.** The
+scroll, the account creation, the profile picture and bio set on TikTok, the hand-post
+from the inbox draft. Print the recipe, say "tick it on the handle page (or the post
+page) when done", and read `task.done` from `apps/<slug>/production/log.jsonl`. The user
+brings links; you fetch, read and judge, guided by the brain: never make the user do
+the reading.
+
+**One agent, two brands.** Whether the user runs Claude Code or Codex, the skills are
+the same files. The one place they differ is the pictures: Codex makes them inline with
+its image tool; Claude starts Codex in the background (`scripts/codex-images.sh`). The
+`images` and `persona-identity` skills branch on this inside their text.
+
+**Just-in-time connections.** Setup checks only what every path needs. The Codex login
+is checked at the first image run (`images`), the posting service is connected at the
+first send (`posting-provider`); each prints the one command or the one recipe and
+waits. Never ask for either earlier.
+
+**The video pipeline sits beside this path**, not inside it: a video the niche read
+found worth recreating goes through `handoff.sh` to stage 1; a plan row with `kind:
+video` is made by `originate` (stage 5) and joins production at `post`.
 
 ### Recreation — 1 to 9
 
@@ -302,8 +370,11 @@ Assume the user has never used a terminal, unless they show you otherwise:
   where to click, and wait.
 - **Say what something costs before running it**, and wait for a yes.
 
-Setup installs everything — Supagen, Monid, Node — for every user, unconditionally.
-Only when it is done do you ask the one question that decides everything after it: **do
-they have a reference video, or a product, a niche or an app name?** With a video, start
-at stage 1. With their own product, start at R0. With a niche or an app name, start at R1
-— and tell them what the research will cost before you spend it.
+Setup installs everything — Supagen, Monid, Node — for every user, unconditionally,
+and nothing that only one path needs (the Codex login and the posting service come
+later, when first needed). Only when it is done do you ask the one question that
+decides everything after it: **do they have a reference video, an app to grow, or only
+a niche or an app name?** With a video, start at stage 1. With their own app, start at
+`product` and walk the slideshow path. With a niche or an app name, `product` records
+the phrase and `apps` runs — and tell them what the research will cost before you spend
+it.
