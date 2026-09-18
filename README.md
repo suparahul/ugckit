@@ -9,6 +9,12 @@ transcribes the on-screen hook off every post, and writes one teardown per app. 
 best-performing post becomes the reference for the recreation pipeline, or the teardowns
 become the brief for a script written from scratch. Niche in, finished video out.
 
+Or give it an app to grow. It researches the niche's slideshows, designs the accounts,
+builds one handle at a time, plans two posts a day per handle, and then, post by post,
+writes the deck, makes the pictures on your Codex plan, composites the slides and sends
+them to your posting service. Every week it reads the numbers back into the plan. App in,
+two slideshows a day per handle out.
+
 It is an agent, a set of skills, the scripts they drive, and a local review UI. You talk
 to the agent; it runs the pipeline.
 
@@ -29,7 +35,8 @@ Set up ugckit for me in a new folder called organic-factory, then take me throug
    .claude/skills/<stage>/SKILL.md. Any agent can read them; the folder name
    is only where Claude Code looks. Read the setup one and do everything it
    says, in order. Install and set up everything it names, then stop and ask
-   me whether I want to generate from a reference video or start research.
+   me whether I want to generate from a reference video, start research, or
+   grow an app with slideshows.
 
 How to treat me while you do this:
 - Assume I have never used a terminal. Give me ONE command at a time, written out
@@ -120,6 +127,38 @@ so you can stop and resume at any point. That matters most in the research half:
 over twenty accounts runs for a long time, and every stage of it is resumable — an account
 already scraped is not paid for twice, a cover already on disk is not fetched again.
 
+## The slideshow path
+
+The third route. An app in, two slideshows a day per handle out. Eight phases; each one
+writes fixed files under `apps/<slug>/`, and the Organic Factory (`./ugckit atlas`,
+http://localhost:3210/app/`<slug>`) reads them in place — a phase is "filled" when its
+files exist, nothing is recorded. Ask the agent for the skill by name.
+
+| # | Phase | Skill | What happens | Cost |
+|---|---|---|---|---|
+| 1 | setup | `setup` | environment, keys, the brain in place | — |
+| 2 | the app | `product` | `APP.md`, `product.json` and the icon from the App Store, a repo or a website | — |
+| 3 | competitor apps | `apps` → `teardown`, then `apps-learnings` | the R1–R5 research above, then its lessons written into the findings | ~$0.75 for five apps |
+| 4 | the niche | `niche-search`, `niche-hunt`, `niche-fetch`, `niche-read` | search the niche's slideshows, scroll for the best by hand, pull one batch, read it | ~$0.20 search, ~$0.03 a batch |
+| 5 | account architecture | `account-architecture` | how many handles, which role each plays, approved on the strategy page | — |
+| 6 | handle identities | `handles`, `persona-identity` | one handle at a time: the identity, the reference pictures, the account on TikTok | — |
+| 7 | app fit and plan | `app-fit`, `plan` | where the app sits in the post, then two posts a day per handle as `PLAN.md` | $0.0015 a tag if measured |
+| 8 | production | per post `deck`, `images`, `callout`, `render`, `post`; `posting-provider` once; `sync` daily; `read` weekly | the deck, the pictures, the app card, the slides, the send; the numbers back | Codex plan, posting subscription, sync under a cent a day |
+
+The read order from phase 4 on is fixed: the brain (`brain/`, three files, read-only),
+then the findings of this app (`apps/<slug>/niche/`), then the app. Every value the agent
+proposes names its source.
+
+The pictures are made by Codex on your Codex plan. If Codex is your agent it makes them
+inline; if Claude is, it starts `codex exec` in the background and waits. The login is
+checked at the first picture, the posting service (Post Bridge by default) is connected at
+the first send — never earlier. The manual steps — the scroll, the account creation, the
+bio — come as recipes with a tick box on the handle page.
+
+Progress is S1–S6 in `pipeline/state/pipeline.json` (`./ugckit state show <slug>`). A video the
+niche read found worth recreating hands off to stage 1 of the recreation half; a plan row
+of kind `video` is written by `originate` and joins production at `post`.
+
 ## Two screens
 
 - **Atlas** (`./ugckit atlas`, http://localhost:3210) — the research half. Opens after the
@@ -129,7 +168,7 @@ already scraped is not paid for twice, a cover already on disk is not fetched ag
 
 The agent starts both at the right moment and hands you the link.
 
-## Two ways in
+## Three ways in
 
 - **You have a reference video.** Stage 1 measures it, and stage 5 `script` writes the
   prompt from those measurements.
@@ -139,6 +178,9 @@ The agent starts both at the right moment and hands you the link.
   write the prompt from the teardowns and the hook library.
 
 Both meet at stage 5, and stages 6–9 do not know or care which route was taken.
+- **You have an app to grow.** The slideshow path above: eight phases, from the app to
+  two posts a day per handle. It uses the research half as its phase 3 and the recreation
+  half for the occasional video.
 
 ## Three flows
 
@@ -159,7 +201,10 @@ front door per app with its whole network in one carousel and the thirteen-headi
 teardown, a dossier per account, a page per post with the video or the slides and the
 verbatim hook, and threads that pull the same hook across every app you studied. It reads
 `research/` in place and starts empty; every app you harvest appears on the next run.
-Needs Node 18+, which nothing else in ugckit does. Lifted from the organic-social Atlas.
+For the slideshow path it is the Organic Factory: one canvas per app at `/app/<slug>`,
+one compartment per phase, the post page with the deck, the candidate pictures and the
+approvals, and the handle page with the tick boxes. It reads `apps/` in place too.
+Needs Node 22.18+, which nothing else in ugckit does. Lifted from the organic-social Atlas.
 
 ## The review UI
 
@@ -223,7 +268,8 @@ Length forces the choice. MiniMax unless you need more than 15 seconds.
 ## Requirements
 
 ffmpeg · python 3.9+ · curl · git · [monid](https://monid.ai) (`npm install -g @monid-ai/cli`) ·
-Node 18+ for the Atlas · a Supagen account and workspace · Claude Code or Codex
+Node 22.18+ for the Atlas · a Supagen account and workspace · Claude Code or Codex (Codex
+logged in for the pictures) · a Post Bridge key for the posting
 
 ## Layout
 
@@ -242,3 +288,6 @@ Node 18+ for the Atlas · a Supagen account and workspace · Claude Code or Code
     atlas/                 the research browser — `ugckit atlas`, Node 18+
     research/              what the research phase found: <project>/<app>/<handle>/
     pipeline/              your work, stage by stage
+    brain/                 the slideshow lessons, read-only, shipped with the kit
+    apps/                  the slideshow path, one folder per app: niche, strategy,
+                           handles, production — see apps/README.md
