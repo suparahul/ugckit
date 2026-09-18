@@ -20,7 +20,7 @@ never exist.
 
 ## What you are working from
 
-The project's own research, if R1–R5 ran: `research/<project>/PRODUCT.md` if R0 wrote
+The project's own research, if R1–R5 ran: `apps/<project>/APP.md` if R0 (`product`) wrote
 it, every `research/<project>/<app>/TEARDOWN.md`, and the `HOOKS.md` files under them. Read the teardown in full — headings 4, 5, 6 and 11 are the
 brief.
 
