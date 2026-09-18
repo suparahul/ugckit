@@ -8,7 +8,12 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 
 import { dateParts, postPath, type PostState } from "@/lib/production";
+import { numbersOf } from "@/lib/read";
+import { SLOTS, SLOT_TIME, slotKey } from "@/lib/slots";
+import { firstPicture } from "@/components/factory/Wait";
 import { Dot, Marks } from "./Marks";
+
+const n = (v: number) => v.toLocaleString("en-US");
 
 export const postHref = (s: PostState) => postPath(s.row);
 
@@ -133,11 +138,7 @@ function WeekRow({ label, days, at }: { label: string; days: string[]; at: (d: s
         return (
           <div key={d} className="week__cell" role="gridcell">
             {posts.map((s) => (
-              <Link key={s.row.key} href={postHref(s)} className={`week__post${s.waiting ? " is-waiting" : ""}`}>
-                <span className="week__slot">{s.row.slot}</span>
-                <span className={`week__topic${s.stage === "killed" ? " is-killed" : ""}`}>{s.row.topic}</span>
-                <span className="week__state"><Marks state={s} /><StateWord s={s} /></span>
-              </Link>
+              <WeekPost key={s.row.key} s={s} />
             ))}
           </div>
         );
@@ -146,24 +147,44 @@ function WeekRow({ label, days, at }: { label: string; days: string[]; at: (d: s
   );
 }
 
+/** A week cell's post: the first picture as a thumbnail once one exists; the views once posted. */
+function WeekPost({ s }: { s: PostState }) {
+  const pic = firstPicture(s);
+  const nb = s.posted ? numbersOf(s) : null;
+  return (
+    <Link href={postHref(s)} className={`week__post${s.waiting ? " is-waiting" : ""}${pic ? " week__post--pic" : ""}`}>
+      {pic ? <img className="week__thumb" src={pic} alt="" /> : null}
+      <span className="week__slot">{s.row.slot}</span>
+      <span className={`week__topic${s.stage === "killed" ? " is-killed" : ""}`}>{s.row.topic}</span>
+      <span className="week__state">{nb ? <span className="state"><b>{n(nb.views)}</b> views</span> : <><Marks state={s} /><StateWord s={s} /></>}</span>
+    </Link>
+  );
+}
+
 /* -------------------------------------------------------------------- day */
 
 /**
- * One row per handle; the handle's posts of the day sit in that row in order,
- * however many there are. The slot word (AM, PM, a time) labels each cell.
+ * One row per handle, three slots a day (11:00 · 15:00 · 19:00, or the
+ * handle's own times): the plan fills two, the third is drawn as an open
+ * card. A post whose slot word is not AM · MID · PM takes the next free slot
+ * in its order. Every card carries the thumbnail slot of the week view.
  */
-export function DayGrid({ states, handles }: { states: PostState[]; handles: { handle: string; short: string; role?: string }[] }) {
-  /* The slot columns share the width equally; every row gets the same count, so the columns line up. */
-  const slots = Math.max(1, ...handles.map((h) => states.filter((s) => s.row.short === h.short).length));
+export function DayGrid({ states, handles, times = {} }: { states: PostState[]; handles: { handle: string; short: string; role?: string }[]; times?: Record<string, Record<string, string>> }) {
   return (
-    <div className="day" style={{ "--slots": slots } as CSSProperties}>
+    <div className="day" style={{ "--slots": SLOTS.length } as CSSProperties}>
       {handles.map((h) => {
         const posts = states.filter((s) => s.row.short === h.short).sort((a, b) => a.row.n - b.row.n);
+        const bySlot = new Map<string, PostState>();
+        const rest: PostState[] = [];
+        for (const s of posts) { const k = slotKey(s.row.slot); if ((SLOTS as readonly string[]).includes(k) && !bySlot.has(k)) bySlot.set(k, s); else rest.push(s); }
+        for (const k of SLOTS) if (!bySlot.has(k) && rest.length) bySlot.set(k, rest.shift()!);
+        const t = { ...SLOT_TIME, ...(times[h.short] ?? {}) };
         return (
           <section key={h.short} className="day__row" aria-label={h.handle}>
-            <h2 className="day__handle">{h.handle}{h.role ? <small>{h.role}</small> : null}</h2>
+            <div><h2 className="day__handle">{h.handle}{h.role ? <small>{h.role}</small> : null}</h2></div>
             <div className="day__posts">
-              {posts.length ? posts.map((s) => <Cell key={s.row.key} s={s} />) : <div className="week__cell is-empty">no post planned</div>}
+              {SLOTS.map((k) => { const s = bySlot.get(k); return s ? <Cell key={s.row.key} s={s} time={t[k]} /> : <OpenCell key={k} slot={k} time={t[k]} />; })}
+              {rest.map((s) => <Cell key={s.row.key} s={s} />)}
             </div>
           </section>
         );
@@ -172,18 +193,37 @@ export function DayGrid({ states, handles }: { states: PostState[]; handles: { h
   );
 }
 
-export function Cell({ s }: { s: PostState }) {
-  const cls = ["cell"];
+/** A planned post in the day view: the thumbnail slot at the left (the first picture once one exists), then the slot, the topic, the format and the state; the numbers once posted. */
+export function Cell({ s, time }: { s: PostState; time?: string }) {
+  const cls = ["cell", "cell--thumb"];
   if (s.waiting) cls.push("is-waiting");
   if (s.stage === "killed") cls.push("is-killed");
+  const pic = firstPicture(s);
+  const word = s.stage === "idea" ? "idea" : s.stage === "planned" ? "deck" : s.stage === "plan" ? "plan" : s.stage === "final" ? "pictures" : "deck";
+  const nb = s.posted ? numbersOf(s) : null;
+  const z = (v: number) => (v === 0 ? "is-zero" : undefined);
   return (
     <Link href={postHref(s)} className={cls.join(" ")}>
-      <span className="cell__handle">{s.row.slot}</span>
+      <span className={`cell__thumb${pic ? "" : " is-empty"}`} aria-hidden="true">{pic ? <img src={pic} alt="" /> : <span className="cell__nopic">{word}</span>}</span>
+      <span className="cell__handle">{s.row.slot}{time ? ` · ${time}` : ""}</span>
       <span className="cell__topic">{s.row.topic}</span>
-      <span className="cell__format">{s.row.format}{s.deck ? ` · ${s.deck.slides.length} slides · ${s.dimension}` : ""}</span>
+      <span className="cell__format"><span className="state">{s.row.format}{s.deck ? ` · ${s.deck.slides.length} slides` : ""} · {s.dimension}</span></span>
       <span className="cell__state"><Marks state={s} /><StateWord s={s} /></span>
-      <span className="cell__room" aria-hidden="true" />
+      {nb ? <span className="cell__read" aria-label={`${n(nb.views)} views, ${nb.saves} saves, ${nb.shares} shares`}><b>{n(nb.views)}</b><span className={z(nb.saves)}>{nb.saves} {nb.saves === 1 ? "save" : "saves"}</span><span className={z(nb.shares)}>{nb.shares} {nb.shares === 1 ? "share" : "shares"}</span></span> : null}
     </Link>
+  );
+}
+
+/** The open slot of the day: the studio holds room for three posts per handle; the plan fills two. Informative only. */
+function OpenCell({ slot, time }: { slot: string; time: string }) {
+  return (
+    <div className="cell cell--thumb cell--open" aria-label={`${slot} ${time}: open slot`}>
+      <span className="cell__thumb is-empty" aria-hidden="true"><span className="cell__nopic">+</span></span>
+      <span className="cell__handle">{slot} · {time}</span>
+      <span className="cell__topic">Open slot</span>
+      <span className="cell__format"><span className="state">third post of the day</span></span>
+      <span className="cell__state"><span className="state">the plan holds two a day</span></span>
+    </div>
   );
 }
 
