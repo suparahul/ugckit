@@ -132,6 +132,8 @@ export type Brand = {
   hasTeardown: boolean;
   notes: string | null;
   appStoreCapture: string | null;
+  /** The app's TikTok profile picture, fetched at index time, as a /media URL. */
+  logo?: string | null;
   stats: {
     accountCount: number;
     knownHandles: number;
@@ -254,6 +256,9 @@ export const getCorpus = () => getIndex().corpus;
 export const getOrb = () => getIndex().orb;
 
 export const getBrand = (id: string) => getIndex().brands.find((b) => b.id === id) || null;
+
+/** The competitor apps researched for one of the user's apps: the brands whose ledger project is the slug. */
+export const brandsOf = (slug: string) => getIndex().brands.filter((b) => b.project === slug);
 
 export function getAccount(handle: string) {
   for (const brand of getIndex().brands) {

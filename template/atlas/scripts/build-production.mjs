@@ -21,7 +21,7 @@
  * is reported, never silently skipped, and a plan row without a deck is a
  * normal state ("no deck yet"), not an error.
  *
- * Decisions, uploads and outcomes are NOT here: they are Rahul's own and live
+ * Decisions, uploads and outcomes are NOT here: they are the user's own and live
  * in ../production/ (see lib/production.ts). This file is the authored truth.
  *
  *   node scripts/build-production.mjs [--verbose]
@@ -207,7 +207,7 @@ function resolveSource(src) {
 /**
  * The idea a plan row carries, beyond its topic: the handle's format lock (the
  * premise every post on the handle shares), the product slot, the feature card
- * named in the arm ("Catwise middle (Routine, task row)") or in the lock ("the
+ * named in the arm ("<App> middle (Routine, task row)") or in the lock ("the
  * CatGPT answer card"), and the handle rows that say where the line comes from.
  * Today these come from the plan's handle blocks; the Atlas will write them
  * directly when plans are made inside it.
@@ -253,7 +253,7 @@ function readPlan() {
   const range = title.match(/(\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2})/);
   const year = range ? range[1].slice(0, 4) : String(new Date().getFullYear());
 
-  /* Handle blocks: `### \`@hannah.catmom\` — main persona` → short name "hannah". */
+  /* Handle blocks: `### \`@example.one\` — main persona` → short name "example". */
   const handles = {};
   let curHandle = null, table = null;
   const clean = (t) => strip(t.replace(/\*\*/g, "")).replace(/\s+/g, " ");

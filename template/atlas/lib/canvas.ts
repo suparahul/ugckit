@@ -67,6 +67,18 @@ const what = (slug: string): Record<PhaseKey, Phase["what"]> => ({
 });
 
 const n = (v: number) => v.toLocaleString("en-US");
+
+/** What a handle at step n asks of you, in the words of PLAN.md § 5.3. */
+function handleAsk(handle: string, step: number): string {
+  switch (step) {
+    case 1: return `the TikTok account for ${handle}, created by hand`;
+    case 2: return `a look at ${handle}’s persona, on the handle page`;
+    case 3: return `a look at ${handle}’s references, on the handle page`;
+    case 4: return `a look at ${handle}’s profile picture and bio, then both set on TikTok by hand`;
+    case 5: return `a look at ${handle}’s defaults, on the handle page`;
+    default: return `${handle} connected in the posting service`;
+  }
+}
 const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
 
 type NicheJson = { totals?: { posts?: number; slideshows?: number; videos?: number; handles?: number }; keywords?: string[] };
@@ -182,7 +194,7 @@ export function canvasOf(slug: string): Canvas {
       ? `${complete.length ? `${plural(complete.length, "handle")} complete` : "No handle complete yet"}${inHand.length ? `; ${inHand.map((h) => `${h.handle} at step ${h.next?.n ?? 6} of 6`).join(", ")}` : ""}.${complete.length === 1 ? " The plan recommends at least two handles at two posts a day; one is allowed." : ""}`
       : "One handle at a time, in six steps. The accounts are created on TikTok by you when the agent asks.",
     facts: handles.length ? [`${n(complete.length)} complete`, ...(inHand.length ? [`${n(inHand.length)} in hand`] : []), `${n(handles.filter((h) => h.connected).length)} connected`] : [],
-    ask: waitingHandles.length ? `a look at ${waitingHandles.map((h) => `${h.handle}’s ${h.next!.name.toLowerCase()}`).join(", ")}, on the handle page` : null,
+    ask: waitingHandles.length ? waitingHandles.map((h) => handleAsk(h.handle, h.next!.n)).join("; ") : null,
     page: { label: "Handles", href: `/app/${s}/handles` }, what: W.handles, at: newestIn(join(dir, "handles")),
   };
 
