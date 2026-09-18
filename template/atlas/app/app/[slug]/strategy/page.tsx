@@ -64,8 +64,11 @@ export default async function StrategyPage({ params }: { params: Promise<{ slug:
   const faceOf = (short: string) => handles.find((h) => h.short === short)?.profile ?? null;
   const nameOf = (short: string) => plan.handles[short]?.handle ?? handles.find((h) => h.short === short)?.handle ?? `@${short}`;
 
-  const band = fitPhase.state !== "done" ? (
-    <StateBand state={fitPhase.state} text="The app fit and plan phase fills this page: every parameter fitted from the competitor apps and the niche, the account architecture before it, then the week’s plan — the handle locks, the experiments, the posts day by day, the judgement rules, the day-7 read." ask={fitPhase.ask ?? accountsPhase.ask ?? (fitPhase.state === "todo" ? "nothing yet; the phase starts once the handles exist" : null)} phase={accountsPhase.state !== "done" ? "phase 5 · account architecture" : "phase 7 · app fit and plan"} />
+  /* Two phases fill this page. Before the architecture is written the band is phase 5's; after it, phase 7's. */
+  const band = accountsPhase.state !== "done" ? (
+    <StateBand state={accountsPhase.state} text={accountsPhase.state === "now" ? "The account architecture is being decided from the competitor apps and the niche: how many handles, the role of each, the name pattern, the cadence. The agent proposes it in the conversation and writes it here; the app fit and the week’s plan follow once the handles exist." : "The account architecture fills this page first: how many handles, the role of each, the name pattern, the cadence, decided from the competitor apps and the niche. Then, once the handles exist, the app fit and the week’s plan — the handle locks, the experiments, the posts day by day, the judgement rules, the day-7 read."} ask={accountsPhase.ask ?? (accountsPhase.state === "now" ? "a yes, or a change, on the handle count and the roles" : "nothing yet; the phase starts once the niche is read")} phase="phase 5 · account architecture" />
+  ) : fitPhase.state !== "done" ? (
+    <StateBand state={fitPhase.state} text={fitPhase.state === "now" ? `${fitPhase.sentence} The plan draws here as soon as its first post row parses.` : "The app fit and plan phase fills this page: every parameter fitted from the competitor apps and the niche, then the week’s plan — the handle locks, the experiments, the posts day by day, the judgement rules, the day-7 read."} ask={fitPhase.ask ?? (fitPhase.state === "todo" ? "nothing yet; the phase starts once the handles exist" : null)} phase="phase 7 · app fit and plan" />
   ) : null;
 
   const shorts = Object.keys(plan.handles).length ? Object.keys(plan.handles) : [...new Set(prod.rows.map((r) => r.short))];

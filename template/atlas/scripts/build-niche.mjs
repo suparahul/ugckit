@@ -14,7 +14,7 @@
  *   node scripts/build-niche.mjs [--verbose]
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -99,5 +99,18 @@ const slugs = new Set([
   ...(existsSync(RESEARCH) ? readdirSync(RESEARCH).filter((d) => !d.startsWith(".") && existsSync(join(RESEARCH, d, "searches"))) : []),
 ]);
 let built = 0;
-for (const slug of [...slugs].sort()) if (build(slug)) built++;
+const kept = new Set();
+for (const slug of [...slugs].sort()) if (build(slug)) { built++; kept.add(slug); }
 if (!built) console.log("niche: no searches yet under apps/<slug>/niche/searches/ or research/<slug>/searches/ — the niche page opens at the niche phase");
+
+/* A built file whose searches are gone is stale: the niche page must not count posts that no longer exist. */
+const DATA = join(ATLAS, "data");
+if (existsSync(DATA)) {
+  for (const f of readdirSync(DATA)) {
+    const m = f.match(/^niche-([\w.-]+)\.json$/);
+    if (m && !kept.has(m[1])) {
+      unlinkSync(join(DATA, f));
+      console.log(`niche ${m[1]}: no searches any more — data/${f} removed`);
+    }
+  }
+}

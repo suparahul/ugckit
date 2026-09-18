@@ -15,7 +15,8 @@ import { getApp, type App } from "./apps";
 import { ledgerApps, readLedger } from "./ledger";
 import { day7Rows } from "./findings";
 import { listHandles } from "./handles";
-import { getProduction, readLog, today } from "./production";
+import { allStates, getProduction, readLog, today } from "./production";
+import { readPlanText } from "./plan";
 import { appDir, exists, listDirs, listFiles, mtimeOf, newestIn, readJson, readText, RESEARCH_DIR, STATE_FILE } from "./root";
 
 export type PhaseKey = "setup" | "app" | "apps" | "niche" | "accounts" | "handles" | "fit" | "production";
@@ -234,17 +235,27 @@ export function canvasOf(slug: string): Canvas {
   const t = today();
   const todayRows = prod.rows.filter((r) => r.date === t);
   const prodStarted = planRows > 0 || decks > 0 || log.length > 0;
-  const prodDone = posted > 0;
+  /* Production is done when the week is read: the day-7 read is in PLAN.md, or the plan's last day is past. Until then it is in progress, day N of 7. */
+  const day7 = prodStarted ? (readPlanText(slug)?.day7 ?? null) : null;
+  const weekOver = !!prod.plan.range && t > prod.plan.range.to;
+  const prodDone = posted > 0 && (!!day7 || weekOver);
   const dayN = prod.plan.range && t >= prod.plan.range.from ? Math.floor((Date.parse(t) - Date.parse(prod.plan.range.from)) / 86400000) + 1 : null;
+  const waiting = prodStarted && !prodDone ? allStates(slug).filter((x) => x.waiting && x.row.date <= t) : [];
+  const waitToday = waiting.filter((x) => x.row.date === t).length;
+  const waitPast = waiting.length - waitToday;
+  const waitingPosts = waiting.length;
+  const waitLine = waitToday ? `${waitToday} of today’s wait for a look from you on their post pages${waitPast ? `, ${waitPast} from earlier days too` : ""}` : waitPast ? `${waitPast} from earlier days wait for a look from you on their post pages` : "";
   const prodPhase: Omit<Phase, "state" | "changedUpstream"> = {
     key: "production", n: 8, title: PHASES[7].title, line: PHASES[7].line,
     sentence: prodDone
-      ? `${plural(posted, "post")} posted${dayN && prod.plan.range && t <= prod.plan.range.to ? `; day ${dayN} of the plan` : ""}${todayRows.length ? `, ${plural(todayRows.length, "post")} planned today` : ""}.`
-      : prodStarted
-        ? `${decks ? `${plural(decks, "deck")} written; ` : ""}nothing posted yet.`
-        : "Opens with the plan: decks, pictures, callout, render, post, sync, the read on day 7.",
-    facts: prodStarted ? [`${n(posted)} posted`, ...(todayRows.length ? [`${n(todayRows.length)} planned today`] : []), ...(decks ? [`${n(decks)} decks`] : []), ...(ownRows.length ? [`${plural(ownRows.length, "day-7 row")} added`] : [])] : [],
-    ask: null,
+      ? `${day7 ? `The week is read${day7.date ? ` on ${day7.date}` : ""}: ` : "The week is over: "}${plural(posted, "post")} posted${ownRows.length ? `, ${plural(ownRows.length, "day-7 row")} in the findings` : ""}. Production starts again from the next plan.`
+      : posted
+        ? `${dayN && prod.plan.range && t <= prod.plan.range.to ? `Day ${dayN} of 7: ` : ""}${plural(posted, "post")} posted${todayRows.length ? `, ${plural(todayRows.length, "post")} planned today` : ""}${waitLine ? `, ${waitLine}` : ""}. The read comes on day 7.`
+        : prodStarted
+          ? `${decks ? `${plural(decks, "deck")} written; ` : ""}nothing posted yet${waitLine ? `; ${waitLine}` : ""}.`
+          : "Opens with the plan: decks, pictures, callout, render, post, sync, the read on day 7.",
+    facts: prodStarted ? [`${n(posted)} posted`, ...(todayRows.length ? [`${n(todayRows.length)} planned today`] : []), ...(decks ? [`${n(decks)} decks`] : []), ...(day7 ? [`read on ${day7.date ?? "day 7"}`] : []), ...(ownRows.length ? [`${plural(ownRows.length, "day-7 row")} added`] : [])] : [],
+    ask: waitingPosts && !prodDone ? `a look at the ${waitingPosts === 1 ? "post" : "posts"} waiting on ${waitingPosts === 1 ? "its" : "their"} post ${waitingPosts === 1 ? "page" : "pages"}` : null,
     page: { label: "Studio", href: `/production/${s}` }, what: W.production, at: Math.max(mtimeOf(join(dir, "production", "log.jsonl")), newestIn(join(dir, "production", "decks"))),
   };
 

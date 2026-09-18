@@ -108,6 +108,7 @@ export default async function AtlasPage({ searchParams }: { searchParams: Promis
   const keyOf: Record<string, (a: Account) => number> = { max: (a) => a.stats.maxViews, median: (a) => a.stats.medianViews, x: (a) => a.stats.xMedian ?? 0, followers: (a) => a.followers ?? 0, week: (a) => a.stats.postsPerWeek };
   const kf = keyOf[q.sort] ?? keyOf.max;
   rows.sort((a, b) => kf(b) - kf(a));
+  const torn = brands.filter((b) => b.hasTeardown).length;
   const brandName = (id: string) => brands.find((b) => b.id === id)?.fullName || brands.find((b) => b.id === id)?.name || id;
   const picks: Pick[] = [
     { key: "brand", label: "app", def: "", opts: [{ v: "", label: `all ${wordN(brands.length)} apps`, n: accounts.length }, ...brands.map((b) => ({ v: b.id, label: b.fullName || b.name, n: b.accounts.length }))] },
@@ -121,14 +122,14 @@ export default async function AtlasPage({ searchParams }: { searchParams: Promis
       <header className="prod__head">
         <div>
           <h1 className="prod__title">Atlas</h1>
-          <p className="prod__counts"><b>{brands.length}</b> {brands.length === 1 ? "app" : "apps"} torn down · <b>{accounts.length}</b> handles scraped of <b>{known}</b> known · <b>{commas(posts)}</b> posts · <b>{views(tv)}</b> views{first ? <> · {ym(first)} → {ym(last)}</> : null}</p>
+          <p className="prod__counts">{torn === brands.length ? <><b>{brands.length}</b> {brands.length === 1 ? "app" : "apps"} torn down</> : <><b>{torn} of {brands.length}</b> apps torn down</>} · <b>{accounts.length}</b> handles scraped of <b>{known}</b> known · <b>{commas(posts)}</b> posts · <b>{views(tv)}</b> views{first ? <> · {ym(first)} → {ym(last)}</> : null}</p>
         </div>
         <div className="settoggle" aria-label="View">
           <Link className={`settoggle__opt${view === "orb" ? " is-on" : ""}`} href={base({ view: "orb" })} aria-current={view === "orb" ? "true" : undefined}>orb</Link>
           <Link className={`settoggle__opt${view === "flat" ? " is-on" : ""}`} href={base({ view: null })} aria-current={view === "flat" ? "true" : undefined}>flat</Link>
         </div>
       </header>
-      {phase && phase.state !== "done" ? <StateBand state={phase.state} text="The competitor apps phase is filling this page: apps found, networks harvested, teardowns written one by one." ask={phase.ask} phase="phase 3 · competitor apps" /> : null}
+      {phase && phase.state !== "done" ? <StateBand state={phase.state} text={`${phase.sentence} The orb turns as the networks come in; the cross-app read comes last.`} ask={phase.ask} phase="phase 3 · competitor apps" /> : null}
 
       {view === "orb" ? (
         <section className="rview" aria-label="The orb">

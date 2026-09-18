@@ -28,7 +28,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
 const REPO = process.env.ATLAS_ROOT ? resolve(process.env.ATLAS_ROOT) : resolve(process.cwd(), "..");
@@ -676,3 +676,15 @@ function build(slug) {
 const slugs = existsSync(APPS) ? readdirSync(APPS).filter((d) => !d.startsWith(".") && d !== "EXAMPLE" && existsSync(join(APPS, d, "production", "PLAN.md"))).sort() : [];
 if (!slugs.length) console.log(`production: no apps/<slug>/production/PLAN.md yet — the studio opens at the app fit and plan phase`);
 for (const slug of slugs) build(slug);
+
+/* A built file whose plan is gone is stale: the studio must not show a week that no longer exists. */
+const DATA = resolve(process.cwd(), "data");
+if (existsSync(DATA)) {
+  for (const f of readdirSync(DATA)) {
+    const m = f.match(/^production-([\w.-]+)\.json$/);
+    if (m && !slugs.includes(m[1])) {
+      unlinkSync(join(DATA, f));
+      console.log(`production ${m[1]}: no PLAN.md any more — data/${f} removed`);
+    }
+  }
+}
