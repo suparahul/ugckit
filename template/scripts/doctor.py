@@ -40,16 +40,19 @@ for tool, fix in [
     ("curl",    "preinstalled on macOS and most Linux"),
     ("python3", "https://www.python.org/downloads/"),
     ("monid",   "npm install -g @monid-ai/cli   (research stages R1-R5)"),
-    ("node",    "https://nodejs.org  (only the Atlas, `ugckit atlas`, needs it)"),
+    ("node",    "https://nodejs.org  (the Atlas and the production scripts need it)"),
 ]:
     p = shutil.which(tool)
     if p:
         v = ""
         if tool == "node":
+            # The Atlas runs its TypeScript readers straight through node (type stripping),
+            # which needs 22.18 or newer; 18 ran the old Atlas but not this one.
             try:
                 v = subprocess.run([p, "--version"], capture_output=True, text=True, timeout=10).stdout.strip()
-                if int(v.lstrip("v").split(".")[0]) < 18:
-                    warn(f"node {v} is too old for the Atlas", "need Node 18+ -- https://nodejs.org")
+                major, minor = (int(x) for x in v.lstrip("v").split(".")[:2])
+                if (major, minor) < (22, 18):
+                    warn(f"node {v} is too old for the Atlas", "need Node 22.18+ -- https://nodejs.org")
                     continue
             except Exception:
                 pass
@@ -64,6 +67,17 @@ for tool, fix in [
         warn(f"{tool} not found", fix)         # optional: only part of the pipeline needs it
     else:
         bad(f"{tool} not found", fix)
+
+say("\nthe brain")
+# Shipped read-only by install.sh; every phase from the niche read on reads it. A
+# workspace without it was installed by an older kit: re-run install.sh.
+BRAIN = os.path.join(ROOT, "brain")
+for f in ["learnings-slideshows.md", "SLIDESHOW-ANATOMY.md", "ACCOUNT-ARCHITECTURE.md"]:
+    path = os.path.join(BRAIN, f)
+    if os.path.exists(path) and os.path.getsize(path) > 0:
+        ok(f"brain/{f}", f"{os.path.getsize(path) // 1024} KB")
+    else:
+        bad(f"brain/{f} missing", "re-run install.sh -- it ships the brain")
 
 say("\npython environment")
 VENV = os.path.join(ROOT, ".venv", "bin", "python3")
@@ -137,6 +151,15 @@ else:
             else:
                 ok("monid CLI has a stored key")
 
+    # The posting service and Codex are connected just in time, at the first send and the
+    # first image run (the `posting-provider` and `images` skills). Neither is required
+    # here; the state is printed as information so the user knows what is ahead.
+    pk = env.get("POST_BRIDGE_API_KEY", "")
+    if pk:
+        ok("POST_BRIDGE_API_KEY", f"{len(pk)} chars, starts {pk[:8]}…")
+    else:
+        say("  - POST_BRIDGE_API_KEY not set (asked for at the first send, not now)")
+
     lib = os.path.expanduser(env.get("LIBRARY_DIR", ""))
     if not lib:
         warn("LIBRARY_DIR not set", "only needed by the `originate` skill (research-led "
@@ -209,6 +232,18 @@ if mk:
             bad(f"Monid returned HTTP {e.code}", e.read()[:200].decode(errors="replace"))
     except Exception as e:
         warn(f"could not reach Monid ({e})", "check your network, then re-run")
+
+say("\ncodex (slideshow pictures; checked again at the first image run)")
+cx = shutil.which("codex")
+if cx:
+    try:
+        r = subprocess.run([cx, "login", "status"], capture_output=True, text=True, timeout=20)
+        line = (r.stdout + r.stderr).strip().splitlines()
+        say(f"  - codex found; login: {line[-1] if line else 'unknown'}")
+    except Exception as e:
+        say(f"  - codex found; login status not read ({e})")
+else:
+    say("  - codex not found (npm install -g @openai/codex -- needed only for the pictures, at the first image run)")
 
 say("\nMCP")
 # We can see whether the server is configured. We cannot see whether the user has

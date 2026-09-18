@@ -24,6 +24,18 @@ case "${1:-help}" in
   transcribe) shift; exec "$PROJ/scripts/transcribe.sh" "$@" ;;
   generate) shift; exec "$PROJ/scripts/generate.sh" "$@" ;;
   composite) shift; exec "$PROJ/scripts/composite.sh" "$@" ;;
+  product-facts) shift; exec "$PROJ/scripts/product-facts.sh" "$@" ;;
+  niche-search) shift; exec "$PROJ/scripts/niche-search.sh" "$@" ;;
+  niche-fetch) shift; exec "$PROJ/scripts/niche-fetch.sh" "$@" ;;
+  niche-stats) shift; exec "$PY" "$PROJ/scripts/niche-stats.py" "$@" ;;
+  hashtag-pool) shift; exec "$PROJ/scripts/hashtag-pool.sh" "$@" ;;
+  images)   shift; exec "$PROJ/scripts/images.sh" "$@" ;;
+  codex-images) shift; exec "$PROJ/scripts/codex-images.sh" "$@" ;;
+  callout)  shift; exec node "$PROJ/scripts/render-callout.mjs" "$@" ;;
+  render)   shift; exec node "$PROJ/scripts/render-slides.mjs" "$@" ;;
+  posting-accounts) shift; exec node "$PROJ/scripts/posting-accounts.mjs" "$@" ;;
+  post)     shift; exec node "$PROJ/scripts/posting-send.mjs" "$@" ;;
+  sync)     shift; exec node "$PROJ/scripts/posting-sync.mjs" "$@" ;;
   *)
     cat <<'USAGE'
 ugckit — a niche or a reference video in, a recreation out.
@@ -31,6 +43,7 @@ ugckit — a niche or a reference video in, a recreation out.
   ugckit doctor              preflight: tools, deps, credentials, live auth
   ugckit ui [--port N]       local review UI (default http://127.0.0.1:7878)
   ugckit key                 fill in .env — it asks you for each secret
+  ugckit key postbridge      the posting service's key, at the first send
   ugckit workspace <id>      the agent sets this from list_workspaces (MCP)
   ugckit state show <proj>   pipeline progress, spend and open feedback
   ugckit state projects      list projects
@@ -44,6 +57,19 @@ ugckit — a niche or a reference video in, a recreation out.
   ugckit handoff <proj> <app> <handle> <post-id>
   ugckit library <stats|templates|hooks|formats|mechanics|teardowns>
   ugckit atlas [--index]                        explore everything scraped, at http://localhost:3210
+
+  the slideshow path (an app in, two slideshows a day per handle out):
+  ugckit product-facts <slug> [--id N | --repo P | --website U | --typed ...]
+  ugckit niche-search <slug> "<keyword>" ...     the Photo tab door and the video door
+  ugckit niche-fetch <slug> <date>               the posts you brought, through Monid
+  ugckit niche-stats <slug> <date>               the counting parts of the read
+  ugckit hashtag-pool <slug> "#tag" ...          measure a hashtag pool, $0.0015 a tag
+  ugckit images <slug> <post> | ugckit codex-images <slug> <post>   the pictures
+  ugckit callout <slug> <post> [--template appstore|feature|custom]
+  ugckit render <slug> <post>                    the finished slides
+  ugckit posting-accounts <slug>                 map handles to the posting service
+  ugckit post <slug> --post <key> [--send]       send (dry run without --send)
+  ugckit sync <slug> --all | --date D | --post <key>
 
   recreation (1-9):
   ugckit ingest <video> <proj> [start] [len]

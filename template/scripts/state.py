@@ -7,6 +7,9 @@ attempt. Only this file counts.
     state.py show <project>
     state.py init <project> [--flow simple|complex|referenced] [--entry reference|research]
     state.py set <project> <stage> <pending|running|done|failed> [note]
+                                                    # stages: setup, product..teardown (R0-R5),
+                                                    # apps-learnings, niche, accounts, handles,
+                                                    # strategy, production (S1-S6), ingest..deliver (1-9)
     state.py note <project> <text>
     state.py cost <project> <usd> <what>
     state.py feedback <project> <stage> <note>       # normally written by the UI
@@ -33,18 +36,24 @@ STATE = os.path.join(ROOT, "pipeline", "state", "pipeline.json")
 FEEDBACK = os.path.join(ROOT, "pipeline", "state", "feedback.jsonl")
 
 RESEARCH = ["product", "apps", "network", "harvest", "deepen", "teardown"]
-STAGES = ["setup"] + RESEARCH + ["ingest", "watch", "transcribe", "breakdown",
-          "script", "generate", "review", "composite", "deliver"]
+# The slideshow path (AGENTS.md § The slideshow path): after the teardowns, the cross-app
+# read, the niche, the account set, the handles, the strategy, then production. The
+# canvas in the Atlas derives "filled" from files; these flags are the orchestrator's own
+# "what is done" record, set by the skill that finishes each phase.
+SLIDESHOW = ["apps-learnings", "niche", "accounts", "handles", "strategy", "production"]
+VIDEO = ["ingest", "watch", "transcribe", "breakdown", "script", "generate", "review",
+         "composite", "deliver"]
+STAGES = ["setup"] + RESEARCH + SLIDESHOW + VIDEO
 
 # Stages that only mean something when a reference clip exists. A research-led project
 # reaches stage 5 through `originate` instead, and these never run.
 REFERENCE_ONLY = ["ingest", "watch", "transcribe", "breakdown"]
 
-# Display numbers. The research half is R0-R5; the recreation half keeps 1-9.
+# Display numbers. The research half is R0-R5, the slideshow path S1-S6; the recreation
+# half keeps 1-9.
 NUM = {s: f"R{i}" for i, s in enumerate(RESEARCH, 0)}
-NUM.update({s: str(i) for i, s in enumerate(
-    ["ingest", "watch", "transcribe", "breakdown", "script",
-     "generate", "review", "composite", "deliver"], 1)})
+NUM.update({s: f"S{i}" for i, s in enumerate(SLIDESHOW, 1)})
+NUM.update({s: str(i) for i, s in enumerate(VIDEO, 1)})
 NUM["setup"] = "0"
 
 HANDLE_KEYS = ("harvested", "deep", "views", "posts", "winner", "evidence", "note", "own")
@@ -156,12 +165,12 @@ def cmd_show(name):
         # pending work -- they are not applicable. Say that rather than showing them
         # unchecked forever.
         if p["entry"] == "research" and s in REFERENCE_ONLY:
-            print(f"  [-] {NUM[s]:<3} {s:<12} n/a       no reference clip")
+            print(f"  [-] {NUM[s]:<3} {s:<14} n/a       no reference clip")
             continue
         mark = {"done": "[x]", "running": "[~]", "failed": "[!]"}.get(st["status"], "[ ]")
         extra = f"   {st.get('note','')}" if st.get("note") else ""
-        print(f"  {mark} {NUM[s]:<3} {s:<12} {st['status']:<9}{extra}")
-        if s == "teardown":
+        print(f"  {mark} {NUM[s]:<3} {s:<14} {st['status']:<9}{extra}")
+        if s in ("teardown", "production"):
             print()
     total = sum(c["usd"] for c in p["costs"])
     if p["costs"]:

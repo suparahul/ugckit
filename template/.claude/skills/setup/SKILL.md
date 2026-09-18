@@ -23,9 +23,20 @@ Two tools are yellow `!`, not red, but **install them anyway, now.** Setup is co
 only when everything is in place; do not ask the user which path they want yet — that
 question comes at the end, in step 8, when there is nothing left to install.
 
-- **node missing** → https://nodejs.org, or `brew install node`. The Atlas needs it,
-  and so does the next line.
+- **node missing or older than 22.18** → https://nodejs.org, or `brew install node`.
+  The Atlas needs it, and so do the production scripts and the next line.
 - **monid missing** → `npm install -g @monid-ai/cli`. The research half needs it.
+
+Two checks are new since the slideshow path exists, and both are red when they fail:
+the brain (`brain/learnings-slideshows.md`, `SLIDESHOW-ANATOMY.md`,
+`ACCOUNT-ARCHITECTURE.md`) is present, and Node is 22.18 or newer. A missing brain means
+an older kit installed this workspace: re-run `install.sh`.
+
+**Two things are not checked here, on purpose.** The Codex login (the pictures) and the
+posting service (Post Bridge or another scheduler) are connected the first time they are
+needed, in production, by the `images` and `posting-provider` skills. `doctor.py` prints
+their state as information only. Do not ask for either now; say once that "logins for
+pictures and posting come later, when we first need them".
 
 ## 2. MCP — first, because it hands you the workspace id
 
@@ -186,14 +197,18 @@ Then re-run `scripts/doctor.py` and confirm it is clean.
 ## 8. Tell the user what they have, then ask the one question
 
 Briefly: which templates were created, which model is active and what a run costs, how
-to switch model. Then — and only now — the fork, in one sentence each, and wait for
-the answer:
+to switch model; that the brain is in place, read-only. Then — and only now — the
+fork, in one sentence each, and wait for the answer. Three answers:
 
-- **They have a reference video** → the `ingest` skill. Mention `ugckit ui` for review.
-- **They have their own product** → the `product` skill (R0). It reads their website,
-  document or repo and settles the niche.
-- **They have a niche or an app name** → the `apps` skill (R1). Say what a first round
-  costs before running it.
+- **They have a reference video** → the `ingest` skill (the video pipeline, stages 1 to
+  9). Mention `ugckit ui` for review.
+- **They have an app to grow** → the `product` skill (phase 2 of the slideshow path,
+  `AGENTS.md` § The slideshow path). It reads their listing, website or repo, writes
+  `apps/<slug>/APP.md` and the callout facts, and settles the niche phrase. Say that
+  nothing costs money until phase 3 and that you will say the figure first.
+- **They have only a niche or an app name** → the `product` skill records the phrase
+  only, then the `apps` skill (phase 3) runs; the app itself is read when they have one.
+  Say what a first round costs before running it.
 
 For either research path, say that after the first harvest the Atlas opens in their
 browser (`ugckit atlas`) and that is where they will see what was found.

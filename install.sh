@@ -107,6 +107,17 @@ ok "scripts, skills, docs and the atlas"
 for f in AGENTS.md CLAUDE.md ugckit; do copy_managed "$f"; done
 ok "AGENTS.md, CLAUDE.md, ugckit"
 
+# The brain: three learnings files, replaced on every upgrade and read-only on disk so
+# nobody edits the copy the next upgrade overwrites. The user's own findings go beside
+# it, under apps/<slug>/niche/ (see apps/README.md).
+( cd "$SRC" && find brain -type f -name '*.md' ) | while read -r rel; do
+  [ -e "$DEST/$rel" ] && chmod u+w "$DEST/$rel"
+  copy_managed "$rel"
+  chmod 444 "$DEST/$rel"
+done
+ok "brain/ (read-only)"
+copy_once "apps/README.md"
+
 # Files an earlier version shipped and this one does not. Left in place, a retired skill
 # is still a skill the agent can pick up, so they go. Only ever paths we authored.
 RETIRED="
@@ -194,9 +205,10 @@ $(b "installed.")
                                           — ask it to run the setup skill first
         then /mcp                         approve the Supagen connection in the browser
 
-  Two ways in. Give it a reference video and it recreates that; give it your product,
-  a niche or an app name and it finds the apps in the niche, studies how each one is
-  promoted, then recreates the best post it found.
+  Three ways in. Give it a reference video and it recreates that. Give it your app and
+  it walks the slideshow path: the competitor apps, the niche, the account set, the
+  handles, the plan, then production, two slideshows a day per handle. Give it only a
+  niche or an app name and it starts with the research and asks for the app later.
 
   The agent drives the pipeline. You mostly watch, review and give feedback:
 

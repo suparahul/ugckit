@@ -12,6 +12,12 @@ The workspace id is not a secret and the user should never have to find it: the
 agent reads it from `list_workspaces` over MCP and writes it with
 
     ./ugckit workspace <id>
+
+The posting service is connected at the first send, not at setup. Its key is asked for
+the same way, with the provider's name after `key` (a name, never a value):
+
+    ./ugckit key postbridge          asks for POST_BRIDGE_API_KEY
+    ./ugckit key <provider>          asks for <PROVIDER>_API_KEY
 """
 import getpass
 import os
@@ -31,6 +37,17 @@ KEYS = [
     ("MONID_API_KEY", "your Monid key",
      "https://app.monid.ai/access/api-keys  (create an account at app.monid.ai first)", 20, False),
 ]
+
+# Posting providers: the name the plan's `Posting service:` line carries -> the .env key.
+# Post Bridge is the default; any other name maps to <PROVIDER>_API_KEY.
+PROVIDER_KEYS = {"postbridge": "POST_BRIDGE_API_KEY"}
+PROVIDER_WHERE = {"postbridge": "the Post Bridge dashboard -> API Keys  (https://app.post-bridge.com)"}
+PROVIDER_RE = re.compile(r"^[a-z][a-z0-9-]{1,19}$")
+
+
+def provider_key(name):
+    return PROVIDER_KEYS.get(name) or name.upper().replace("-", "_") + "_API_KEY"
+
 
 RED, GREEN, DIM, OFF = "\033[31m", "\033[32m", "\033[2m", "\033[0m"
 
@@ -107,18 +124,28 @@ def set_workspace(value):
 
 
 def main():
+    keys = KEYS
     if len(sys.argv) > 1:
         arg = sys.argv[1]
         known = {k for k, *_ in KEYS} | {"SUPAGEN_WORKSPACE_ID"}
         if arg in ("-h", "--help"):
             print("usage: ./ugckit key                (no arguments — it asks you for each secret)\n"
+                  "       ./ugckit key postbridge     (the posting service's key, asked for at the first send)\n"
+                  "       ./ugckit key <provider>     (another posting service: <PROVIDER>_API_KEY)\n"
                   "       ./ugckit workspace <id>     (the agent sets this from list_workspaces)")
             return 0
         if arg == "--workspace":
             if len(sys.argv) < 3:
                 die("usage: ./ugckit workspace <id>")
             return set_workspace(sys.argv[2])
-        if arg in known:
+        if PROVIDER_RE.match(arg) and arg not in known:
+            # A provider name: short, lowercase, no underscore. A pasted secret is longer
+            # or carries a prefix like sk_ / monid_ / pb_live_, and falls through to the
+            # warning below.
+            name = provider_key(arg)
+            keys = [(name, f"your {arg} API key",
+                     PROVIDER_WHERE.get(arg, f"the {arg} dashboard, under API keys"), 12, True)]
+        elif arg in known:
             print(f"{DIM}note: you do not need to name the key. "
                   f"Just run: ./ugckit key{OFF}\n")
         else:
@@ -154,7 +181,7 @@ def main():
     print("is saved to your shell history.\n")
 
     changed = 0
-    for name, what, where, minlen, required in KEYS:
+    for name, what, where, minlen, required in keys:
         have = existing.get(name, "")
         if not required and not have:
             print(f"\n{name} — the research stages spend against it. Setup wants it; only skip")
