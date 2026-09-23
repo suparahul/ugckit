@@ -6,6 +6,7 @@
  *   node scripts/posting-sync.mjs <slug> --all
  *   node scripts/posting-sync.mjs <slug> --date 2026-09-17
  *   node scripts/posting-sync.mjs <slug> --post <key>
+ *   ... --no-monid   (Post Bridge only) skip the Monid link pull, numbers from the provider's own analytics only
  *
  * For a sent post without a link: the handle's latest posts through Monid (the profile
  * scraper, $0.00045 a post; under a cent for three posts), matched by caption and upload

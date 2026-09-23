@@ -3,7 +3,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { captionMatch, captionTokens, matchPosts, outcomeOfMonid, tiktokUrl, type MonidPost } from "./tiktok-link.ts";
+import { captionMatch, captionTokens, matchByTime, matchPosts, outcomeOfMonid, pbLinkOf, tiktokIdOf, tiktokUrl, type MonidPost } from "./tiktok-link.ts";
+import type { Event } from "./production.ts";
 
 const rec = (o: Partial<MonidPost>): MonidPost => ({ id: "1", postPage: "", uploadedAtFormatted: "2026-09-16T19:30:03.000Z", views: 0, likes: 0, comments: 0, shares: 0, bookmarks: 0, title: "", ...o });
 
@@ -28,6 +29,32 @@ test("matchPosts: only posts after the send, best first", () => {
   ];
   const m = matchPosts("Signs your cat loves you, from a first time cat owner #cattok", "2026-09-16T17:25:31.650Z", posts);
   assert.deepEqual(m.map((x) => x.post.id), ["new"]);
+});
+
+test("matchByTime: the single later post is the match; none or several is no match", () => {
+  const posts = [
+    rec({ id: "old", uploadedAtFormatted: "2026-09-16T10:00:00.000Z" }),
+    rec({ id: "new", uploadedAtFormatted: "2026-09-16T19:00:00.000Z" }),
+  ];
+  assert.equal(matchByTime("2026-09-16T17:25:31.650Z", posts)?.id, "new");
+  assert.equal(matchByTime("2026-09-16T20:00:00.000Z", posts), null, "nothing after the send");
+  const two = [...posts, rec({ id: "new2", uploadedAtFormatted: "2026-09-16T19:30:00.000Z" })];
+  assert.equal(matchByTime("2026-09-16T17:25:31.650Z", two), null, "more than one after the send");
+});
+
+test("tiktokIdOf: the digits after /video/ or /photo/, query stripped", () => {
+  assert.equal(tiktokIdOf("https://www.tiktok.com/@x/video/123?utm_campaign=a&utm_source=b"), "123");
+  assert.equal(tiktokIdOf("https://www.tiktok.com/@x/photo/456"), "456");
+  assert.equal(tiktokIdOf("https://www.tiktok.com/@x"), null);
+});
+
+test("pbLinkOf: the last Post Bridge outcome.sync line's url, query stripped; null without one", () => {
+  const log: Event[] = [
+    { at: "t1", post: "p", kind: "outcome.sync", data: { source: "monid", url: "https://www.tiktok.com/@x/photo/1" } },
+    { at: "t2", post: "p", kind: "outcome.sync", data: { source: "postbridge", url: "https://www.tiktok.com/@x/video/789?utm_campaign=a" } },
+  ];
+  assert.deepEqual(pbLinkOf(log), { url: "https://www.tiktok.com/@x/video/789", id: "789" });
+  assert.equal(pbLinkOf([{ at: "t1", post: "p", kind: "posted", data: {} }]), null);
 });
 
 test("tiktokUrl and outcomeOfMonid", () => {

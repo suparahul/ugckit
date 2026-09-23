@@ -4,10 +4,16 @@
  * tools/scrape-account.sh), not from Post Bridge: Post Bridge never learns the
  * final URL of a draft (platform_video_id stays null once the phone publishes it).
  *
- * "Find the link", per handle with a sent post that has no link yet:
+ * A post Post Bridge's own analytics already report a link for (`pbLinkOf`,
+ * an `outcome.sync` line with `data.source === "postbridge"`) skips all of
+ * this: the link is written straight from that URL, no Monid call spent.
+ *
+ * Otherwise, "find the link", per handle with a sent post that has no link yet:
  *   1. fetch the handle's latest posts through Monid (one paid call per handle, cents);
  *   2. match by caption: the caption's first line, hashtags off, exact or a
- *      high token overlap (captionMatch), and an upload time after the send;
+ *      high token overlap (captionMatch), and an upload time after the send —
+ *      or, when the caption is hashtags only (no text to score), the single
+ *      post uploaded after the send (matchByTime);
  *   3. exactly one match: append `posted.link` { url, id, uploadedAt } and, when
  *      no `posted` line exists yet, `posted` { time, url } — both actor "sync";
  *      more than one: write nothing and return the candidates.
@@ -142,16 +148,48 @@ export function linkOf(log: Event[]): { url: string; id: string | null } | null 
   return null;
 }
 
+/** The TikTok id in a URL Post Bridge (or Monid) reports: the digits after `/video/` or `/photo/`, query stripped. */
+export function tiktokIdOf(url: string): string | null {
+  const m = url.split("?")[0].match(/\/(?:video|photo)\/(\d+)/);
+  return m ? m[1] : null;
+}
+
+/**
+ * The link Post Bridge's own analytics already report for a post: the last
+ * `outcome.sync` line with `data.source === "postbridge"`, its query stripped.
+ * When Post Bridge already knows the link, `findLinks` uses it directly and
+ * skips both the caption match and the Monid call — that pull is only for the
+ * posts nothing else has resolved yet.
+ */
+export function pbLinkOf(log: Event[]): { url: string; id: string } | null {
+  const e = [...log].reverse().find((ev) => ev.kind === "outcome.sync" && ev.data?.source === "postbridge" && typeof ev.data?.url === "string");
+  if (!e) return null;
+  const url = String(e.data!.url).split("?")[0];
+  const id = tiktokIdOf(url);
+  return id ? { url, id } : null;
+}
+
+/** The single Monid post uploaded after the send, when it is the only one: the fallback for a caption with no text to match (hashtags only). */
+export function matchByTime(since: string, posts: MonidPost[]): MonidPost | null {
+  const later = posts.filter((p) => p.uploadedAtFormatted > since);
+  return later.length === 1 ? later[0] : null;
+}
+
 /**
  * Finds the links and pulls the Monid numbers for every sent post (or the
- * ones selected). One Monid call per handle. `fetch` is for tests.
+ * ones selected). A post Post Bridge already links (`pbLinkOf`) is resolved
+ * without a Monid call; the rest cost one Monid call per handle. `fetch` is for tests.
  */
 export async function findLinks(slug: string, sel: { date?: string; keys?: string[] } = {}, fetch: Fetch = monidHandlePosts): Promise<LinkReport[]> {
   const wanted = sel.keys ?? (sel.date ? getProduction(slug).rows.filter((r) => r.date === sel.date).map((r) => r.key) : null);
   const states = allStates(slug).filter((s) => s.sent && (!wanted || wanted.includes(s.row.key)));
   const byHandle = new Map<string, PostState[]>();
-  for (const s of states) byHandle.set(s.row.handle, [...(byHandle.get(s.row.handle) ?? []), s]);
   const reports: LinkReport[] = [];
+  for (const s of states) {
+    const pb = !linkOf(s.log) ? pbLinkOf(s.log) : null;
+    if (pb) { reports.push(linkViaPostBridge(s, pb)); continue; }
+    byHandle.set(s.row.handle, [...(byHandle.get(s.row.handle) ?? []), s]);
+  }
   for (const [handle, posts] of byHandle) {
     let records: MonidPost[];
     try { records = await fetch(handle); } catch (e) {
@@ -162,6 +200,20 @@ export async function findLinks(slug: string, sel: { date?: string; keys?: strin
     for (const s of posts) reports.push(linkOne(s, handle, records));
   }
   return reports;
+}
+
+/** Writes `posted.link` (and `posted`, when none exists) — shared by every path that resolves a link. */
+function writeLink(s: PostState, url: string, id: string, uploadedAt: string): void {
+  appendEvent(s.row.slug, { post: s.row.key, kind: "posted.link", actor: "sync", data: { url, id, uploadedAt } });
+  if (!s.posted) appendEvent(s.row.slug, { post: s.row.key, kind: "posted", actor: "sync", data: { time: uploadedAt.slice(11, 16), url } });
+}
+
+/** A post Post Bridge already reports the link for: no caption match, no Monid call. */
+function linkViaPostBridge(s: PostState, pb: { url: string; id: string }): LinkReport {
+  const base = { post: s.row.key, handle: s.row.handle, candidates: [] as LinkReport["candidates"], outcome: null as MonidOutcome | null, written: false };
+  const since = s.sent!.scheduledAt && s.sent!.scheduledAt > s.sent!.at ? s.sent!.scheduledAt : s.sent!.at;
+  writeLink(s, pb.url, pb.id, since);
+  return { ...base, status: "linked", url: pb.url, tiktokId: pb.id, note: "linked from Post Bridge's own analytics; no Monid call was made" };
 }
 
 function linkOne(s: PostState, handle: string, records: MonidPost[]): LinkReport {
@@ -179,19 +231,32 @@ function linkOne(s: PostState, handle: string, records: MonidPost[]): LinkReport
     const caption = s.deck?.caption ?? "";
     /* A direct post goes up at its scheduled time, never before; a draft any time after the send. */
     const since = s.sent!.scheduledAt && s.sent!.scheduledAt > s.sent!.at ? s.sent!.scheduledAt : s.sent!.at;
-    const matches = matchPosts(caption, since, records);
-    base.candidates = matches.map((m) => ({ url: tiktokUrl(handle, m.post), title: m.post.title, uploadedAt: m.post.uploadedAtFormatted, score: m.score }));
-    if (matches.length !== 1) {
-      /* Nothing matched: the later posts are the candidates the eye can check. */
-      const later = records.filter((p) => p.uploadedAtFormatted > since);
-      if (!matches.length) base.candidates = later.map((p) => ({ url: tiktokUrl(handle, p), title: p.title ?? "", uploadedAt: p.uploadedAtFormatted, score: captionMatch(caption, p.title ?? "") }));
-      return { ...base, status: matches.length ? "many" : "none", url: null, tiktokId: null, note: matches.length ? `${matches.length} posts match the caption; nothing written` : `no post of @${handle.replace(/^@/, "")} after ${since.slice(0, 16).replace("T", " ")} reads as the caption (${later.length} later post${later.length === 1 ? "" : "s"} seen)` };
+    if (!captionTokens(caption).length) {
+      /* Hashtags only: no text to score, so the single post uploaded after the send is the match. */
+      const byTime = matchByTime(since, records);
+      if (!byTime) {
+        const later = records.filter((p) => p.uploadedAtFormatted > since);
+        base.candidates = later.map((p) => ({ url: tiktokUrl(handle, p), title: p.title ?? "", uploadedAt: p.uploadedAtFormatted, score: 0 }));
+        return { ...base, status: later.length ? "many" : "none", url: null, tiktokId: null, note: later.length ? `the caption is hashtags only; ${later.length} posts went up after ${since.slice(0, 16).replace("T", " ")}, none can be told apart by text` : `no post of @${handle.replace(/^@/, "")} after ${since.slice(0, 16).replace("T", " ")} (the caption is hashtags only)` };
+      }
+      record = byTime;
+      url = tiktokUrl(handle, record);
+      status = "linked";
+      writeLink(s, url, record.id, record.uploadedAtFormatted);
+    } else {
+      const matches = matchPosts(caption, since, records);
+      base.candidates = matches.map((m) => ({ url: tiktokUrl(handle, m.post), title: m.post.title, uploadedAt: m.post.uploadedAtFormatted, score: m.score }));
+      if (matches.length !== 1) {
+        /* Nothing matched: the later posts are the candidates the eye can check. */
+        const later = records.filter((p) => p.uploadedAtFormatted > since);
+        if (!matches.length) base.candidates = later.map((p) => ({ url: tiktokUrl(handle, p), title: p.title ?? "", uploadedAt: p.uploadedAtFormatted, score: captionMatch(caption, p.title ?? "") }));
+        return { ...base, status: matches.length ? "many" : "none", url: null, tiktokId: null, note: matches.length ? `${matches.length} posts match the caption; nothing written` : `no post of @${handle.replace(/^@/, "")} after ${since.slice(0, 16).replace("T", " ")} reads as the caption (${later.length} later post${later.length === 1 ? "" : "s"} seen)` };
+      }
+      record = matches[0].post;
+      url = tiktokUrl(handle, record);
+      status = "linked";
+      writeLink(s, url, record.id, record.uploadedAtFormatted);
     }
-    record = matches[0].post;
-    url = tiktokUrl(handle, record);
-    status = "linked";
-    appendEvent(s.row.slug, { post: key, kind: "posted.link", actor: "sync", data: { url, id: record.id, uploadedAt: record.uploadedAtFormatted } });
-    if (!s.posted) appendEvent(s.row.slug, { post: key, kind: "posted", actor: "sync", data: { time: record.uploadedAtFormatted.slice(11, 16), url } });
   }
   if (!record) return { ...base, status, url, tiktokId: known?.id ?? null, note: "linked, but the post is not among the latest Monid records; no numbers" };
   const o = outcomeOfMonid(record, url);

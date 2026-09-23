@@ -301,9 +301,14 @@ export type SyncAll = { links: LinkReport[]; refreshed: boolean; reports: SyncRe
  * first "find the link" and the numbers through Monid (lib/tiktok-link.ts),
  * then the Post Bridge analytics as the second source when it has data.
  * A Post Bridge failure (no key, an API error) does not undo the Monid half.
+ * `noMonid` skips the Monid half entirely (no calls, no cost) — for a run
+ * where every sent post's link is already known, from the log or from
+ * Post Bridge's own analytics (`pbLinkOf` in findLinks handles that case even
+ * without this flag; `noMonid` is for skipping the Monid call outright, e.g.
+ * when nothing new needs a link and only fresh numbers are wanted).
  */
-export async function syncAll(slug: string, sel: { date?: string; keys?: string[] } = {}): Promise<SyncAll> {
-  const links = await findLinks(slug, sel);
+export async function syncAll(slug: string, sel: { date?: string; keys?: string[] } = {}, opts: { noMonid?: boolean } = {}): Promise<SyncAll> {
+  const links = opts.noMonid ? [] : await findLinks(slug, sel);
   if (!hasKey()) return { links, refreshed: false, reports: [], postBridgeError: "POST_BRIDGE_API_KEY is not set" };
   try {
     const { refreshed, reports } = await syncOutcomes(slug, sel);

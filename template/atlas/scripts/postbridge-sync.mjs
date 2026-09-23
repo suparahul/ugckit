@@ -16,6 +16,7 @@
  *   node scripts/postbridge-sync.mjs --all                 every sent post
  *   node scripts/postbridge-sync.mjs --date 2026-09-17     the sent posts of that date
  *   node scripts/postbridge-sync.mjs --post <key>          one post
+ *   ... --no-monid                                         skip step 1 (Monid) entirely — Post Bridge's own analytics only, no Monid cost
  */
 
 import { dirname, join, resolve } from "node:path";
@@ -36,18 +37,22 @@ const args = process.argv.slice(3);
 const value = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
 const post = value("--post");
 const date = value("--date");
-if (!post && !date && !args.includes("--all")) { console.error("usage: node scripts/postbridge-sync.mjs --all | --date YYYY-MM-DD | --post <key>"); process.exit(2); }
+const noMonid = args.includes("--no-monid");
+if (!post && !date && !args.includes("--all")) { console.error("usage: node scripts/postbridge-sync.mjs --all | --date YYYY-MM-DD | --post <key> [--no-monid]"); process.exit(2); }
 
-const { links, refreshed, reports, postBridgeError } = await syncAll(SLUG, post ? { keys: [post] } : date ? { date } : {});
-if (!links.length) { console.log(post ? `${post}: not sent through Post Bridge` : date ? `${date}: no post sent through Post Bridge` : "No post was sent through Post Bridge yet."); process.exit(0); }
+const { links, refreshed, reports, postBridgeError } = await syncAll(SLUG, post ? { keys: [post] } : date ? { date } : {}, { noMonid });
+if (!links.length && !noMonid) { console.log(post ? `${post}: not sent through Post Bridge` : date ? `${date}: no post sent through Post Bridge` : "No post was sent through Post Bridge yet."); process.exit(0); }
 
-console.log("Monid — the link and the numbers:");
-for (const l of links) {
-  const o = l.outcome;
-  const nums = o ? `${o.views} views · ${o.likes} likes · ${o.comments} comments · ${o.saves} saves · ${o.shares} shares` : "no numbers";
-  console.log(`  ${l.post.padEnd(26)} ${l.status.padEnd(7)} ${l.url ?? "—"}`);
-  console.log(`  ${"".padEnd(26)} ${nums}  (${l.note})`);
-  if (l.status === "many" || l.status === "none") for (const c of l.candidates) console.log(`  ${"".padEnd(26)}   candidate ${c.url} · ${c.uploadedAt} · ${Math.round(c.score * 100)}% · “${c.title.split("\n")[0].slice(0, 60)}”`);
+if (noMonid) console.log("Monid — skipped (--no-monid).");
+else {
+  console.log("Monid — the link and the numbers:");
+  for (const l of links) {
+    const o = l.outcome;
+    const nums = o ? `${o.views} views · ${o.likes} likes · ${o.comments} comments · ${o.saves} saves · ${o.shares} shares` : "no numbers";
+    console.log(`  ${l.post.padEnd(26)} ${l.status.padEnd(7)} ${l.url ?? "—"}`);
+    console.log(`  ${"".padEnd(26)} ${nums}  (${l.note})`);
+    if (l.status === "many" || l.status === "none") for (const c of l.candidates) console.log(`  ${"".padEnd(26)}   candidate ${c.url} · ${c.uploadedAt} · ${Math.round(c.score * 100)}% · “${c.title.split("\n")[0].slice(0, 60)}”`);
+  }
 }
 
 console.log("Post Bridge — the second source:");
