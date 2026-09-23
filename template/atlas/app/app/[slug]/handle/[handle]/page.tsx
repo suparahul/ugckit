@@ -16,7 +16,9 @@ import { notFound } from "next/navigation";
 import { getApp } from "@/lib/apps";
 import { getHandle, type Handle } from "@/lib/handles";
 import { allStates, getProduction, postPath, type PostState } from "@/lib/production";
-import { dayViews, isPosted, numbersOf, readOf, weekDays } from "@/lib/read";
+import { PLATFORM_NAME } from "@/lib/platform";
+import { dayViews, isPostedIn, numbersIn, readOf, weekDays, type View } from "@/lib/read";
+import { Account, hasSecondPlatform, LegSplit, onPlatform, PlatformIcon, PlatformSwitch, viewOf } from "@/components/Platform";
 import { dmy, Face, n, pct, Section, wdm } from "@/components/factory/Bits";
 import { PostedShow } from "@/components/factory/Cards";
 import { IdentityRail } from "@/components/factory/IdentityRail";
@@ -92,20 +94,33 @@ function Prose({ text }: { text: string }) {
   );
 }
 
-export default async function HandlePage({ params }: { params: Promise<P> }) {
+export default async function HandlePage({ params, searchParams }: { params: Promise<P>; searchParams: Promise<{ platform?: string }> }) {
   const { slug, handle } = await params;
   const app = getApp(slug);
   const h = getHandle(slug, handle);
   if (!app || !h) notFound();
   const s = encodeURIComponent(slug);
   const prod = getProduction(slug);
-  const states = allStates(slug).filter((st) => st.row.short === h.short);
-  const posted = states.filter(isPosted).sort((a, b) => (b.posted!.at > a.posted!.at ? 1 : -1));
-  const planned = states.filter((st) => !st.posted && !st.killed);
-  const r = readOf(states);
+  const all = allStates(slug).filter((st) => st.row.short === h.short);
+  /* Two platforms: the Instagram account under the TikTok one, and a switch that the figures, the grid, the read and the table follow.
+     One platform: the page as it always was (the view is "both" and nothing new is drawn). */
+  const two = h.accounts.length > 1 || hasSecondPlatform(all);
+  const view: View = two ? viewOf((await searchParams).platform) : "both";
+  const onView = onPlatform;
+  const states = all.filter((st) => onView(st, view));
+  const posted = states.filter((st) => isPostedIn(st, view)).sort((a, b) => (b.posted!.at > a.posted!.at ? 1 : -1));
+  const planned = states.filter((st) => !isPostedIn(st, view) && !st.killed);
+  const r = readOf(states, view);
   const views = r.views;
-  const top = Math.max(0, ...posted.map((st) => numbersOf(st)?.views ?? 0));
-  const median = (() => { const v = posted.map((st) => numbersOf(st)?.views ?? 0).sort((a, b) => a - b); return v.length ? v[Math.floor(v.length / 2)] : 0; })();
+  const top = Math.max(0, ...posted.map((st) => numbersIn(st, view)?.views ?? 0));
+  const median = (() => { const v = posted.map((st) => numbersIn(st, view)?.views ?? 0).sort((a, b) => a - b); return v.length ? v[Math.floor(v.length / 2)] : 0; })();
+  /* Saves come from TikTok only: in the merged view saves/view is TikTok's saves over TikTok's views; on Instagram there is none. */
+  const tt = two ? readOf(all.filter((st) => onView(st, "tiktok")), "tiktok") : r;
+  const savesView = view === "instagram" ? "—" : pct(tt.saves, tt.views);
+  const savesWord = !two ? "saves/view" : view === "instagram" ? "saves/view · not reported" : "saves/view · TikTok";
+  const ig = h.accounts.find((a) => a.platform === "instagram") ?? null;
+  const counts = two ? { both: all.length, tiktok: all.filter((st) => onView(st, "tiktok")).length, instagram: all.filter((st) => onView(st, "instagram")).length } : undefined;
+  const here = `/app/${s}/handle/${encodeURIComponent(h.dir)}`;
   const range = prod.plan.range;
   const days = range ? weekDays(slug, range.from) : [];
   const provider = h.account?.provider === "postbridge" ? "Post Bridge" : h.account?.provider ?? "the posting service";
@@ -119,7 +134,8 @@ export default async function HandlePage({ params }: { params: Promise<P> }) {
             <Face src={h.profile} name={h.handle} size=" face--lg" />
             <div>
               <p className="eyebrow"><Link href={`/app/${s}/handles`}>{app.name}</Link> handles</p>
-              <h1 className="display" style={{ margin: 0 }}>{h.handle}</h1>
+              <h1 className="display" style={{ margin: 0 }}>{two ? <PlatformIcon p="tiktok" /> : null}{h.handle}</h1>
+              {ig ? <p className="ahead__alt"><PlatformIcon p="instagram" />{ig.account} <small>{PLATFORM_NAME.instagram} · {ig.connected && ig.connectedAt ? `connected ${dmy(ig.connectedAt)}` : ig.connection}</small></p> : null}
               <p className="ahead__name serif">{[h.persona?.match(/\*\*([^*]+)\*\*/)?.[1], h.role].filter(Boolean).join(" · ")}</p>
             </div>
           </div>
@@ -128,6 +144,7 @@ export default async function HandlePage({ params }: { params: Promise<P> }) {
             <Face src={h.profile} name={h.handle} size=" face--lg" word={next ? `no picture · step ${next.n}` : "no picture"} />
             <div>
               <h1 className="prod__title">{h.handle}</h1>
+              {ig ? <p className="prod__counts"><Account p="instagram" name={ig.account}> · {ig.connection}</Account></p> : null}
               <p className="prod__counts">{[h.role ?? "handle", h.created ? `created ${h.created}` : null, h.connected ? `connected through ${provider}` : h.connection].filter(Boolean).join(" · ")} · {next ? <span className={next.state === "you" ? "is-waiting" : undefined}>step {next.n} of 5 · {next.state === "you" ? "your turn" : next.state === "agent" ? "the agent’s turn" : "open"}</span> : <b>complete</b>}</p>
             </div>
           </>
@@ -136,12 +153,14 @@ export default async function HandlePage({ params }: { params: Promise<P> }) {
         {h.complete ? (
           <div className="ahead__links">
             <a className="chip" href={`https://www.tiktok.com/${h.handle}`} target="_blank" rel="noreferrer">TikTok ↗</a>
+            {ig ? <a className="chip" href={`https://www.instagram.com/${ig.account.replace(/^@/, "")}/`} target="_blank" rel="noreferrer">Instagram ↗</a> : null}
             {h.tier ? <span className="chip">{h.tier}</span> : null}
             <span className="chip">{h.connected ? `connected · ${provider}` : h.connection}</span>
             <span className="chip">complete · 5 of 5 steps</span>
             {h.format ? <Link className="chip" href={`/app/${s}/strategy`}>format: {h.format.split("(")[0].trim()}</Link> : null}
           </div>
         ) : null}
+        {h.complete && two ? <PlatformSwitch href={here} view={view} counts={counts} note={ig ? "Instagram reposts the TikTok decks, 10 slides at most. Its saves are not reported." : undefined} /> : null}
       </div>
       {h.complete ? (
         <dl className="ahead__stats">
@@ -149,7 +168,7 @@ export default async function HandlePage({ params }: { params: Promise<P> }) {
           <div><dd className="tabular">{n(views)}</dd><dt>views</dt></div>
           <div><dd className="tabular">{n(top)}</dd><dt>top post</dt></div>
           <div><dd className="tabular">{n(median)}</dd><dt>median views</dt></div>
-          <div><dd className="tabular">{pct(r.saves, views)}</dd><dt>saves/view</dt></div>
+          <div><dd className="tabular">{savesView}</dd><dt>{savesWord}</dt></div>
           <div><dd className="tabular">{h.cadence ?? "—"}</dd><dt>cadence</dt></div>
         </dl>
       ) : (
@@ -233,7 +252,7 @@ export default async function HandlePage({ params }: { params: Promise<P> }) {
       <Section title="The grid" small={`${posted.length} posted · hover or tap to play · ${planned.length} planned`} link={{ href: `/production/${s}?zoom=week`, label: "The week" }}>
         {states.length ? (
           <ul className="pgrid">
-            {posted.map((st) => <li key={st.row.key}><PostedShow s={st} handle={h} /></li>)}
+            {posted.map((st) => <li key={st.row.key}><PostedShow s={st} handle={h} view={two ? view : undefined} /></li>)}
             {planned.map((st) => (
               <li key={st.row.key}>
                 <Link className="slot" href={postPath(st.row)}>
@@ -248,12 +267,12 @@ export default async function HandlePage({ params }: { params: Promise<P> }) {
       </Section>
       {posted.length ? (
         <Section title="The read" small={range ? "this plan" : undefined}>
-          <ReadStrip r={r} days={days} views={dayViews(states, days)} shown={null} hrefFor={(d) => `/production/${s}?zoom=day&date=${d}`} />
+          <ReadStrip r={r} days={days} views={dayViews(states, days, view)} shown={null} hrefFor={(d) => `/production/${s}?zoom=day&date=${d}`} />
         </Section>
       ) : null}
       {states.length ? (
         <Section title="Posts" small={`${states.length}${range ? " · this plan" : ""}`} link={{ href: `/production/${s}`, label: "The studio" }}>
-          <PostTable states={states} />
+          <PostTable states={states} view={view} two={two} />
         </Section>
       ) : null}
       <Section title="Identity" small="what every generation carries">{identity}</Section>
@@ -261,22 +280,23 @@ export default async function HandlePage({ params }: { params: Promise<P> }) {
   );
 }
 
-function PostTable({ states }: { states: PostState[] }) {
+function PostTable({ states, view = "both", two = false }: { states: PostState[]; view?: View; two?: boolean }) {
   return (
     <div className="plist__wrap" style={{ marginTop: 0 }}>
       <table className="plist plist--wide">
-        <thead><tr><th>Day</th><th>Post</th><th>Format</th><th>State</th><th style={{ textAlign: "right" }}>Views</th><th style={{ textAlign: "right" }}>Saves/view</th></tr></thead>
+        <thead><tr><th>Day</th><th>Post</th><th>Format</th><th>State</th><th style={{ textAlign: "right" }}>Views</th><th style={{ textAlign: "right" }}>{two && view !== "instagram" ? "Saves/view · TikTok" : "Saves/view"}</th></tr></thead>
         <tbody>
           {states.map((st) => {
-            const nb = numbersOf(st);
+            const nb = numbersIn(st, view);
+            const ttNb = two ? numbersIn(st, "tiktok") : nb;
             return (
               <tr key={st.row.key} className={st.waiting ? "is-you" : undefined}>
                 <td className="plist__handle">{st.row.day}<small>{dmy(st.row.date)} · {st.row.slot}</small></td>
                 <td className="plist__topic"><Link href={postPath(st.row)}>{st.row.topic}</Link></td>
                 <td className="plist__muted">{st.row.format.split(";")[0].slice(0, 48)}</td>
                 <td><span className="week__state"><Marks state={st} /><StateWord s={st} /></span></td>
-                <td className="plist__num">{nb ? <b>{n(nb.views)}</b> : "—"}</td>
-                <td className="plist__num">{nb ? pct(nb.saves, nb.views) : "—"}</td>
+                <td className="plist__num">{nb ? <b>{n(nb.views)}</b> : "—"}{two && view === "both" ? <LegSplit s={st} className="plist__split" /> : null}</td>
+                <td className="plist__num">{view === "instagram" ? "—" : ttNb ? pct(ttNb.saves, ttNb.views) : "—"}</td>
               </tr>
             );
           })}

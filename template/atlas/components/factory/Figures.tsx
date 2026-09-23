@@ -8,13 +8,15 @@ import Link from "next/link";
 
 import type { Handle } from "@/lib/handles";
 import { addDays, dateParts, type PostState } from "@/lib/production";
-import { dayViews, isPosted, readOf, readSentence, weekDays } from "@/lib/read";
+import { PLATFORMS, PLATFORM_NAME } from "@/lib/platform";
+import { dayViews, isPosted, isPostedIn, readOf, readSentence, weekDays, type View } from "@/lib/read";
+import { hasSecondPlatform, onPlatform, PlatformIcon, viewOf } from "@/components/Platform";
 import { n } from "./Bits";
 import { ReadStrip } from "./Read";
 
 export type Period = "day" | "week" | "month";
 
-export type FiguresQuery = { period: Period; day: string; account: string | null };
+export type FiguresQuery = { period: Period; day: string; account: string | null; /** One platform, or both; "both" when no post goes to more than TikTok. */ platform?: View };
 
 /** The query of the numbers card, with the defaults: the latest posting day, all accounts. */
 export function figuresQuery(sp: Record<string, string | string[] | undefined>, states: PostState[], todayIso: string): FiguresQuery {
@@ -24,35 +26,43 @@ export function figuresQuery(sp: Record<string, string | string[] | undefined>, 
   const latest = postedDays.length ? postedDays[postedDays.length - 1] : todayIso;
   const day = /^\d{4}-\d{2}-\d{2}$/.test(one("day")) ? one("day") : latest;
   const account = one("account") || null;
-  return { period, day, account };
+  const platform = hasSecondPlatform(states) ? viewOf(one("platform")) : "both";
+  return { period, day, account, platform };
 }
 
 export function Figures({ slug, states, handles, q, base }: { slug: string; states: PostState[]; handles: Handle[]; q: FiguresQuery; base: string }) {
   const { period, day, account } = q;
-  const mine = account ? states.filter((s) => s.row.short === account) : states;
+  const view: View = q.platform ?? "both";
+  const two = hasSecondPlatform(states);
+  const onView = (s: PostState) => onPlatform(s, view);
+  const mine = (account ? states.filter((s) => s.row.short === account) : states).filter(onView);
   const week = weekDays(slug, day);
   const ym = day.slice(0, 7);
   const inPeriod = (s: PostState) => (period === "day" ? s.row.date === day : period === "week" ? week.includes(s.row.date) : s.row.date.startsWith(ym));
   const shown = mine.filter(inPeriod);
-  const r = readOf(shown);
+  const r = readOf(shown, view);
   const p = dateParts(day);
   const w0 = dateParts(week[0]), w6 = dateParts(week[6]);
   const label = period === "day" ? `${p.weekday.slice(0, 3)} ${p.d} ${p.month.slice(0, 3)}` : period === "week" ? `${w0.weekday.slice(0, 3)} ${w0.d} – ${w6.weekday.slice(0, 3)} ${w6.d} ${w6.month.slice(0, 3)}` : `${p.month} ${p.y}`;
   const href = (patch: Partial<FiguresQuery>) => {
     const u = new URLSearchParams();
-    const v = { period, day, account, ...patch };
+    const v = { period, day, account, platform: view, ...patch };
     if (v.period !== "day") u.set("period", v.period);
     u.set("day", v.day);
     if (v.account) u.set("account", v.account);
+    if (v.platform && v.platform !== "both") u.set("platform", v.platform);
     return `${base}?${u.toString()}`;
   };
   const step = (k: number) => (period === "month" ? new Date(Date.UTC(p.y, p.m - 1 + k, 1)).toISOString().slice(0, 10) : addDays(day, period === "week" ? 7 * k : k));
-  const posted = shown.filter(isPosted).length;
-  const planned = shown.filter((s) => !s.posted && !s.killed).length;
-  const what = period === "day" ? `${n(posted)} posted` : period === "week" ? `${n(posted)} posted on ${new Set(shown.filter(isPosted).map((s) => s.row.date)).size} of 7 days` : `${n(posted)} posted${planned ? ` · ${n(planned)} planned` : ""}`;
+  const isOn = (s: PostState) => (two ? isPostedIn(s, view) : isPosted(s));
+  const posted = shown.filter(isOn).length;
+  const planned = shown.filter((s) => !isOn(s) && !s.killed).length;
+  const what = period === "day" ? `${n(posted)} posted` : period === "week" ? `${n(posted)} posted on ${new Set(shown.filter(isOn).map((s) => s.row.date)).size} of 7 days` : `${n(posted)} posted${planned ? ` · ${n(planned)} planned` : ""}`;
+  /* Under the merged totals, the same figures once per platform. */
+  const split = two && view === "both" ? PLATFORMS.map((p) => ({ p, r: readOf(shown.filter((s) => onPlatform(s, p)), p) })).filter((x) => x.r.posted) : [];
   const acctWord = account ? handles.find((h) => h.short === account)?.handle ?? account : "all accounts";
   const nOf = (short: string | null) => states.filter(inPeriod).filter((s) => !short || s.row.short === short).length;
-  const views = dayViews(mine, week);
+  const views = dayViews(mine, week, view);
   return (
     <div className="figures" id="figures">
       <div className="figures__bar" role="toolbar" aria-label="Period and accounts">
@@ -70,6 +80,13 @@ export function Figures({ slug, states, handles, q, base }: { slug: string; stat
             <Link key={k} className={`settoggle__opt${k === period ? " is-on" : ""}`} href={href({ period: k })} scroll={false} aria-current={k === period ? "true" : undefined}>{k}</Link>
           ))}
         </div>
+        {two ? (
+          <div className="settoggle" aria-label="Platform">
+            {(["both", ...PLATFORMS] as View[]).map((k) => (
+              <Link key={k} className={`settoggle__opt${k === view ? " is-on" : ""}`} href={href({ platform: k })} scroll={false} aria-current={k === view ? "true" : undefined}>{k === "both" ? "both platforms" : <><PlatformIcon p={k} /> {PLATFORM_NAME[k]}</>}</Link>
+            ))}
+          </div>
+        ) : null}
         <details className={`pick${account ? " is-set" : ""}`}>
           <summary aria-label={`Accounts: ${acctWord}`}>{acctWord}</summary>
           <ul className="pick__list">
@@ -82,7 +99,22 @@ export function Figures({ slug, states, handles, q, base }: { slug: string; stat
       </div>
       <div className="figures__set">
         <p className="figures__what">{what}{r.lastAt ? ` · read ${r.lastAt.slice(0, 10)} ${r.lastAt.slice(11, 16)} UTC` : ""} · <Link href={`/production/${encodeURIComponent(slug)}?view=list&zoom=${period}&date=${day}`} title="Every post of the period as a list in the studio">every post →</Link></p>
-        <ReadStrip r={r} sentence={readSentence(r)} days={week} views={views} shown={period === "day" ? day : null} hrefFor={(d) => `/production/${encodeURIComponent(slug)}?zoom=day&date=${d}`} label="Views by posting day; each day is a link to the studio" none={period === "day" ? `Nothing posted ${label}.` : `Nothing posted in this ${period}.`} />
+        <ReadStrip r={r} sentence={readSentence(r)} days={week} views={views} shown={period === "day" ? day : null} hrefFor={(d) => `/production/${encodeURIComponent(slug)}?zoom=day&date=${d}`} label="Views by posting day; each day is a link to the studio" none={period === "day" ? `Nothing posted ${label}.` : `Nothing posted in this ${period}.`} >
+          {split.length > 1 ? (
+            <div className="pfsplit" aria-label="The figures per platform">
+              {split.map(({ p, r: x }) => (
+                <span key={p} className="pfsplit__row">
+                    <span className="pfsplit__name"><PlatformIcon p={p} /> {PLATFORM_NAME[p]}</span>
+                    <span><b>{n(x.views)}</b> views</span><span className="pfsplit__sep">·</span>
+                    <span><b>{n(x.likes)}</b> likes</span><span className="pfsplit__sep">·</span>
+                    <span><b>{n(x.comments)}</b> comments</span><span className="pfsplit__sep">·</span>
+                    <span><b>{n(x.shares)}</b> shares</span><span className="pfsplit__sep">·</span>
+                    {x.savesViews ? <span><b>{n(x.saves)}</b> saves</span> : <span className="pfsplit__note">saves not reported</span>}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </ReadStrip>
       </div>
     </div>
   );

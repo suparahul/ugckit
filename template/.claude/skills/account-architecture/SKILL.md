@@ -59,7 +59,7 @@ Every value you propose names its source: `brain`, `competitor apps` or `niche`.
     One line: none | "<format>, <views>, worth a plan row later".
 
 One row per planned handle. A handle's name is `@<to name>` until the `handles` skill
-names it; the Atlas counts the rows that start with `@`. The user approves on the
+names it; the Organic Factory UI counts the rows that start with `@`. The user approves on the
 strategy page (http://localhost:3210/app/<slug>/strategy → `accounts.approve` in the
 log) or in the conversation; record the date either way.
 

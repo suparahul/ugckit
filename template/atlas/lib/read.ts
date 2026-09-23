@@ -18,6 +18,8 @@ export type View = Platform | "both";
 
 export type Numbers = { views: number; likes: number; comments: number; saves: number; shares: number };
 export type Read = Numbers & {
+  /** The views of the reads whose saves are known (TikTok's): saves/view divides by this, not by every view. */
+  savesViews: number;
   /** Posts posted in the period. */
   posted: number;
   /** Of those, posts with at least one read. */
@@ -29,7 +31,7 @@ export type Read = Numbers & {
 
 const SOURCE_WORD: Record<string, string> = { monid: "Monid", postbridge: "Post Bridge", typed: "typed by hand" };
 
-export type PostNumbers = Numbers & { source: string; at: string; /** The legs the numbers come from; saves only from those with a known save count. */ legs?: Platform[]; savesKnown?: boolean };
+export type PostNumbers = Numbers & { source: string; at: string; /** The legs the numbers come from; saves only from those with a known save count. */ legs?: Platform[]; savesKnown?: boolean; /** The views of the legs whose saves are known. Absent: all of them. */ savesViews?: number };
 
 /** The latest numbers of one post, every leg added up. Null when unread. One argument: it is passed to `map` as it is. */
 export function numbersOf(s: PostState): PostNumbers | null {
@@ -42,10 +44,10 @@ export function numbersIn(s: PostState, view: View): PostNumbers | null {
   const platforms = s.platforms ?? ["tiktok"];
   const parts = platforms.map((p) => [p, legNumbers(s, p)] as const).filter((x): x is readonly [Platform, PostNumbers] => !!x[1]);
   if (parts.length <= 1) return parts[0]?.[1] ?? null;
-  const out: PostNumbers = { views: 0, likes: 0, comments: 0, saves: 0, shares: 0, source: parts[0][1].source, at: "", legs: parts.map(([p]) => p), savesKnown: parts.some(([, n]) => n.savesKnown !== false) };
+  const out: PostNumbers = { views: 0, likes: 0, comments: 0, saves: 0, shares: 0, source: parts[0][1].source, at: "", legs: parts.map(([p]) => p), savesKnown: parts.some(([, n]) => n.savesKnown !== false), savesViews: 0 };
   for (const [, n] of parts) {
     out.views += n.views; out.likes += n.likes; out.comments += n.comments; out.shares += n.shares;
-    if (n.savesKnown !== false) out.saves += n.saves;
+    if (n.savesKnown !== false) { out.saves += n.saves; out.savesViews! += n.savesViews ?? n.views; }
     if (n.at > out.at) out.at = n.at;
   }
   return out;
@@ -57,7 +59,7 @@ function legNumbers(s: PostState, p: Platform): PostNumbers | null {
   if (p === primary) return primaryNumbers(s);
   const y = s.legs?.[p]?.synced;
   if (!y) return null;
-  return { views: y.views, likes: y.likes, comments: y.comments, saves: y.saves ?? 0, shares: y.shares, source: y.source, at: y.syncedAt || y.at, legs: [p], savesKnown: y.saves !== null };
+  return { views: y.views, likes: y.likes, comments: y.comments, saves: y.saves ?? 0, shares: y.shares, source: y.source, at: y.syncedAt || y.at, legs: [p], savesKnown: y.saves !== null, savesViews: y.saves !== null ? y.views : 0 };
 }
 
 /** The primary leg's numbers: exactly the rule from before two platforms. */
@@ -80,13 +82,14 @@ export const postedDay = (s: PostState) => s.row.date;
 
 export function readOf(states: PostState[], view: View = "both"): Read {
   const posted = states.filter((s) => isPostedIn(s, view));
-  const out: Read = { views: 0, likes: 0, comments: 0, saves: 0, shares: 0, posted: posted.length, read: 0, sources: [], lastAt: null };
+  const out: Read = { views: 0, likes: 0, comments: 0, saves: 0, shares: 0, savesViews: 0, posted: posted.length, read: 0, sources: [], lastAt: null };
   const sources = new Set<string>();
   for (const s of posted) {
     const nb = numbersIn(s, view);
     if (!nb) continue;
     out.read++;
     out.views += nb.views; out.likes += nb.likes; out.comments += nb.comments; out.saves += nb.saves; out.shares += nb.shares;
+    out.savesViews += nb.savesViews ?? nb.views;
     sources.add(nb.source);
     if (!out.lastAt || nb.at > out.lastAt) out.lastAt = nb.at;
   }

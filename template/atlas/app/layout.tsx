@@ -10,6 +10,7 @@ import "./reporting.css";
 import "./endproduct.css";
 import "./niche.css";
 import "./factory.css";
+import "./platform.css";
 import CommandBar from "@/components/CommandBar";
 import { Breadcrumb, RouteFlag, Ticker } from "@/components/Chrome";
 import { Pbar, ResearchRow } from "@/components/Shell";

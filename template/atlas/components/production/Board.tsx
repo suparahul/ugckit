@@ -9,6 +9,7 @@ import Link from "next/link";
 
 import { dateParts, postPath, type PostState } from "@/lib/production";
 import { numbersOf } from "@/lib/read";
+import { Account, LegSplit } from "@/components/Platform";
 import { SLOTS, SLOT_TIME, slotKey } from "@/lib/slots";
 import { firstPicture } from "@/components/factory/Wait";
 import { Dot, Marks } from "./Marks";
@@ -100,7 +101,7 @@ export function MonthGrid({ states, ym, todayIso, hrefForDay }: { states: PostSt
  * One row per handle, seven day columns. A day cell stacks that handle's posts
  * in order — two today, three or four when the plan says so — each a link.
  */
-export function WeekGrid({ states, monday, todayIso, handles }: { states: PostState[]; monday: string; todayIso: string; handles: { handle: string; short: string }[] }) {
+export function WeekGrid({ states, monday, todayIso, handles }: { states: PostState[]; monday: string; todayIso: string; handles: { handle: string; short: string; instagram?: string | null }[] }) {
   const days: string[] = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday + "T00:00:00Z");
@@ -121,17 +122,17 @@ export function WeekGrid({ states, monday, todayIso, handles }: { states: PostSt
           );
         })}
         {handles.map((h) => (
-          <WeekRow key={h.short} label={h.handle} days={days} at={(d) => at(h.short, d)} />
+          <WeekRow key={h.short} label={h.handle} instagram={h.instagram} days={days} at={(d) => at(h.short, d)} />
         ))}
       </div>
     </div>
   );
 }
 
-function WeekRow({ label, days, at }: { label: string; days: string[]; at: (d: string) => PostState[] }) {
+function WeekRow({ label, instagram, days, at }: { label: string; instagram?: string | null; days: string[]; at: (d: string) => PostState[] }) {
   return (
     <>
-      <div className="week__row" role="rowheader">{label}</div>
+      <div className="week__row" role="rowheader">{instagram ? <><Account p="tiktok" name={label} /><Account p="instagram" name={instagram} /></> : label}</div>
       {days.map((d) => {
         const posts = at(d);
         if (!posts.length) return <div key={d} className="week__cell is-empty" role="gridcell">—</div>;
@@ -157,6 +158,7 @@ function WeekPost({ s }: { s: PostState }) {
       <span className="week__slot">{s.row.slot}</span>
       <span className={`week__topic${s.stage === "killed" ? " is-killed" : ""}`}>{s.row.topic}</span>
       <span className="week__state">{nb ? <span className="state"><b>{n(nb.views)}</b> views</span> : <><Marks state={s} /><StateWord s={s} /></>}</span>
+      <LegSplit s={s} className="week__split" />
     </Link>
   );
 }
@@ -169,7 +171,7 @@ function WeekPost({ s }: { s: PostState }) {
  * card. A post whose slot word is not AM · MID · PM takes the next free slot
  * in its order. Every card carries the thumbnail slot of the week view.
  */
-export function DayGrid({ states, handles, times = {} }: { states: PostState[]; handles: { handle: string; short: string; role?: string }[]; times?: Record<string, Record<string, string>> }) {
+export function DayGrid({ states, handles, times = {} }: { states: PostState[]; handles: { handle: string; short: string; role?: string; instagram?: string | null }[]; times?: Record<string, Record<string, string>> }) {
   return (
     <div className="day" style={{ "--slots": SLOTS.length } as CSSProperties}>
       {handles.map((h) => {
@@ -181,7 +183,7 @@ export function DayGrid({ states, handles, times = {} }: { states: PostState[]; 
         const t = { ...SLOT_TIME, ...(times[h.short] ?? {}) };
         return (
           <section key={h.short} className="day__row" aria-label={h.handle}>
-            <div><h2 className="day__handle">{h.handle}{h.role ? <small>{h.role}</small> : null}</h2></div>
+            <div><h2 className="day__handle">{h.instagram ? <><Account p="tiktok" name={h.handle} /><Account p="instagram" name={h.instagram} /></> : h.handle}{h.role ? <small>{h.role}</small> : null}</h2></div>
             <div className="day__posts">
               {SLOTS.map((k) => { const s = bySlot.get(k); return s ? <Cell key={s.row.key} s={s} time={t[k]} /> : <OpenCell key={k} slot={k} time={t[k]} />; })}
               {rest.map((s) => <Cell key={s.row.key} s={s} />)}
@@ -210,6 +212,7 @@ export function Cell({ s, time }: { s: PostState; time?: string }) {
       <span className="cell__format"><span className="state">{s.row.format}{s.deck ? ` · ${s.deck.slides.length} slides` : ""} · {s.dimension}</span></span>
       <span className="cell__state"><Marks state={s} /><StateWord s={s} /></span>
       {nb ? <span className="cell__read" aria-label={`${n(nb.views)} views, ${nb.saves} saves, ${nb.shares} shares`}><b>{n(nb.views)}</b><span className={z(nb.saves)}>{nb.saves} {nb.saves === 1 ? "save" : "saves"}</span><span className={z(nb.shares)}>{nb.shares} {nb.shares === 1 ? "share" : "shares"}</span></span> : null}
+      <LegSplit s={s} className="cell__split" />
     </Link>
   );
 }

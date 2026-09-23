@@ -26,8 +26,10 @@ export type HandleAccount = DeclaredAccount & {
   id: string | number | null;
   username: string | null;
   provider: string | null;
-  /** The connection in words: "connected 15 Sep · Post Bridge", "needs a reconnect", "connects at the first send". */
+  /** The connection in words: "connected 2026-09-15 · Post Bridge", "needs a reconnect", "connects at the first send". */
   connection: string;
+  /** The day the account was connected (an account.connect line, else the map's time), or null. */
+  connectedAt: string | null;
 };
 
 export type Handle = {
@@ -141,7 +143,8 @@ function readHandle(slug: string, dir: string, log: Event[], accounts: AccountsF
     const a = onService[d.platform] ?? null;
     const ok = !!a && !a.needs_reconnect;
     const at = connectLine(d.platform) ?? day(accounts?.syncedAt);
-    return { ...d, connected: ok, needsReconnect: !!a?.needs_reconnect, id: a?.id ?? null, username: a?.username ?? null, provider: a ? a.provider ?? (a.platform ? "Post Bridge" : "unknown") : null, connection: ok ? `connected${at ? ` ${at}` : ""} · ${a!.provider ?? "Post Bridge"}` : a ? "needs a reconnect" : "connects at the first send" };
+    const service = !a?.provider || a.provider === "postbridge" ? "Post Bridge" : a.provider;
+    return { ...d, connected: ok, needsReconnect: !!a?.needs_reconnect, id: a?.id ?? null, username: a?.username ?? null, provider: a ? a.provider ?? (a.platform ? "Post Bridge" : "unknown") : null, connection: ok ? `connected${at ? ` ${at}` : ""} · ${service}` : a ? "needs a reconnect" : "connects at the first send", connectedAt: ok ? at : null };
   });
   const primaryAccount = handleAccounts.find((a) => a.role === "primary") ?? handleAccounts[0];
   const acct = onService[primaryAccount.platform] ?? null;

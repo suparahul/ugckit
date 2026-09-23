@@ -7,7 +7,7 @@ description: Phase 6 — create one handle identity at a time, in five steps: ro
 
 No script of its own; the references come from the `persona-identity` stage. One handle
 at a time, one step at a time, from the rows of `strategy/ACCOUNTS.md`. The sixth step
-of the Atlas's list, the connection to the posting service, is **not** here: it runs at
+of the Organic Factory UI's list, the connection to the posting service, is **not** here: it runs at
 the first send (`posting-provider`). A handle is complete for this phase at five steps.
 
 Read first: `strategy/ACCOUNTS.md` (the role, the subject, the pattern, the cadence),
@@ -17,7 +17,7 @@ sources), `niche/learnings.md`.
 ## The five steps
 
 Each step ends with a file or a section, and where the user acts, with the tick or the
-approval line the Atlas writes to the log. Say "tick it on the handle page when done"
+approval line the Organic Factory UI writes to the log. Say "tick it on the handle page when done"
 (http://localhost:3210/app/<slug>/handle/<handle>) and read `task.done`; do not wait
 silently.
 
@@ -117,7 +117,7 @@ in one sentence, then in both cases the identity clause naming the subjects and 
 reference files), `## Identity rule`, `## Post-process step`. The user approves
 (`defaults.approve`).
 
-The head lines and sections are the ones `apps/README.md` lists; the Atlas reads them by
+The head lines and sections are the ones `apps/README.md` lists; the Organic Factory UI reads them by
 name, so keep the spelling.
 
 ## Finish, per handle

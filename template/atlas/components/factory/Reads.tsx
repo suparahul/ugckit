@@ -6,7 +6,8 @@
  */
 
 import type { PostState } from "@/lib/production";
-import { numbersOf } from "@/lib/read";
+import { platformOf } from "@/lib/platform";
+import { numbersIn, type View } from "@/lib/read";
 import { n, pct } from "./Bits";
 
 function Series({ reads, postedAt }: { reads: { at: string; views: number }[]; postedAt: string }) {
@@ -39,10 +40,20 @@ function Series({ reads, postedAt }: { reads: { at: string; views: number }[]; p
   );
 }
 
-export function Reads({ s }: { s: PostState }) {
-  if (!s.posted) return null;
-  const nb = numbersOf(s);
-  const reads = s.log.filter((e) => e.kind === "outcome.sync" && e.data).map((e) => ({ at: String(e.data!.syncedAt ?? e.at), views: Number(e.data!.views ?? 0), source: String(e.data!.source ?? "postbridge") }));
+/**
+ * `view`: one platform's read, or "both" (the legs added up; the series and the
+ * saves stay TikTok's, since no source gives Instagram's saves). A post with one
+ * TikTok leg reads exactly as before.
+ */
+export function Reads({ s, view = "both" }: { s: PostState; view?: View }) {
+  const leg = view === "both" ? s.primary ?? "tiktok" : view;
+  const posted = leg === (s.primary ?? "tiktok") ? s.posted : s.legs?.[leg]?.posted ?? null;
+  if (!posted) return null;
+  const nb = numbersIn(s, view);
+  const two = view !== "both" || (nb?.legs?.length ?? 1) > 1;
+  /* Saves: TikTok's alone. On the Instagram view there are none to show. */
+  const saves = leg === "instagram" ? null : two ? numbersIn(s, "tiktok") : nb;
+  const reads = s.log.filter((e) => e.kind === "outcome.sync" && e.data && (platformOf(e.data.platform) ?? "tiktok") === leg).map((e) => ({ at: String(e.data!.syncedAt ?? e.at), views: Number(e.data!.views ?? 0), source: String(e.data!.source ?? "postbridge") }));
   const monid = reads.filter((r) => r.source === "monid");
   const series = monid.length ? monid : reads;
   const z = (v: number) => (v === 0 ? " is-zero" : "");
@@ -54,17 +65,17 @@ export function Reads({ s }: { s: PostState }) {
           <span className="is-lead"><b>{n(nb.views)}</b>views</span>
           <span className={z(nb.likes)}><b>{n(nb.likes)}</b>likes</span>
           <span className={z(nb.comments)}><b>{n(nb.comments)}</b>{nb.comments === 1 ? "comment" : "comments"}</span>
-          <span className={z(nb.saves)}><b>{n(nb.saves)}</b>{nb.saves === 1 ? "save" : "saves"}</span>
+          {saves ? <span className={z(saves.saves)}><b>{n(saves.saves)}</b>{saves.saves === 1 ? "save" : "saves"}{two ? " · TikTok" : ""}</span> : <span className="is-zero"><b>—</b>saves not reported</span>}
           <span className={z(nb.shares)}><b>{n(nb.shares)}</b>{nb.shares === 1 ? "share" : "shares"}</span>
-          <span className={`is-ratio${z(nb.saves)}`}><b>{pct(nb.saves, nb.views)}</b>saves/view</span>
+          {saves ? <span className={`is-ratio${z(saves.saves)}`}><b>{pct(saves.saves, saves.views)}</b>saves/view{two ? " · TikTok" : ""}</span> : null}
         </p>
       ) : null}
       <p className="reads__line">
         {nb
           ? `Read ${reads.length === 1 ? "once" : reads.length === 2 ? "twice" : `${reads.length} times`}${monid.length ? " through Monid" : ""}, last ${nb.at.slice(0, 10)} ${nb.at.slice(11, 16)} UTC${reads.some((r) => r.source === "postbridge") && monid.length ? " · Post Bridge agrees" : ""}${s.outcomes ? " · the day-7 numbers are typed" : opens ? ` · on day 7 (${opens}) two counts are typed by hand: “what app?” comments and store impressions` : ""}`
-          : `Posted ${s.posted.time}. No read yet; the sync brings the numbers.`}
+          : `Posted ${posted.time}. No read yet; the sync brings the numbers.`}
       </p>
-      {series.length ? <div className="series"><Series reads={series} postedAt={s.posted.at} /></div> : null}
+      {series.length ? <div className="series"><Series reads={series} postedAt={posted.at} /></div> : null}
     </section>
   );
 }

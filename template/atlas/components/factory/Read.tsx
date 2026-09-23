@@ -12,13 +12,15 @@ import { n, pct, wdm } from "./Bits";
 
 export function ReadTotals({ r }: { r: Read }) {
   const z = (v: number) => (v === 0 ? "is-zero" : undefined);
+  const partial = r.savesViews !== undefined && r.savesViews !== r.views;
   return (
     <p className="read__totals">
       <span><b>{n(r.views)}</b>views</span>
-      <span className={z(r.saves)}><b>{n(r.saves)}</b>{r.saves === 1 ? "save" : "saves"}</span>
+      {/* Saves are TikTok's: with Instagram in the views, saves/view divides by TikTok's views only and says so. */}
+      {partial && !r.savesViews ? <span className="is-zero"><b>—</b>saves not reported</span> : <span className={z(r.saves)}><b>{n(r.saves)}</b>{r.saves === 1 ? "save" : "saves"}</span>}
       <span className={z(r.shares)}><b>{n(r.shares)}</b>{r.shares === 1 ? "share" : "shares"}</span>
       <span className={z(r.comments)}><b>{n(r.comments)}</b>{r.comments === 1 ? "comment" : "comments"}</span>
-      <span className="is-ratio"><b>{pct(r.saves, r.views)}</b>saves/view</span>
+      {partial && !r.savesViews ? null : <span className="is-ratio"><b>{pct(r.saves, partial ? r.savesViews : r.views)}</b>saves/view{partial ? " · TikTok" : ""}</span>}
     </p>
   );
 }
@@ -49,7 +51,7 @@ export function DaysNav({ days, views, shown, hrefFor, label }: { days: string[]
   );
 }
 
-export function ReadStrip({ r, sentence, days, views, shown, hrefFor, label, none }: { r: Read; sentence?: string; days?: string[]; views?: Record<string, number | "unread" | null>; shown?: string | null; hrefFor?: (iso: string) => string; label?: string; none?: string }) {
+export function ReadStrip({ r, sentence, days, views, shown, hrefFor, label, none, children }: { r: Read; sentence?: string; days?: string[]; views?: Record<string, number | "unread" | null>; shown?: string | null; hrefFor?: (iso: string) => string; label?: string; none?: string; /** Under the totals: the split per platform, when there are two. */ children?: React.ReactNode }) {
   if (!r.posted) {
     return (
       <section className="read" aria-label="The read">
@@ -61,6 +63,7 @@ export function ReadStrip({ r, sentence, days, views, shown, hrefFor, label, non
   return (
     <section className="read" aria-label="The read">
       <ReadTotals r={r} />
+      {children}
       <p className="read__line">{sentence ?? readSentence(r)}</p>
       {days && views && hrefFor ? <DaysNav days={days} views={views} shown={shown ?? null} hrefFor={hrefFor} label={label ?? "Views by posting day; each day is a link to the studio"} /> : null}
     </section>

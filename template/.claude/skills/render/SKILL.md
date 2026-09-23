@@ -20,7 +20,7 @@ and sizes are the deck's blocks, or the layout the user locked on the post page
 (`slide.layout` in the log). The product slide gets the callout from `cards/1-*.png` in
 the lower third with the callout sentence above it.
 
-The numbers, as the Atlas draws them (a change to one is a change to both): the font
+The numbers, as the Organic Factory UI draws them (a change to one is a change to both): the font
 is Helvetica Neue Bold, white, black outline; the sizes are a share of the width —
 big 7.4%, medium 5.1% (5.6% on 9:16), small 4.3% (3.9% on 9:16), a boxed block 3.7%
 in medium weight on a translucent brown box. The safe area is 4% top and bottom on
@@ -34,7 +34,7 @@ a 3:4 deck is centre-cropped, not regenerated.
 **Slide style.** The deck's `Slide style` row: `photo` (or absent) burns the text as
 above; `illustrated` skips the text layer on every slide, because the generator drew the
 words into the picture, and pastes only the callout on the product slide.
-`cover-text.txt` and `caption.txt` are written either way. (The Atlas's compositor
+`cover-text.txt` and `caption.txt` are written either way. (The kit's compositor
 holds this change; until it lands, an illustrated deck renders the text a second time
 — see the BUILD-LOG note of 2026-09-18.)
 

@@ -171,9 +171,9 @@ Research output lives in `research/<project>/<app>/<handle>/`, never in `pipelin
 only thing that crosses over is the file `handoff.sh` writes to `pipeline/00-source/<project>/`.
 
 **The Atlas is how the user sees the research.** `scripts/atlas.sh` (the `atlas` skill)
-serves everything scraped at http://localhost:3210 — an orb with one cluster per app, a
-page per app, account and post, read in place from `research/`. The same app is the
-Organic Factory of the slideshow path: the home base, the canvas, the niche page, the
+serves the Organic Factory UI at http://localhost:3210. Its research part, the Atlas, is
+everything scraped — an orb with one cluster per app, a page per app, account and post,
+read in place from `research/`. The rest of the same UI serves the slideshow path: the home base, the canvas, the niche page, the
 strategy page, the handle pages and the studio, read in place from `apps/<slug>/`. Run it after a harvest
 and after a teardown, and whenever the user asks what was found. Give them URLs, not lists.
 

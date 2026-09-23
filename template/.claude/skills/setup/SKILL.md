@@ -77,7 +77,7 @@ only when everything is in place; do not ask the user which path they want yet �
 question comes at the end, in step 8, when there is nothing left to install.
 
 - **node missing or older than 22.18** → https://nodejs.org, or `brew install node`.
-  The Atlas needs it, and so do the production scripts and the next line.
+  The Organic Factory UI needs it, and so do the production scripts and the next line.
 - **monid missing** → `npm install -g @monid-ai/cli`. The research half needs it.
 
 Two checks are new since the slideshow path exists, and both are red when they fail:

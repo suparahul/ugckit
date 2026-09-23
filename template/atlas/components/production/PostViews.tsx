@@ -309,6 +309,19 @@ export function AnatomyRail({ state, src }: { state: PostState; src: ReturnType<
           </dd>
         </div>
         {state.link ? <div className="anatomy__row"><dt>Posted</dt><dd><a href={state.link} target="_blank" rel="noreferrer">{state.posted?.time ?? ""} · open on TikTok →</a></dd></div> : null}
+        {/* The Instagram leg, when the post has one: where it is, its link, and what it posts beside the slides. */}
+        {state.legs?.instagram ? (() => {
+          const ig = state.legs.instagram!;
+          const where = ig.dropped ? `not on this post${ig.dropped.note ? ` · ${ig.dropped.note}` : ""}` : ig.failed ? `failed · ${ig.failed.error}` : ig.posted ? `${ig.posted.time} UTC` : ig.sent ? "sent" : "with TikTok's send";
+          const caption = deck?.caption ? deck.caption.replace(/(^|\s)#[\p{L}\p{N}_]+/gu, "").trim() : null;
+          const tags = [...new Set([...(deck?.hashtags ?? []), ...((deck?.caption ?? "").match(/#[\p{L}\p{N}_]+/gu) ?? [])])];
+          return (
+            <>
+              <div className="anatomy__row"><dt>Instagram</dt><dd>{ig.link ? <a href={ig.link} target="_blank" rel="noreferrer">{where} · open on Instagram →</a> : where}</dd></div>
+              <div className="anatomy__row"><dt>Instagram post</dt><dd>4:5 JPEG slides, the cover text burned in, no music (added by hand){caption ? <> · caption “{caption.split("\n")[0]}”</> : null}{tags.length ? <> · first comment {tags.join(" ")}</> : null}</dd></div>
+            </>
+          );
+        })() : null}
         {params.map((r) => {
           let v = r.value;
           if (/^handle \/ post$/i.test(r.column) && state.link) v = `${state.row.handle} · ${state.link.split("/").pop()}`;

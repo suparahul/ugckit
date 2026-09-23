@@ -22,6 +22,8 @@ import { getZones } from "@/lib/when";
 import { handleByShort } from "@/lib/handles";
 import { Face } from "@/components/factory/Bits";
 import { Reads } from "@/components/factory/Reads";
+import { Account, hasSecondPlatform, viewOf } from "@/components/Platform";
+import { Legs } from "@/components/production/Legs";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +52,10 @@ export default async function ProductionPost({ params, searchParams }: { params:
   const slideNo = Number(Array.isArray(sp.slide) ? sp.slide[0] : sp.slide) || 1;
   const overlayOff = (Array.isArray(sp.overlay) ? sp.overlay[0] : sp.overlay) === "0";
   const base = postPath(row);
+  /* Two platforms: the legs under the title, and the read follows the chosen platform. */
+  const two = hasSecondPlatform([state]) || Object.keys(state.legs ?? {}).some((p) => p !== "tiktok");
+  const view = two ? viewOf(sp.platform) : "both";
+  const igAccount = identity?.accounts.find((a) => a.platform === "instagram") ?? null;
   const primary = primaryAction(state);
   const next = nextStep(state);
   const dp = dateParts(row.date);
@@ -85,7 +91,7 @@ export default async function ProductionPost({ params, searchParams }: { params:
         </nav>
         <Link className="post-head__who" href={`/app/${encodeURIComponent(app)}/handle/${encodeURIComponent(identity?.dir ?? row.handle.slice(1))}`} title="The handle this post is for">
           <Face src={identity?.profile ?? null} name={row.handle} />
-          <span className="post-head__who-text"><b>{row.handle}</b><small>{[identity?.role ?? row.role, identity ? (identity.connected ? "connected" : "not connected") : null].filter(Boolean).join(" · ")}</small></span>
+          <span className="post-head__who-text">{two && igAccount ? <><Account p="tiktok" name={row.handle} /><Account p="instagram" name={igAccount.account} /></> : <b>{row.handle}</b>}<small>{[identity?.role ?? row.role, identity ? (identity.connected ? "connected" : "not connected") : null].filter(Boolean).join(" · ")}</small></span>
         </Link>
         <h1 className={`post-head__topic${state.killed ? " is-killed" : ""}`}>{curl(row.topic)}</h1>
         <p className="post-head__meta">
@@ -98,6 +104,7 @@ export default async function ProductionPost({ params, searchParams }: { params:
             <Link className="post-head__mode" href={`${base}?as=plan`}>view as plan</Link>
           )}
         </p>
+        {two ? <Legs s={state} href={`${base}${slideNo > 1 ? `?slide=${slideNo}` : ""}`} view={view} /> : null}
         <div className="next" id="decision">
           <div className="next__left">
             <p className={`next__text is-${next.who}`}>
@@ -113,7 +120,7 @@ export default async function ProductionPost({ params, searchParams }: { params:
           </div>
           <DecisionRail state={state} primary={primary} outcomesOpen={outcomesOpenAt(state)} readOnly={next.who === "agent"} bridge={bridge} warning={warning} zones={zones} />
         </div>
-        <Reads s={state} />
+        <Reads s={state} view={view} />
         {openNote ? <p className="band">Sent back {openNote.at ? stamp(openNote.at) : ""} — <em>“{openNote.note}”</em></p> : null}
         {state.changed && !state.killed ? (
           <p className="band">

@@ -1,0 +1,208 @@
+/* What Instagram adds to the Organic Factory UI (0.4.0), from the approved
+ * mockups (ugckit-port/05-MULTI-PLATFORM/mocks/css/platform.css) without the
+ * mockup's own parts (the view copies, the note bar, the "new" outlines). The
+ * view is the ?platform= parameter, read on the server; a page with no
+ * Instagram leg draws none of this. The live tokens (--ink-*, --rule*,
+ * --ember*) keep it in the same world.
+ */
+
+/* ---------------------------------------------------------- platform icons */
+
+.pf {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  vertical-align: -2px;
+  color: var(--ink-3);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pf .pf__dot { fill: currentColor; stroke: none; }
+
+/* One account: the platform icon, then the account id. */
+.acct {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.acct > span { min-width: 0; overflow-wrap: anywhere; }
+
+/* ------------------------------------------------ the platform view switch */
+
+/* The picker in a toolbar reads like the live "all accounts" picker. */
+.pfpick > summary .pf { margin-right: 1px; }
+.pfpick .pick__list a { display: flex; align-items: center; gap: 7px; }
+
+/* The platform switch on the post page: the live .settoggle, with a state
+ * word on each platform. */
+.pfbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 14px 0 12px;
+}
+.pfbar .settoggle { margin: 0; }
+.pfbar .settoggle__opt { align-items: center; cursor: pointer; font: inherit; font-size: 0.78rem; }
+.pfbar .settoggle__opt .pf { width: 12px; height: 12px; vertical-align: 0; }
+.pfbar__note { margin: 0; font-size: 12.5px; color: var(--ink-3); }
+.legword { font-size: 11px; font-weight: 600; color: var(--ink-4); }
+.legword.is-waiting { color: var(--ember-deep); }
+.legword.is-approved { color: #2f6b3a; }
+.legword.is-out { color: #2f6b3a; }
+.legword.is-failed { color: var(--ember-deep); }
+
+/* -------------------------------------------------------- the read, split */
+
+/* Under the merged totals: the same five figures once per platform. Shown in
+ * the "both platforms" view only; a single-platform view shows that platform's
+ * figures in the big numbers instead. */
+.pfsplit {
+  display: grid;
+  grid-column: 1;
+  gap: 3px;
+  margin: 8px 0 2px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.pfsplit__row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 7px; }
+.pfsplit__row b { font-weight: 600; color: var(--ink-2); }
+.pfsplit__name { min-width: 64px; font-weight: 600; color: var(--ink-2); }
+.pfsplit__sep { color: var(--ink-4); }
+.pfsplit__note { color: var(--ink-4); }
+
+/* The day bars: the Instagram part of each bar sits on top of the TikTok part,
+ * lighter, so the bar still reads as one day. */
+.days__bar.has-ig { display: flex; flex-direction: column; overflow: hidden; }
+.days__ig {
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
+  background: repeating-linear-gradient(135deg, rgba(255, 253, 245, 0.55) 0 2px, transparent 2px 4px);
+  border-bottom: 1px solid rgba(255, 253, 245, 0.7);
+}
+.pfkey {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.pfkey i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--ink-3);
+}
+.pfkey i.is-ig {
+  background: var(--ink-3) repeating-linear-gradient(135deg, rgba(255, 253, 245, 0.55) 0 2px, transparent 2px 4px);
+}
+
+/* ------------------------------------------------ cards, cells and tiles */
+
+/* One small line per post: the TikTok figure, then the Instagram figure. */
+.legsplit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.legsplit > span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.legsplit .pf { width: 11px; height: 11px; vertical-align: 0; }
+.legsplit b { font-weight: 600; color: var(--ink-2); }
+.legsplit .is-failed { color: var(--ember-deep); font-weight: 600; }
+.legsplit .is-failed .pf { color: var(--ember-deep); }
+
+.cell--thumb .cell__split { grid-column: 2; margin-top: 4px; }
+.week__post--pic .week__split { grid-column: 2; }
+.week__split { gap: 1px 7px; }
+.month__legs { margin-top: 6px; }
+.plist__split { justify-content: flex-end; font-weight: 400; }
+
+.show__body .legsplit { margin-top: 2px; }
+
+/* The handle column of the board and the week: the TikTok account, then the
+ * Instagram account under it. */
+/* The one change to a live measure: the week's handle column is 12px wider
+ * (120px → 132px) so an icon fits beside the longest id on one line. */
+.week { grid-template-columns: 132px repeat(7, minmax(128px, 1fr)); }
+.week__row .acct > span,
+.day__handle .acct > span { white-space: nowrap; overflow-wrap: normal; }
+
+.day__handle .acct + .acct,
+.week__row .acct + .acct { margin-top: 3px; }
+.day__handle .acct .pf,
+.week__row .acct .pf { width: 12px; height: 12px; }
+.day__handle .acct--ig { font-weight: 500; }
+
+/* The handle page head: the Instagram account under the TikTok one. */
+.ahead__alt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  font-size: clamp(18px, 1.9vw, 24px);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--ink-2);
+}
+.ahead__alt .pf { width: 18px; height: 18px; color: var(--ink-3); }
+.ahead__alt small { font-size: 12.5px; font-weight: 400; letter-spacing: 0; color: var(--ink-3); }
+.display .pf { width: 0.5em; height: 0.5em; margin-right: 0.18em; vertical-align: 0.08em; stroke-width: 1.7; }
+
+/* Home: the handle cards. */
+.hcard .acct--ig { font-size: 12.5px; font-weight: 500; color: var(--ink-2); margin-top: -2px; }
+.hcard__name.acct { display: flex; }
+
+/* Home: the waiting card names the Instagram account on its own line. */
+.wait__who { flex-wrap: wrap; }
+.wait__who .acct--ig { flex-basis: 100%; padding-left: 30px; white-space: nowrap; }
+.wait__who .acct--ig .pf { width: 11px; height: 11px; }
+
+/* The post head: both accounts under the face. */
+.post-head__who-text .acct--ig { font-weight: 600; color: var(--ink); }
+
+/* The post page: the Instagram side of the caption block and the checks. */
+.tt__alt {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+.tt__alt .pf { margin-right: 4px; }
+.tag.is-changed { text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+.check.is-warn { color: var(--ember-deep); }
+
+/* ------------------------------------- the handle page, 2026-09-23 review */
+
+/* The platform filter under a page head: a visible switch, not a menu.
+ * The figures, the grid, the read and the posts table follow it. */
+.pfbar--filter { margin: 14px 0 0; }
+.pfbar--filter .settoggle__opt { font-size: 0.8rem; }
+
+/* A post that does not go to Instagram at all (12 slides; Instagram takes 10). */
+.legsplit .is-off { color: var(--ink-4); }
+.ahead__alt { flex-wrap: wrap; row-gap: 2px; }
+.ahead__alt small { white-space: nowrap; }
+
+/* The switch's options are links here: the icon sits on the text's baseline. */
+.pfbar .settoggle__opt { align-items: center; }
+
+/* The post page: the legs under the title. */
+.legs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 10px 0 4px; }
+.legs .pfbar { margin: 0; flex: 1 1 auto; }
+.legs .pfbar__note code { font-size: 11.5px; overflow-wrap: anywhere; }
+.legs__open { font-size: 12.5px; color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; }
+.legs__open:hover { color: var(--ember-deep); }
+.legs__toggle { display: inline-flex; align-items: center; gap: 8px; }
+.post-head__who-text .acct { font-weight: 600; color: var(--ink); }

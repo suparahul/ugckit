@@ -86,7 +86,9 @@ export default async function Studio({ params, searchParams }: { params: Promise
   const sort = (["date", "account", "topic", "format", "state"].includes(one(sp.sort)) ? one(sp.sort) : "date") as SortKey;
   const dir = one(sp.dir) === "desc" ? "desc" : "asc";
 
-  const handles = Object.values(prod.plan.handles);
+  /* The Instagram account of each handle, when it has one: drawn under the TikTok one in the day's handle column. */
+  const igOf = Object.fromEntries(identities.map((h) => [h.short, h.accounts.find((a) => a.platform === "instagram")?.account ?? null]));
+  const handles = Object.values(prod.plan.handles).map((h) => ({ ...h, instagram: igOf[h.short] ?? null }));
   const shownHandles = accounts.length ? handles.filter((h) => accounts.includes(h.short)) : handles;
 
   /* The period the zoom shows. */

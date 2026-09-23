@@ -85,7 +85,7 @@ ugckit — a niche or a reference video in, a recreation out.
   ugckit deepen <proj> <app> --rank | --deep | <handle>
   ugckit handoff <proj> <app> <handle> <post-id>
   ugckit library <stats|templates|hooks|formats|mechanics|teardowns>
-  ugckit atlas [--index]                        explore everything scraped, at http://localhost:3210
+  ugckit atlas [--index]                        the Organic Factory UI, at http://localhost:3210 (the Atlas is its research part)
 
   the slideshow path (an app in, two slideshows a day per handle out):
   ugckit product-facts <slug> [--id N | --repo P | --website U | --typed ...]
@@ -97,7 +97,8 @@ ugckit — a niche or a reference video in, a recreation out.
   ugckit callout <slug> <post> [--template appstore|feature|custom]
   ugckit render <slug> <post>                    the finished slides
   ugckit posting-accounts <slug>                 map handles to the posting service
-  ugckit post <slug> --post <key> [--send]       send (dry run without --send)
+  ugckit post <slug> --post <key> [--send]       send to every platform of the handle (dry run without --send;
+                                                 --only tiktok|instagram for one)
   ugckit sync <slug> --all | --date D | --post <key>
 
   recreation (1-9):

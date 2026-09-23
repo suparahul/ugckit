@@ -148,6 +148,7 @@ function ScheduleDirect({ who, busy, zones, onSchedule, onCancel }: { who: strin
 export function PostingRail({
   post,
   handle,
+  alsoInstagram = false,
   sent,
   link,
   exported,
@@ -159,6 +160,8 @@ export function PostingRail({
 }: {
   post: string;
   handle: string;
+  /** The post also goes to Instagram in the same send: always published at once, with no music. */
+  alsoInstagram?: boolean;
   sent: SentState | null;
   link: string | null;
   exported: { at: string; dir: string } | null;
@@ -210,7 +213,7 @@ export function PostingRail({
             </span>
           ) : asking ? (
             <span className="posting__ask">
-              Send to the drafts of {who}?
+              Send to the drafts of {who}{alsoInstagram ? " and publish on Instagram now (no music: add it in the Instagram app)" : ""}?
               <button type="button" className="pill" disabled={sending} onClick={() => void send()}>Yes, send</button>
               <button type="button" className="rail__kill" onClick={() => setAsking(false)}>cancel</button>
             </span>
@@ -218,8 +221,8 @@ export function PostingRail({
             <>
               <ExportFiles post={post} exported={exported} />
               <button type="button" className="rail__kill" title="Marks it posted. Use Export files to get the images first." onClick={() => setByHand(true)}>Mark as manually posted</button>
-              <button type="button" className="rail__kill" disabled={sending || !bridge.canSend} title="Post Bridge publishes it at a set time; nobody types the cover text, so it is burned into slide 1" onClick={() => setScheduling(true)}>Schedule direct post…</button>
-              <button type="button" className="rail__go" disabled={sending || !bridge.canSend} onClick={() => setAsking(true)}>{sending ? "Sending…" : "Send to TikTok drafts"}</button>
+              <button type="button" className="rail__kill" disabled={sending || !bridge.canSend} title={`Post Bridge publishes it at a set time${alsoInstagram ? ", on TikTok and Instagram together" : ""}; nobody types the cover text, so it is burned into slide 1`} onClick={() => setScheduling(true)}>Schedule direct post…</button>
+              <button type="button" className="rail__go" disabled={sending || !bridge.canSend} onClick={() => setAsking(true)}>{sending ? "Sending…" : alsoInstagram ? "Send to TikTok drafts and Instagram" : "Send to TikTok drafts"}</button>
             </>
           )}
         </div>

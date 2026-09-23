@@ -15,7 +15,7 @@ yourself before writing a line.
 
 ## The file: `apps/<slug>/production/decks/<date>-<short>.md`
 
-`<short>` is the plan's handle short name. The Atlas parses the file by these
+`<short>` is the plan's handle short name. The Organic Factory UI parses the file by these
 conventions; keep them exactly.
 
     # `@hannah.catmom` — day 2, 2026-09-17 — two slideshow posts
@@ -132,7 +132,7 @@ the spelling: a generator's text is a candidate to reject, not to fix.
 ## Finish
 
 Rebuild the index (`cd atlas && ATLAS_ROOT=.. node scripts/build-production.mjs`) and read
-what it could not parse. A deck on disk is the plan: the Atlas counts the plan stage
+what it could not parse. A deck on disk is the plan: the Organic Factory UI counts the plan stage
 done the moment the deck exists, and the user reads the deck through its pictures on
 the post page, http://localhost:3210/production/<slug>/<date>/<short>/<n> (the written
 deck alone is at `?as=plan`). Do not wait for a `plan.approve` line; run the `images`

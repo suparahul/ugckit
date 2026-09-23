@@ -64,6 +64,9 @@ const KIND_WORD: Record<string, string> = {
   posted: "posted",
   outcomes: "outcomes recorded",
   "postbridge.sent": "sent to TikTok drafts",
+  "posting.failed": "a platform refused it",
+  "leg.drop": "platform taken off",
+  "leg.add": "platform put back",
   "posted.link": "link found",
   "outcome.sync": "outcomes synced",
   export: "files exported",
@@ -124,7 +127,7 @@ export function DecisionRail({
             <button type="button" className="rail__kill" disabled={busy} onClick={() => run({ post, kind: "unkill" })}>Un-kill this post</button>
           </div>
         ) : primary.kind === "posted" ? (
-          <PostingRail post={post} handle={state.row.handle} sent={state.sent} link={state.link} exported={state.exported} bridge={bridge ?? { account: null, why: "POST_BRIDGE_API_KEY is not set in .env", canSend: false }} warning={warning ?? null} busy={busy} onDecide={run} zones={zones} />
+          <PostingRail post={post} handle={state.row.handle} alsoInstagram={(state.platforms ?? []).includes("instagram") && !state.legs?.instagram?.dropped && !state.legs?.instagram?.sent} sent={state.sent} link={state.link} exported={state.exported} bridge={bridge ?? { account: null, why: "POST_BRIDGE_API_KEY is not set in .env", canSend: false }} warning={warning ?? null} busy={busy} onDecide={run} zones={zones} />
         ) : primary.kind === "outcomes" ? (
           <PostedRail post={post} sent={state.sent} link={state.link} exported={state.exported} synced={state.synced}>
             {outcomesReady ? <OutcomesForm post={post} busy={busy} onDecide={run} synced={state.synced} /> : null}
@@ -287,7 +290,7 @@ export function DecisionLog({ log }: { log: Event[] }) {
           <li key={e.at + i}>
             <time dateTime={e.at}>{stamp(e.at)}</time>
             <span className="k">{KIND_WORD[e.kind] ?? e.kind}{e.slide ? ` · slide ${e.slide}` : ""}{e.actor === "demo" ? <span className="state__demo">test</span> : e.actor ? <span className="state__demo">agent</span> : null}</span>
-            <span>{e.note ? <em>“{e.note}”</em> : (e.kind === "postbridge.sent" || e.kind === "posting.sent") ? `Post Bridge post ${e.data?.id ?? ""}${e.data?.mode === "direct" ? ` · direct, scheduled ${String(e.data?.scheduledAt ?? "").slice(0, 16).replace("T", " ")} UTC` : ""}` : e.kind === "outcome.sync" ? `${e.data?.source === "monid" ? "Monid" : "Post Bridge"}: ${Number(e.data?.views ?? 0).toLocaleString("en-US")} views · ${e.data?.likes ?? 0} likes · ${e.data?.comments ?? 0} comments${e.data?.saves != null ? ` · ${e.data.saves} saves` : ""} · ${e.data?.shares ?? 0} shares` : e.data?.url ? String(e.data.url) : ""}</span>
+            <span>{e.note ? <em>“{e.note}”</em> : (e.kind === "postbridge.sent" || e.kind === "posting.sent") ? `Post Bridge post ${e.data?.id ?? ""}${e.data?.mode === "direct" ? ` · direct, scheduled ${String(e.data?.scheduledAt ?? "").slice(0, 16).replace("T", " ")} UTC` : ""}` : e.kind === "posting.failed" ? `${e.data?.platform === "instagram" ? "Instagram" : "TikTok"}: ${String(e.data?.error ?? "")}` : e.kind === "outcome.sync" ? `${e.data?.platform === "instagram" ? "Instagram, " : ""}${e.data?.source === "monid" ? "Monid" : "Post Bridge"}: ${Number(e.data?.views ?? 0).toLocaleString("en-US")} views · ${e.data?.likes ?? 0} likes · ${e.data?.comments ?? 0} comments${e.data?.saves != null ? ` · ${e.data.saves} saves` : ""} · ${e.data?.shares ?? 0} shares` : e.data?.url ? String(e.data.url) : ""}</span>
           </li>
         ))}
         {!lines.length ? <li className="is-more">No decisions yet.</li> : null}

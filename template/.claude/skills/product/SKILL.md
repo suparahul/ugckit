@@ -48,7 +48,7 @@ Any of these, in any mix. Read all of what is given, not the first page of it.
   "<subtitle>" [icon]`; the source is recorded as `typed`.
 
 The fallback chain is that order: id, repo, website, typed. `product.json` records
-which one it came from in `source`; the Atlas shows the source next to the card. An
+which one it came from in `source`; the Organic Factory UI shows the source next to the card. An
 Android-only or not-yet-listed app has no lookup: use the repo or the site, and say so
 in the gaps section.
 
@@ -116,4 +116,4 @@ canvas shows stage 1 as waiting for the user. When the app exists, come back her
 Report the niche phrase, the search-word list and the callout facts as written (name,
 subtitle, source), and ask the user to confirm the phrase and the words before phase 3
 spends on them. Stage 1 is filled when `APP.md` exists and `product.json` has a source:
-open http://localhost:3210/app/<slug> if the Atlas runs.
+open http://localhost:3210/app/<slug> if the Organic Factory UI runs.

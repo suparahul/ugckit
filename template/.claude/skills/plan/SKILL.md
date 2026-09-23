@@ -27,7 +27,7 @@ magnitude bigger than the niche ones (#cat 1.2T against #newcatowner 60M).
 
 ## Write `apps/<slug>/production/PLAN.md`
 
-The Atlas reads this file by these exact conventions:
+The Organic Factory UI reads this file by these exact conventions:
 
     # Week 1 plan — <YYYY-MM-DD> to <YYYY-MM-DD>
 
@@ -66,7 +66,7 @@ The Atlas reads this file by these exact conventions:
 The posts table: `Handle` is the short name (the part of the handle before the first
 dot); `Date` is `MM-DD` in the plan's year; `Source` carries the source post's handle,
 its view count and its exact url ("no URL held" when none); `Kind` is `slideshow` or
-`video` and sits last so the Atlas's column order holds. A row with `kind: video` names
+`video` and sits last so the UI's column order holds. A row with `kind: video` names
 the video pipeline as its maker (`originate`, stage 5) and joins production at `post`.
 Two handles at two a day for seven days is 28 rows; write every row with a source.
 

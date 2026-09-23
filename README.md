@@ -194,7 +194,7 @@ already scraped is not paid for twice, a cover already on disk is not fetched ag
 ## The slideshow path
 
 The third route. An app in, two slideshows a day per handle out. Eight phases; each one
-writes fixed files under `apps/<slug>/`, and the Organic Factory (`./ugckit atlas`,
+writes fixed files under `apps/<slug>/`, and the Organic Factory UI (`./ugckit atlas`,
 http://localhost:3210/app/`<slug>`) reads them in place — a phase is "filled" when its
 files exist, nothing is recorded. Ask the agent for the skill by name.
 
@@ -205,7 +205,7 @@ files exist, nothing is recorded. Ask the agent for the skill by name.
 | 3 | competitor apps | `apps` → `teardown`, then `apps-learnings` | the R1–R5 research above, then its lessons written into the findings | ~$0.75 for five apps |
 | 4 | the niche | `niche-search`, `niche-hunt`, `niche-fetch`, `niche-read` | search the niche's slideshows, scroll for the best by hand, pull one batch, read it | ~$0.20 search, ~$0.03 a batch |
 | 5 | account architecture | `account-architecture` | how many handles, which role each plays, approved on the strategy page | — |
-| 6 | handle identities | `handles`, `persona-identity` | one handle at a time: the identity, the reference pictures, the account on TikTok | — |
+| 6 | handle identities | `handles`, `persona-identity` | one handle at a time: the identity, the reference pictures, the account on TikTok (and on Instagram, when it reposts there) | — |
 | 7 | app fit and plan | `app-fit`, `plan` | where the app sits in the post, then two posts a day per handle as `PLAN.md` | $0.0015 a tag if measured |
 | 8 | production | per post `deck`, `images`, `callout`, `render`, `post`; `posting-provider` once; `sync` daily; `read` weekly | the deck, the pictures, the app card, the slides, the send; the numbers back | Codex plan, posting subscription, sync under a cent a day |
 
@@ -219,14 +219,24 @@ checked at the first picture, the posting service (Post Bridge by default) is co
 the first send — never earlier. The manual steps — the scroll, the account creation, the
 bio — come as recipes with a tick box on the handle page.
 
+**Instagram, as a repost.** An identity can also post on Instagram: the `handles` skill adds
+the account (a professional account; its name may differ), and from then on every deck
+of that identity goes to both platforms in one send, at the same time. Instagram is
+always published directly, as 4:5 JPEG slides with the cover text burned in, the tags in
+the first comment and no music (add it in the Instagram app: Edit, then Replace Audio).
+Its decks are 10 slides at most, because Instagram's API takes 10. Its numbers come from
+Post Bridge, with no Monid call; its saves are not reported by any source. The research
+stays TikTok only. Details: `docs/instagram.md` in your folder.
+
 Progress is S1–S6 in `pipeline/state/pipeline.json` (`./ugckit state show <slug>`). A video the
 niche read found worth recreating hands off to stage 1 of the recreation half; a plan row
 of kind `video` is written by `originate` and joins production at `post`.
 
 ## Two screens
 
-- **Atlas** (`./ugckit atlas`, http://localhost:3210) — the research half. Opens after the
-  first harvest and after each teardown.
+- **Organic Factory UI** (`./ugckit atlas`, http://localhost:3210) — the home base of each
+  app, the studio, the post and handle pages, and the Atlas, its research part. The Atlas
+  opens after the first harvest and after each teardown.
 - **Review UI** (`./ugckit ui`, http://127.0.0.1:7878) — the recreation half. Opens when a
   prompt exists, after every generation, and at delivery.
 
@@ -256,16 +266,17 @@ Selected by which files exist in `pipeline/05-prompt/<project>/`:
 - `+ refs.json` — **referenced**: hand reference clips to the model. Rarely what you want;
   read rule 1 in `AGENTS.md` first.
 
-## The Atlas
+## The Organic Factory UI, and the Atlas
 
     ./ugckit atlas     # http://localhost:3210
 
-Everything the research half scraped, on one surface: an orb with one cluster per app, a
+The whole interface is the Organic Factory UI; the Atlas is its research part. The Atlas
+is everything the research half scraped, on one surface: an orb with one cluster per app, a
 front door per app with its whole network in one carousel and the thirteen-heading
 teardown, a dossier per account, a page per post with the video or the slides and the
 verbatim hook, and threads that pull the same hook across every app you studied. It reads
 `research/` in place and starts empty; every app you harvest appears on the next run.
-For the slideshow path it is the Organic Factory: one canvas per app at `/app/<slug>`,
+The rest of the Organic Factory UI serves the slideshow path: one canvas per app at `/app/<slug>`,
 one compartment per phase, the post page with the deck, the candidate pictures and the
 approvals, and the handle page with the tick boxes. It reads `apps/` in place too.
 Needs Node 22.18+, which nothing else in ugckit does. Lifted from the organic-social Atlas.

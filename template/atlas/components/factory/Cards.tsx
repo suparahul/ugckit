@@ -11,7 +11,8 @@ import type { Brand, Post } from "@/lib/data";
 import type { Handle } from "@/lib/handles";
 import type { BatchPost } from "@/lib/niche";
 import { postPath, uploadedFiles, type PostState } from "@/lib/production";
-import { numbersOf } from "@/lib/read";
+import { numbersIn, numbersOf, type View } from "@/lib/read";
+import { Account, LegSplit } from "@/components/Platform";
 import { fileUrl } from "@/components/production/Frame";
 import { firstPicture } from "./Wait";
 import { Face, MarkRow, dmy, n, pct, short, wdm, word } from "./Bits";
@@ -38,9 +39,12 @@ export function formatHead(format: string): string {
   return format.split(/[,;:(]/)[0].trim() || format;
 }
 
-export function PostedShow({ s, handle }: { s: PostState; handle: Handle | null }) {
+/** `view`: the numbers of one platform, or of both with the split line under them. Absent: the post's numbers, as before two platforms. */
+export function PostedShow({ s, handle, view }: { s: PostState; handle: Handle | null; view?: View }) {
   const srcs = slidesOf(s);
-  const nb = numbersOf(s);
+  const nb = numbersIn(s, view ?? "both");
+  /* Saves are TikTok's: none on the Instagram view. */
+  const saves = view === "instagram" ? null : view === "both" ? numbersIn(s, "tiktok") : nb;
   const when = s.posted ? `${wdm(s.row.date)}, ${s.posted.time}` : wdm(s.row.date);
   const z = (v: number) => (v === 0 ? "is-zero" : undefined);
   const body = (
@@ -48,10 +52,11 @@ export function PostedShow({ s, handle }: { s: PostState; handle: Handle | null 
       <span className="show__when"><b>{when}</b><small>{s.row.handle} · {s.row.slot}</small></span>
       <span className="show__topic">{s.row.topic}</span>
       {nb ? (
-        <span className="show__nums"><span><b>{n(nb.views)}</b> views</span><span className={z(nb.saves)}>{word(nb.saves, "save")}</span><span className={z(nb.shares)}>{word(nb.shares, "share")}</span></span>
+        <span className="show__nums"><span><b>{n(nb.views)}</b> views</span>{saves ? <span className={z(saves.saves)}>{word(saves.saves, "save")}</span> : view === "instagram" ? <span className="is-zero">saves not reported</span> : null}<span className={z(nb.shares)}>{word(nb.shares, "share")}</span></span>
       ) : (
         <span className="show__nums"><span className="is-zero">posted, no read yet</span></span>
       )}
+      {view === "both" ? <LegSplit s={s} /> : null}
       <span className="show__state"><span className="state state--short" title={s.row.format}>{formatHead(s.row.format)}{srcs.length ? ` · ${srcs.length} slides` : ""}</span></span>
     </>
   );
@@ -105,11 +110,12 @@ export function HandleCard({ h, states, href }: { h: Handle; states: PostState[]
   const posted = mine.filter((s) => !!s.posted && !s.killed);
   const views = posted.reduce((t, s) => t + (numbersOf(s)?.views ?? 0), 0);
   const planned = mine.filter((s) => !s.posted && !s.killed).length;
+  const ig = (h.accounts ?? []).find((a) => a.platform === "instagram") ?? null;
   return (
     <Link className="hcard" href={href}>
       <span className={`hcard__dot${h.connected ? " is-ok" : ""}`} role="img" aria-label={h.connected ? "Connected to the posting service" : "Not connected yet"} title={h.connected ? "Connected to the posting service · turns ember when the connection needs you" : "Not connected to the posting service yet"} />
       <Face src={h.profile} name={h.handle} />
-      <span className="hcard__name">{h.handle}</span>
+      {ig ? <><Account p="tiktok" name={h.handle} className="hcard__name" /><Account p="instagram" name={ig.account} /></> : <span className="hcard__name">{h.handle}</span>}
       <span className="hcard__role">{h.role ?? "handle"} · {h.complete ? "complete" : `step ${h.next?.n ?? 5} of 5`}</span>
       <dl className="stats stats--sm">
         <div><dd>{n(views)}</dd><dt>views</dt></div>
