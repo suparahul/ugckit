@@ -30,10 +30,12 @@
  *                    shape Instagram's API takes (4:5 to 1.91:1, JPEG). A 3:4 slide loses
  *                    45 px at the top and at the bottom, outside the text's safe area; a
  *                    9:16 slide is fitted whole on a blurred copy of itself. The cover
- *                    always carries its text, since nobody types it on Instagram.
- *                    caption.txt is the caption without the hashtags; first-comment.txt
- *                    holds the hashtags (Post Bridge posts it as the first comment).
- *                    A deck over 10 slides is written with a warning: Instagram takes 10.
+ *                    always carries its text, since nobody types it on Instagram: the
+ *                    post is rendered a second time with --burn-cover, into a scratch
+ *                    folder, and that render is converted. caption.txt is the caption
+ *                    without the hashtags; first-comment.txt holds the hashtags (Post
+ *                    Bridge posts it as the first comment). A deck over 10 slides is
+ *                    written with a warning: Instagram takes 10.
  *
  * Text style: Helvetica Neue Bold, white, with a black outline (TikTok's
  * "classic" look). Boxed blocks (the deck's "in a box") are the TikTok
@@ -51,7 +53,8 @@
  * by rendering it, so no font-metrics library is needed.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import sharp from "sharp";
 import { cardHash, renderAppStoreCard } from "./lib/appstore-card.mjs";
@@ -284,12 +287,12 @@ function instagramText(deck) {
   return { caption, firstComment: tags.join(" ") };
 }
 
-async function renderPost(key, { force = false, override = {}, burnCover = false, instagram = false } = {}) {
+async function renderPost(key, { force = false, override = {}, burnCover = false, instagram = false, outDir: into = null } = {}) {
   const hit = deckOf(key);
   if (!hit) { console.log(`${key}: no deck`); return false; }
   const { deck, file } = hit;
   const events = log.filter((e) => e.post === key);
-  const outDir = join(FILES, fileKey(key), "final");
+  const outDir = into ?? join(FILES, fileKey(key), "final");
 
   const pics = deck.slides.map((s) => ({ n: s.n, ...pictureOf(key, s.n, events) }));
   const missing = pics.filter((p) => !p.approved);
@@ -299,8 +302,6 @@ async function renderPost(key, { force = false, override = {}, burnCover = false
   FR = frameOf(deck.dimension ?? "3:4");
   H = FR.h;
   mkdirSync(outDir, { recursive: true });
-  const igDir = join(outDir, "instagram");
-  if (instagram) mkdirSync(igDir, { recursive: true });
 
   for (const slide of deck.slides) {
     const pic = pics.find((p) => p.n === slide.n);
@@ -311,56 +312,42 @@ async function renderPost(key, { force = false, override = {}, burnCover = false
     /* A picture of another shape is centre-cropped to the canvas; the line below says so. */
     const cropped = meta.width && meta.height && Math.abs(meta.width / meta.height - W / H) > 0.02 ? `${meta.width}×${meta.height} centre-cropped to ${FR.dimension}` : "";
     const base = sharp(srcPath).resize(W, H, { fit: "cover", position: "centre" });
+    const layers = [];
     const hasCard = slide.cards.length > 0 && !!cardPath;
     /* Direct mode: the cover carries its text, in the deck's slide-1 style (or its locked layout), since no hand types it.
      * An illustrated deck (the item row `Slide style: illustrated`) has its text drawn into the picture by the generator:
      * no text layer on any slide, the callout card still on the product slide. An absent row, or `photo`, is today's path. */
     const flag = illustrated ? "overlay" : burnCover && slide.n === 1 ? "baked" : textFlagOf(slide.n, events);
-    /* The layers of the slide with this text flag; the Instagram cover is composed "baked" even when TikTok's is not. */
-    const compose = async (flag) => {
-      const layers = [];
-      if (flag === "baked") {
-        const layout = layoutOf(slide.n, events);
-        const body = layout ? await lockedLayoutSvg(layout) : await defaultLayoutSvg(slide, slide.cards.length > 0);
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><defs><filter id="sh" x="-5%" y="-5%" width="110%" height="110%"><feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-color="#000" flood-opacity="0.6"/></filter></defs>${body}</svg>`;
-        layers.push({ input: Buffer.from(svg), top: 0, left: 0 });
-      }
-      if (hasCard) {
-        /* The card: where the locked layout put it (x, y, w in % of the frame; the height follows the 139:34 ratio), or the
-         * default of production.css .frame__cards: 80% wide, centred, its bottom edge on the safe-area limit. Alone on the photo with a soft shadow. */
-        const layout = flag === "baked" ? layoutOf(slide.n, events) : null;
-        const { path, note } = await cardFor(key, layout, cardPath);
-        cardNote = note;
-        const lc = layout?.card;
-        const cw = Math.round(((lc ? lc.w : CARD.w) / 100) * W), ch = Math.round(cw * CARD.ratio);
-        const cardLeft = Math.round(lc ? (lc.x / 100) * W : (W - cw) / 2);
-        const cardTop = Math.round(lc ? (lc.y / 100) * H : (FR.safe.bottom / 100) * H - ch);
-        const card = await sharp(path).resize(cw, ch, { fit: "cover" }).png().toBuffer();
-        const shadow = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><defs><filter id="b" x="-10%" y="-20%" width="120%" height="150%"><feGaussianBlur stdDeviation="${1.5 * cq}"/></filter></defs><rect x="${cardLeft}" y="${cardTop + 1.2 * cq}" width="${cw}" height="${ch}" rx="${3.6 * cq}" fill="rgba(0,0,0,0.28)" filter="url(#b)"/></svg>`;
-        layers.push({ input: Buffer.from(shadow), top: 0, left: 0 });
-        layers.push({ input: card, top: cardTop, left: cardLeft });
-      }
-      return base.clone().composite(layers).png().toBuffer();
-    };
-    let cardNote = "";
-    const png = await compose(flag);
-    const out = join(outDir, `slide-${String(slide.n).padStart(2, "0")}.png`);
-    writeFileSync(out, png);
-    if (instagram) {
-      const igFlag = illustrated ? "overlay" : slide.n === 1 ? "baked" : flag;
-      writeFileSync(join(igDir, `slide-${String(slide.n).padStart(2, "0")}.jpg`), await toInstagram(igFlag === flag ? png : await compose(igFlag), FR.dimension));
+
+    if (flag === "baked") {
+      const layout = layoutOf(slide.n, events);
+      const body = layout ? await lockedLayoutSvg(layout) : await defaultLayoutSvg(slide, slide.cards.length > 0);
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><defs><filter id="sh" x="-5%" y="-5%" width="110%" height="110%"><feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-color="#000" flood-opacity="0.6"/></filter></defs>${body}</svg>`;
+      layers.push({ input: Buffer.from(svg), top: 0, left: 0 });
     }
+    let cardNote = "";
+    if (hasCard) {
+      /* The card: where the locked layout put it (x, y, w in % of the frame; the height follows the 139:34 ratio), or the
+       * default of production.css .frame__cards: 80% wide, centred, its bottom edge on the safe-area limit. Alone on the photo with a soft shadow. */
+      const layout = flag === "baked" ? layoutOf(slide.n, events) : null;
+      const { path, note } = await cardFor(key, layout, cardPath);
+      cardNote = note;
+      const lc = layout?.card;
+      const cw = Math.round(((lc ? lc.w : CARD.w) / 100) * W), ch = Math.round(cw * CARD.ratio);
+      const cardLeft = Math.round(lc ? (lc.x / 100) * W : (W - cw) / 2);
+      const cardTop = Math.round(lc ? (lc.y / 100) * H : (FR.safe.bottom / 100) * H - ch);
+      const card = await sharp(path).resize(cw, ch, { fit: "cover" }).png().toBuffer();
+      const shadow = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><defs><filter id="b" x="-10%" y="-20%" width="120%" height="150%"><feGaussianBlur stdDeviation="${1.5 * cq}"/></filter></defs><rect x="${cardLeft}" y="${cardTop + 1.2 * cq}" width="${cw}" height="${ch}" rx="${3.6 * cq}" fill="rgba(0,0,0,0.28)" filter="url(#b)"/></svg>`;
+      layers.push({ input: Buffer.from(shadow), top: 0, left: 0 });
+      layers.push({ input: card, top: cardTop, left: cardLeft });
+    }
+    const out = join(outDir, `slide-${String(slide.n).padStart(2, "0")}.png`);
+    await base.composite(layers).png().toFile(out);
     const note = illustrated ? "illustrated: text in the picture" : flag === "overlay" ? "cover, no text" : `${layoutOf(slide.n, events) ? "locked layout" : "deck layout"}${burnCover && slide.n === 1 ? ", cover text burned for a direct post" : ""}`;
     console.log(`${key}: wrote ${out} (${FR.dimension} ${W}×${H}, ${note}${hasCard ? `, product callout${cardNote ? ` (${cardNote})` : ""}` : ""}${cropped ? `, ${cropped}` : ""}${override[slide.n] ? `, picture overridden: ${override[slide.n]}` : ""})`);
   }
 
-  if (instagram) {
-    const ig = instagramText(deck);
-    writeFileSync(join(igDir, "caption.txt"), ig.caption + "\n");
-    writeFileSync(join(igDir, "first-comment.txt"), ig.firstComment + "\n");
-    console.log(`${key}: wrote the Instagram set in ${igDir} (${deck.slides.length} JPEG slides at 4:5 ${IG.w}×${IG.h}, cover text burned; caption.txt without the hashtags, first-comment.txt with them)`);
-    if (deck.slides.length > IG.maxSlides) console.log(`${key}: WARNING — ${deck.slides.length} slides; Instagram takes ${IG.maxSlides}. A handle on TikTok and Instagram plans its decks at ${IG.maxSlides} slides or fewer: cut the deck.`);
-  }
+  if (instagram) await instagramSet(key, deck, outDir, { force, override, burned: burnCover || illustrated });
 
   const cover = deck.slides[0];
   if (cover) writeFileSync(join(outDir, "cover-text.txt"), cover.blocks.map((b) => b.text).join("\n\n") + "\n");
@@ -368,6 +355,37 @@ async function renderPost(key, { force = false, override = {}, burnCover = false
   writeFileSync(join(outDir, "caption.txt"), (deck.caption && deck.hashtags.every((h) => deck.caption.includes(h)) ? deck.caption : caption.join(" ")) + "\n");
   console.log(`${key}: wrote cover-text.txt and caption.txt (${file.file})`);
   return true;
+}
+
+/**
+ * final/instagram/: the slides as 4:5 JPEG with the cover text burned in. When the
+ * render above already burned it (direct mode, or an illustrated deck), its PNGs are
+ * converted; otherwise the post is rendered once more with --burn-cover into a scratch
+ * folder, quietly, and that render is converted. The loop above is not touched.
+ */
+async function instagramSet(key, deck, outDir, { force, override, burned }) {
+  const igDir = join(outDir, "instagram");
+  mkdirSync(igDir, { recursive: true });
+  let from = outDir, tmp = null;
+  if (!burned) {
+    tmp = mkdtempSync(join(tmpdir(), "ugckit-ig-"));
+    const say = console.log;
+    console.log = () => {};
+    try { await renderPost(key, { force, override, burnCover: true, outDir: tmp }); } finally { console.log = say; }
+    from = tmp;
+  }
+  const nn = (n) => String(n).padStart(2, "0");
+  for (const slide of deck.slides) {
+    const png = join(from, `slide-${nn(slide.n)}.png`);
+    if (!existsSync(png)) continue;
+    writeFileSync(join(igDir, `slide-${nn(slide.n)}.jpg`), await toInstagram(readFileSync(png), FR.dimension));
+  }
+  if (tmp) rmSync(tmp, { recursive: true, force: true });
+  const ig = instagramText(deck);
+  writeFileSync(join(igDir, "caption.txt"), ig.caption + "\n");
+  writeFileSync(join(igDir, "first-comment.txt"), ig.firstComment + "\n");
+  console.log(`${key}: wrote the Instagram set in ${igDir} (${deck.slides.length} JPEG slides at 4:5 ${IG.w}×${IG.h}, cover text burned; caption.txt without the hashtags, first-comment.txt with them)`);
+  if (deck.slides.length > IG.maxSlides) console.log(`${key}: WARNING — ${deck.slides.length} slides; Instagram takes ${IG.maxSlides}. A handle on TikTok and Instagram plans its decks at ${IG.maxSlides} slides or fewer: cut the deck.`);
 }
 
 const args = process.argv.slice(3);
