@@ -34,11 +34,13 @@ test("the 10-slide rule: a check only when the post also goes to Instagram", () 
   assert.match(over.label, /13 slides · Instagram takes 10: cut the deck/);
 });
 
-test("platformsOf: the row's cell, else the plan's line, else TikTok", () => {
-  const row = { slug: "x" } as PlanRow;
-  assert.deepEqual(platformsOf(row, {}), ["tiktok"]);
-  assert.deepEqual(platformsOf(row, { platforms: ["tiktok", "instagram"] }), ["tiktok", "instagram"]);
-  assert.deepEqual(platformsOf({ ...row, platforms: ["tiktok"] }, { platforms: ["tiktok", "instagram"] }), ["tiktok"]);
+test("platformsOf: the row's cell; else the handle's declared accounts, kept to the plan's line; else TikTok", () => {
+  const row = { slug: "x", handle: "@hannah.catmom" } as PlanRow;
+  assert.deepEqual(platformsOf(row, {}, null), ["tiktok"]);
+  assert.deepEqual(platformsOf(row, {}, ["tiktok", "instagram"]), ["tiktok", "instagram"], "the handle reposts on Instagram");
+  assert.deepEqual(platformsOf(row, { platforms: ["tiktok"] }, ["tiktok", "instagram"]), ["tiktok"], "the plan holds Instagram back this week");
+  assert.deepEqual(platformsOf(row, { platforms: ["tiktok", "instagram"] }, ["tiktok"]), ["tiktok"], "the plan cannot add an account the handle does not have");
+  assert.deepEqual(platformsOf({ ...row, platforms: ["tiktok"] }, {}, ["tiktok", "instagram"]), ["tiktok"], "the row's own cell wins");
 });
 
 test("a log with no platform gives one TikTok leg, exactly as before", () => {

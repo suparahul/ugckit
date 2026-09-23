@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { accountsOf, mapAccounts, outcomeOf, postBridge, PostBridgeError, readKey, sendStatusOf, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type PBAnalytics, type PBPost, type PBPostResult } from "./postbridge.ts";
+import { accountsOf, legStatusOf, legsPost, mapAccounts, outcomeOf, postBridge, PostBridgeError, readKey, sendStatusOf, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type PBAnalytics, type PBPost, type PBPostResult } from "./postbridge.ts";
 
 type Call = { url: string; method: string; headers: Record<string, string>; body: unknown };
 
@@ -234,4 +234,96 @@ test("accountsOf: a map written before 0.4.0 (one account per handle) still give
   assert.equal(accountsOf(old, "hannah.catmom").tiktok?.id, 97911, "found without the @ too");
   assert.deepEqual(accountsOf(old, "@catlover.tiktok3"), {});
   assert.deepEqual(accountsOf(null, "@hannah.catmom"), {});
+});
+
+test("legsPost: one post for both accounts; TikTok draft, Instagram with its own slides, caption and first comment", () => {
+  const input = legsPost({
+    legs: [{ platform: "tiktok", account: 97911 }, { platform: "instagram", account: 98014 }],
+    mode: "draft",
+    tiktok: { caption: "7 signs your cat is stressed #catsoftiktok", media: ["t1", "t2"] },
+    instagram: { caption: "7 signs your cat is stressed", media: ["i1", "i2"], firstComment: "#catsoftiktok" },
+  });
+  assert.deepEqual(input.accounts, [97911, 98014]);
+  assert.deepEqual(input.media, ["t1", "t2"], "the post's media are TikTok's");
+  assert.equal(input.caption, "7 signs your cat is stressed #catsoftiktok");
+  assert.deepEqual(input.platformConfig, {
+    tiktok: { draft: true },
+    instagram: { caption: "7 signs your cat is stressed", media: ["i1", "i2"], first_comment: "#catsoftiktok" },
+  });
+  assert.equal(input.schedule, undefined, "a draft is processed now: Instagram publishes at once");
+});
+
+test("legsPost: direct mode schedules both legs at one instant; an Instagram leg alone carries its own media", () => {
+  const both = legsPost({
+    legs: [{ platform: "tiktok", account: 1 }, { platform: "instagram", account: 2 }],
+    mode: "direct", scheduledAt: "2026-09-23T23:00:00.000Z",
+    tiktok: { caption: "c", media: ["t1"] }, instagram: { caption: "c", media: ["i1"], firstComment: "" },
+  });
+  assert.equal(both.schedule, "2026-09-23T23:00:00.000Z");
+  assert.equal(both.platformConfig?.tiktok?.draft, false);
+  assert.equal(both.platformConfig?.instagram?.first_comment, undefined, "no hashtags, no first comment");
+  const ig = legsPost({ legs: [{ platform: "instagram", account: 2 }], mode: "draft", instagram: { caption: "c", media: ["i1", "i2"], firstComment: "#a" } });
+  assert.deepEqual(ig.accounts, [2]);
+  assert.deepEqual(ig.media, ["i1", "i2"]);
+  assert.equal(ig.platformConfig?.tiktok, undefined);
+  assert.throws(() => legsPost({ legs: [{ platform: "instagram", account: 2 }], mode: "draft" }), /Instagram leg needs/);
+  assert.throws(() => legsPost({ legs: [{ platform: "tiktok", account: 1 }], mode: "direct", tiktok: { caption: "c", media: ["t"] } }), /needs a time/);
+});
+
+test("legStatusOf: each leg reads its own post result; one success and one failure", () => {
+  const post = { id: "p1", status: "posted", scheduled_at: null, platform_configurations: { tiktok: { draft: true } } } as unknown as PBPost;
+  const results = [
+    { id: "r1", post_id: "p1", success: true, social_account_id: 1, error: null, platform_data: { url: "https://www.tiktok.com/@h/photo/1" } },
+    { id: "r2", post_id: "p1", success: false, social_account_id: 2, error: { message: "Aspect ratio not supported" }, platform_data: null },
+  ] as PBPostResult[];
+  assert.deepEqual(legStatusOf(post, results, { platform: "tiktok", account: 1 }), { word: "draft created", error: null, url: "https://www.tiktok.com/@h/photo/1" });
+  assert.deepEqual(legStatusOf(post, results, { platform: "instagram", account: 2 }), { word: "error", error: "Aspect ratio not supported", url: null });
+  assert.equal(legStatusOf({ ...post, status: "processing" } as PBPost, [], { platform: "instagram", account: 2 }).word, "queued");
+});
+
+test("syncOutcomesWith: two legs give one line each; one refresh per platform; an Instagram failure is heard, not a TikTok line", async () => {
+  const ttRow: PBAnalytics = { id: "an_t", post_result_id: "res_t", platform: "tiktok", platform_post_id: null, view_count: 900, like_count: 40, comment_count: 3, share_count: 2, share_url: "https://www.tiktok.com/@h/photo/1", last_synced_at: "", match_confidence: null };
+  const igRow: PBAnalytics = { ...ttRow, id: "an_i", post_result_id: "res_i", platform: "instagram", view_count: 300, like_count: 25, share_url: "https://www.instagram.com/p/abc/" };
+  const m = mockFetch({
+    "POST /v1/analytics/sync": {},
+    "GET /v1/posts/two": { id: "two", status: "posted", scheduled_at: "2026-09-23T23:00:00.000Z", platform_configurations: { tiktok: { draft: false }, instagram: {} } },
+    "GET /v1/posts/bad": { id: "bad", status: "posted", scheduled_at: null, platform_configurations: { tiktok: { draft: true }, instagram: {} } },
+    "GET /v1/post-results": (c: Call) => (c.url.includes("post_id=two")
+      ? { data: [{ id: "res_t", post_id: "two", success: true, social_account_id: 1, error: null, platform_data: {} }, { id: "res_i", post_id: "two", success: true, social_account_id: 4, error: null, platform_data: { url: "https://www.instagram.com/p/abc/" } }] }
+      : { data: [{ id: "res_t2", post_id: "bad", success: true, social_account_id: 1, error: null, platform_data: {} }, { id: "res_i2", post_id: "bad", success: false, social_account_id: 4, error: "Media aspect ratio not supported", platform_data: null }] }),
+    "GET /v1/analytics": (c: Call) => ({ data: c.url.includes("res_t2") || c.url.includes("res_i2") ? [] : c.url.includes("res_t") ? [ttRow] : [igRow] }),
+  });
+  const pb = postBridge({ apiKey: KEY, fetch: m.fetch });
+  const legs = [{ platform: "tiktok" as const, account: 1 }, { platform: "instagram" as const, account: 4 }];
+  const written: { post: string; platform?: string; views: number; saves?: null }[] = [];
+  const heard: string[] = [];
+  const r = await syncOutcomesWith(pb, [{ post: "a", pbPost: "two", legs }, { post: "b", pbPost: "bad", legs }], () => null,
+    (post, o) => written.push({ post, platform: o.platform, views: o.views, saves: o.saves }),
+    (post, _pb, leg, st) => heard.push(`${post} ${leg.platform} ${st.word}${st.error ? `: ${st.error}` : ""}`));
+  assert.deepEqual(m.calls.filter((c) => c.url.includes("/v1/analytics/sync")).map((c) => c.url.split("platform=")[1]), ["tiktok", "instagram"]);
+  assert.deepEqual(written, [{ post: "a", platform: undefined, views: 900, saves: undefined }, { post: "a", platform: "instagram", views: 300, saves: null }]);
+  assert.deepEqual(heard, ["a tiktok posted", "a instagram posted", "b tiktok draft created", "b instagram error: Media aspect ratio not supported"]);
+  assert.equal(r.reports.find((x) => x.post === "b" && x.platform === "instagram")?.result, "error: Media aspect ratio not supported");
+  /* The same numbers again: nothing written, per leg. */
+  const again: string[] = [];
+  await syncOutcomesWith(pb, [{ post: "a", pbPost: "two", legs }], (_p, platform) => (platform === "tiktok" ? { views: 900, likes: 40, comments: 3, shares: 2 } : { views: 300, likes: 25, comments: 3, shares: 2 }), (post, o) => again.push(`${post} ${o.platform ?? "tiktok"}`));
+  assert.deepEqual(again, []);
+});
+
+test("syncOutcomesWith: a TikTok-only send makes exactly the calls it made before (one refresh, no platform in the line)", async () => {
+  const row: PBAnalytics = { id: "an_1", post_result_id: "res_1", platform: "tiktok", platform_post_id: null, view_count: 5, like_count: 0, comment_count: 0, share_count: 0, share_url: null, last_synced_at: "", match_confidence: null };
+  const m = mockFetch({
+    "POST /v1/analytics/sync": {},
+    "GET /v1/posts/p": { id: "p", status: "posted", platform_configurations: { tiktok: { draft: true } } },
+    "GET /v1/post-results": { data: [{ id: "res_1", post_id: "p", success: true, social_account_id: 7, error: null, platform_data: {} }] },
+    "GET /v1/analytics": { data: [row] },
+  });
+  const lines: object[] = [];
+  let heard = 0;
+  await syncOutcomesWith(postBridge({ apiKey: KEY, fetch: m.fetch }), [{ post: "a", pbPost: "p" }], () => null, (_post, o) => lines.push(o), () => heard++);
+  assert.deepEqual(m.calls.map((c) => `${c.method} ${c.url.replace("https://api.post-bridge.com", "")}`), [
+    "POST /v1/analytics/sync?platform=tiktok", "GET /v1/posts/p", "GET /v1/post-results?post_id=p&limit=100", "GET /v1/analytics?post_result_id=res_1&limit=100",
+  ]);
+  assert.equal("platform" in (lines[0] as object), false);
+  assert.equal(heard, 0, "a send with no legs is not a two-platform send");
 });

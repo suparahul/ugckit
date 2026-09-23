@@ -13,6 +13,12 @@
  *   2. the Post Bridge analytics, as a second source when it has data (no saves;
  *      rarely anything for a draft published from the phone).
  *
+ * An Instagram leg (a post sent to TikTok and Instagram) needs no Monid call:
+ * its link, its post time and its numbers come from Post Bridge, one
+ * `outcome.sync` line with data.platform "instagram" (views, likes, comments,
+ * shares; no source gives Instagram's saves). A failed Instagram leg is written
+ * once as `posting.failed`, with Instagram's own words.
+ *
  *   node scripts/postbridge-sync.mjs --all                 every sent post
  *   node scripts/postbridge-sync.mjs --date 2026-09-17     the sent posts of that date
  *   node scripts/postbridge-sync.mjs --post <key>          one post
@@ -58,10 +64,12 @@ else {
 console.log("Post Bridge — the second source:");
 if (postBridgeError) console.log(`  not read: ${postBridgeError}`);
 else {
-  console.log(refreshed ? "  Post Bridge pulled fresh numbers from TikTok." : "  Post Bridge is on its 30-minute cooldown; the numbers are the last it holds.");
+  const platforms = [...new Set(reports.map((r) => r.platform ?? "tiktok"))].map((p) => (p === "instagram" ? "Instagram" : "TikTok")).join(" and ") || "TikTok";
+  console.log(refreshed ? `  Post Bridge pulled fresh numbers from ${platforms}.` : "  Post Bridge is on its 30-minute cooldown; the numbers are the last it holds.");
   for (const r of reports) {
     const o = r.outcome;
-    console.log(`  ${r.post.padEnd(26)} ${r.result.padEnd(14)} ${o ? `${o.views} views · ${o.likes} likes · ${o.comments} comments · ${o.shares} shares` : "no numbers yet"}  (${r.note})`);
+    const leg = r.platform ? ` ${r.platform}` : reports.some((x) => x.post === r.post && x.platform) ? " tiktok" : "";
+    console.log(`  ${`${r.post}${leg}`.padEnd(reports.some((x) => x.platform) ? 36 : 26)} ${r.result.padEnd(14)} ${o ? `${o.views} views · ${o.likes} likes · ${o.comments} comments · ${o.shares} shares${r.platform === "instagram" ? " · saves not reported on Instagram" : ""}` : "no numbers yet"}  (${r.note})`);
   }
 }
 process.exit(links.some((l) => l.status === "error") ? 1 : 0);

@@ -24,11 +24,13 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { PLATFORM_NAME, type Platform } from "./platform.ts";
-import { accountsOf, hasKey, postBridge, sendStatusOf, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type AccountsFile, type PBAccount, type SendStatus, type SyncReport } from "./postbridge.ts";
-import { allStates, appendEvent, filesRoot, fileKey, getProduction, isSent, postingStep, readLog, storeOf, type PostState } from "./production.ts";
+import { identitiesOf } from "./accounts.ts";
+import { MAX_SLIDES, PLATFORM_NAME, platformOf, primaryOf, type Platform } from "./platform.ts";
+import { slotKey, slotTimes } from "./slots.ts";
+import { accountsOf, hasKey, legsPost, postBridge, sendStatusOf, type Leg, type SentPost, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type AccountsFile, type PBAccount, type SendStatus, type SyncReport } from "./postbridge.ts";
+import { allStates, appendEvent, filesRoot, fileKey, getProduction, isSent, legsOfSent, postingStep, readLog, storeOf, type Event, type PostState } from "./production.ts";
 import { findLinks, type LinkReport } from "./tiktok-link.ts";
-import { fmtBoth } from "./when.ts";
+import { fmtBoth, postingZone, zonedToUtc } from "./when.ts";
 
 const run = promisify(execFile);
 
@@ -110,9 +112,20 @@ export type SendPlan = {
   skip: string | null;
   /** True when a `postbridge.sent` line exists (sent only with force). */
   sentBefore: boolean;
+  /** Every platform the post goes to: the account, and why that leg is not sent (null: it is sent). */
+  legs: { platform: Platform; account: number | null; skip: string | null }[];
+  /** Said before the send, not a reason to stop: "Instagram publishes at once", … */
+  warnings: string[];
 };
 
-export type SendSelect = { date?: string; keys?: string[]; force?: boolean; mode?: SendMode; /** Direct mode: the instant, ISO UTC; required. */ at?: string};
+export type SendSelect = { date?: string; keys?: string[]; force?: boolean; mode?: SendMode; /** Direct mode: the instant, ISO UTC; required. */ at?: string; /** One platform only: a retry of one leg, or TikTok alone for a deck Instagram cannot take. */ only?: Platform };
+
+/** The slot instant of a plan row (ISO UTC), from the handle's `Slots:` line in the posting zone, or null for a slot word with no time. */
+function slotInstant(slug: string, handle: string, date: string, slot: string): string | null {
+  const line = identitiesOf(slug).find((i) => i.handle.toLowerCase() === handle.toLowerCase())?.slots ?? null;
+  const t = slotTimes(line)[slotKey(slot)] ?? (/^\d{1,2}:\d{2}$/.test(slot) ? slot : null);
+  return t ? zonedToUtc(date, t, postingZone()) : null;
+}
 
 /**
  * The selection rule, shared by the CLI and the button: the posts of the date
@@ -131,23 +144,57 @@ export function selectSends(slug: string, sel: SendSelect): SendPlan[] {
   return states.map((s) => {
     const info = bridgeInfo(s);
     const finalOk = s.final.status === "approved" && ["ready", "posted", "read"].includes(s.stage);
+    const slides = s.deck?.slides.length ?? 0;
+    /* The legs: the post's platforms, less a leg taken off (leg.drop), or the one named with --only. */
+    const wanted = sel.only ? [sel.only] : s.platforms.filter((p) => !s.legs[p]?.dropped);
+    const legs = wanted.map((p) => {
+      const { account, why } = accountFor(slug, s.row.handle, p);
+      const leg = s.legs[p];
+      const sent = !!leg?.sent && !leg.failed && !sel.force;
+      const skip =
+        !account ? why
+        : why ? `${why}; then run node scripts/postbridge-accounts.mjs`
+        : sent ? `sent already (${leg!.sent!.at.slice(0, 16).replace("T", " ")}, Post Bridge post ${leg!.sent!.id}${leg!.sent!.mode === "direct" ? ", direct" : ""}${p === "tiktok" ? "" : `, ${PLATFORM_NAME[p]}`}); --force to send again`
+        : null;
+      return { platform: p, account: account?.id ?? null, skip, sent };
+    });
+    /* The 10-slide rule (Rahul, 2026-09-23): a deck over the limit of a platform stops the send; no slide is dropped. */
+    const over = legs.map((l) => l.platform).filter((p) => MAX_SLIDES[p] !== null && slides > MAX_SLIDES[p]!);
+    const tooLong = over.length ? `${slides} slides; ${over.map((p) => `${PLATFORM_NAME[p]} takes ${MAX_SLIDES[p]}`).join(", ")}: cut the deck to ${Math.min(...over.map((p) => MAX_SLIDES[p]!))} (the deck skill)${s.platforms.includes("tiktok") && !sel.only ? ", or send TikTok alone with --only tiktok" : ""}` : null;
+    const primaryLeg = legs.find((l) => l.platform === primaryOf(wanted)) ?? legs[0];
+    const open = legs.filter((l) => !l.skip);
     const skip =
       s.killed ? "killed"
       : !finalOk ? `the final is not approved (${s.final.status})`
       : timeBad ? timeBad
       : !info.keySet ? info.why
-      : !info.account || info.why ? info.why
-      : s.sent && !sel.force ? `sent already (${s.sent.at.slice(0, 16).replace("T", " ")}, Post Bridge post ${s.sent.id}${s.sent.mode === "direct" ? ", direct" : ""}); --force to send again`
+      : !legs.length ? "no platform left: every leg was taken off"
+      : tooLong ? tooLong
+      /* Nothing left to send; or the primary leg cannot go (not connected, needs a reconnect): the post stops, as before.
+         A primary leg sent already lets the other legs go (the retry of a failed Instagram leg). */
+      : !open.length ? primaryLeg.skip
+      : primaryLeg.skip && !primaryLeg.sent ? primaryLeg.skip
       : null;
+    const warnings: string[] = [];
+    for (const l of legs) if (l.skip && !skip) warnings.push(`${PLATFORM_NAME[l.platform]} is left out: ${l.skip}`);
+    if (!skip && open.some((l) => l.platform === "instagram") && mode === "draft") {
+      /* Instagram has no drafts: the leg publishes when the send runs. Q3: at the slot time, with TikTok's. */
+      const slotAt = slotInstant(slug, s.row.handle, s.row.date, s.row.slot);
+      const ahead = slotAt ? (new Date(slotAt).getTime() - Date.now()) / 60000 : null;
+      warnings.push(ahead !== null && ahead > 15
+        ? `Instagram has no drafts: it publishes the moment this is sent, ${Math.round(ahead)} minutes before the slot (${fmtBoth(slotAt!)}). Send at the slot time, or schedule a direct post.`
+        : "Instagram has no drafts: the Instagram post publishes the moment this is sent.");
+    }
     return {
-      key: s.row.key, handle: s.row.handle, account: info.account?.id ?? null, slides: s.deck?.slides.length ?? 0, caption: (s.deck?.caption ?? "").split("\n")[0],
+      key: s.row.key, handle: s.row.handle, account: info.account?.id ?? null, slides, caption: (s.deck?.caption ?? "").split("\n")[0],
       mode, scheduledAt: at, finalStatus: s.final.status, coverText: s.deck?.slides[0]?.blocks.map((b) => b.text) ?? [], skip, sentBefore: !!s.sent,
+      legs: legs.map(({ platform, account, skip }) => ({ platform, account, skip })), warnings,
     };
   });
 }
 
 export type SendReport = { id: string; media: string[]; account: number; status: string; warnings: string[] };
-export type SendResult = { key: string; ok: boolean; id?: string; status?: string; error?: string };
+export type SendResult = { key: string; ok: boolean; id?: string; status?: string; error?: string; /** Post Bridge's own warnings on the created post. */ warnings?: string[] };
 
 /**
  * Sends the selected posts, one after the other, and never throws for one
@@ -160,8 +207,8 @@ export async function sendPosts(slug: string, sel: SendSelect & { dryRun?: boole
   for (const p of plans) {
     if (p.skip) continue;
     try {
-      const r = await sendPost(slug, p.key, { force: !!sel.force, mode: p.mode, at: p.scheduledAt ?? undefined });
-      results.push({ key: p.key, ok: true, id: r.id, status: r.status });
+      const r = await sendPost(slug, p.key, { force: !!sel.force, mode: p.mode, at: p.scheduledAt ?? undefined, only: sel.only });
+      results.push({ key: p.key, ok: true, id: r.id, status: r.status, warnings: r.warnings.filter((w) => !p.warnings.includes(w)) });
     } catch (e) {
       results.push({ key: p.key, ok: false, error: e instanceof Error ? e.message : String(e) });
     }
@@ -169,40 +216,62 @@ export async function sendPosts(slug: string, sel: SendSelect & { dryRun?: boole
   return { plans, results };
 }
 
-/** One post, to the drafts or as a scheduled direct post. The button and sendPosts both come here; the selection rule is selectSends. */
-export async function sendPost(slug: string, key: string, opts: { compose?: boolean; force?: boolean; mode?: SendMode; at?: string } = {}): Promise<SendReport> {
+/**
+ * One post, to the drafts or as a scheduled direct post, on every leg that is
+ * open (selectSends decides which): one Post Bridge post for all the accounts.
+ * The button and sendPosts both come here. A post with one TikTok leg writes
+ * exactly the line it always wrote; with Instagram, the line carries `legs`.
+ */
+export async function sendPost(slug: string, key: string, opts: { compose?: boolean; force?: boolean; mode?: SendMode; at?: string; only?: Platform } = {}): Promise<SendReport> {
   const state = allStates(slug).find((s) => s.row.key === key);
   if (!state) throw new Error(`No post ${key}.`);
   if (!state.deck) throw new Error("No deck.");
-  const plan = selectSends(slug, { keys: [key], force: opts.force, mode: opts.mode, at: opts.at })[0];
+  const plan = selectSends(slug, { keys: [key], force: opts.force, mode: opts.mode, at: opts.at, only: opts.only })[0];
   if (plan.skip) throw new Error(plan.skip);
-  const account = plan.account!;
+  const legs = plan.legs.filter((l) => !l.skip && l.account !== null).map((l) => ({ platform: l.platform, account: l.account! }));
+  const tt = legs.some((l) => l.platform === "tiktok");
+  const ig = legs.some((l) => l.platform === "instagram");
   const direct = plan.mode === "direct";
 
-  /* 1. The compositor, from the log as it is now; direct mode burns the cover text. */
+  /* 1. The compositor, from the log as it is now; direct mode burns the cover text; an Instagram leg adds the 4:5 JPEG set. */
   if (opts.compose !== false) {
-    const { stdout, stderr } = await run("node", ["scripts/render-slides.mjs", slug, key, ...(direct ? ["--burn-cover"] : [])], { cwd: process.cwd(), maxBuffer: 8 * 1024 * 1024 });
+    const { stdout, stderr } = await run("node", ["scripts/render-slides.mjs", slug, key, ...(direct ? ["--burn-cover"] : []), ...(ig ? ["--instagram"] : [])], { cwd: process.cwd(), maxBuffer: 8 * 1024 * 1024 });
     if (/skipped/.test(stdout)) throw new Error(`The compositor skipped: ${stdout.trim().split("\n").find((l) => /skipped/.test(l))}`);
     if (stderr.trim()) console.warn(stderr.trim());
   }
   const dir = join(filesRoot(slug), fileKey(key), "final");
-  const files = state.deck.slides.map((s) => join(dir, `slide-${String(s.n).padStart(2, "0")}.png`));
-  const missing = files.filter((f) => !existsSync(f));
-  if (missing.length) throw new Error(`final/ is missing ${missing.map((f) => f.split("/").pop()).join(", ")}.`);
-  const captionFile = join(dir, "caption.txt");
-  if (!existsSync(captionFile)) throw new Error("final/caption.txt is missing.");
-  const caption = readFileSync(captionFile, "utf8").trim();
-  if (!caption) throw new Error("The caption is empty.");
+  const need = (f: string) => { if (!existsSync(f)) throw new Error(`${f.slice(dir.length + 1)} is missing in final/.`); return f; };
+  const text = (f: string, what: string) => { const t = readFileSync(need(f), "utf8").trim(); if (!t && what) throw new Error(`The ${what} is empty.`); return t; };
+  const nn = (n: number) => String(n).padStart(2, "0");
+  const ttFiles = tt ? state.deck.slides.map((s) => need(join(dir, `slide-${nn(s.n)}.png`))) : [];
+  const ttCaption = tt ? text(join(dir, "caption.txt"), "caption") : "";
+  const igFiles = ig ? state.deck.slides.map((s) => need(join(dir, "instagram", `slide-${nn(s.n)}.jpg`))) : [];
+  const igCaption = ig ? text(join(dir, "instagram", "caption.txt"), "Instagram caption") : "";
+  const igComment = ig ? text(join(dir, "instagram", "first-comment.txt"), "") : "";
 
   /* 2. and 3. */
   const pb = postBridge();
   const media: string[] = [];
-  for (const f of files) media.push((await pb.uploadMedia({ path: f })).media_id);
-  const post = await pb.createPost(direct ? tiktokDirectPost(caption, account, media, plan.scheduledAt!) : tiktokDraftPost(caption, account, media));
+  for (const f of ttFiles) media.push((await pb.uploadMedia({ path: f })).media_id);
+  const igMedia: string[] = [];
+  for (const f of igFiles) igMedia.push((await pb.uploadMedia({ path: f })).media_id);
+  const post = await pb.createPost(legsPost({
+    legs, mode: plan.mode, scheduledAt: plan.scheduledAt,
+    ...(tt ? { tiktok: { caption: ttCaption, media } } : {}),
+    ...(ig ? { instagram: { caption: igCaption, media: igMedia, firstComment: igComment } } : {}),
+  }));
 
-  /* 4. */
-  appendEvent(slug, { post: key, kind: "posting.sent", actor: "agent", data: { provider: "postbridge", id: post.id, media: media.join(" "), account, status: post.status, mode: plan.mode, ...(direct ? { scheduledAt: plan.scheduledAt! } : {}) } });
-  return { id: post.id, media, account, status: post.status, warnings: post.warnings ?? [] };
+  /* 4. One line for the send. TikTok alone: the line as it always was. */
+  const first = legs[0];
+  const lineMedia = tt ? media : igMedia;
+  appendEvent(slug, { post: key, kind: "posting.sent", actor: "agent", data: {
+    provider: "postbridge", id: post.id, media: lineMedia.join(" "), account: first.account, status: post.status, mode: plan.mode, ...(direct ? { scheduledAt: plan.scheduledAt! } : {}),
+    ...(legs.length === 1 && first.platform === "tiktok" ? {} : {
+      ...(ig && tt ? { igMedia: igMedia.join(" ") } : {}),
+      legs: legs.map((l) => ({ platform: l.platform, account: l.account, mode: plan.mode, scheduledAt: direct ? plan.scheduledAt : null, status: post.status })),
+    }),
+  } });
+  return { id: post.id, media: lineMedia, account: first.account, status: post.status, warnings: [...plan.warnings, ...(post.warnings ?? [])] };
 }
 
 /** The old name of sendPost, draft mode. */
@@ -285,13 +354,41 @@ export async function withStatusWords<T extends PostState>(states: T[]): Promise
 export async function syncOutcomes(slug: string, sel: { date?: string; keys?: string[] } = {}): Promise<{ refreshed: boolean; reports: SyncReport[] }> {
   const log = readLog(slug);
   const wanted = sel.keys ?? (sel.date ? getProduction(slug).rows.filter((r) => r.date === sel.date).map((r) => r.key) : null);
-  const byPost = new Map<string, string>();
-  for (const e of log) if (isSent(e.kind) && e.post && e.data?.id && (!wanted || wanted.includes(e.post))) byPost.set(e.post, String(e.data.id));
+  /* Per post and platform, the last send that carried that leg; then grouped by Post Bridge post. A send with no `legs` is one TikTok leg. */
+  const lastSend = new Map<string, { at: string; pbPost: string; leg: Leg; legs: boolean }>();
+  for (const e of log) {
+    if (!isSent(e.kind) || !e.post || !e.data?.id || (wanted && !wanted.includes(e.post))) continue;
+    const many = Array.isArray(e.data.legs);
+    for (const l of legsOfSent(e)) {
+      const p = platformOf(l.platform);
+      if (p) lastSend.set(`${e.post}\u0000${p}`, { at: e.at, pbPost: String(e.data.id), leg: { platform: p, account: Number(l.account ?? 0) }, legs: many });
+    }
+  }
+  const sends = new Map<string, SentPost & { at: string }>();
+  for (const [k, v] of lastSend) {
+    const post = k.split("\u0000")[0];
+    const id = `${post}\u0000${v.pbPost}`;
+    const x = sends.get(id) ?? { post, pbPost: v.pbPost, at: v.at, ...(v.legs ? { legs: [] } : {}) };
+    if (v.legs) x.legs!.push(v.leg);
+    sends.set(id, x);
+  }
+  const lineOf = (post: string, kind: Event["kind"], p: Platform, after = "") => log.some((e) => e.post === post && e.kind === kind && (platformOf(e.data?.platform) ?? "tiktok") === p && e.at >= after);
   return syncOutcomesWith(
     postBridge(),
-    [...byPost].map(([post, pbPost]) => ({ post, pbPost })),
-    (post) => [...log].reverse().find((e) => e.post === post && e.kind === "outcome.sync" && e.data?.source !== "monid")?.data ?? null,
+    [...sends.values()],
+    (post, p) => ([...log].reverse().find((e) => e.post === post && e.kind === "outcome.sync" && e.data?.source !== "monid" && (platformOf(e.data?.platform) ?? "tiktok") === p)?.data as Record<string, unknown> | undefined) ?? null,
     (post, o) => { appendEvent(slug, { post, kind: "outcome.sync", actor: "agent", data: { source: "postbridge", ...o } }); },
+    /* A leg of a two-platform send: its failure once (the platform's words), and an Instagram leg's post and link once it is published. */
+    (post, pbPost, leg, st, pbp) => {
+      const since = sends.get(`${post}\u0000${pbPost}`)?.at ?? "";
+      const tag = { platform: leg.platform, account: leg.account };
+      if (st.word === "error" && !lineOf(post, "posting.failed", leg.platform, since)) appendEvent(slug, { post, kind: "posting.failed", actor: "sync", data: { ...tag, error: st.error ?? "failed", pbPost } });
+      if (leg.platform !== "tiktok" && st.word === "posted") {
+        const at = pbp.scheduled_at ? new Date(pbp.scheduled_at).toISOString() : pbp.updated_at ?? new Date().toISOString();
+        if (!lineOf(post, "posted", leg.platform, since)) appendEvent(slug, { post, kind: "posted", actor: "sync", data: { platform: leg.platform, time: at.slice(11, 16), url: st.url ?? "" } });
+        if (st.url && !lineOf(post, "posted.link", leg.platform, since)) appendEvent(slug, { post, kind: "posted.link", actor: "sync", data: { platform: leg.platform, url: st.url, uploadedAt: at } });
+      }
+    },
   );
 }
 

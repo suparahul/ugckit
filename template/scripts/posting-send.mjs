@@ -10,6 +10,12 @@
  *                                                                          direct mode: scheduled, TikTok picks the sound,
  *                                                                          the cover text burned in
  *   node scripts/posting-send.mjs <slug> --post <key> --send --force      a post that was sent before
+ *   node scripts/posting-send.mjs <slug> --post <key> --only instagram --send
+ *                                                                          one leg only (a retry, or --only tiktok)
+ *
+ * A post goes to every platform its plan row names (TikTok, and Instagram when the
+ * identity reposts there), in one send at one time. Instagram has no drafts: its leg
+ * publishes when the send runs, and the dry run says so.
  *
  * Selection: the posts whose final is approved (final.approve in the log), whose handle
  * is mapped in posting-accounts.json, with no posting.sent line yet. For each: the
@@ -21,7 +27,7 @@ import { providerOf, runProvider } from "./lib/posting/index.mjs";
 import { runAtlasScript } from "./lib/atlas-run.mjs";
 
 const [slug, ...rest] = process.argv.slice(2);
-if (!slug || slug.startsWith("--")) { console.error("usage: node scripts/posting-send.mjs <slug> [--post <key> | --date YYYY-MM-DD] [--send] [--force] [--direct --at-local \"HH:MM Zone\"]"); process.exit(2); }
+if (!slug || slug.startsWith("--")) { console.error("usage: node scripts/posting-send.mjs <slug> [--post <key> | --date YYYY-MM-DD] [--send] [--force] [--direct --at-local \"HH:MM Zone\"] [--only tiktok|instagram]"); process.exit(2); }
 const provider = providerOf(slug, rest);
 if (provider === "postbridge") runAtlasScript("postbridge-send.mjs", [slug, ...rest]);
 else await runProvider(provider, "send", slug, rest);

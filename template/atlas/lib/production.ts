@@ -25,6 +25,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statS
 import { join, resolve } from "node:path";
 import { appDir } from "./root.ts";
 import { fmtBoth, setZones } from "./when.ts";
+import { declaredPlatforms } from "./accounts.ts";
 import { PLATFORMS, PLATFORM_NAME, platformOf, primaryOf, slideLimit, type Platform } from "./platform.ts";
 
 /* ------------------------------------------------------------------- authored */
@@ -599,9 +600,18 @@ export function slideLimitCheck(slides: number, platforms: Platform[]): PostStat
   return [{ label: slides <= max ? `${slides} slides · ${who} takes ${max}` : `${slides} slides · ${who} takes ${max}: cut the deck`, ok: slides <= max }];
 }
 
-/** Where a row goes: its own cell, else the plan's `Platforms:` line, else TikTok. */
-export function platformsOf(row: PlanRow, plan: Pick<Production["plan"], "platforms"> = getProduction(row.slug).plan): Platform[] {
-  const list = row.platforms?.length ? row.platforms : plan.platforms?.length ? plan.platforms : ["tiktok" as Platform];
+/**
+ * Where a row goes: its own `Platforms` cell; else the platforms of its handle's
+ * declared accounts (HANDLE.md `## Accounts`), kept to the plan's `Platforms:`
+ * line when the plan has one; else TikTok. So an identity that adds an Instagram
+ * account reposts there from the next plan build, and a plan can hold it back.
+ */
+export function platformsOf(row: PlanRow, plan: Pick<Production["plan"], "platforms"> = getProduction(row.slug).plan, declared: Platform[] | null = declaredPlatforms(row.slug).get(row.handle.toLowerCase()) ?? null): Platform[] {
+  let list: Platform[] = row.platforms?.length ? row.platforms : declared?.length ? declared : ["tiktok"];
+  if (!row.platforms?.length && plan.platforms?.length) {
+    const kept = list.filter((p) => plan.platforms!.includes(p));
+    list = kept.length ? kept : [primaryOf(list)];
+  }
   return PLATFORMS.filter((p) => list.includes(p));
 }
 

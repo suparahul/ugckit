@@ -139,11 +139,14 @@ export type LinkReport = {
 
 type Fetch = (handle: string) => Promise<MonidPost[]>;
 
-/** The link the log holds for a post: the last `posted.link`, else the url of the `posted` line. */
+/** A line of the TikTok leg: no platform named, or TikTok. The Instagram leg's lines are never read here. */
+const tiktokLine = (e: Event) => e.data?.platform == null || e.data.platform === "tiktok";
+
+/** The TikTok link the log holds for a post: the last `posted.link`, else the url of the `posted` line. */
 export function linkOf(log: Event[]): { url: string; id: string | null } | null {
-  const l = [...log].reverse().find((e) => e.kind === "posted.link" && e.data?.url);
+  const l = [...log].reverse().find((e) => e.kind === "posted.link" && e.data?.url && tiktokLine(e));
   if (l) return { url: String(l.data!.url), id: l.data!.id ? String(l.data!.id) : null };
-  const p = [...log].reverse().find((e) => e.kind === "posted" && e.data?.url);
+  const p = [...log].reverse().find((e) => e.kind === "posted" && e.data?.url && tiktokLine(e));
   if (p) return { url: String(p.data!.url), id: String(p.data!.url).split("/").pop() ?? null };
   return null;
 }
@@ -162,7 +165,7 @@ export function tiktokIdOf(url: string): string | null {
  * posts nothing else has resolved yet.
  */
 export function pbLinkOf(log: Event[]): { url: string; id: string } | null {
-  const e = [...log].reverse().find((ev) => ev.kind === "outcome.sync" && ev.data?.source === "postbridge" && typeof ev.data?.url === "string");
+  const e = [...log].reverse().find((ev) => ev.kind === "outcome.sync" && ev.data?.source === "postbridge" && typeof ev.data?.url === "string" && tiktokLine(ev));
   if (!e) return null;
   const url = String(e.data!.url).split("?")[0];
   const id = tiktokIdOf(url);
@@ -182,7 +185,8 @@ export function matchByTime(since: string, posts: MonidPost[]): MonidPost | null
  */
 export async function findLinks(slug: string, sel: { date?: string; keys?: string[] } = {}, fetch: Fetch = monidHandlePosts): Promise<LinkReport[]> {
   const wanted = sel.keys ?? (sel.date ? getProduction(slug).rows.filter((r) => r.date === sel.date).map((r) => r.key) : null);
-  const states = allStates(slug).filter((s) => s.sent && (!wanted || wanted.includes(s.row.key)));
+  /* The posts with a TikTok leg sent: Monid reads TikTok only. An Instagram leg's link comes from Post Bridge (syncOutcomes). */
+  const states = allStates(slug).filter((s) => s.sent && (s.primary ?? "tiktok") === "tiktok" && (!wanted || wanted.includes(s.row.key)));
   const byHandle = new Map<string, PostState[]>();
   const reports: LinkReport[] = [];
   for (const s of states) {

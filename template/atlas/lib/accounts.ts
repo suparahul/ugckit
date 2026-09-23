@@ -18,6 +18,7 @@
  * Pure apart from reading the files: the scripts import it too.
  */
 
+import { statSync } from "node:fs";
 import { join } from "node:path";
 
 import { PLATFORMS, platformOf, type Platform } from "./platform.ts";
@@ -62,7 +63,7 @@ export function declaredAccounts(md: string, dir = ""): DeclaredAccount[] {
   return PLATFORMS.flatMap((p) => out.filter((a) => a.platform === p));
 }
 
-export type Identity = { dir: string; handle: string; accounts: DeclaredAccount[] };
+export type Identity = { dir: string; handle: string; accounts: DeclaredAccount[]; /** The `Slots:` head line ("AM 11:00, PM 19:00"), or null. */ slots: string | null };
 
 /** Every identity of an app with its declared accounts, in folder order. */
 export function identitiesOf(slug: string): Identity[] {
@@ -71,6 +72,20 @@ export function identitiesOf(slug: string): Identity[] {
     .filter((d) => !/^EXAMPLE$/i.test(d))
     .flatMap((dir) => {
       const md = readText(join(appDir(slug), "handles", dir, "HANDLE.md"));
-      return md === null ? [] : [{ dir, handle: handleOf(md, dir), accounts: declaredAccounts(md, dir) }];
+      return md === null ? [] : [{ dir, handle: handleOf(md, dir), accounts: declaredAccounts(md, dir), slots: headLines(md)["Slots"] ?? null }];
     });
+}
+
+/* Cached per app on the HANDLE.md files' times: allStates asks once per post. */
+const platformCache = new Map<string, { stamp: string; map: Map<string, Platform[]> }>();
+
+/** The platforms each handle posts on, by its lowercase `@handle`: its declared accounts. */
+export function declaredPlatforms(slug: string): Map<string, Platform[]> {
+  const dirs = listDirs(join(appDir(slug), "handles"));
+  const stamp = dirs.map((d) => { try { return `${d}:${statSync(join(appDir(slug), "handles", d, "HANDLE.md")).mtimeMs}`; } catch { return d; } }).join("|");
+  const hit = platformCache.get(slug);
+  if (hit && hit.stamp === stamp) return hit.map;
+  const map = new Map(identitiesOf(slug).map((i) => [i.handle.toLowerCase(), i.accounts.map((a) => a.platform)]));
+  platformCache.set(slug, { stamp, map });
+  return map;
 }

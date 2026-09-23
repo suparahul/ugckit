@@ -95,7 +95,16 @@ export type TiktokConfig = {
   disclose_your_brand?: boolean;
 };
 
-export type PlatformConfig = { tiktok?: TiktokConfig } & Record<string, unknown>;
+/**
+ * Instagram has no draft: a post is published when Post Bridge processes it
+ * (its API reference has no draft field for Instagram; `is_draft` only holds
+ * the post in Post Bridge). `media` and `caption` override the post's for the
+ * Instagram account; `first_comment` is posted right after, where the kit puts
+ * the hashtags. Carousels take 1–10 images, JPEG, 4:5 to 1.91:1.
+ */
+export type InstagramConfig = { caption?: string; media?: string[]; first_comment?: string; placement?: "story" };
+
+export type PlatformConfig = { tiktok?: TiktokConfig; instagram?: InstagramConfig } & Record<string, unknown>;
 
 export type CreatePostInput = {
   caption: string;
@@ -333,8 +342,63 @@ export function tiktokDirectPost(caption: string, accountId: number, media: stri
   };
 }
 
-/** The data of one `outcome.sync` log line, from one analytics row. Post Bridge has no save count, so `saves` is absent. */
+/** One account a post goes to: the platform and the posting service's account id. */
+export type Leg = { platform: Platform; account: number };
+
+/**
+ * One request for every leg of a post: the accounts together, one time for all
+ * (Rahul, 2026-09-23: Instagram posts at the same time as TikTok). TikTok gets
+ * the draft or the direct configuration as before; Instagram gets its own
+ * slides (4:5 JPEG), its caption without the hashtags, and the hashtags as the
+ * first comment. With no TikTok leg, the post's own media and caption are
+ * Instagram's.
+ */
+export function legsPost(o: {
+  legs: Leg[];
+  mode: "draft" | "direct";
+  /** Direct mode: ISO UTC, one instant for every leg. */
+  scheduledAt?: string | null;
+  tiktok?: { caption: string; media: string[] };
+  instagram?: { caption: string; media: string[]; firstComment: string };
+}): CreatePostInput {
+  const tt = o.legs.some((l) => l.platform === "tiktok");
+  const ig = o.legs.some((l) => l.platform === "instagram");
+  if (tt && !o.tiktok) throw new Error("A TikTok leg needs the TikTok slides and caption.");
+  if (ig && !o.instagram) throw new Error("An Instagram leg needs the Instagram slides and caption.");
+  const direct = o.mode === "direct";
+  if (direct && !o.scheduledAt) throw new Error("A direct post needs a time.");
+  const platformConfig: PlatformConfig = {};
+  if (tt) platformConfig.tiktok = direct ? { draft: false, privacy_status: "public", auto_add_music: true, allow_comment: true } : { draft: true };
+  if (ig) platformConfig.instagram = { caption: o.instagram!.caption, media: o.instagram!.media, ...(o.instagram!.firstComment ? { first_comment: o.instagram!.firstComment } : {}) };
+  const main = tt ? o.tiktok! : o.instagram!;
+  return {
+    caption: main.caption,
+    accounts: o.legs.map((l) => l.account),
+    media: main.media,
+    platformConfig,
+    ...(direct ? { schedule: o.scheduledAt! } : {}),
+  };
+}
+
+/** The status of one leg: its post result, by the account id. The same words as sendStatusOf. */
+export function legStatusOf(post: PBPost, results: PBPostResult[], leg: Leg): { word: SendStatus["word"]; error: string | null; url: string | null } {
+  const r = results.find((x) => x.social_account_id === leg.account);
+  const tiktokDraft = leg.platform === "tiktok" && !!(post.platform_configurations as PlatformConfig | null)?.tiktok?.draft;
+  if (r && !r.success && r.error) return { word: "error", error: errorText(r.error), url: null };
+  if (r?.success) return { word: tiktokDraft ? "draft created" : "posted", error: null, url: r.platform_data?.url ?? null };
+  if (post.status === "failed") return { word: "error", error: "Post Bridge marked the post failed.", url: null };
+  return { word: !tiktokDraft && post.scheduled_at ? "scheduled" : "queued", error: null, url: null };
+}
+
+/**
+ * The data of one `outcome.sync` log line, from one analytics row. Post Bridge
+ * has no save count, so `saves` is absent (TikTok's come from Monid). A line of
+ * another leg than TikTok names its `platform`, and its `saves` is null: no
+ * source gives Instagram's (not Post Bridge, not Monid's public scrapers).
+ */
 export type OutcomeSync = {
+  platform?: Platform;
+  saves?: null;
   pbPost: string;
   analyticsId: string;
   views: number;
@@ -345,8 +409,9 @@ export type OutcomeSync = {
   syncedAt: string;
 };
 
-export function outcomeOf(pbPost: string, a: PBAnalytics): OutcomeSync {
+export function outcomeOf(pbPost: string, a: PBAnalytics, platform: Platform = "tiktok"): OutcomeSync {
   return {
+    ...(platform === "tiktok" ? {} : { platform, saves: null }),
     pbPost,
     analyticsId: a.id,
     views: a.view_count ?? 0,
@@ -443,37 +508,53 @@ export function mapAccounts(identities: MapIdentity[], accounts: PBAccount[], no
   return { syncedAt: now, accounts: map, unmatched: accounts.filter((a) => !used.has(a.id)) };
 }
 
-export type SyncReport = { post: string; pbPost: string; written: boolean; outcome: OutcomeSync | null; note: string; /** The send's result in words: queued, draft created, error: … */ result: string };
+export type SyncReport = { post: string; pbPost: string; /** The leg; absent for TikTok. */ platform?: Platform; written: boolean; outcome: OutcomeSync | null; note: string; /** The send's result in words: queued, draft created, error: … */ result: string };
+
+/** One send to read: the Post Bridge post and its legs. No legs: one TikTok leg, as every send before Instagram. */
+export type SentPost = { post: string; pbPost: string; legs?: Leg[] };
 
 /**
- * The outcome sync, with the log abstracted: `sent` is every post with its Post
- * Bridge id, `lastSync(post)` the data of the post's last `outcome.sync` line,
- * `append(post, data)` writes one. One line per post whose numbers changed.
- * Asks Post Bridge for fresh numbers first; the 30-minute cooldown is not an error.
+ * The outcome sync, with the log abstracted: `sent` is every send with its Post
+ * Bridge id and legs, `lastSync(post, platform)` the data of that leg's last
+ * `outcome.sync` line, `append(post, data)` writes one. One line per leg whose
+ * numbers changed. Asks Post Bridge for fresh numbers first, once per platform
+ * that has a leg; the 30-minute cooldown is not an error. `onLeg` hears each
+ * leg's status (the flow records a failed or a published Instagram leg).
  */
 export async function syncOutcomesWith(
   pb: PostBridgeClient,
-  sent: { post: string; pbPost: string }[],
-  lastSync: (post: string) => Record<string, unknown> | null,
+  sent: SentPost[],
+  lastSync: (post: string, platform: Platform) => Record<string, unknown> | null,
   append: (post: string, data: OutcomeSync) => void,
+  onLeg?: (post: string, pbPost: string, leg: Leg, status: ReturnType<typeof legStatusOf>, pbp: PBPost) => void,
 ): Promise<{ refreshed: boolean; reports: SyncReport[] }> {
-  /* Nothing sent: no call at all. */
-  const refreshed = sent.length ? await pb.syncAnalytics("tiktok") : false;
+  const legsOf = (x: SentPost): Leg[] => (x.legs?.length ? x.legs : [{ platform: "tiktok", account: 0 }]);
+  /* Nothing sent: no call at all. Otherwise one refresh per platform, TikTok first. */
+  const platforms = PLATFORMS.filter((p) => sent.some((x) => legsOf(x).some((l) => l.platform === p)));
+  let refreshed = false;
+  for (const p of platforms) if (await pb.syncAnalytics(p)) refreshed = true;
   const reports: SyncReport[] = [];
-  for (const { post, pbPost } of sent) {
+  for (const x of sent) {
+    const { post, pbPost } = x;
     const [pbp, results] = await Promise.all([pb.getPost(pbPost), pb.listPostResults(pbPost)]);
     const st = sendStatusOf(pbp, results);
-    const result = st.word === "error" ? `error: ${st.error}` : st.word;
     const rows: PBAnalytics[] = [];
     for (const r of results) rows.push(...(await pb.analyticsForResult(r.id)));
-    const a = rows.find((r) => r.platform === "tiktok") ?? rows[0];
-    if (!a) { reports.push({ post, pbPost, written: false, outcome: null, note: "no analytics yet (the draft is not live, or TikTok has not exposed it)", result }); continue; }
-    const o = outcomeOf(pbPost, a);
-    const prev = lastSync(post);
-    const same = !!prev && (["views", "likes", "comments", "shares"] as const).every((k) => Number(prev[k] ?? -1) === o[k]);
-    if (same) { reports.push({ post, pbPost, written: false, outcome: o, note: "unchanged", result }); continue; }
-    append(post, o);
-    reports.push({ post, pbPost, written: true, outcome: o, note: "written", result });
+    for (const leg of legsOf(x)) {
+      const tag = leg.platform === "tiktok" ? {} : { platform: leg.platform };
+      const ls = legStatusOf(pbp, results, leg);
+      /* One leg's word; a send with one TikTok leg keeps the post's word, as before. */
+      const result = x.legs?.length ? (ls.word === "error" ? `error: ${ls.error}` : ls.word) : st.word === "error" ? `error: ${st.error}` : st.word;
+      if (x.legs?.length) onLeg?.(post, pbPost, leg, ls, pbp);
+      const a = leg.platform === "tiktok" ? rows.find((r) => r.platform === "tiktok") ?? (x.legs?.length ? undefined : rows[0]) : rows.find((r) => platformOf(r.platform) === leg.platform);
+      if (!a) { reports.push({ post, pbPost, ...tag, written: false, outcome: null, note: leg.platform === "tiktok" ? "no analytics yet (the draft is not live, or TikTok has not exposed it)" : `no analytics yet (${leg.platform} has not reported the post)`, result }); continue; }
+      const o = outcomeOf(pbPost, a, leg.platform);
+      const prev = lastSync(post, leg.platform);
+      const same = !!prev && (["views", "likes", "comments", "shares"] as const).every((k) => Number(prev[k] ?? -1) === o[k]);
+      if (same) { reports.push({ post, pbPost, ...tag, written: false, outcome: o, note: "unchanged", result }); continue; }
+      append(post, o);
+      reports.push({ post, pbPost, ...tag, written: true, outcome: o, note: "written", result });
+    }
   }
   return { refreshed, reports };
 }
