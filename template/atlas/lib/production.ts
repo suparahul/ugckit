@@ -25,6 +25,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statS
 import { join, resolve } from "node:path";
 import { appDir } from "./root.ts";
 import { fmtBoth, setZones } from "./when.ts";
+import { PLATFORMS, PLATFORM_NAME, platformOf, primaryOf, slideLimit, type Platform } from "./platform.ts";
 
 /* ------------------------------------------------------------------- authored */
 
@@ -50,6 +51,8 @@ export type PlanRow = {
   sources: SourceRef[];
   /** The idea beyond the topic: what the post is, structurally, and why. */
   idea: Idea;
+  /** The row's own `Platforms` cell, when it has one; else the plan's `Platforms:` line, else TikTok (platformsOf). */
+  platforms?: Platform[];
 };
 
 /** A source post the plan points at, with what the corpus holds about it. */
@@ -173,6 +176,8 @@ export type Production = {
     appStoreId: string | null;
     /** The posting service, from `Posting service:`; postbridge when absent. */
     service: string;
+    /** From `Platforms:`; absent means TikTok only. */
+    platforms?: Platform[];
     /** From `Posting zone:` and `Home zone:`; null means the machine's zone. */
     zones: { posting: string | null; home: string | null };
     handles: Record<string, { handle: string; short: string; role: string; params: Record<string, string>; experiments: Idea["experiments"] }>;
@@ -258,6 +263,11 @@ export type EventKind =
   | "posting.rescheduled"
   | "posted.link"
   | "outcome.sync"
+  /* One leg of a send failed on its platform (data.platform, data.error: the platform's words). */
+  | "posting.failed"
+  /* A leg taken off a post, or put back (data.platform, note). */
+  | "leg.drop"
+  | "leg.add"
   | "outcome.check"
   | "export"
   /* Identity events (the handle pages): the same log, `handle` instead of `post`. */
@@ -288,9 +298,15 @@ export type Event = {
   card?: number;
   file?: string;
   hash?: string;
-  data?: Record<string, string | number>;
+  data?: Record<string, string | number | null | LegData[]>;
   task?: string;
 };
+
+/**
+ * One leg of a `posting.sent` line: the account of one platform the post went
+ * to. A line without `legs` is one leg on `data.platform`, TikTok when absent.
+ */
+export type LegData = { platform: string; account: number; mode: string; scheduledAt: string | null; status: string };
 
 /* Cached on the log's mtime and size: the log is appended between requests, never rewritten. */
 const logCache = new Map<string, { at: number; size: number; events: Event[] }>();
@@ -451,6 +467,27 @@ export type PostState = {
   checks: { label: string; ok: boolean | null }[];
   /** The slide dimension of the post: the deck's, or 3:4 before a deck exists. */
   dimension: Dimension;
+  /** Where the post goes: the row's cell, else the plan's line, else TikTok. */
+  platforms: Platform[];
+  /** The leg whose state is `sent`, `posted`, `link` and `synced`: TikTok when the post goes there. */
+  primary: Platform;
+  legs: Partial<Record<Platform, LegState>>;
+};
+
+/**
+ * One platform's side of a post. `sent`, `posted`, `link` and `synced` on the
+ * PostState are the primary leg's, so everything written for TikTok alone reads
+ * the same. `failed` is the platform's error since the last send of this leg;
+ * `dropped` is a `leg.drop` not undone by a later `leg.add`.
+ */
+export type LegState = {
+  platform: Platform;
+  sent: SentState | null;
+  posted: { at: string; time: string; url: string } | null;
+  link: string | null;
+  synced: SyncedState | null;
+  failed: { at: string; error: string } | null;
+  dropped: { at: string; note: string } | null;
 };
 
 /** `mode` "draft" (the inbox; the phone publishes) or "direct" (Post Bridge publishes at `scheduledAt`, ISO UTC). Lines before the modes are drafts. */
@@ -537,7 +574,7 @@ export function appPattern(app: string | null): RegExp | null {
   return esc ? new RegExp(`\\b${esc}\\b`, "i") : null;
 }
 
-function checksFor(row: PlanRow, deck: Deck, deckFile: DeckFile, app: RegExp | null): PostState["checks"] {
+function checksFor(row: PlanRow, deck: Deck, deckFile: DeckFile, app: RegExp | null, platforms: Platform[] = ["tiktok"]): PostState["checks"] {
   const all = deck.slides.flatMap((s) => s.blocks.map((b) => b.text)).join("\n");
   const slide1 = deck.slides[0] ? deck.slides[0].blocks.map((b) => b.text).join(" ") : "";
   const namesApp = /caption names the app/i.test(row.arm);
@@ -550,7 +587,58 @@ function checksFor(row: PlanRow, deck: Deck, deckFile: DeckFile, app: RegExp | n
     { label: "one style prefix", ok: !!deckFile.stylePrefix },
     { label: deck.dimensionSet ? `dimension set: ${deck.dimension}` : "dimension set", ok: deck.dimensionSet },
     productSlide ? { label: `product on slide ${productSlide.n} of ${deck.slides.length}`, ok: productSlide.n !== 1 } : { label: "no product slot", ok: null },
+    ...slideLimitCheck(deck.slides.length, platforms),
   ];
+}
+
+/** The 10-slide rule: a post that also goes to Instagram has 10 slides at most (Rahul, 2026-09-23). No check for TikTok alone. */
+export function slideLimitCheck(slides: number, platforms: Platform[]): PostState["checks"] {
+  const max = slideLimit(platforms);
+  if (max === null) return [];
+  const who = platforms.filter((p) => slideLimit([p]) !== null).map((p) => PLATFORM_NAME[p]).join(" and ");
+  return [{ label: slides <= max ? `${slides} slides · ${who} takes ${max}` : `${slides} slides · ${who} takes ${max}: cut the deck`, ok: slides <= max }];
+}
+
+/** Where a row goes: its own cell, else the plan's `Platforms:` line, else TikTok. */
+export function platformsOf(row: PlanRow, plan: Pick<Production["plan"], "platforms"> = getProduction(row.slug).plan): Platform[] {
+  const list = row.platforms?.length ? row.platforms : plan.platforms?.length ? plan.platforms : ["tiktok" as Platform];
+  return PLATFORMS.filter((p) => list.includes(p));
+}
+
+const onLeg = (e: Event, p: Platform) => platformOf(e.data?.platform) === p;
+
+/** The legs of a `posting.sent` line: its `legs`, or one leg on `data.platform` (TikTok when absent). */
+export function legsOfSent(e: Event): LegData[] {
+  const d = e.data ?? {};
+  if (Array.isArray(d.legs)) return d.legs;
+  return [{ platform: platformOf(d.platform) ?? "tiktok", account: Number(d.account ?? 0), mode: d.mode === "direct" ? "direct" : "draft", scheduledAt: d.scheduledAt ? String(d.scheduledAt) : null, status: String(d.status ?? "") }];
+}
+
+/** One platform's side of a post, from the post's log lines. A line with no platform is TikTok's. */
+export function legState(log: Event[], p: Platform): LegState {
+  const sentEv = last(log.filter((e) => isSent(e.kind) && legsOfSent(e).some((l) => platformOf(l.platform) === p)));
+  const leg = sentEv ? legsOfSent(sentEv).find((l) => platformOf(l.platform) === p)! : null;
+  /* A `posting.rescheduled` line for the same service id moves the time. */
+  const resched = sentEv ? last(log.filter((e) => isRescheduled(e.kind) && e.at > sentEv.at && e.data?.id === sentEv.data?.id && (e.data?.platform == null || onLeg(e, p)))) : null;
+  const sent: SentState | null = sentEv?.data && leg
+    ? { at: sentEv.at, id: String(sentEv.data.id ?? ""), media: String(sentEv.data.media ?? "").split(" ").filter(Boolean), account: Number(leg.account ?? 0), status: String(resched?.data?.status ?? leg.status ?? ""), mode: leg.mode === "direct" ? "direct" : "draft", scheduledAt: resched?.data?.scheduledAt ? String(resched.data.scheduledAt) : leg.scheduledAt ? String(leg.scheduledAt) : null }
+    : null;
+  const postedEv = last(log.filter((e) => e.kind === "posted" && onLeg(e, p)));
+  const posted = postedEv ? { at: postedEv.at, time: String(postedEv.data?.time ?? hhmm(postedEv.at)), url: String(postedEv.data?.url ?? "") } : null;
+  /* Monid first: it is the source that knows the link and the saves. */
+  const mine = log.filter((e) => e.kind === "outcome.sync" && onLeg(e, p));
+  const syncEv = last(mine.filter((e) => e.data?.source === "monid")) ?? last(mine);
+  const synced: SyncedState | null = syncEv?.data
+    ? { at: syncEv.at, source: syncEv.data.source === "monid" ? "monid" : "postbridge", views: Number(syncEv.data.views ?? 0), likes: Number(syncEv.data.likes ?? 0), comments: Number(syncEv.data.comments ?? 0), saves: syncEv.data.saves == null ? null : Number(syncEv.data.saves), shares: Number(syncEv.data.shares ?? 0), url: String(syncEv.data.url ?? ""), syncedAt: String(syncEv.data.syncedAt ?? syncEv.at), pbPost: String(syncEv.data.pbPost ?? "") }
+    : null;
+  /* The link: the `posted.link` line the sync wrote, else the link typed with "Mark posted". */
+  const linkEv = last(log.filter((e) => e.kind === "posted.link" && e.data?.url && onLeg(e, p)));
+  const link: string | null = linkEv ? String(linkEv.data!.url) : posted?.url || null;
+  const failEv = last(log.filter((e) => e.kind === "posting.failed" && onLeg(e, p)));
+  const failed = failEv && (!sentEv || failEv.at >= sentEv.at) ? { at: failEv.at, error: String(failEv.data?.error ?? failEv.note ?? "failed") } : null;
+  const dropEv = last(log.filter((e) => (e.kind === "leg.drop" || e.kind === "leg.add") && onLeg(e, p)));
+  const dropped = dropEv?.kind === "leg.drop" ? { at: dropEv.at, note: dropEv.note ?? String(dropEv.data?.note ?? "") } : null;
+  return { platform: p, sent, posted, link, synced, failed, dropped };
 }
 
 const hhmm = (iso: string) => iso.slice(11, 16);
@@ -590,6 +678,8 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
   const deckFile = prod.decks.find((d) => d.posts.some((p) => p.key === row.key)) ?? null;
   const deck = deckFile ? deckFile.posts.find((p) => p.key === row.key) ?? null : null;
   const log = all.filter((e) => e.post === row.key);
+  const platforms = platformsOf(row, prod.plan);
+  const primary = primaryOf(platforms);
 
   const killEv = last(log.filter((e) => e.kind === "kill" || e.kind === "unkill"));
   const killed = killEv && killEv.kind === "kill" ? { at: killEv.at, note: killEv.note ?? "" } : null;
@@ -610,8 +700,7 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
   const planBack = last(log.filter((e) => e.kind === "plan.approve" || e.kind === "plan.sendback"));
   const rewritten = planRaw.status === "sentback" && !!deck && !!planBack?.hash && planBack.hash !== deck.hash;
   const plan: PointState = deck && (planRaw.status === "open" || rewritten) ? { status: "approved", at: null, note: null } : planRaw;
-  const postedEv = last(log.filter((e) => e.kind === "posted"));
-  const changed = deckChange(deck, log, plan, !!postedEv);
+  const changed = deckChange(deck, log, plan, log.some((e) => e.kind === "posted" && onLeg(e, primary)));
   const changedSlides = new Set(changed?.slides ?? []);
 
   const slides = deck ? slideStates(slug, deck, row.key, log, changedSlides) : [];
@@ -625,23 +714,18 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
   const lastSlideDecision = last(log.filter((e) => e.kind === "slide.approve" || e.kind === "slide.reject"))?.at ?? null;
   const final = pointState(log, "final.approve", "final.sendback", deck?.hash ?? null, (at) => !!lastSlideDecision && lastSlideDecision > at);
 
-  const posted = postedEv ? { at: postedEv.at, time: String(postedEv.data?.time ?? hhmm(postedEv.at)), url: String(postedEv.data?.url ?? "") } : null;
   const outEv = last(log.filter((e) => e.kind === "outcomes"));
-  const outcomes = outEv ? outEv.data ?? null : null;
-  const sentEv = last(log.filter((e) => isSent(e.kind)));
-  /* A `posting.rescheduled` line for the same service id moves the time. */
-  const resched = sentEv ? last(log.filter((e) => isRescheduled(e.kind) && e.at > sentEv.at && e.data?.id === sentEv.data?.id)) : null;
-  const sent: SentState | null = sentEv?.data ? { at: sentEv.at, id: String(sentEv.data.id ?? ""), media: String(sentEv.data.media ?? "").split(" ").filter(Boolean), account: Number(sentEv.data.account ?? 0), status: String(resched?.data?.status ?? sentEv.data.status ?? ""), mode: sentEv.data.mode === "direct" ? "direct" : "draft", scheduledAt: resched?.data?.scheduledAt ? String(resched.data.scheduledAt) : sentEv.data.scheduledAt ? String(sentEv.data.scheduledAt) : null } : null;
+  const outcomes = outEv ? (outEv.data as Record<string, string | number> | undefined) ?? null : null;
   const exportEv = last(log.filter((e) => e.kind === "export"));
   const exported = exportEv?.data?.dir ? { at: exportEv.at, dir: String(exportEv.data.dir) } : null;
-  /* Monid first: it is the source that knows the link and the saves. */
-  const syncEv = last(log.filter((e) => e.kind === "outcome.sync" && e.data?.source === "monid")) ?? last(log.filter((e) => e.kind === "outcome.sync"));
-  const synced: SyncedState | null = syncEv?.data
-    ? { at: syncEv.at, source: syncEv.data.source === "monid" ? "monid" : "postbridge", views: Number(syncEv.data.views ?? 0), likes: Number(syncEv.data.likes ?? 0), comments: Number(syncEv.data.comments ?? 0), saves: syncEv.data.saves == null ? null : Number(syncEv.data.saves), shares: Number(syncEv.data.shares ?? 0), url: String(syncEv.data.url ?? ""), syncedAt: String(syncEv.data.syncedAt ?? syncEv.at), pbPost: String(syncEv.data.pbPost ?? "") }
-    : null;
-  /* The TikTok link: the `posted.link` line the sync wrote (from Monid), else the link typed with "Mark posted". */
-  const linkEv = last(log.filter((e) => e.kind === "posted.link" && e.data?.url));
-  const link: string | null = linkEv ? String(linkEv.data!.url) : posted?.url || null;
+  /* One leg per platform the post goes to, plus any leg the log holds for another (a send made before the plan changed).
+     The primary leg is the post's `sent`, `posted`, `link` and `synced`. */
+  const legs: PostState["legs"] = {};
+  for (const p of PLATFORMS) {
+    const l = legState(log, p);
+    if (platforms.includes(p) || l.sent || l.posted || l.synced) legs[p] = l;
+  }
+  const { sent, posted, link, synced } = legs[primary] ?? legState(log, primary);
 
   let stage: Stage;
   if (killed) stage = "killed";
@@ -687,8 +771,9 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
   return {
     row, deck, deckFile, stage, mode, idea, plan, final, changed, slides, cards, approvedSlides,
     posted, sent, exported, synced, link, outcomes, killed, log, sentence, waiting, demo: log.some((e) => e.actor === "demo"),
-    checks: deck && deckFile ? checksFor(row, deck, deckFile, appPattern(prod.plan.app)) : [],
+    checks: deck && deckFile ? checksFor(row, deck, deckFile, appPattern(prod.plan.app), platforms) : [],
     dimension: deck?.dimension ?? "3:4",
+    platforms, primary, legs,
   };
 }
 

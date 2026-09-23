@@ -30,6 +30,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import { parsePlatforms } from "../lib/platform.ts";
 
 const REPO = process.env.ATLAS_ROOT ? resolve(process.env.ATLAS_ROOT) : resolve(process.cwd(), "..");
 const APPS = join(REPO, "apps");
@@ -247,6 +248,8 @@ function readPlan() {
   const appStoreId = headLine("App Store id");
   const zones = { posting: headLine("Posting zone"), home: headLine("Home zone") };
   const service = (headLine("Posting service") || "postbridge").toLowerCase();
+  /* `Platforms: tiktok, instagram`: where the week's posts go. Absent means TikTok, and nothing is written. */
+  const platforms = parsePlatforms(headLine("Platforms"));
   if (!app) warn("plan: no `App: Name` line; the checks that name the app are skipped");
 
   const title = (lines.find((l) => l.startsWith("# ")) || "").replace(/^#\s*/, "");
@@ -299,8 +302,10 @@ function readPlan() {
   /* The posts table: the first table whose header starts with | Day | Date |. */
   const rows = [];
   let inTable = false;
+  /* The optional `Platforms` column, found by its header (the last column, after Kind). */
+  let platIdx = -1;
   for (const l of lines) {
-    if (/^\|\s*Day\s*\|\s*Date\s*\|/.test(l)) { inTable = true; continue; }
+    if (/^\|\s*Day\s*\|\s*Date\s*\|/.test(l)) { inTable = true; platIdx = cells(l).findIndex((x) => /^platforms?$/i.test(strip(x))); continue; }
     if (inTable) {
       if (!isRow(l)) { if (rows.length) break; continue; }
       const c = cells(l);
@@ -330,6 +335,9 @@ function readPlan() {
         sources: parseSources(source).map(resolveSource),
         idea: ideaOf(strip(arm), h, `${Number(day)} ${slot.toUpperCase()}`),
       });
+      /* Written only when the row names its platforms; blank means the head line's. */
+      const rowPlatforms = platIdx >= 0 ? parsePlatforms(c[platIdx]) : null;
+      if (rowPlatforms) rows[rows.length - 1].platforms = rowPlatforms;
     }
   }
 
@@ -346,7 +354,7 @@ function readPlan() {
     }
   }
 
-  return { title, range: range ? { from: range[1], to: range[2] } : null, app, slug: SLUG, appStoreId, zones, service, handles, rows, tasks, rules };
+  return { title, range: range ? { from: range[1], to: range[2] } : null, app, slug: SLUG, appStoreId, zones, service, platforms, handles, rows, tasks, rules };
 }
 
 /* ---------------------------------------------------------------- decks */
@@ -659,7 +667,7 @@ function build(slug) {
 
   const out = {
     generatedAt: new Date().toISOString(),
-    plan: { title: plan.title, range: plan.range, app: plan.app, slug, appStoreId: plan.appStoreId, service: plan.service, zones: plan.zones, handles: plan.handles, rules: plan.rules, tasks: plan.tasks },
+    plan: { title: plan.title, range: plan.range, app: plan.app, slug, appStoreId: plan.appStoreId, service: plan.service, ...(plan.platforms ? { platforms: plan.platforms } : {}), zones: plan.zones, handles: plan.handles, rules: plan.rules, tasks: plan.tasks },
     rows: plan.rows,
     decks,
     notes,

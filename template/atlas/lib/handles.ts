@@ -8,12 +8,27 @@
 
 import { join } from "node:path";
 
+import { declaredAccounts, handleOf, type DeclaredAccount } from "./accounts";
+import { PLATFORM_NAME, type Platform } from "./platform";
+import { accountsOf, type AccountsFile } from "./postbridge";
 import { readLog, storeOf, type Event } from "./production";
-import { appDir, exists, headLines, listDirs, listFiles, readJson, readText, sectionOf, tableRows, titleOf } from "./root";
+import { appDir, exists, headLines, listDirs, listFiles, readJson, readText, sectionOf, tableRows } from "./root";
 
 export type Reference = { file: string; role: string; what: string; use: string; exists: boolean; url: string | null; approved: string | null; rejected: string | null };
 export type StepState = "done" | "you" | "agent" | "open";
 export type Step = { n: number; name: string; state: StepState; fact: string };
+
+/** One declared account of an identity, with its connection on the posting service. */
+export type HandleAccount = DeclaredAccount & {
+  connected: boolean;
+  needsReconnect: boolean;
+  /** The posting service's id and username, when the map has the account. */
+  id: string | number | null;
+  username: string | null;
+  provider: string | null;
+  /** The connection in words: "connected 15 Sep · Post Bridge", "needs a reconnect", "connects at the first send". */
+  connection: string;
+};
 
 export type Handle = {
   slug: string;
@@ -48,6 +63,10 @@ export type Handle = {
   /** The posting-service connection in words: it is made at the first send, not as a step. */
   connection: string;
   account: { provider: string; id: string | number | null; username: string | null } | null;
+  /** Every account the identity posts from, TikTok first: the `## Accounts` table, or the one account of the head lines. */
+  accounts: HandleAccount[];
+  /** The platforms of those accounts. */
+  platforms: Platform[];
   steps: Step[];
   complete: boolean;
   /** The first step not done, or null when complete. */
@@ -55,7 +74,7 @@ export type Handle = {
   approvals: { persona: string | null; bio: string | null; defaults: string | null };
 };
 
-export type AccountsFile = { syncedAt?: string; accounts?: Record<string, { id?: number | string; platform?: string; username?: string; needs_reconnect?: boolean; provider?: string } | null> };
+export type { AccountsFile };
 
 export function readAccounts(slug: string): AccountsFile | null {
   return readJson<AccountsFile>(join(storeOf(slug), "posting-accounts.json")) ?? readJson<AccountsFile>(join(storeOf(slug), "postbridge-accounts.json"));
@@ -69,9 +88,7 @@ function readHandle(slug: string, dir: string, log: Event[], accounts: AccountsF
   const md = readText(join(base, "HANDLE.md"));
   if (md === null) return null;
   const head = headLines(md);
-  const title = titleOf(md) ?? "";
-  const fromTitle = title.match(/@([\w.]+)/)?.[1];
-  const handle = `@${(head["Handle"] ?? "").replace(/^@/, "") || fromTitle || dir.replace(/^@/, "")}`;
+  const handle = handleOf(md, dir);
   const mine = log.filter((e) => e.handle === handle || e.handle === handle.slice(1));
   /* readLog() prefixes every `file` with the slug for the production files; a reference line names its file bare, so match the tail. */
   const sameFile = (a: string | undefined, b: string) => !!a && (a === b || a.endsWith(`/${b}`));
@@ -117,7 +134,17 @@ function readHandle(slug: string, dir: string, log: Event[], accounts: AccountsF
   const stylePrefix = styleBody?.match(/\*\*Style prefix:\*\*\s*(.+)/)?.[1]?.trim() ?? null;
   const dimension = head["Dimension"] ?? sectionOf(md, /^Default dimension/i)?.match(/(\d+\s*:\s*\d+)/)?.[1]?.replace(/\s/g, "") ?? null;
 
-  const acct = accounts?.accounts?.[handle] ?? accounts?.accounts?.[handle.slice(1)] ?? null;
+  /* The connection of each declared account. The primary one is the handle's `connected`, `connection` and `account`. */
+  const onService = accountsOf(accounts, handle);
+  const connectLine = (p: Platform) => day(last(mine.filter((e) => e.kind === "account.connect" && (e.data?.platform ?? "tiktok") === p))?.at);
+  const handleAccounts: HandleAccount[] = declaredAccounts(md, dir).map((d) => {
+    const a = onService[d.platform] ?? null;
+    const ok = !!a && !a.needs_reconnect;
+    const at = connectLine(d.platform) ?? day(accounts?.syncedAt);
+    return { ...d, connected: ok, needsReconnect: !!a?.needs_reconnect, id: a?.id ?? null, username: a?.username ?? null, provider: a ? a.provider ?? (a.platform ? "Post Bridge" : "unknown") : null, connection: ok ? `connected${at ? ` ${at}` : ""} · ${a!.provider ?? "Post Bridge"}` : a ? "needs a reconnect" : "connects at the first send" };
+  });
+  const primaryAccount = handleAccounts.find((a) => a.role === "primary") ?? handleAccounts[0];
+  const acct = onService[primaryAccount.platform] ?? null;
   const connected = !!acct && !acct.needs_reconnect;
   const connectedAt = approvedAt("account.connect") ?? day(accounts?.syncedAt);
 
@@ -136,7 +163,7 @@ function readHandle(slug: string, dir: string, log: Event[], accounts: AccountsF
   const s5 = !!(head["Format"] && dimension && head["Slots"] && head["Cadence"]);
   const done = [s1, s2, s3, s4, s5];
   const facts = [
-    s1 ? `done${head["Created"] ? ` ${head["Created"]}` : ""}` : head["Role"] ? "the account is created on TikTok by you, then the date is written" : "the role and the name come first",
+    s1 ? `done${head["Created"] ? ` ${head["Created"]}` : ""}` : head["Role"] ? `the account is created on ${handleAccounts.map((a) => PLATFORM_NAME[a.platform]).join(" and ")} by you, then the date is written` : "the role and the name come first",
     s2 ? (approvals.persona ? `approved ${approvals.persona}` : "written · a look from you is asked") : "drafted by the agent from the findings",
     s3 ? `${approvedRefs ? `${approvedRefs} approved` : `${identityRefs.length} drawn`}${references.some((r) => r.exists && !r.approved && /identity|face|subject/i.test(r.role)) ? " · a look from you is asked" : ""}` : styleOnly ? (references.some((r) => r.exists) ? "the style references are here · a look from you is asked" : "the style references are drawn after the persona") : "the face and the subjects are drawn after the persona",
     s4 ? `${approvals.bio ? `approved ${approvals.bio}` : "written"}${taskDone("set on TikTok") ? " · set on TikTok" : ""}` : profileRef ? "the picture is here; the bio is next" : bioQuote ? "the bio is here; the picture is next" : "after the references",
@@ -159,6 +186,7 @@ function readHandle(slug: string, dir: string, log: Event[], accounts: AccountsF
     persona: personaBody, bio: bioQuote, bioRule, references, defaults: defaultsRows,
     stylePrefix, identityRule: sectionOf(md, /^Identity rule/i), postProcess: sectionOf(md, /^Post-process/i),
     profile: profileRef?.url ?? null, connected, connection: connected ? `connected${connectedAt ? ` ${connectedAt}` : ""}${acct?.provider || acct?.platform ? ` · ${acct.provider ?? "Post Bridge"}` : ""}` : acct ? "needs a reconnect" : "connects at the first send", account: acct ? { provider: acct.provider ?? (acct.platform ? "Post Bridge" : "unknown"), id: acct.id ?? null, username: acct.username ?? null } : null,
+    accounts: handleAccounts, platforms: handleAccounts.map((a) => a.platform),
     steps, complete: done.every(Boolean), next: steps.find((s) => s.state !== "done") ?? null, approvals,
   };
 }

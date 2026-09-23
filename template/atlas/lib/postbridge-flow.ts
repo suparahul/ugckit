@@ -24,7 +24,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { hasKey, postBridge, sendStatusOf, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type AccountsFile, type PBAccount, type SendStatus, type SyncReport } from "./postbridge.ts";
+import { PLATFORM_NAME, type Platform } from "./platform.ts";
+import { accountsOf, hasKey, postBridge, sendStatusOf, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type AccountsFile, type PBAccount, type SendStatus, type SyncReport } from "./postbridge.ts";
 import { allStates, appendEvent, filesRoot, fileKey, getProduction, isSent, postingStep, readLog, storeOf, type PostState } from "./production.ts";
 import { findLinks, type LinkReport } from "./tiktok-link.ts";
 import { fmtBoth } from "./when.ts";
@@ -55,12 +56,12 @@ export function writeAccounts(slug: string, file: AccountsFile): void {
   writeFileSync(join(storeOf(slug), "posting-accounts.json"), JSON.stringify(file, null, 2) + "\n");
 }
 
-/** The posting-service account for a handle, or null with the reason the UI prints. */
-export function accountFor(slug: string, handle: string): { account: PBAccount | null; why: string | null } {
+/** The posting-service account of a handle on one platform (TikTok when not named), or null with the reason the UI prints. */
+export function accountFor(slug: string, handle: string, platform: Platform = "tiktok"): { account: PBAccount | null; why: string | null } {
   const f = readAccounts(slug);
   if (!f) return { account: null, why: "no account map yet: run node scripts/postbridge-accounts.mjs" };
-  const a = f.accounts[handle];
-  if (!a) return { account: null, why: `connect ${handle} in Post Bridge, then run node scripts/postbridge-accounts.mjs` };
+  const a = accountsOf(f, handle)[platform] ?? null;
+  if (!a) return { account: null, why: `connect ${handle}${platform === "tiktok" ? "" : ` on ${PLATFORM_NAME[platform]}`} in Post Bridge, then run node scripts/postbridge-accounts.mjs` };
   if (a.needs_reconnect) return { account: a, why: `${handle} needs a reconnect in Post Bridge` };
   return { account: a, why: null };
 }

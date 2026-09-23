@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { mapAccounts, outcomeOf, postBridge, PostBridgeError, readKey, sendStatusOf, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type PBAnalytics, type PBPost, type PBPostResult } from "./postbridge.ts";
+import { accountsOf, mapAccounts, outcomeOf, postBridge, PostBridgeError, readKey, sendStatusOf, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type PBAnalytics, type PBPost, type PBPostResult } from "./postbridge.ts";
 
 type Call = { url: string; method: string; headers: Record<string, string>; body: unknown };
 
@@ -192,14 +192,46 @@ test("syncOutcomesWith: writes a line when the numbers changed, none when they d
   assert.equal(r2.reports[0].note, "unchanged");
 });
 
-test("mapAccounts: handles pair by TikTok username; a missing one is null; the rest are unmatched", () => {
+test("mapAccounts: a bare handle declares one TikTok account; a missing one is null; the rest are unmatched", () => {
   const f = mapAccounts(["@example.one", "@example.two", "@example.app"], [
     { id: 7, platform: "tiktok", username: "example.one" },
     { id: 8, platform: "instagram", username: "example.app" },
     { id: 9, platform: "tiktok", username: "someone.else" },
   ], "2026-09-16T00:00:00.000Z");
-  assert.equal(f.accounts["@example.one"]?.id, 7);
-  assert.equal(f.accounts["@example.two"], null);
-  assert.equal(f.accounts["@example.app"], null, "an Instagram account with the same name is not the TikTok one");
+  assert.equal(accountsOf(f, "@example.one").tiktok?.id, 7);
+  assert.deepEqual(accountsOf(f, "@example.two"), {});
+  assert.deepEqual(accountsOf(f, "@example.app"), {}, "an Instagram account with the same name is not matched: the identity does not declare it");
   assert.deepEqual(f.unmatched.map((a) => a.id), [8, 9]);
+});
+
+test("mapAccounts: a declared Instagram account with another name is matched; the same name on Instagram is not, unless declared", () => {
+  const listed = [
+    { id: 1, platform: "tiktok", username: "hannah.catmom" },
+    { id: 2, platform: "tiktok", username: "catlover.tiktok3" },
+    { id: 3, platform: "tiktok", username: "catwise.app" },
+    { id: 4, platform: "instagram", username: "hannah.catmom_" },
+    { id: 5, platform: "instagram", username: "catlover.tiktok3" },
+  ];
+  const f = mapAccounts([
+    { handle: "@hannah.catmom", accounts: [{ platform: "tiktok", account: "@hannah.catmom", role: "primary" }, { platform: "instagram", account: "@hannah.catmom_", role: "repost" }] },
+    "@catlover.tiktok3",
+    { handle: "@catwise.app", accounts: [{ platform: "tiktok", account: "@catwise.app", role: "primary" }, { platform: "instagram", account: "@catwise.app", role: "repost" }] },
+  ], listed, "2026-09-23T00:00:00.000Z");
+  const hannah = accountsOf(f, "@hannah.catmom");
+  assert.equal(hannah.tiktok?.id, 1);
+  assert.equal(hannah.instagram?.id, 4, "the declared Instagram account, with its own name");
+  assert.deepEqual(Object.keys(accountsOf(f, "@catlover.tiktok3")), ["tiktok"], "the Instagram account with the same name is not matched: not declared");
+  const catwise = accountsOf(f, "@catwise.app");
+  assert.equal(catwise.tiktok?.id, 3);
+  assert.equal(catwise.instagram, undefined, "declared, not connected yet");
+  assert.equal((f.accounts["@catwise.app"] as { platforms: Record<string, unknown> }).platforms.instagram, null);
+  assert.deepEqual(f.unmatched.map((a) => a.id), [5]);
+});
+
+test("accountsOf: a map written before 0.4.0 (one account per handle) still gives the TikTok account", () => {
+  const old = { accounts: { "@hannah.catmom": { id: 97911, platform: "tiktok", username: "hannah.catmom", needs_reconnect: false, provider: "postbridge" }, "@catlover.tiktok3": null } };
+  assert.equal(accountsOf(old, "@hannah.catmom").tiktok?.id, 97911);
+  assert.equal(accountsOf(old, "hannah.catmom").tiktok?.id, 97911, "found without the @ too");
+  assert.deepEqual(accountsOf(old, "@catlover.tiktok3"), {});
+  assert.deepEqual(accountsOf(null, "@hannah.catmom"), {});
 });

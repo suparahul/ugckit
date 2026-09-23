@@ -27,6 +27,8 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
 
+import { PLATFORMS, platformOf, primaryOf, type Platform } from "./platform.ts";
+
 export const API_BASE = "https://api.post-bridge.com";
 export const ENV_KEY = "POST_BRIDGE_API_KEY";
 
@@ -377,26 +379,66 @@ export function sendStatusOf(post: PBPost, results: PBPostResult[]): SendStatus 
 
 /* ------------------------------------------------- shared with the scripts */
 
-/** production/postbridge-accounts.json: our handles → Post Bridge accounts. Committed; it holds ids and usernames, no secrets. */
+/** One connected account, as the map stores it. `provider` names the posting service. */
+export type AccountEntry = PBAccount & { provider?: string };
+
+/** The accounts of one identity, per platform. Null: declared, not connected yet. */
+export type IdentityAccounts = { primary: Platform; platforms: Partial<Record<Platform, AccountEntry | null>> };
+
+/**
+ * production/posting-accounts.json: our handles → the posting service's accounts.
+ * Committed; it holds ids and usernames, no secrets. Keyed by the handle the plan
+ * uses. An entry is the per-platform shape (written since 0.4.0) or, in a file
+ * written before, one account (read as that account's platform; see accountsOf).
+ */
 export type AccountsFile = {
   syncedAt: string;
-  /** One entry per handle in the plan. Null: the handle is not connected in Post Bridge yet. */
-  accounts: Record<string, PBAccount | null>;
-  /** Connected accounts that match no handle in the plan, for the eye. */
+  provider?: string;
+  /** One entry per handle in the plan. Null: the handle is not connected yet. */
+  accounts: Record<string, IdentityAccounts | AccountEntry | null>;
+  /** Connected accounts that no identity declares, for the eye. */
   unmatched: PBAccount[];
 };
 
 const bare = (h: string) => h.replace(/^@/, "").toLowerCase();
 
-/** Pairs the plan's handles with the accounts Post Bridge lists, by TikTok username. Pure: the script, the Atlas and the tests share it. */
-export function mapAccounts(handles: string[], accounts: PBAccount[], now = new Date().toISOString()): AccountsFile {
-  const tiktok = accounts.filter((a) => String(a.platform).toLowerCase() === "tiktok");
+/** The connected accounts of one handle, per platform, from either shape of the file. Empty: not connected. */
+export function accountsOf(file: Pick<AccountsFile, "accounts"> | null | undefined, handle: string): Partial<Record<Platform, AccountEntry>> {
+  const e = file?.accounts?.[handle] ?? file?.accounts?.[handle.replace(/^@/, "")] ?? file?.accounts?.[`@${bare(handle)}`] ?? null;
+  if (!e) return {};
+  if ("platforms" in e && e.platforms) {
+    const out: Partial<Record<Platform, AccountEntry>> = {};
+    for (const p of PLATFORMS) if (e.platforms[p]) out[p] = e.platforms[p]!;
+    return out;
+  }
+  const p = platformOf((e as AccountEntry).platform) ?? "tiktok";
+  return { [p]: e as AccountEntry };
+}
+
+/** An identity to map: its handle and the accounts its HANDLE.md declares. A bare handle declares one TikTok account of that name. */
+export type MapIdentity = string | { handle: string; accounts: { platform: Platform; account: string; role?: string }[] };
+
+/**
+ * Pairs each identity's declared accounts with the accounts the posting service
+ * lists: an account matches when it has the declared platform AND the declared
+ * username. No name is guessed: an Instagram account with the TikTok name is
+ * not matched unless the identity declares it, and a declared account with
+ * another name is. Pure: the script, the Organic Factory UI and the tests share it.
+ */
+export function mapAccounts(identities: MapIdentity[], accounts: PBAccount[], now = new Date().toISOString()): AccountsFile {
   const map: AccountsFile["accounts"] = {};
   const used = new Set<number>();
-  for (const h of handles) {
-    const hit = tiktok.find((a) => bare(a.username) === bare(h)) ?? null;
-    map[h] = hit;
-    if (hit) used.add(hit.id);
+  for (const i of identities) {
+    const handle = typeof i === "string" ? i : i.handle;
+    const declared = typeof i === "string" ? [{ platform: "tiktok" as Platform, account: i, role: "primary" }] : i.accounts;
+    const platforms: IdentityAccounts["platforms"] = {};
+    for (const d of declared) {
+      const hit = accounts.find((a) => platformOf(a.platform) === d.platform && bare(a.username) === bare(d.account)) ?? null;
+      platforms[d.platform] = hit;
+      if (hit) used.add(hit.id);
+    }
+    const primary = declared.find((d) => d.role === "primary")?.platform ?? primaryOf(declared.map((d) => d.platform));
+    map[handle] = { primary, platforms };
   }
   return { syncedAt: now, accounts: map, unmatched: accounts.filter((a) => !used.has(a.id)) };
 }
@@ -412,7 +454,7 @@ export type SyncReport = { post: string; pbPost: string; written: boolean; outco
 export async function syncOutcomesWith(
   pb: PostBridgeClient,
   sent: { post: string; pbPost: string }[],
-  lastSync: (post: string) => Record<string, string | number> | null,
+  lastSync: (post: string) => Record<string, unknown> | null,
   append: (post: string, data: OutcomeSync) => void,
 ): Promise<{ refreshed: boolean; reports: SyncReport[] }> {
   /* Nothing sent: no call at all. */

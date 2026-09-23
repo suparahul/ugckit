@@ -14,15 +14,20 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
+import { isPlatform } from "@/lib/platform";
 import { allStates, appendEvent, finalBlock, parseLayout, slideHashes, validSlug, type Event, type EventKind } from "@/lib/production";
 
 const KINDS = new Set<EventKind>([
   "idea.approve", "idea.sendback", "plan.approve", "plan.sendback", "final.approve", "final.sendback",
   "slide.choose", "slide.approve", "slide.reject", "slide.note", "slide.text", "slide.layout", "slide.unlock", "posted", "outcomes", "kill", "unkill", "task.tick", "task.untick",
-  /* Identity events, from the handle page: `handle` instead of `post`. */
-  "persona.approve", "persona.sendback", "reference.approve", "reference.reject", "bio.approve", "defaults.approve", "task.done",
+  /* One leg of a post taken off, or put back: data.platform names it. */
+  "leg.drop", "leg.add",
+  /* Identity events, from the handle page: `handle` instead of `post`. account.connect may name data.platform (TikTok when absent). */
+  "persona.approve", "persona.sendback", "reference.approve", "reference.reject", "bio.approve", "defaults.approve", "task.done", "account.connect",
 ]);
-const IDENTITY = new Set<EventKind>(["persona.approve", "persona.sendback", "reference.approve", "reference.reject", "bio.approve", "defaults.approve", "task.done"]);
+const IDENTITY = new Set<EventKind>(["persona.approve", "persona.sendback", "reference.approve", "reference.reject", "bio.approve", "defaults.approve", "task.done", "account.connect"]);
+/* The kinds whose data.platform must name a platform: required on a leg line, optional on account.connect. */
+const LEG = new Set<EventKind>(["leg.drop", "leg.add"]);
 
 const NEEDS_NOTE = new Set<EventKind>(["idea.sendback", "plan.sendback", "final.sendback", "slide.reject", "slide.note", "kill", "persona.sendback", "reference.reject"]);
 
@@ -39,6 +44,8 @@ export async function POST(request: NextRequest) {
   const identity = IDENTITY.has(body.kind);
   if (identity && (!body.handle || typeof body.handle !== "string")) return NextResponse.json({ error: "handle is required." }, { status: 400 });
   if (!identity && (!body.post || typeof body.post !== "string")) return NextResponse.json({ error: "post is required." }, { status: 400 });
+  const platform = body.data && typeof body.data === "object" ? (body.data as Record<string, unknown>).platform : undefined;
+  if ((LEG.has(body.kind) || platform !== undefined) && !isPlatform(platform)) return NextResponse.json({ error: "data.platform must be tiktok or instagram." }, { status: 400 });
   const note = typeof body.note === "string" ? body.note.trim() : "";
   if (NEEDS_NOTE.has(body.kind) && !note) return NextResponse.json({ error: "Say what to change." }, { status: 400 });
 
