@@ -118,10 +118,10 @@ if [ "$DEST" = "$SRC" ]; then
 fi
 
 # An upgrade is the same command in the same folder. A managed file the user changed
-# (an atlas/ tweak, a reworded skill, an app's own feature) is copied to
-# .ugckit-backup/<old version>/<path>, and then it is not replaced but merged: the
-# kit's changes since the version the last install shipped go into the user's file,
-# and the user's changes stay. Where the two touch the same lines, the user's file is
+# (an atlas/ tweak, a reworded skill, an app's own feature) is not replaced but merged:
+# the kit's changes since the version the last install shipped go into the user's file,
+# and the user's changes stay; the file from before the merge is copied to
+# .ugckit-backup/<old version>/<path>. Where the two touch the same lines, the user's file is
 # left as it is and the kit's version is written beside it as <path>.ugckit-new.
 # "Changed by the user" is decided against .ugckit-manifest, the checksums of the files
 # the previous install shipped; a folder installed before the manifest existed falls
@@ -151,8 +151,6 @@ base_of() {  # <rel> <checksum> -> that version's content on stdout; fails when 
 # changes into it, or leave it and put the kit's version beside it.
 keep_or_merge() {
   rel="$1"; shipped="$2"
-  mkdir -p "$BACKUP/$(dirname "$rel")"
-  cp "$DEST/$rel" "$BACKUP/$rel"
   base="$(mktemp)"
   if base_of "$rel" "$shipped" > "$base"; then
     if cmp -s "$base" "$SRC/$rel"; then
@@ -160,6 +158,7 @@ keep_or_merge() {
     else
       merged="$(mktemp)"; cp "$DEST/$rel" "$merged"
       if git merge-file -q "$merged" "$base" "$SRC/$rel" 2>/dev/null; then
+        mkdir -p "$BACKUP/$(dirname "$rel")"; cp "$DEST/$rel" "$BACKUP/$rel"   # the only case that writes over theirs
         cp "$merged" "$DEST/$rel"; echo "$rel" >> "$MERGED"
       else
         cp "$SRC/$rel" "$DEST/$rel.ugckit-new"; echo "$rel" >> "$CLASH"
