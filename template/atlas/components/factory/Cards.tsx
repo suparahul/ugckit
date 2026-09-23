@@ -27,6 +27,17 @@ export function slidesOf(s: PostState): string[] {
   return one ? [one] : [];
 }
 
+/**
+ * The format's name without its note: the words before the first `,` `;` `:` or `(`.
+ * A plan row's format cell often carries the whole reasoning ("paragraph density,
+ * 9 slides: hook, one food per slide …"), which made the grid cards grow to ten
+ * lines (Rahul, 2026-09-23). The card shows the name; the whole cell is its tooltip
+ * and stays on the post page.
+ */
+export function formatHead(format: string): string {
+  return format.split(/[,;:(]/)[0].trim() || format;
+}
+
 export function PostedShow({ s, handle }: { s: PostState; handle: Handle | null }) {
   const srcs = slidesOf(s);
   const nb = numbersOf(s);
@@ -41,7 +52,7 @@ export function PostedShow({ s, handle }: { s: PostState; handle: Handle | null 
       ) : (
         <span className="show__nums"><span className="is-zero">posted, no read yet</span></span>
       )}
-      <span className="show__state"><span className="state">{s.row.format}{srcs.length ? ` · ${srcs.length} slides` : ""}</span></span>
+      <span className="show__state"><span className="state state--short" title={s.row.format}>{formatHead(s.row.format)}{srcs.length ? ` · ${srcs.length} slides` : ""}</span></span>
     </>
   );
   void handle;

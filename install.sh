@@ -23,7 +23,10 @@ else
   TMP="$(mktemp -d)"
   trap 'rm -rf "$TMP"' EXIT
   echo "fetching ugckit from $REPO ..."
-  git clone --depth 1 --branch "$BRANCH" "$REPO" "$TMP/ugckit" >/dev/null 2>&1 \
+  # The whole history without the file contents (they are fetched when needed): an upgrade
+  # looks up the version of a file the last install shipped, to merge the user's changes.
+  git clone --filter=blob:none --branch "$BRANCH" "$REPO" "$TMP/ugckit" >/dev/null 2>&1 \
+    || git clone --depth 1 --branch "$BRANCH" "$REPO" "$TMP/ugckit" >/dev/null 2>&1 \
     || { echo "could not clone $REPO (branch $BRANCH)" >&2; exit 1; }
   SRC="$TMP/ugckit/template"
   VERSION="$(cat "$TMP/ugckit/VERSION" 2>/dev/null || echo dev)"
@@ -115,8 +118,11 @@ if [ "$DEST" = "$SRC" ]; then
 fi
 
 # An upgrade is the same command in the same folder. A managed file the user changed
-# (an atlas/ tweak, a reworded skill) is copied to .ugckit-backup/<old version>/<path>
-# before it is replaced, so nothing they typed is lost and nothing asks.
+# (an atlas/ tweak, a reworded skill, an app's own feature) is copied to
+# .ugckit-backup/<old version>/<path>, and then it is not replaced but merged: the
+# kit's changes since the version the last install shipped go into the user's file,
+# and the user's changes stay. Where the two touch the same lines, the user's file is
+# left as it is and the kit's version is written beside it as <path>.ugckit-new.
 # "Changed by the user" is decided against .ugckit-manifest, the checksums of the files
 # the previous install shipped; a folder installed before the manifest existed falls
 # back to "differs from the file shipping now", which also counts the kit's own updates.
@@ -124,8 +130,47 @@ FIRST=1; [ -e "$DEST/AGENTS.md" ] && FIRST=0
 OLD="$(cat "$DEST/.ugckit-version" 2>/dev/null || echo unknown)"
 BACKUP="$DEST/.ugckit-backup/$OLD"
 OLDMAN="$DEST/.ugckit-manifest"
-SAVED="$(mktemp)"; NEWMAN="$(mktemp)"
+SAVED="$(mktemp)"; NEWMAN="$(mktemp)"; KEPT="$(mktemp)"; MERGED="$(mktemp)"; CLASH="$(mktemp)"
 sum() { cksum < "$1" | cut -d' ' -f1; }
+
+# The kit's git history (the clone this installer runs from), to find the version of a
+# file that the last install shipped: the one whose checksum the manifest holds.
+KITGIT=""
+if git -C "$SRC/.." rev-parse --git-dir >/dev/null 2>&1; then KITGIT="$(cd "$SRC/.." && pwd)"; fi
+base_of() {  # <rel> <checksum> -> that version's content on stdout; fails when not found
+  [ -n "$KITGIT" ] || return 1
+  for c in $(git -C "$KITGIT" log --format=%H -- "template/$1" 2>/dev/null); do
+    if [ "$(git -C "$KITGIT" show "$c:template/$1" 2>/dev/null | cksum | cut -d' ' -f1)" = "$2" ]; then
+      git -C "$KITGIT" show "$c:template/$1"; return 0
+    fi
+  done
+  return 1
+}
+
+# A managed file the user changed, in a folder with a manifest: keep it, merge the kit's
+# changes into it, or leave it and put the kit's version beside it.
+keep_or_merge() {
+  rel="$1"; shipped="$2"
+  mkdir -p "$BACKUP/$(dirname "$rel")"
+  cp "$DEST/$rel" "$BACKUP/$rel"
+  base="$(mktemp)"
+  if base_of "$rel" "$shipped" > "$base"; then
+    if cmp -s "$base" "$SRC/$rel"; then
+      echo "$rel" >> "$KEPT"                       # the kit did not change it: nothing to do
+    else
+      merged="$(mktemp)"; cp "$DEST/$rel" "$merged"
+      if git merge-file -q "$merged" "$base" "$SRC/$rel" 2>/dev/null; then
+        cp "$merged" "$DEST/$rel"; echo "$rel" >> "$MERGED"
+      else
+        cp "$SRC/$rel" "$DEST/$rel.ugckit-new"; echo "$rel" >> "$CLASH"
+      fi
+      rm -f "$merged"
+    fi
+  else
+    cp "$SRC/$rel" "$DEST/$rel.ugckit-new"; echo "$rel" >> "$CLASH"   # the shipped version is not in the history
+  fi
+  rm -f "$base"
+}
 
 # Files we replace on upgrade: code and instructions.
 # Files we never clobber: anything the user authored or generated.
@@ -137,7 +182,11 @@ copy_managed() {
     if [ -f "$OLDMAN" ]; then shipped="$(awk -v r="$rel" 'substr($0, index($0, " ") + 1) == r { print $1 }' "$OLDMAN")"; fi
     changed=0
     if [ -n "$shipped" ]; then
-      if [ "$(sum "$DEST/$rel")" != "$shipped" ]; then changed=1; fi
+      if [ "$(sum "$DEST/$rel")" != "$shipped" ] && ! cmp -s "$SRC/$rel" "$DEST/$rel"; then
+        keep_or_merge "$rel" "$shipped"
+        echo "$(sum "$SRC/$rel") $rel" >> "$NEWMAN"   # the kit's version, so the next upgrade finds the change again
+        return
+      fi
     elif ! cmp -s "$SRC/$rel" "$DEST/$rel"; then changed=1; fi
     if [ "$changed" = 1 ]; then
       mkdir -p "$BACKUP/$(dirname "$rel")"
@@ -227,6 +276,15 @@ if [ "$N" -gt 0 ]; then
     hm "$N file(s) you had changed were replaced; your versions are in .ugckit-backup/$OLD/ (an atlas/ tweak lives there too, under the same path)"
   fi
 fi
+list() { sed 's/^/      /' "$1"; }
+NK="$(wc -l < "$KEPT" | tr -d ' ')"; NM="$(wc -l < "$MERGED" | tr -d ' ')"; NC="$(wc -l < "$CLASH" | tr -d ' ')"
+if [ "$NK" -gt 0 ]; then hm "$NK file(s) you had changed are kept as they are (this version does not change them):"; list "$KEPT"; fi
+if [ "$NM" -gt 0 ]; then hm "$NM file(s) you had changed now have this version's changes merged in, and keep yours (before the merge: .ugckit-backup/$OLD/):"; list "$MERGED"; fi
+if [ "$NC" -gt 0 ]; then
+  no "$NC file(s) you had changed could not be merged. Yours are kept as they are; this version's file is beside each one as <file>.ugckit-new. Ask your agent to merge them (the setup skill, § 0):"
+  list "$CLASH"
+fi
+rm -f "$KEPT" "$MERGED" "$CLASH"
 
 # ---------------------------------------------------------------- python env
 echo

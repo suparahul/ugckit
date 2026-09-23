@@ -31,9 +31,27 @@ exist yet. The old file stays where it is; nothing under `research/`, `pipeline/
 `.env` is touched. Then say, in one line per project, what was read and what was
 written. A user with no `PRODUCT.md` is told "nothing to migrate" and setup goes on.
 
-The installer's own summary line names `.ugckit-backup/<old version>/`: a managed file
-the user had changed (an `atlas/` tweak, a reworded skill) sits there under its old
-path. Say once where it is; do not merge it back unless asked.
+From 0.3.1 on, `./ugckit update` fetches the kit and runs the installer; nothing moved
+between 0.3.0 and 0.3.1, so the table above has nothing new to do.
+
+A managed file the user had changed (an `atlas/` tweak, a reworded skill, a feature
+only their app has) is merged, not replaced. The installer's summary lists three kinds:
+
+- **kept as they are**: the new version does not change the file. Nothing to do.
+- **merged**: the kit's changes are in the user's file and the user's changes stayed.
+  The copy from before the merge is in `.ugckit-backup/<old version>/<path>`. Nothing to
+  do, unless something the user relies on stops working; then compare with that copy.
+- **could not be merged**: the user's file is untouched and the kit's version sits
+  beside it as `<path>.ugckit-new`. Find these with
+  `find . -name '*.ugckit-new' -not -path './node_modules/*'`. For each one, show the
+  user in plain words what the kit changed and what they had changed, merge the two
+  into `<path>` keeping both where they can live together, ask when they cannot, check
+  the result (`node --check` for a script, `npm run build` in `atlas/` for the UI), and
+  then delete the `.ugckit-new` file. The next update merges from the kit's new version.
+
+A folder upgraded from 0.2 or older (no `.ugckit-manifest` before) had a changed file
+backed up to `.ugckit-backup/<old version>/` and replaced. Say once where it is; do not
+merge it back unless asked.
 
 ## 1. Preflight
 

@@ -36,6 +36,33 @@ case "${1:-help}" in
   posting-accounts) shift; exec node "$PROJ/scripts/posting-accounts.mjs" "$@" ;;
   post)     shift; exec node "$PROJ/scripts/posting-send.mjs" "$@" ;;
   sync)     shift; exec node "$PROJ/scripts/posting-sync.mjs" "$@" ;;
+  update)
+    # Get the latest kit and run its installer on this folder. apps/, research/,
+    # pipeline/ and .env are never touched; a kit file you changed is merged, not
+    # replaced (install.sh says which). UGCKIT_REPO may be a local clone, for a test.
+    # The installer rewrites this file while it runs: bash has read the whole case
+    # statement already, and the branch ends in exit, so nothing more is read from it.
+    shift
+    REPO="${UGCKIT_REPO:-https://github.com/suparahul/ugckit}"
+    BR="${UGCKIT_BRANCH:-main}"
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --branch) BR="${2:?--branch needs a name}"; shift 2 ;;
+        *) echo "ugckit update: unknown option $1 (use: ugckit update [--branch B])" >&2; exit 2 ;;
+      esac
+    done
+    command -v git >/dev/null 2>&1 || { echo "git is required for ugckit update" >&2; exit 1; }
+    echo "installed: $(cat "$PROJ/.ugckit-version" 2>/dev/null || echo unknown)"
+    TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+    echo "fetching ugckit from $REPO (branch $BR) ..."
+    git clone -q --filter=blob:none --branch "$BR" "$REPO" "$TMP/ugckit" 2>/dev/null \
+      || git clone -q --depth 1 --branch "$BR" "$REPO" "$TMP/ugckit" \
+      || { echo "could not fetch $REPO (branch $BR)" >&2; exit 1; }
+    echo "fetched:   $(cat "$TMP/ugckit/VERSION" 2>/dev/null || echo dev)"
+    cd "$PROJ"
+    rc=0; UGCKIT_BRANCH="$BR" bash "$TMP/ugckit/install.sh" . || rc=$?
+    exit "$rc"
+    ;;
   *)
     cat <<'USAGE'
 ugckit — a niche or a reference video in, a recreation out.
@@ -45,6 +72,8 @@ ugckit — a niche or a reference video in, a recreation out.
   ugckit key                 fill in .env — it asks you for each secret
   ugckit key postbridge      the posting service's key, at the first send
   ugckit workspace <id>      the agent sets this from list_workspaces (MCP)
+  ugckit update [--branch B] get the latest kit; apps/, research/ and .env stay,
+                             and a kit file you changed is merged, not replaced
   ugckit state show <proj>   pipeline progress, spend and open feedback
   ugckit state projects      list projects
 

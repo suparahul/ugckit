@@ -493,6 +493,8 @@
 .show__topic, .show__hook { min-height: calc(2 * 1.3em); }
 .show__nums { min-height: 1.4em; }
 .show__state { margin-top: auto; padding-top: 4px; }
+/* The format's name and the slide count on one line; the whole format cell is the tooltip (Cards.tsx formatHead). */
+.show__state .state--short { display: block; min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .show--one .show__open { cursor: pointer; }
 .show__handle > span > small { color: var(--ink-3); font-size: 11px; }
 

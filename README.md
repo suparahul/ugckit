@@ -73,7 +73,13 @@ see [Upgrading](#upgrading) below.
 
 ## Upgrading
 
-Go into your folder and run the install command with no argument:
+Go into your folder and run the update command:
+
+    cd organic-factory
+    ./ugckit update
+
+A folder installed before 0.3.1 has no `update` command yet. Run the install command
+with no argument once; from then on `./ugckit update` works:
 
     cd organic-factory
     curl -fsSL https://raw.githubusercontent.com/suparahul/ugckit/main/install.sh | sh
@@ -110,9 +116,17 @@ How to treat me while you do this:
 **Replaced:** the scripts, the skills, `AGENTS.md`, `CLAUDE.md`, `ugckit`, `docs/`,
 `atlas/` and `brain/` — the code and the instructions. **Kept:** `.env`, `.mcp.json`,
 `research/`, `pipeline/`, `apps/`, `.venv`, your prompts and everything you generated.
-A managed file you had changed by hand (a tweak in `atlas/`, a reworded skill) is
-copied to `.ugckit-backup/<old version>/<same path>` before it is replaced, and the
-installer's last line says how many and where. On the next session the agent offers
+A managed file you had changed by hand (a tweak in `atlas/`, a reworded skill, a
+feature only your app has) is **not** replaced. It is copied to
+`.ugckit-backup/<old version>/<same path>`, and then the kit's changes since your last
+install are merged into it, so your changes stay and the kit's arrive. When the new
+version does not change that file, it stays exactly as it is. When your change and the
+kit's change touch the same lines, your file stays as it is and the kit's version is
+written beside it as `<file>.ugckit-new`; the agent merges the two with you (the
+`setup` skill, § 0). The installer's summary lists every file it kept, merged or left
+with a `.ugckit-new`. A new file you added (one the kit never shipped) is never
+touched. (A folder installed before the kit kept a manifest of what it shipped, 0.2 and
+older, still gets the old behaviour once: the changed file is backed up and replaced.) On the next session the agent offers
 the migrate step of the `setup` skill: it reads the files whose place moved
 (`research/<project>/PRODUCT.md` → `apps/<slug>/APP.md` plus the callout facts),
 writes the new ones, and leaves the old ones in place.
