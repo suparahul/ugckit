@@ -36,6 +36,7 @@ The Atlas reads this file by these exact conventions:
     Posting zone: America/New_York      (where the audience is; the slots are in this zone)
     Home zone: Asia/Kolkata             (where the user is; the board shows both)
     Posting service: postbridge         (the name only; the connection is made at the first send)
+    Platforms: tiktok, instagram        (optional; see "Two platforms" below)
 
     ## Judgement rules
     | Rule | Value | Source |
@@ -57,6 +58,7 @@ The Atlas reads this file by these exact conventions:
     ## Posts
     | Day | Date | Handle | Slot | Topic | Format / variation | Arm | Source | Tags | Kind |
     | 1 | 09-16 | hannah | AM | … | tip list, 7 slides | Catwise slide 3 | `@x`, 1,201,654, https://www.tiktok.com/@x/photo/… | #a #b #c #d #e | slideshow |
+    (an optional last column, `Platforms`, after `Kind`: see "Two platforms")
 
     ## Day-7 read
     | Handle | Format verdict | Experiments to read | What settles each |
@@ -67,6 +69,29 @@ its view count and its exact url ("no URL held" when none); `Kind` is `slideshow
 `video` and sits last so the Atlas's column order holds. A row with `kind: video` names
 the video pipeline as its maker (`originate`, stage 5) and joins production at `post`.
 Two handles at two a day for seven days is 28 rows; write every row with a source.
+
+## Two platforms
+
+A post goes to every platform its handle has an account on: the `## Accounts` table of
+`HANDLE.md` (no table: TikTok only). Instagram is a repost of the same deck, sent in the
+same call at the same time; the research and the formats stay TikTok's. So nothing in
+the plan is needed for Instagram to happen. Two optional places hold it back:
+
+- the head line `Platforms: tiktok` keeps the whole week on TikTok (`Platforms: tiktok,
+  instagram` allows both, which is the same as no line);
+- the last column `Platforms` of one row (`tiktok`, `instagram`, or both) overrides it
+  for that post. Blank or `—` means the head line.
+
+**The 10-slide rule (Rahul, 2026-09-23).** Every row on a handle with both a TikTok and
+an Instagram account is planned at **10 slides or fewer**, the CTA and the save ask
+included: Instagram's API takes 10 in a carousel (the app takes 20; the API does not).
+Say the count in the `Format / variation` cell ("tip list, 9 slides"). A handle on TikTok
+only keeps no limit. The post page shows a failing check and the send stops for a deck
+over 10 on a two-platform handle; nothing is cut by the kit.
+
+**The tags.** The five tags of a row are measured on TikTok and used on both platforms.
+On Instagram they go in the first comment, not the caption (the compositor splits them).
+The pool is not measured on Instagram.
 
 ## Then the index
 

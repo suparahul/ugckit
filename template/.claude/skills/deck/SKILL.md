@@ -107,9 +107,17 @@ the spelling: a generator's text is a candidate to reject, not to fix.
   slides, 195 posts, 2026-09-16); across every app niche two-slide posts dominate and
   no 12+ deck reached 1M. A long deck costs pictures and views: on a fresh handle it
   waits until the handle clears about 500 views on a shorter one.
+- **The 10-slide rule (Rahul, 2026-09-23).** A deck for a handle with both a TikTok and
+  an Instagram account (the `## Accounts` table of its `HANDLE.md`) has **10 slides or
+  fewer**, the CTA slide and the save ask included: Instagram's API takes 10 in a
+  carousel. When the source has more ideas than fit, merge two per slide or drop the
+  weakest; never plan on the kit cutting slides (it does not: the check on the post page
+  fails and the send stops). A handle on TikTok only keeps no limit.
 - The caption's first line repeats the cover text (4 of the 9 biggest tip posts of the
   scrolled batch do; search reads the caption for certain), then the plan row's five
-  tags. The sync matches the posted link by that first line, so keep it exact.
+  tags. The sync matches the posted link by that first line, so keep it exact. Write one
+  caption for both platforms: on Instagram the compositor takes the tags out of it and
+  posts them as the first comment (`final/instagram/caption.txt`, `first-comment.txt`).
 - The SEO handle (the search-keyword tier, when `ACCOUNTS.md` has one): slide 1's text
   is the keyword and nothing else, and the keyword sits in the caption too; its cover is
   typed in TikTok, never burned, because search reads TikTok's own text layer. Its tags

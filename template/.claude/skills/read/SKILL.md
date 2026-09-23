@@ -21,7 +21,9 @@ post), and `niche/anatomy.md`'s post table for the source posts' numbers.
    columns as the deck set them (persona, slides, deck shape, hook shape, density,
    product slot, product form, ask, image origin, sound, caption) and the outcome
    columns from the sync (views, saves/view, shares/view, comments/view, app questions
-   counted from the comments), `Source` = **`own posts`**, `Kind` = slideshow | video.
+   counted from the comments), `Source` = **`own posts`**, `Kind` = slideshow | video,
+   `Platform` = `tiktok`, `instagram` or `both` (add the column when it is missing; rows
+   written before it are `tiktok`, and so are the rows of the research).
    Rows appended under the post table do not count as a change to the parameter
    tables: the strategy page reads "day-7 rows added", and the fit is re-read on the
    next plan, not unfilled.
@@ -36,6 +38,14 @@ post), and `niche/anatomy.md`'s post table for the source posts' numbers.
 
 Views and ×median first; then the metric the experiment names (saves/view on tip
 lists); not engagement rate, not comments.
+
+**Two platforms.** A post on TikTok and Instagram is one format read: judge it on the
+views of both legs added up (the post page and the home base show both, and the split).
+When one platform has more than **3×** the other's views on the same post, the verdict
+names the platform and the anatomy row is written per platform (`tiktok` and `instagram`,
+two rows) instead of `both`. 3× is a starting number (Rahul, 2026-09-23); say when it
+looks wrong. **Saves/view is TikTok's only:** no source gives Instagram saves, so the
+row says "saves/view: TikTok"; do not divide TikTok's saves by the added views.
 
 ## Finish
 

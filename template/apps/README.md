@@ -23,15 +23,17 @@ is a pending slot on the canvas, never an error.
         APP-FIT.md               every parameter of both brain sheets, one value each, with a source and a status
         HASHTAG-POOL.md          optional: the measured hashtag pool
       handles/<handle>/
-        HANDLE.md                the identity: head lines (…, Dimension:, Slide style:), Persona, Bio,
+        HANDLE.md                the identity: head lines (…, Dimension:, Slide style:), Accounts (optional:
+                                 one row per platform, see docs/instagram.md), Persona, Bio,
                                  References, Defaults, Style prefix, Identity rule, Post-process step
         references/              face.png, subject-<name>.png, style.png, profile.png
       production/
-        PLAN.md                  the plan: App:, App Store id:, Posting zone:, Home zone:, Posting service:, the posts table
+        PLAN.md                  the plan: App:, App Store id:, Posting zone:, Home zone:, Posting service:,
+                                 Platforms: (optional), the posts table
         decks/<date>-<short>.md  one deck per handle per day
         log.jsonl                append-only decisions: approvals, sends, posted links, outcome reads, ticks
-        files/<date>-<short>-<n>/  slide-NN/ candidates, cards/, final/, images-job.json, images-result.json
-        posting-accounts.json    handle -> posting-service account, written at the first send
+        files/<date>-<short>-<n>/  slide-NN/ candidates, cards/, final/ (and final/instagram/), images-job.json, images-result.json
+        posting-accounts.json    handle -> posting-service account per platform, written at the first send
 
 `brain/` (read-only, shipped by the kit) is read together with `niche/` at every stage from the
 niche read on. Money is spent only in the competitor-apps phase, the niche phase and the sync,

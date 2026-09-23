@@ -34,6 +34,15 @@ written. A user with no `PRODUCT.md` is told "nothing to migrate" and setup goes
 From 0.3.1 on, `./ugckit update` fetches the kit and runs the installer; nothing moved
 between 0.3.0 and 0.3.1, so the table above has nothing new to do.
 
+**0.4.0 (Instagram) moves nothing either.** Every file written before reads as TikTok
+only: a `HANDLE.md` without `## Accounts` is one TikTok account, a log line without
+`data.platform` is TikTok's, and the old `posting-accounts.json` (one account per
+handle) is still read; the next `posting-accounts.mjs` run writes it per platform. Say
+in one line: "Instagram is available: an identity can repost there. To add it, run the
+`handles` skill, step 1, for that identity (it writes the `## Accounts` table), then the
+`posting-provider` skill (connect the account in Post Bridge, run posting-accounts.mjs).
+From then on its decks are 10 slides or fewer." Do not add Instagram unasked.
+
 A managed file the user had changed (an `atlas/` tweak, a reworded skill, a feature
 only their app has) is merged, not replaced. The installer's summary lists three kinds:
 

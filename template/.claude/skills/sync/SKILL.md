@@ -1,6 +1,6 @@
 ---
 name: sync
-description: Phase 8, the outcomes — the posted link through Monid by matching the handle's latest posts to the caption, then the numbers (views, likes, comments, saves, shares) as outcome.sync lines; the service's own analytics as a second source. Under a cent per post.
+description: Phase 8, the outcomes — the posted link through Monid by matching the handle's latest posts to the caption, then the numbers (views, likes, comments, saves, shares) as outcome.sync lines; the service's own analytics as a second source; per platform (an Instagram leg's link and numbers come from the service, with no Monid call). Under a cent per post.
 ---
 
 # Phase 8 — the sync
@@ -26,6 +26,22 @@ saves).
 
 Say the figure before a run over many posts: a day of four posts is about a cent.
 
+## An Instagram leg
+
+A post sent to TikTok and Instagram is read per platform. The TikTok part is the one
+above. **The Instagram leg needs no Monid call**, so the cost does not rise: Post Bridge
+reports its link, its post time and its numbers. The sync writes, for that leg, `posted`
+and `posted.link` once it is live, and one `outcome.sync` line with
+`data.platform: "instagram"` (views, likes, comments, shares) whenever they change. A leg
+that failed is written once as `posting.failed`, with Instagram's own words; say it to
+the user and offer the retry (the `post` skill).
+
+**Saves come only from TikTok, through Monid.** Instagram saves are not reported: no
+source gives them (Post Bridge has no save field; the public scrapers on Monid cannot
+see a save count, which Instagram shows only to the account owner). So saves/view is a
+TikTok figure; on Instagram read views, likes, comments and shares. Post Bridge pulls
+fresh numbers at most every 30 minutes per account.
+
 ## Where the caption match fails
 
 A caption edited on the phone (a word dropped, the tags removed) lowers the overlap; the
@@ -34,5 +50,5 @@ guessing.
 
 ## Finish
 
-Report each post: the link, the numbers, the read time. The board and the home base show
+Report each post: the link, the numbers, the read time; per platform when there are two. The board and the home base show
 them. On the day-7 date, run the `read` skill.

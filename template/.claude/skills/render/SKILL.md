@@ -1,6 +1,6 @@
 ---
 name: render
-description: Phase 8, the compositor — the finished slides of one post, text burned in, at the post's dimension, with the callout on the product slide, into files/<post>/final/. Runs before every send and export. Free.
+description: Phase 8, the compositor — the finished slides of one post, text burned in, at the post's dimension, with the callout on the product slide, into files/<post>/final/; with an Instagram leg, also the 4:5 JPEG set in final/instagram/. Runs before every send and export. Free.
 ---
 
 # Phase 8 — the render
@@ -9,6 +9,7 @@ description: Phase 8, the compositor — the finished slides of one post, text b
     node scripts/render-slides.mjs <slug> <post> --force        draw the current picture where none is approved (a preview)
     node scripts/render-slides.mjs <slug> --date <date>         every post of the day whose pictures are all approved
     node scripts/render-slides.mjs <slug> <post> --burn-cover   slide 1 with its text, for a direct (scheduled) send
+    node scripts/render-slides.mjs <slug> <post> --instagram    also the Instagram set (the send adds it when the post has an Instagram leg)
 
 Writes `files/<post>/final/slide-NN.png` at the post's dimension (3:4 → 1080×1440,
 9:16 → 1080×1920; a picture of another shape is centre-cropped and the line says so),
@@ -42,13 +43,27 @@ and writes `cover-text.txt` for the user to type; direct mode burns it (`--burn-
 run inside the send). The SEO handle's cover is always typed, whatever the mode: the
 keyword must be in TikTok's own text layer.
 
+**The Instagram set.** A post with an Instagram leg (its handle has an Instagram account)
+also gets `final/instagram/slide-NN.jpg`: the same slides as JPEG at **4:5, 1080×1350**,
+because Meta's API takes 4:5 to 1.91:1 and JPEG only. Every slide taller than 4:5 needs
+it. A 3:4 slide loses 45 px at the top and at the bottom, outside the text's 4% safe
+area; a 9:16 slide is fitted whole on a blurred, darker copy of itself, so no text is
+cut. No new picture is generated. The cover always carries its text in this set,
+whatever the TikTok mode: Instagram is always published directly and nobody types on
+it. `instagram/caption.txt` is the caption without the hashtags;
+`instagram/first-comment.txt` holds them (the send posts them as the first comment). A
+deck over 10 slides is written with a warning: Instagram takes 10, and the send stops.
+The Instagram post has no music: the user adds it by hand in the Instagram app (Edit,
+then Replace Audio) once it is live.
+
 Text-free slides (the words typed in TikTok) are the post page's export control
 (`slide.text` = overlay); the compositor reads it from the log.
 
 ## Then look
 
 Open two or three of the finals yourself: the text inside the safe area, the callout on
-the right slide, the cat the right cat. Then the user approves the final on the post
+the right slide, the cat the right cat. With an Instagram set, open two of its JPEGs as
+well: the cover's text whole, the callout not cut at the bottom. Then the user approves the final on the post
 page (`final.approve`). Nothing is sent without that line.
 
 ## Finish

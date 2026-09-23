@@ -206,7 +206,7 @@ balance` says what is left.
 Eight phases, each a compartment of the Organic Factory's canvas (http://localhost:3210/app/<slug>).
 Phases 1 to 3 are the setup, the app and the research above; the rest is new. Files are
 the interface: each phase writes fixed paths under `apps/<slug>/` (see `apps/README.md`),
-the Atlas reads them in place, and "filled" is derived from the files, never recorded.
+the Organic Factory UI reads them in place, and "filled" is derived from the files, never recorded.
 
 | # | Phase | Skill(s) | Produces | Filled when |
 |---|---|---|---|---|
@@ -218,6 +218,17 @@ the Atlas reads them in place, and "filled" is derived from the files, never rec
 | 6 | Handle identities | `handles`, `persona-identity` | `handles/<handle>/HANDLE.md`, `references/` | one handle complete at five steps; two recommended |
 | 7 | App fit and plan | `app-fit`, `plan` (`hashtag-pool.sh`) | `strategy/APP-FIT.md`, `production/PLAN.md`, optionally `strategy/HASHTAG-POOL.md` | the fit exists and the plan parses with a handle and a row |
 | 8 | Production | per post: `deck`, `images` (`images.sh`, `codex-images.sh`), `callout` (`render-callout.mjs`), `render` (`render-slides.mjs`), `post` (`posting-send.mjs`; `posting-provider` once, `posting-accounts.mjs`), `sync` (`posting-sync.mjs`); per week: `read` | `production/decks/`, `files/<post>/`, the log lines, `posting-accounts.json`; the day-7 rows in `niche/anatomy.md` | the first `posted` line |
+
+**Two platforms.** An identity posts on TikTok, and may repost on Instagram: its
+`HANDLE.md` then has an `## Accounts` table, one row per platform, each account with its
+own name (`handles` step 1; see `docs/instagram.md`). A post has one deck, one approval
+and one leg per platform, sent in one call at the same time; Instagram is always
+published directly, as 4:5 JPEG slides, with no music (the user adds it in the Instagram
+app), and a deck on such a handle has 10 slides or fewer. The research stays TikTok
+only. A file, a plan row or a log line that names no platform means TikTok, so
+everything written before reads as it did. The log adds `data.platform`, `data.legs` on
+`posting.sent`, `posting.failed` (a leg the platform refused, in its words), `leg.drop`
+and `leg.add`. Instagram saves are not reported by any source; saves/view is TikTok's.
 
 **The state.** `pipeline.json` carries the stages `product`, `apps-learnings`, `niche`,
 `accounts`, `handles`, `strategy`, `production` per project (`state.py set <slug> niche

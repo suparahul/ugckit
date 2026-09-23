@@ -8,19 +8,33 @@
  * launcher (--post <key>, --date YYYY-MM-DD, --send, --force, --direct, --at-local
  * "HH:MM Zone"). What the kit expects back: files and log lines, never a return value.
  *
- *   accounts    apps/<slug>/production/posting-accounts.json:
- *               { "provider": "<name>", "accounts": { "@handle": { "id", "username", "platform", "provider": "<name>" } | null }, "unmatched": [] }
+ *   accounts    apps/<slug>/production/posting-accounts.json, one entry per platform account each identity
+ *               declares (the `## Accounts` table of its HANDLE.md; no table: one TikTok account with
+ *               the handle's name; atlas/lib/accounts.ts identitiesOf reads them). Match by platform AND
+ *               username, never by a similar name:
+ *               { "provider": "<name>", "accounts": { "@handle": { "primary": "tiktok", "platforms": {
+ *                   "tiktok": { "id", "username", "platform", "provider": "<name>" } | null,
+ *                   "instagram": { … } | null } } }, "unmatched": [ accounts no identity declares ] }
  *   send        for each selected post (final approved, mapped, not yet sent unless --force):
  *               upload apps/<slug>/production/files/<date>-<short>-<n>/final/slide-NN.png in order,
  *               the caption from final/caption.txt, create the post (draft by default; scheduled
  *               when --direct with the instant from --at-local), then append to log.jsonl:
  *               {"at", "post": "<key>", "kind": "posting.sent", "actor": "agent",
  *                "data": {"provider": "<name>", "mode": "draft"|"direct", "id": "<post id>", "media": [...], "scheduledAt": "<iso>"|null}}
+ *               A post goes to every platform its handle declares (one leg each, at one time). With
+ *               more than TikTok, the line also carries "legs": [{"platform", "account", "mode",
+ *               "scheduledAt", "status"}]. The Instagram leg: always direct (no draft exists), the
+ *               4:5 JPEG set in final/instagram/ (render-slides.mjs --instagram), its caption.txt,
+ *               and first-comment.txt as the first comment when the service has one; 10 slides at
+ *               most. A leg the service refuses: {"kind": "posting.failed", "data": {"platform",
+ *               "account", "error": "<the platform's words>"}}. --only tiktok|instagram sends one leg.
  *               Without --send: print the selection and send nothing.
  *   status      print the service's state of each sent post.
  *   sync        the posted url when the service returns one (append posted.link + posted), the
  *               service's numbers (append outcome.sync with data.source "<name>"); the Monid link
- *               match of atlas/lib/tiktok-link.ts can be reused for a draft the service cannot see.
+ *               match of atlas/lib/tiktok-link.ts can be reused for a TikTok draft the service cannot
+ *               see. A line of another leg than TikTok carries "platform": "instagram"; a line with
+ *               no platform is TikTok's.
  *   reschedule  move a scheduled post; append posting.rescheduled with the new instant.
  */
 import { appendFileSync, existsSync, readFileSync } from "node:fs";

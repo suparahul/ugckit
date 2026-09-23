@@ -1,6 +1,6 @@
 ---
 name: handles
-description: Phase 6 — create one handle identity at a time, in five steps: role and name, persona, references, profile picture and bio, defaults. Each step ends in a file under apps/<slug>/handles/<handle>/. The user creates the account on TikTok and ticks; the agent writes. No cost through Monid.
+description: Phase 6 — create one handle identity at a time, in five steps: role and name, persona, references, profile picture and bio, defaults. Each step ends in a file under apps/<slug>/handles/<handle>/. The user creates the accounts (TikTok, and Instagram when the identity reposts there) and ticks; the agent writes. No cost through Monid.
 ---
 
 # Phase 6 — the handle identities
@@ -33,6 +33,36 @@ Write `HANDLE.md` with the head lines:
     Tier: persona handle
     Created: <date the user ticked>
 
+Then ask one question: **does this identity also post on Instagram?** Instagram is a
+repost of the same decks (the research stays TikTok only). When the answer is yes:
+
+- propose the Instagram name. It may differ from the TikTok one (`@hannah.catmom_`
+  when `@hannah.catmom` is taken there); nothing derives one from the other;
+- the user creates the account in the Instagram app by hand and makes it a
+  **professional account** (Business or Creator: Settings → Account type and tools).
+  Publishing through the posting service works only on a professional account; a
+  Facebook Page is not needed;
+- write the `## Accounts` table right after the head lines. TikTok stays the primary
+  account (`Handle:` and `Platform:` still name it):
+
+      ## Accounts
+
+      | Platform | Account | Created | Role | Status |
+      |---|---|---|---|---|
+      | tiktok | @hannah.catmom | 2026-09-14 | primary | connected |
+      | instagram | @hannah.catmom_ | 2026-09-22 | repost | not connected |
+
+  The Status cell is for the eye; the truth is `posting-accounts.json`. No table means
+  one TikTok account, which is every handle written before this.
+- **the 10-slide rule:** from now on every deck of this identity has 10 slides or fewer
+  (Instagram's API takes 10 in a carousel). Say so in one line; the `plan` and `deck`
+  skills keep it.
+
+**Adding Instagram to an existing identity** is this step for the new row only: ask
+the name, the user creates the professional account, write the row (or the whole table,
+with the TikTok row first). Steps 2 to 5 stay approved. Then the `posting-provider`
+skill connects it.
+
 A handle the user already has: read its profile (`scripts/network.sh <slug> <app>
 https://www.tiktok.com/@<handle>` is the method; or the user tells you the bio), fill
 the head lines from it, and steps 1 and 4 become "confirm", not "create".
@@ -54,7 +84,7 @@ photo (`references/style.png`). Real subject → skip; write `## References` wit
     | references/face.png | identity, when in frame | … | attached when the persona is in frame |
     | references/subject-tabby.png | identity | … | attached to every generation |
     | references/style.png | style | … | style only |
-    | references/profile.png | profile picture | … | set on TikTok by hand |
+    | references/profile.png | profile picture | … | set on TikTok (and on Instagram) by hand |
 
 The `images` skill reads this table: every row whose role is not the profile picture
 is attached to every generation. The user approves each file (`reference.approve`) or
@@ -64,7 +94,9 @@ asks for a new one (`reference.reject` with a note); regenerate that one only.
 subjects (the `persona-identity` stage again). Draft `## Bio` by the tier's rule: the
 persona bio never names the app; the brand bio is the search instruction ("Search
 <App> in the App Store"). Quote it in a `>` line, then the rule line. The user approves
-(`bio.approve`), sets both on TikTok by hand, and ticks "set on TikTok".
+(`bio.approve`), sets both on TikTok by hand, and ticks "set on TikTok". An identity
+with an Instagram account uses the same picture and the same bio there, and the user
+ticks "set on Instagram" too.
 
 **5. Defaults.** Propose from the brain and the findings, and write the head lines
 `Format:`, `Dimension:` (3:4 unless the user chooses 9:16: the camera-roll shape, shown
