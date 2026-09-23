@@ -90,7 +90,7 @@ only keeps no limit. The post page shows a failing check and the send stops for 
 over 10 on a two-platform handle; nothing is cut by the kit.
 
 **The tags.** The five tags of a row are measured on TikTok and used on both platforms.
-On Instagram they go in the first comment, not the caption (the compositor splits them).
+On Instagram they stay in the caption, as on TikTok; there is no first comment.
 The pool is not measured on Instagram.
 
 ## Then the index

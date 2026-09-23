@@ -244,10 +244,9 @@ export async function sendPost(slug: string, key: string, opts: { compose?: bool
   const text = (f: string, what: string) => { const t = readFileSync(need(f), "utf8").trim(); if (!t && what) throw new Error(`The ${what} is empty.`); return t; };
   const nn = (n: number) => String(n).padStart(2, "0");
   const ttFiles = tt ? state.deck.slides.map((s) => need(join(dir, `slide-${nn(s.n)}.png`))) : [];
-  const ttCaption = tt ? text(join(dir, "caption.txt"), "caption") : "";
+  /* One caption for both platforms, hashtags included. */
+  const caption = text(join(dir, "caption.txt"), "caption");
   const igFiles = ig ? state.deck.slides.map((s) => need(join(dir, "instagram", `slide-${nn(s.n)}.jpg`))) : [];
-  const igCaption = ig ? text(join(dir, "instagram", "caption.txt"), "Instagram caption") : "";
-  const igComment = ig ? text(join(dir, "instagram", "first-comment.txt"), "") : "";
 
   /* 2. and 3. */
   const pb = postBridge();
@@ -257,8 +256,8 @@ export async function sendPost(slug: string, key: string, opts: { compose?: bool
   for (const f of igFiles) igMedia.push((await pb.uploadMedia({ path: f })).media_id);
   const post = await pb.createPost(legsPost({
     legs, mode: plan.mode, scheduledAt: plan.scheduledAt,
-    ...(tt ? { tiktok: { caption: ttCaption, media } } : {}),
-    ...(ig ? { instagram: { caption: igCaption, media: igMedia, firstComment: igComment } } : {}),
+    ...(tt ? { tiktok: { caption, media } } : {}),
+    ...(ig ? { instagram: { caption, media: igMedia } } : {}),
   }));
 
   /* 4. One line for the send. TikTok alone: the line as it always was. */

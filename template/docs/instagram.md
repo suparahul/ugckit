@@ -38,7 +38,7 @@ From the next send, every post of that identity goes to both platforms.
 | Time | the slot | the same instant as TikTok. A draft slot: send at the slot time, because Instagram publishes the moment the send runs |
 | Slides | PNG at the deck's shape (3:4 or 9:16) | JPEG at 4:5, 1080 × 1350, in `final/instagram/`: a 3:4 slide loses 45 px at the top and the bottom; a 9:16 slide is fitted whole on a blurred copy of itself |
 | Cover text | typed by hand (draft) or burned (direct) | always burned |
-| Caption | the caption and the five tags | the caption without the tags; the tags are the first comment |
+| Caption | the caption and the five tags | the same caption, tags included; no first comment |
 | Music | picked on the phone (draft) or by TikTok (direct) | none. Once the post is live, add it in the Instagram app: Edit, then Replace Audio |
 | Slides at most | no limit the kit sets | **10** (the API's carousel limit; the app takes 20, the API does not). A handle on both platforms plans every deck at 10 or fewer; a deck over 10 is not sent |
 | The link and the numbers | Monid (a draft) or Post Bridge | Post Bridge, no Monid call |

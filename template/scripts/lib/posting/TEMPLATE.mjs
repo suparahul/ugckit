@@ -24,10 +24,10 @@
  *               A post goes to every platform its handle declares (one leg each, at one time). With
  *               more than TikTok, the line also carries "legs": [{"platform", "account", "mode",
  *               "scheduledAt", "status"}]. The Instagram leg: always direct (no draft exists), the
- *               4:5 JPEG set in final/instagram/ (render-slides.mjs --instagram), its caption.txt,
- *               and first-comment.txt as the first comment when the service has one; 10 slides at
- *               most. A leg the service refuses: {"kind": "posting.failed", "data": {"platform",
- *               "account", "error": "<the platform's words>"}}. --only tiktok|instagram sends one leg.
+ *               4:5 JPEG set in final/instagram/ (render-slides.mjs --instagram) and the same
+ *               final/caption.txt as TikTok (no first comment); 10 slides at most. A leg the
+ *               service refuses: {"kind": "posting.failed", "data": {"platform", "account",
+ *               "error": "<the platform's words>"}}. --only tiktok|instagram sends one leg.
  *               Without --send: print the selection and send nothing.
  *   status      print the service's state of each sent post.
  *   sync        the posted url when the service returns one (append posted.link + posted), the

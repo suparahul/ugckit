@@ -116,8 +116,8 @@ the spelling: a generator's text is a candidate to reject, not to fix.
 - The caption's first line repeats the cover text (4 of the 9 biggest tip posts of the
   scrolled batch do; search reads the caption for certain), then the plan row's five
   tags. The sync matches the posted link by that first line, so keep it exact. Write one
-  caption for both platforms: on Instagram the compositor takes the tags out of it and
-  posts them as the first comment (`final/instagram/caption.txt`, `first-comment.txt`).
+  caption for both platforms: Instagram gets the same `caption.txt`, tags included, with
+  no first comment.
 - The SEO handle (the search-keyword tier, when `ACCOUNTS.md` has one): slide 1's text
   is the keyword and nothing else, and the keyword sits in the caption too; its cover is
   typed in TikTok, never burned, because search reads TikTok's own text layer. Its tags

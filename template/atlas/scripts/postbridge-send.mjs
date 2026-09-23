@@ -25,8 +25,8 @@
  * identity declares (posting-accounts.json). One Post Bridge post carries every
  * leg, at one time. Instagram has no drafts: its leg publishes when the post is
  * processed, so in draft mode it publishes the moment this sends, and the dry run
- * says so. Its slides are the 4:5 JPEG set (render-slides.mjs --instagram), its
- * caption has no hashtags, and the hashtags are its first comment. A deck over
+ * says so. Its slides are the 4:5 JPEG set (render-slides.mjs --instagram), and
+ * its caption is TikTok's, hashtags included, with no first comment. A deck over
  * 10 slides with an Instagram leg is not sent: cut the deck, or --only tiktok.
  *
  * Selection: the posts of the date (or the one named) whose final is approved,
@@ -88,7 +88,7 @@ for (const p of plans) {
   console.log(p.skip ? `${head}\n      skipped: ${p.skip}` : head);
   /* The legs, when there is more than TikTok. */
   if (p.legs.length > 1 || p.legs.some((l) => l.platform !== "tiktok")) {
-    for (const l of p.legs) console.log(`      ${l.platform.padEnd(9)} account ${String(l.account ?? "—").padEnd(6)} ${l.skip ? `left out: ${l.skip}` : l.platform === "instagram" ? "published by Post Bridge · 4:5 JPEG slides, cover text burned, hashtags in the first comment, no music (add it in the Instagram app: Edit, then Replace Audio)" : p.mode === "direct" ? "published by Post Bridge" : "to the TikTok drafts"}`);
+    for (const l of p.legs) console.log(`      ${l.platform.padEnd(9)} account ${String(l.account ?? "—").padEnd(6)} ${l.skip ? `left out: ${l.skip}` : l.platform === "instagram" ? "published by Post Bridge · 4:5 JPEG slides, cover text burned, the same caption, no music (add it in the Instagram app: Edit, then Replace Audio)" : p.mode === "direct" ? "published by Post Bridge" : "to the TikTok drafts"}`);
   }
   for (const w of p.warnings) console.log(`      ! ${w}`);
   if (p.mode === "direct") {

@@ -99,8 +99,8 @@ export type TiktokConfig = {
  * Instagram has no draft: a post is published when Post Bridge processes it
  * (its API reference has no draft field for Instagram; `is_draft` only holds
  * the post in Post Bridge). `media` and `caption` override the post's for the
- * Instagram account; `first_comment` is posted right after, where the kit puts
- * the hashtags. Carousels take 1–10 images, JPEG, 4:5 to 1.91:1.
+ * Instagram account; the kit sends no `first_comment` (Rahul, 2026-09-23: the
+ * hashtags stay in the caption). Carousels take 1–10 images, JPEG, 4:5 to 1.91:1.
  */
 export type InstagramConfig = { caption?: string; media?: string[]; first_comment?: string; placement?: "story" };
 
@@ -349,8 +349,8 @@ export type Leg = { platform: Platform; account: number };
  * One request for every leg of a post: the accounts together, one time for all
  * (Rahul, 2026-09-23: Instagram posts at the same time as TikTok). TikTok gets
  * the draft or the direct configuration as before; Instagram gets its own
- * slides (4:5 JPEG), its caption without the hashtags, and the hashtags as the
- * first comment. With no TikTok leg, the post's own media and caption are
+ * slides (4:5 JPEG) and the same caption, hashtags included, with no first
+ * comment. With no TikTok leg, the post's own media and caption are
  * Instagram's.
  */
 export function legsPost(o: {
@@ -359,7 +359,7 @@ export function legsPost(o: {
   /** Direct mode: ISO UTC, one instant for every leg. */
   scheduledAt?: string | null;
   tiktok?: { caption: string; media: string[] };
-  instagram?: { caption: string; media: string[]; firstComment: string };
+  instagram?: { caption: string; media: string[] };
 }): CreatePostInput {
   const tt = o.legs.some((l) => l.platform === "tiktok");
   const ig = o.legs.some((l) => l.platform === "instagram");
@@ -369,7 +369,7 @@ export function legsPost(o: {
   if (direct && !o.scheduledAt) throw new Error("A direct post needs a time.");
   const platformConfig: PlatformConfig = {};
   if (tt) platformConfig.tiktok = direct ? { draft: false, privacy_status: "public", auto_add_music: true, allow_comment: true } : { draft: true };
-  if (ig) platformConfig.instagram = { caption: o.instagram!.caption, media: o.instagram!.media, ...(o.instagram!.firstComment ? { first_comment: o.instagram!.firstComment } : {}) };
+  if (ig) platformConfig.instagram = { caption: o.instagram!.caption, media: o.instagram!.media };
   const main = tt ? o.tiktok! : o.instagram!;
   return {
     caption: main.caption,

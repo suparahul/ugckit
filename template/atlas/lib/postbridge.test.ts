@@ -236,19 +236,19 @@ test("accountsOf: a map written before 0.4.0 (one account per handle) still give
   assert.deepEqual(accountsOf(null, "@hannah.catmom"), {});
 });
 
-test("legsPost: one post for both accounts; TikTok draft, Instagram with its own slides, caption and first comment", () => {
+test("legsPost: one post for both accounts; TikTok draft, Instagram with its own slides, the same caption and no first comment", () => {
   const input = legsPost({
     legs: [{ platform: "tiktok", account: 97911 }, { platform: "instagram", account: 98014 }],
     mode: "draft",
     tiktok: { caption: "7 signs your cat is stressed #catsoftiktok", media: ["t1", "t2"] },
-    instagram: { caption: "7 signs your cat is stressed", media: ["i1", "i2"], firstComment: "#catsoftiktok" },
+    instagram: { caption: "7 signs your cat is stressed #catsoftiktok", media: ["i1", "i2"] },
   });
   assert.deepEqual(input.accounts, [97911, 98014]);
   assert.deepEqual(input.media, ["t1", "t2"], "the post's media are TikTok's");
   assert.equal(input.caption, "7 signs your cat is stressed #catsoftiktok");
   assert.deepEqual(input.platformConfig, {
     tiktok: { draft: true },
-    instagram: { caption: "7 signs your cat is stressed", media: ["i1", "i2"], first_comment: "#catsoftiktok" },
+    instagram: { caption: "7 signs your cat is stressed #catsoftiktok", media: ["i1", "i2"] },
   });
   assert.equal(input.schedule, undefined, "a draft is processed now: Instagram publishes at once");
 });
@@ -257,12 +257,12 @@ test("legsPost: direct mode schedules both legs at one instant; an Instagram leg
   const both = legsPost({
     legs: [{ platform: "tiktok", account: 1 }, { platform: "instagram", account: 2 }],
     mode: "direct", scheduledAt: "2026-09-23T23:00:00.000Z",
-    tiktok: { caption: "c", media: ["t1"] }, instagram: { caption: "c", media: ["i1"], firstComment: "" },
+    tiktok: { caption: "c", media: ["t1"] }, instagram: { caption: "c", media: ["i1"] },
   });
   assert.equal(both.schedule, "2026-09-23T23:00:00.000Z");
   assert.equal(both.platformConfig?.tiktok?.draft, false);
-  assert.equal(both.platformConfig?.instagram?.first_comment, undefined, "no hashtags, no first comment");
-  const ig = legsPost({ legs: [{ platform: "instagram", account: 2 }], mode: "draft", instagram: { caption: "c", media: ["i1", "i2"], firstComment: "#a" } });
+  assert.equal(both.platformConfig?.instagram?.first_comment, undefined, "no first comment");
+  const ig = legsPost({ legs: [{ platform: "instagram", account: 2 }], mode: "draft", instagram: { caption: "c", media: ["i1", "i2"] } });
   assert.deepEqual(ig.accounts, [2]);
   assert.deepEqual(ig.media, ["i1", "i2"]);
   assert.equal(ig.platformConfig?.tiktok, undefined);

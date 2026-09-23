@@ -32,10 +32,9 @@
  *                    9:16 slide is fitted whole on a blurred copy of itself. The cover
  *                    always carries its text, since nobody types it on Instagram: the
  *                    post is rendered a second time with --burn-cover, into a scratch
- *                    folder, and that render is converted. caption.txt is the caption
- *                    without the hashtags; first-comment.txt holds the hashtags (Post
- *                    Bridge posts it as the first comment). A deck over 10 slides is
- *                    written with a warning: Instagram takes 10.
+ *                    folder, and that render is converted. The caption is caption.txt,
+ *                    the same as TikTok's. A deck over 10 slides is written with a
+ *                    warning: Instagram takes 10.
  *
  * Text style: Helvetica Neue Bold, white, with a black outline (TikTok's
  * "classic" look). Boxed blocks (the deck's "in a box") are the TikTok
@@ -280,13 +279,6 @@ async function toInstagram(png, dimension) {
   return sharp(bg).composite([{ input: fg, left: Math.round((IG.w - m.width) / 2), top: Math.round((IG.h - m.height) / 2) }]).jpeg({ quality: 90, mozjpeg: true }).toBuffer();
 }
 
-/** The caption without its hashtags, and the hashtags: on Instagram they go to the first comment. */
-function instagramText(deck) {
-  const tags = [...new Set([...(deck.hashtags ?? []), ...((deck.caption ?? "").match(/#[\p{L}\p{N}_]+/gu) ?? [])])];
-  const caption = (deck.caption ?? "").replace(/(^|\s)#[\p{L}\p{N}_]+/gu, "").replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").trim();
-  return { caption, firstComment: tags.join(" ") };
-}
-
 async function renderPost(key, { force = false, override = {}, burnCover = false, instagram = false, outDir: into = null } = {}) {
   const hit = deckOf(key);
   if (!hit) { console.log(`${key}: no deck`); return false; }
@@ -381,10 +373,9 @@ async function instagramSet(key, deck, outDir, { force, override, burned }) {
     writeFileSync(join(igDir, `slide-${nn(slide.n)}.jpg`), await toInstagram(readFileSync(png), FR.dimension));
   }
   if (tmp) rmSync(tmp, { recursive: true, force: true });
-  const ig = instagramText(deck);
-  writeFileSync(join(igDir, "caption.txt"), ig.caption + "\n");
-  writeFileSync(join(igDir, "first-comment.txt"), ig.firstComment + "\n");
-  console.log(`${key}: wrote the Instagram set in ${igDir} (${deck.slides.length} JPEG slides at 4:5 ${IG.w}×${IG.h}, cover text burned; caption.txt without the hashtags, first-comment.txt with them)`);
+  /* A 0.4.0 test render wrote its own caption and first comment here; the send no longer reads them. */
+  for (const f of ["caption.txt", "first-comment.txt"]) rmSync(join(igDir, f), { force: true });
+  console.log(`${key}: wrote the Instagram set in ${igDir} (${deck.slides.length} JPEG slides at 4:5 ${IG.w}×${IG.h}, cover text burned; the caption is caption.txt, as on TikTok)`);
   if (deck.slides.length > IG.maxSlides) console.log(`${key}: WARNING — ${deck.slides.length} slides; Instagram takes ${IG.maxSlides}. A handle on TikTok and Instagram plans its decks at ${IG.maxSlides} slides or fewer: cut the deck.`);
 }
 

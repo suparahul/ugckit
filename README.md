@@ -222,8 +222,8 @@ bio — come as recipes with a tick box on the handle page.
 **Instagram, as a repost.** An identity can also post on Instagram: the `handles` skill adds
 the account (a professional account; its name may differ), and from then on every deck
 of that identity goes to both platforms in one send, at the same time. Instagram is
-always published directly, as 4:5 JPEG slides with the cover text burned in, the tags in
-the first comment and no music (add it in the Instagram app: Edit, then Replace Audio).
+always published directly, as 4:5 JPEG slides with the cover text burned in, the same
+caption as TikTok and no music (add it in the Instagram app: Edit, then Replace Audio).
 Its decks are 10 slides at most, because Instagram's API takes 10. Its numbers come from
 Post Bridge, with no Monid call; its saves are not reported by any source. The research
 stays TikTok only. Details: `docs/instagram.md` in your folder.

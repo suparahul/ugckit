@@ -50,9 +50,8 @@ it. A 3:4 slide loses 45 px at the top and at the bottom, outside the text's 4% 
 area; a 9:16 slide is fitted whole on a blurred, darker copy of itself, so no text is
 cut. No new picture is generated. The cover always carries its text in this set,
 whatever the TikTok mode: Instagram is always published directly and nobody types on
-it. `instagram/caption.txt` is the caption without the hashtags;
-`instagram/first-comment.txt` holds them (the send posts them as the first comment). A
-deck over 10 slides is written with a warning: Instagram takes 10, and the send stops.
+it. The caption is `caption.txt`, the same as TikTok's, hashtags included; there is no
+first comment. A deck over 10 slides is written with a warning: Instagram takes 10, and the send stops.
 The Instagram post has no music: the user adds it by hand in the Instagram app (Edit,
 then Replace Audio) once it is live.
 

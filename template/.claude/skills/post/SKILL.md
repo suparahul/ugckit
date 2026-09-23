@@ -52,7 +52,7 @@ differs:
   adds the music by hand in the Instagram app: Edit, then Replace Audio, from
   Instagram's own library. Say this after the send, every time.
 - **Its own slides and text.** The 4:5 JPEG set (the `render` skill), the cover text
-  burned in, the caption without the tags, the tags as the first comment.
+  burned in, and the same caption as TikTok, tags included. There is no first comment.
 - **10 slides at most.** A deck over 10 on a two-platform handle is not sent: the dry
   run says "cut the deck (the deck skill), or send TikTok alone with --only tiktok".
   Ask the user which; do not cut slides yourself.

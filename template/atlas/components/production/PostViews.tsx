@@ -313,12 +313,10 @@ export function AnatomyRail({ state, src }: { state: PostState; src: ReturnType<
         {state.legs?.instagram ? (() => {
           const ig = state.legs.instagram!;
           const where = ig.dropped ? `not on this post${ig.dropped.note ? ` · ${ig.dropped.note}` : ""}` : ig.failed ? `failed · ${ig.failed.error}` : ig.posted ? `${ig.posted.time} UTC` : ig.sent ? "sent" : "with TikTok's send";
-          const caption = deck?.caption ? deck.caption.replace(/(^|\s)#[\p{L}\p{N}_]+/gu, "").trim() : null;
-          const tags = [...new Set([...(deck?.hashtags ?? []), ...((deck?.caption ?? "").match(/#[\p{L}\p{N}_]+/gu) ?? [])])];
           return (
             <>
               <div className="anatomy__row"><dt>Instagram</dt><dd>{ig.link ? <a href={ig.link} target="_blank" rel="noreferrer">{where} · open on Instagram →</a> : where}</dd></div>
-              <div className="anatomy__row"><dt>Instagram post</dt><dd>4:5 JPEG slides, the cover text burned in, no music (added by hand){caption ? <> · caption “{caption.split("\n")[0]}”</> : null}{tags.length ? <> · first comment {tags.join(" ")}</> : null}</dd></div>
+              <div className="anatomy__row"><dt>Instagram post</dt><dd>4:5 JPEG slides, the cover text burned in, no music (added by hand), the same caption as TikTok</dd></div>
             </>
           );
         })() : null}
