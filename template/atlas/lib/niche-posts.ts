@@ -162,3 +162,75 @@ export function generalPost(a: Record<string, any>, keyword: string): NichePost 
     url: handle ? `https://www.tiktok.com/@${handle}/${slides ? "photo" : "video"}/${id}` : "",
   };
 }
+
+/* ------------------------------------------------------------- the detail */
+
+/** A search window as the niche pages name it. */
+export const windowLabel = (w: string) => ({ LAST_THREE_MONTHS: "last three months", PHOTO_TAB: "photo tab", THIS_MONTH: "this month", SCROLL: "your scroll", GENERAL: "general search", IG_TOP: "Instagram top", IG_RECENT: "Instagram recent" }[w] ?? w.toLowerCase().replace(/_/g, " "));
+
+/** The detail page of a niche post: /app/<slug>/niche/post/<platform>/<id>. */
+export const nichePostHref = (slug: string, platform: Platform, id: string) =>
+  `/app/${encodeURIComponent(slug)}/niche/post/${platform}/${encodeURIComponent(id)}`;
+
+/**
+ * One niche post as its detail page shows it: every search row of the post merged
+ * (a post found by two keywords or two windows is one post, with both names). A
+ * count not reported stays null, as on the niche page.
+ */
+export type NicheDetail = {
+  platform: Platform;
+  id: string;
+  code?: string;
+  src: "search" | "scroll";
+  handle: string;
+  url: string;
+  date: string;
+  mediaType: "slideshow" | "video";
+  slideCount: number | null;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  saves: number | null;
+  caption: string;
+  hashtags: string[];
+  /** A /media URL on disk, or null (a signed URL is not shown: it expires). */
+  cover: string | null;
+  /** The slides on disk (a post from your scroll), as /media URLs. */
+  slides: string[];
+  sound: string | null;
+  /** Where the search found it: keyword and window, one per row. */
+  found: { keyword: string; window: string }[];
+};
+
+/** The hashtags of a caption, without the #, in order, once each. */
+export const hashtagsOf = (caption: string): string[] => [...new Set(Array.from(caption.matchAll(/#([\p{L}\p{N}_]+)/gu), (m) => m[1]))];
+
+/** The detail of a searched post, or null when the searches hold no post with this platform and id. */
+export function nicheDetailOf(posts: NichePost[], platform: Platform, id: string): NicheDetail | null {
+  const rows = posts.filter((p) => (p.platform ?? "tiktok") === platform && p.id === id);
+  if (!rows.length) return null;
+  /* The row with the most views (or likes) carries the counts: the latest read of the post. */
+  const best = [...rows].sort((a, b) => (b.views ?? -1) - (a.views ?? -1) || (b.likes ?? -1) - (a.likes ?? -1))[0];
+  const found: NicheDetail["found"] = [];
+  for (const r of rows) if (!found.some((f) => f.keyword === r.keyword && f.window === r.window)) found.push({ keyword: r.keyword, window: r.window });
+  return {
+    platform, id, code: best.code, src: "search", handle: best.handle, url: best.url, date: best.date,
+    mediaType: best.mediaType, slideCount: best.slideCount,
+    views: best.views, likes: best.likes, comments: best.comments, shares: best.shares, saves: best.saves,
+    caption: best.caption, hashtags: hashtagsOf(best.caption),
+    cover: rows.find((r) => r.coverLocal)?.cover ?? null,
+    slides: [], sound: null, found,
+  };
+}
+
+/** The detail of a post from your own scroll (a read batch; TikTok): the slides are on disk. */
+export function scrollDetailOf(p: { id: string; handle: string; url: string; date: string | null; views: number; likes: number; comments: number; shares: number; saves: number; slideCount: number; caption: string; sound: string | null; slides: string[] }): NicheDetail {
+  return {
+    platform: "tiktok", id: p.id, src: "scroll", handle: p.handle, url: p.url, date: p.date ?? "",
+    mediaType: "slideshow", slideCount: p.slideCount || p.slides.length || null,
+    views: p.views, likes: p.likes, comments: p.comments, shares: p.shares, saves: p.saves,
+    caption: p.caption, hashtags: hashtagsOf(p.caption), cover: p.slides[0] ?? null, slides: p.slides, sound: p.sound,
+    found: [{ keyword: "", window: "SCROLL" }],
+  };
+}

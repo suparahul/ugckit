@@ -14,7 +14,7 @@
 
 import { join } from "node:path";
 
-import type { NichePost } from "./niche-posts";
+import { nicheDetailOf, scrollDetailOf, type NicheDetail, type NichePost } from "./niche-posts";
 import type { Platform } from "./platform";
 import { appDir, exists, listDirs, listFiles, mtimeOf, readJson, readText, tableOf } from "./root";
 
@@ -132,4 +132,23 @@ function readBatch(slug: string, date: string): Batch {
 export function listBatches(slug: string): Batch[] {
   if (!/^[\w.-]+$/.test(slug)) return [];
   return listDirs(join(appDir(slug), "niche", "batches")).sort().reverse().map((d) => readBatch(slug, d));
+}
+
+/* ---------------------------------------------------------------- detail */
+
+/**
+ * One niche post for its detail page: a searched post (TikTok or Instagram) or,
+ * failing that, a post from a read batch of your own scroll (TikTok). With the
+ * other posts of the same handle on the same platform, most views (or likes) first.
+ */
+export function getNicheDetail(slug: string, platform: Platform, id: string): { post: NicheDetail; more: NicheDetail[] } | null {
+  const posts = getNiche(slug)?.posts ?? [];
+  const scrolled = platform === "tiktok" ? listBatches(slug).filter((b) => b.read).flatMap((b) => b.posts.filter((p) => p.slides.length)) : [];
+  const post = nicheDetailOf(posts, platform, id) ?? (() => { const b = scrolled.find((p) => p.id === id); return b ? scrollDetailOf(b) : null; })();
+  if (!post) return null;
+  const ids = new Set(posts.filter((p) => (p.platform ?? "tiktok") === platform && p.handle === post.handle && p.id !== id).map((p) => p.id));
+  const more = [...ids].map((x) => nicheDetailOf(posts, platform, x)!)
+    .concat(scrolled.filter((p) => p.handle === post.handle && p.id !== id && !ids.has(p.id)).map(scrollDetailOf))
+    .sort((a, b) => (b.views ?? -1) - (a.views ?? -1) || (b.likes ?? -1) - (a.likes ?? -1));
+  return { post, more };
 }

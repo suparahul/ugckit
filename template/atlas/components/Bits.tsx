@@ -11,8 +11,14 @@ import { commas, shortDate, views } from "@/lib/data";
 import CopyButton from "./CopyButton";
 import { head } from "@/lib/text";
 
+/** A count, or an em dash when the platform does not report it (a niche post on Instagram: no saves, no shares, no views on a photo, hidden likes). Never 0 for "not reported". */
+const count = (value: number | null, size: "sm" | "lg") => (value === null ? "—" : size === "lg" ? commas(value) : views(value));
+
+/** The five counts of a post; null is "not reported". An Atlas post always has all five. */
+export type Counts = { views: number | null; likes: number | null; comments: number | null; shares: number | null; bookmarks: number | null };
+
 /** The five metrics, in the order the platform shows them. */
-export function StatRow({ post, size = "sm" }: { post: Post; size?: "sm" | "lg" }) {
+export function StatRow({ post, size = "sm" }: { post: Counts; size?: "sm" | "lg" }) {
   const cells = [
     ["views", post.views],
     ["likes", post.likes],
@@ -24,7 +30,7 @@ export function StatRow({ post, size = "sm" }: { post: Post; size?: "sm" | "lg" 
     <dl className={`stats stats--${size}`}>
       {cells.map(([label, value]) => (
         <div key={label}>
-          <dd className="tabular">{size === "lg" ? commas(value) : views(value)}</dd>
+          <dd className="tabular">{count(value, size)}</dd>
           <dt>{label}</dt>
         </div>
       ))}
@@ -61,7 +67,7 @@ export function TagChips({
   );
 }
 
-/** Open on TikTok. On every card and every header, per the spec. */
+/** Open on TikTok (or, with its label, on Instagram). On every card and every header, per the spec. */
 export function TikTokLink({ href, label = "Open on TikTok" }: { href: string; label?: string }) {
   return (
     <a className="tiktok" href={href} target="_blank" rel="noopener noreferrer">
@@ -77,13 +83,13 @@ export function TikTokLink({ href, label = "Open on TikTok" }: { href: string; l
  * or a grey box, a missing cover prints the post's own numbers. It still reads
  * as evidence.
  */
-export function Cover({ post, className = "" }: { post: Post; className?: string }) {
+export function Cover({ post, className = "" }: { post: Pick<Post, "cover" | "onScreen" | "handle"> & { views: number | null }; className?: string }) {
   if (post.cover) {
     return (
       <img
         className={`cover ${className}`}
         src={post.cover}
-        alt={post.onScreen ? `Cover: ${head(post.onScreen, 110)}` : `Post by @${post.handle}, ${views(post.views)} views`}
+        alt={post.onScreen ? `Cover: ${head(post.onScreen, 110)}` : `Post by @${post.handle}${post.views === null ? "" : `, ${views(post.views)} views`}`}
         loading="lazy"
         width={525}
         height={700}
@@ -91,8 +97,8 @@ export function Cover({ post, className = "" }: { post: Post; className?: string
     );
   }
   return (
-    <span className={`cover cover--none ${className}`} aria-label={`No cover yet for this post — ${views(post.views)} views`}>
-      <span className="cover__views tabular">{views(post.views)}</span>
+    <span className={`cover cover--none ${className}`} aria-label={`No cover yet for this post${post.views === null ? "" : ` — ${views(post.views)} views`}`}>
+      <span className="cover__views tabular">{count(post.views, "sm")}</span>
       <span className="cover__note">cover not yet fetched</span>
     </span>
   );
@@ -123,13 +129,13 @@ export function PostCard({ post, showHandle = false }: { post: Post; showHandle?
  * sound names. The room is made of tinkerers; they should leave with the raw
  * material, not a description of it.
  */
-export function StealThis({ post }: { post: Post }) {
+export function StealThis({ post, platformName = "TikTok" }: { post: Pick<Post, "onScreen" | "caption" | "hashtags" | "sound" | "url">; platformName?: string }) {
   const rows: { label: string; value: string | null }[] = [
     { label: "On-screen hook", value: post.onScreen },
     { label: "Caption", value: post.caption || null },
     { label: "Hashtags", value: post.hashtags.length ? post.hashtags.map((h) => `#${h}`).join(" ") : null },
     { label: "Sound", value: post.sound },
-    { label: "TikTok URL", value: post.url },
+    { label: `${platformName} URL`, value: post.url },
   ];
   const present = rows.filter((r) => r.value);
 

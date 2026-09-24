@@ -19,6 +19,7 @@ import { day7Rows, readAccountTable, readFindings, readPostTable, readValues, ty
 import { listHandles } from "@/lib/handles";
 import { getNiche, listBatches, type BatchPost, type NichePost } from "@/lib/niche";
 import { markWins, overFloor, WIN_VIEWS, type Rated } from "@/lib/niche-win";
+import { nichePostHref, windowLabel } from "@/lib/niche-posts";
 import { PLATFORM_NAME, profileUrl, type Platform } from "@/lib/platform";
 import { clip } from "@/lib/text";
 import { dmy, n, pct, Room, Section } from "@/components/factory/Bits";
@@ -48,7 +49,7 @@ type Tile = Rated & {
 
 const PAGE = 24;
 
-const winLabel = (w: string) => ({ LAST_THREE_MONTHS: "last three months", PHOTO_TAB: "photo tab", THIS_MONTH: "this month", SCROLL: "your scroll", GENERAL: "general search", IG_TOP: "Instagram top", IG_RECENT: "Instagram recent" }[w] ?? w.toLowerCase().replace(/_/g, " "));
+const winLabel = windowLabel;
 const cut = (t: string, max = 120) => clip(t, max);
 const viewsLabel = (v: number) => (v ? `${v >= 1_000_000 ? `${v / 1_000_000}M` : `${v / 1000}K`} and up` : "any");
 
@@ -80,21 +81,22 @@ function Nums({ t }: { t: Tile }) {
     : <p className="niche-tile__nums"><span className={w}><b>{n(t.likes)}</b> likes</span>{shares}<span><b>{n(t.comments)}</b> comments</span></p>;
 }
 
-function TileCard({ t, mixed }: { t: Tile; mixed: boolean }) {
+/** A tile: the cover opens the post's detail page; "open" goes to the post on its platform. */
+function TileCard({ t, mixed, slug }: { t: Tile; mixed: boolean; slug: string }) {
   const ext = { target: "_blank", rel: "noreferrer" } as const;
   const badge = t.kind === "video" ? (t.platform === "instagram" ? "reel" : "video") : t.platform === "instagram" && t.slides === 1 ? "photo" : t.slides ? `${t.slides} slides` : "slideshow";
   return (
     <li className={`niche-tile niche-tile--${t.kind}${t.win_ ? " is-win" : ""}`}>
-      <a className="niche-tile__cover" href={t.url} {...ext}>
+      <Link className="niche-tile__cover" href={nichePostHref(slug, t.platform, t.id)} aria-label={`@${t.handle} on ${PLATFORM_NAME[t.platform]}: the post in detail`}>
         {t.cover ? <img src={t.cover} alt="" loading="lazy" /> : <span className="niche-tile__nocover">{t.kind}<small>cover not held on disk</small></span>}
         <span className="niche-tile__badge">{badge}</span>
         {t.src === "scroll" ? <span className="niche-tile__src">your scroll</span> : null}
-      </a>
+      </Link>
       <div className="niche-tile__body">
         <div className="niche-tile__head"><a href={profileUrl(t.platform, t.handle)} {...ext}>{mixed ? <PlatformIcon p={t.platform} /> : null}@{t.handle}</a>{t.views !== null ? <strong>{n(t.views)}<small>views</small></strong> : <strong className="is-none">—<small>no views reported</small></strong>}</div>
         <Nums t={t} />
         <p className="niche-tile__caption">{cut(t.caption) || "no caption"}</p>
-        <div className="niche-tile__foot"><span>{[t.date ? dmy(t.date) : null, t.kw ? `#${t.kw}` : null, winLabel(t.win)].filter(Boolean).join(" · ")}</span><a href={t.url} {...ext}>open ↗</a></div>
+        <div className="niche-tile__foot"><span>{[t.date ? dmy(t.date) : null, t.kw ? `#${t.kw}` : null, winLabel(t.win)].filter(Boolean).join(" · ")}</span><span><Link href={nichePostHref(slug, t.platform, t.id)}>detail</Link> · <a href={t.url} {...ext}>{PLATFORM_NAME[t.platform]} ↗</a></span></div>
       </div>
     </li>
   );
@@ -265,7 +267,7 @@ export default async function NichePage({ params, searchParams }: { params: Prom
             {onIg ? <PlatformSwitch href={hrefWith({ ...q, platform: "" })} view={view} counts={{ both: tiles.length, tiktok: tiles.filter((t) => t.platform === "tiktok").length, instagram: tiles.filter((t) => t.platform === "instagram").length }} /> : null}
             <NicheFilters picks={picks} checks={[{ key: "recent", label: "last 90 days" }, { key: "winners", label: "winners only" }]} values={q} sort={sortPick} />
             <p className="state hx__count" aria-live="polite"><b>{n(match.length)}</b> match · <b>{n(winsIn)}</b> win · showing <b>{n(shown)}</b>{match.length > shown ? <> · then {PAGE} more each time</> : null}</p>
-            {match.length ? <ul className="niche-grid">{match.slice(0, shown).map((t) => <TileCard key={`${t.platform}:${t.id}`} t={t} mixed={onIg} />)}</ul> : <p className="niche-empty">No post matches these filters. Lower the views floor or widen the window.</p>}
+            {match.length ? <ul className="niche-grid">{match.slice(0, shown).map((t) => <TileCard key={`${t.platform}:${t.id}`} t={t} mixed={onIg} slug={slug} />)}</ul> : <p className="niche-empty">No post matches these filters. Lower the views floor or widen the window.</p>}
             {match.length > shown ? <p style={{ marginTop: 14 }}><Link className="read__again" href={moreHref()} scroll={false}>Show {Math.min(PAGE, match.length - shown)} more</Link></p> : null}
           </>
         ) : (
