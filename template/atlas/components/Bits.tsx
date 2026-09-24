@@ -9,6 +9,7 @@ import Link from "next/link";
 import type { Post, Tag } from "@/lib/data";
 import { commas, shortDate, views } from "@/lib/data";
 import CopyButton from "./CopyButton";
+import { head } from "@/lib/text";
 
 /** The five metrics, in the order the platform shows them. */
 export function StatRow({ post, size = "sm" }: { post: Post; size?: "sm" | "lg" }) {
@@ -82,7 +83,7 @@ export function Cover({ post, className = "" }: { post: Post; className?: string
       <img
         className={`cover ${className}`}
         src={post.cover}
-        alt={post.onScreen ? `Cover: ${post.onScreen.slice(0, 110)}` : `Post by @${post.handle}, ${views(post.views)} views`}
+        alt={post.onScreen ? `Cover: ${head(post.onScreen, 110)}` : `Post by @${post.handle}, ${views(post.views)} views`}
         loading="lazy"
         width={525}
         height={700}

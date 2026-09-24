@@ -20,6 +20,7 @@ import { listHandles } from "@/lib/handles";
 import { getNiche, listBatches, type BatchPost, type NichePost } from "@/lib/niche";
 import { markWins, overFloor, WIN_VIEWS, type Rated } from "@/lib/niche-win";
 import { PLATFORM_NAME, profileUrl, type Platform } from "@/lib/platform";
+import { clip } from "@/lib/text";
 import { dmy, n, pct, Room, Section } from "@/components/factory/Bits";
 import { Anat } from "@/components/factory/Anat";
 import { BatchShow } from "@/components/factory/Cards";
@@ -48,7 +49,7 @@ type Tile = Rated & {
 const PAGE = 24;
 
 const winLabel = (w: string) => ({ LAST_THREE_MONTHS: "last three months", PHOTO_TAB: "photo tab", THIS_MONTH: "this month", SCROLL: "your scroll", GENERAL: "general search", IG_TOP: "Instagram top", IG_RECENT: "Instagram recent" }[w] ?? w.toLowerCase().replace(/_/g, " "));
-const cut = (t: string, max = 120) => (t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t);
+const cut = (t: string, max = 120) => clip(t, max);
 const viewsLabel = (v: number) => (v ? `${v >= 1_000_000 ? `${v / 1_000_000}M` : `${v / 1000}K`} and up` : "any");
 
 function tilesOf(posts: NichePost[], scrolled: BatchPost[]): Tile[] {
@@ -109,7 +110,7 @@ function Inline({ text }: { text: string }) {
 
 const gist = (b: FindingBlock) => {
   const t = (b.lead || b.items[0]?.text || "").replace(/\*\*|`/g, "");
-  return t.length > 150 ? `${t.slice(0, 148).trimEnd()}…` : t;
+  return clip(t, 149);
 };
 
 function Fold({ title, gist, id, children }: { title: ReactNode; gist: string; id?: string; children: ReactNode }) {

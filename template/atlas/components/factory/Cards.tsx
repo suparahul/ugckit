@@ -12,6 +12,7 @@ import type { Handle } from "@/lib/handles";
 import type { BatchPost } from "@/lib/niche";
 import { postPath, uploadedFiles, type PostState } from "@/lib/production";
 import { numbersIn, numbersOf, type View } from "@/lib/read";
+import { head } from "@/lib/text";
 import { Account, LegSplit } from "@/components/Platform";
 import { fileUrl } from "@/components/production/Frame";
 import { firstPicture } from "./Wait";
@@ -86,7 +87,7 @@ export function AppShow({ brand, post }: { brand: Brand; post: Post }) {
       <span className="show__nums"><span><b>{n(post.views)}</b> views</span><span>{word(post.bookmarks, "save")}</span><span>{pct(post.bookmarks, post.views)} saves/view</span></span>
     </>
   );
-  return <Show srcs={srcs} alt={`${post.caption.slice(0, 60)} by @${post.handle}, promoting ${brand.name}`} href={`/post/${post.id}`} bodyHref={`/post/${post.id}`} body={body} scraped kind={kind} />;
+  return <Show srcs={srcs} alt={`${head(post.caption, 60)} by @${post.handle}, promoting ${brand.name}`} href={`/post/${post.id}`} bodyHref={`/post/${post.id}`} body={body} scraped kind={kind} />;
 }
 
 export function AppCard({ brand }: { brand: Brand }) {
