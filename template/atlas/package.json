@@ -9,7 +9,7 @@
     "dev:fast": "next dev -p 3210",
     "build": "npm run index && next build",
     "start": "next start -p 3210",
-    "test": "node --test lib/when.test.ts lib/postbridge.test.ts lib/tiktok-link.test.ts lib/accounts.test.ts lib/production.test.ts"
+    "test": "node --test lib/when.test.ts lib/postbridge.test.ts lib/tiktok-link.test.ts lib/accounts.test.ts lib/production.test.ts lib/niche-posts.test.ts lib/niche-win.test.ts"
   },
   "dependencies": {
     "next": "15.5.4",

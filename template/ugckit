@@ -26,6 +26,7 @@ case "${1:-help}" in
   composite) shift; exec "$PROJ/scripts/composite.sh" "$@" ;;
   product-facts) shift; exec "$PROJ/scripts/product-facts.sh" "$@" ;;
   niche-search) shift; exec "$PROJ/scripts/niche-search.sh" "$@" ;;
+  niche-import) shift; exec "$PROJ/scripts/niche-import.sh" "$@" ;;
   niche-fetch) shift; exec "$PROJ/scripts/niche-fetch.sh" "$@" ;;
   niche-stats) shift; exec "$PY" "$PROJ/scripts/niche-stats.py" "$@" ;;
   hashtag-pool) shift; exec "$PROJ/scripts/hashtag-pool.sh" "$@" ;;
@@ -89,7 +90,8 @@ ugckit — a niche or a reference video in, a recreation out.
 
   the slideshow path (an app in, two slideshows a day per handle out):
   ugckit product-facts <slug> [--id N | --repo P | --website U | --typed ...]
-  ugckit niche-search <slug> "<keyword>" ...     the Photo tab door and the video door
+  ugckit niche-search <slug> "<keyword>" ...     the Photo tab door and the video door (DOORS=...,instagram adds Instagram)
+  ugckit niche-import <slug>                     the covers and the niche page from the searches on disk (free)
   ugckit niche-fetch <slug> <date>               the posts you brought, through Monid
   ugckit niche-stats <slug> <date>               the counting parts of the read
   ugckit hashtag-pool <slug> "#tag" ...          measure a hashtag pool, $0.0015 a tag

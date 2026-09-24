@@ -9,8 +9,10 @@ For a batch it reads batches/<date>/<handle>/<id>/post.json (and comments.json) 
 the batch table in BATCH.md's column order (handle, id, date, views, likes, comments,
 shares, saves, slides or seconds, saves/view, shares/view, likes/view, sound, kind), then
 the medians by kind, the view spread, and the handles with 2+ posts. For the searches it
-reads niche/searches/*.json (both doors) and prints the spread of views, the share from
-the last 90 days, and the handles with 2+ posts, by kind. No verdicts.
+reads niche/searches/*.json (the Photo tab, the general search, the video door) and
+niche/instagram/searches/hashtag.*.json, and prints the spread of views (of likes for an
+Instagram photo or carousel, which reports no views), the share from the last 90 days, and
+the handles with 2+ posts, by platform and kind. No verdicts.
 """
 import glob, json, os, statistics, sys, time
 
@@ -98,6 +100,15 @@ def batch(slug, date):
     print(f"comments on disk: {sum(1 for r in rows if r['commentsRead'] is not None)} of {len(rows)} posts")
 
 
+def iso_t(v):
+    if isinstance(v, (int, float)):
+        return v
+    try:
+        return time.mktime(time.strptime(str(v)[:19], "%Y-%m-%dT%H:%M:%S")) if v else 0
+    except ValueError:
+        return 0
+
+
 def searches(slug):
     d = os.path.join(ROOT, "apps", slug, "niche", "searches")
     posts = {}
@@ -107,7 +118,16 @@ def searches(slug):
         except Exception:
             print(f"{os.path.basename(f)}: not JSON", file=sys.stderr)
             continue
-        if os.path.basename(f).startswith("photo."):
+        if os.path.basename(f).startswith("general."):
+            for x in j.get("data") or []:
+                a = (x or {}).get("aweme_info") or {}
+                if not a.get("aweme_id"):
+                    continue
+                s = a.get("statistics") or {}
+                posts.setdefault(str(a["aweme_id"]), {"kind": "slideshow" if (a.get("image_post_info") or {}).get("images") else "video",
+                    "handle": (a.get("author") or {}).get("unique_id", ""), "views": int(s.get("play_count") or 0),
+                    "saves": int(s.get("collect_count") or 0), "t": a.get("create_time") or 0})
+        elif os.path.basename(f).startswith("photo."):
             for it in j.get("item_list") or []:
                 s = it.get("statsV2") or {}
                 posts.setdefault(str(it.get("id")), {"kind": "slideshow", "handle": (it.get("author") or {}).get("uniqueId", ""),
@@ -119,22 +139,45 @@ def searches(slug):
                 t = it.get("uploadedAt") or 0
                 posts.setdefault(str(it["id"]), {"kind": "slideshow" if it.get("images") else "video", "handle": (it.get("channel") or {}).get("username", ""),
                     "views": it.get("views") or 0, "saves": it.get("bookmarks") or 0, "t": t})
-    if not posts:
-        sys.exit(f"no search files under {d}")
-    now = time.time()
-    for kind in ("slideshow", "video"):
-        ks = [p for p in posts.values() if p["kind"] == kind]
-        if not ks:
+    # Instagram: raw control characters inside strings, so strict=False. No saves, and no views on a photo or a carousel.
+    for f in sorted(glob.glob(os.path.join(ROOT, "apps", slug, "niche", "instagram", "searches", "hashtag.*.json"))):
+        try:
+            j = json.loads(open(f, encoding="utf-8").read(), strict=False)
+        except Exception:
+            print(f"instagram/{os.path.basename(f)}: not JSON", file=sys.stderr)
             continue
-        recent = [p for p in ks if p["t"] and now - p["t"] < 90 * 86400]
-        by = {}
-        for p in ks:
-            by.setdefault(p["handle"], 0)
-            by[p["handle"]] += 1
-        multi = sorted(((h, n) for h, n in by.items() if n >= 2), key=lambda x: -x[1])
-        print(f"{len(ks)} {kind}s from {len(by)} handles; {len(recent)} from the last 90 days")
-        print(f"   view spread: {spread([p['views'] for p in ks])}")
-        print(f"   handles with 2+ {kind}s: {len(multi)}" + (" — " + ", ".join(f"@{h} ({n})" for h, n in multi[:12]) if multi else ""))
+        for it in ((j.get("output") or j).get("data") or {}).get("items") or []:
+            pid = str(it.get("pk") or it.get("id") or "").split("_")[0]
+            if not pid:
+                continue
+            video = it.get("media_type") == 2
+            posts.setdefault("ig:" + pid, {"platform": "instagram", "kind": "video" if video else "slideshow",
+                "handle": (it.get("user") or {}).get("username", ""),
+                "views": max(it.get("play_count") or 0, it.get("view_count") or 0) if video else None,
+                "likes": it.get("like_count"), "t": iso_t(it.get("taken_at"))})
+    if not posts:
+        sys.exit(f"no search files under {d} or {os.path.join(os.path.dirname(d), 'instagram', 'searches')}")
+    now = time.time()
+    for platform in ("tiktok", "instagram"):
+        for kind in ("slideshow", "video"):
+            ks = [p for p in posts.values() if p.get("platform", "tiktok") == platform and p["kind"] == kind]
+            if not ks:
+                continue
+            recent = [p for p in ks if p["t"] and now - p["t"] < 90 * 86400]
+            by = {}
+            for p in ks:
+                by.setdefault(p["handle"], 0)
+                by[p["handle"]] += 1
+            multi = sorted(((h, n) for h, n in by.items() if n >= 2), key=lambda x: -x[1])
+            word = {"slideshow": "photos and carousels", "video": "reels"}[kind] if platform == "instagram" else f"{kind}s"
+            print(f"{platform}: {len(ks)} {word} from {len(by)} handles; {len(recent)} from the last 90 days")
+            if platform == "instagram" and kind == "slideshow":
+                print(f"   like spread (no views reported): {spread([p['likes'] for p in ks if p['likes'] is not None])}")
+            else:
+                print(f"   view spread: {spread([p['views'] for p in ks])}")
+            if platform == "instagram" and kind == "video":
+                print(f"   like spread: {spread([p['likes'] for p in ks if p['likes'] is not None])}")
+            print(f"   handles with 2+: {len(multi)}" + (" — " + ", ".join(f"@{h} ({n})" for h, n in multi[:12]) if multi else ""))
 
 
 if __name__ == "__main__":

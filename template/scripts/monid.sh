@@ -24,7 +24,7 @@ json_rows() {
   python3 -c "
 import json,sys
 try:
-    d = json.load(open(sys.argv[1]))
+    d = json.loads(open(sys.argv[1], encoding='utf-8').read(), strict=False)  # Instagram captions carry raw control characters
 except Exception:
     sys.exit(1)
 print(len(d) if isinstance(d, (list, dict)) else 1)

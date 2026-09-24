@@ -1,24 +1,33 @@
 #!/usr/bin/env bash
-# Phase 4, the niche search (the `niche-search` skill): two doors per keyword, through
-# Monid one call at a time, into apps/<slug>/niche/.
+# Phase 4, the niche search (the `niche-search` skill): two doors per keyword, three with
+# Instagram, through Monid one call at a time, into apps/<slug>/niche/.
 #
 #   scripts/niche-search.sh <slug> "<keyword>" ["<keyword>" ...]
-#       PAGES=5          Photo tab pages per keyword (20 items each, $0.0015 a page)
+#       PAGES=5          Photo tab pages per keyword (20 items each, $0.0015 a page),
+#                        and Instagram pages per keyword and feed
 #       WINDOWS="THIS_MONTH LAST_THREE_MONTHS"   the video door's windows
 #       MAXITEMS=100     results per video search ($0.00045 each)
-#       DOORS=photo,video   or photo | video, to run one door only
+#       DOORS=photo,video   or photo | video to run one door only; add instagram
+#                        (DOORS=photo,video,instagram, or DOORS=instagram alone) for the
+#                        Instagram hashtag door
+#       IG_FEEDS="top recent"   the Instagram door's feeds ($0.003 a page)
 #
 # The Photo tab door is TikHub fetch_search_photo: slideshows only, full counts including
 # saves, no sort and no date parameter (both are local; the tab is not recency-sorted, and
 # most of it is older than 90 days). Page 0 has no search_id; every later page passes
 # extra.logid from page 0. TikTok spell-corrects the keyword (query_correct_info on page
 # 0); the corrected phrase is recorded. The video door is the apidojo keyword search with
-# MOST_LIKED and a date window, the same call as R1; it never returns a slideshow.
+# MOST_LIKED and a date window, the same call as R1; it never returns a slideshow. The
+# Instagram door is TikHub fetch_hashtag_posts on the keyword as a hashtag (spaces out),
+# feed_type top and recent, paged on pagination_token (a page can come back empty and the
+# next one full: only a missing token ends the feed). Instagram reports no saves and no
+# shares, and no views on a photo or a carousel.
 #
-# Writes searches/photo.<kw>.p<N>.json, searches/<kw>.<WINDOW>.json, covers/<postId>.jpg
-# (the first slide of a slideshow, the cover of a video, fetched now because the urls
-# expire), the search log in NICHE.md, then rebuilds the Atlas's niche index. Files that
-# exist and parse are reused and cost nothing, so a killed run resumes.
+# Writes searches/photo.<kw>.p<N>.json, searches/<kw>.<WINDOW>.json,
+# instagram/searches/hashtag.<tag>.<feed>.p<N>.json, the search log in NICHE.md, then runs
+# scripts/niche-import.sh: the covers (covers/<postId>.jpg, instagram/covers/<id>.jpg,
+# fetched now because the urls expire) and the Atlas's niche index. Files that exist and
+# parse are reused and cost nothing, so a killed run resumes.
 set -euo pipefail
 
 [ $# -ge 2 ] || { sed -n 2,20p "$0"; exit 2; }
@@ -29,10 +38,12 @@ ROOT="$PROJ_ROOT"
 NICHE="$ROOT/apps/$SLUG/niche"
 mkdir -p "$NICHE/searches" "$NICHE/covers"
 PAGES="${PAGES:-5}"; WINDOWS="${WINDOWS:-THIS_MONTH LAST_THREE_MONTHS}"; MAXITEMS="${MAXITEMS:-100}"; DOORS="${DOORS:-photo,video}"
+IG_FEEDS="${IG_FEEDS:-top recent}"
 PER_PAGE=0.0015
+IG_PER_PAGE=0.003
 TODAY=$(date +%Y-%m-%d)
 LOG="$NICHE/NICHE.md"
-PHOTO_CALLS=0; VIDEO_CALLS=0
+PHOTO_CALLS=0; VIDEO_CALLS=0; IG_CALLS=0
 
 # The search log: a row per call. NICHE.md is created with its head lines on the first run.
 if [ ! -s "$LOG" ]; then
@@ -40,7 +51,7 @@ if [ ! -s "$LOG" ]; then
 # The niche of $SLUG
 
 Keywords:
-Doors: Photo tab (TikHub fetch_search_photo), video (apidojo keyword search)
+Doors: Photo tab (TikHub fetch_search_photo), video (apidojo keyword search), instagram (TikHub fetch_hashtag_posts, when asked)
 
 ## Search log
 
@@ -131,48 +142,49 @@ PY
     done
     ;;
   esac
+
+  # ------------------------------------------------------------ the Instagram door
+  case ",$DOORS," in *,instagram,*)
+    TAG=$(printf '%s' "$KW" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_')
+    mkdir -p "$NICHE/instagram/searches"
+    for FEED in $IG_FEEDS; do
+      echo "== $KW: Instagram door (#$TAG, $FEED, up to $PAGES pages) =="
+      TOKEN=""; SEEN="$NICHE/instagram/searches/.hashtag.$TAG.$FEED.ids"; : > "$SEEN"
+      for ((P=0; P<PAGES; P++)); do
+        OUT="$NICHE/instagram/searches/hashtag.$TAG.$FEED.p$P.json"
+        BEFORE=$([ -s "$OUT" ] && echo 1 || echo 0)
+        if [ "$P" -gt 0 ] && [ -z "$TOKEN" ]; then echo "  no pagination_token: the feed is done"; break; fi
+        INPUT="{\"keyword\":\"$TAG\",\"feed_type\":\"$FEED\"${TOKEN:+,\"pagination_token\":\"$TOKEN\"}}"
+        monid_run tikhub /api/v1/instagram/v2/fetch_hashtag_posts "$INPUT" "$OUT" || break
+        [ "$BEFORE" = 0 ] && IG_CALLS=$((IG_CALLS + 1))
+        read -r ITEMS NEW TOKEN < <(python3 - "$OUT" "$SEEN" <<'PY'
+import json, sys
+d = json.loads(open(sys.argv[1], encoding="utf-8").read(), strict=False); seen = set(open(sys.argv[2]).read().split())
+o = d.get("output") or d
+items = (o.get("data") or {}).get("items") or []
+ids = [str(i.get("pk") or i.get("id") or "").split("_")[0] for i in items]
+new = [i for i in ids if i and i not in seen]
+open(sys.argv[2], "a").write("".join(i + "\n" for i in new))
+print(len(items), len(new), o.get("pagination_token") or "-")
+PY
+)
+        [ "$TOKEN" = "-" ] && TOKEN=""
+        echo "  page $P: $ITEMS items, $NEW new"
+        [ "$BEFORE" = 0 ] && logrow "$TODAY" "instagram" "#$TAG" "$FEED p$P" "$ITEMS" "$NEW" "" "\$$IG_PER_PAGE"
+        true
+      done
+      rm -f "$SEEN"
+    done
+    ;;
+  esac
 done
 
-# ------------------------------------------------------------ covers, now, before the urls die
-echo "== covers =="
-python3 - "$NICHE" <<'PY' > "$NICHE/searches/.covers.tsv"
-import glob, json, os, sys
-d = sys.argv[1]; out = {}
-for f in glob.glob(os.path.join(d, "searches", "photo.*.json")):
-    try: r = json.load(open(f))
-    except Exception: continue
-    for it in r.get("item_list") or []:
-        imgs = ((it.get("imagePost") or {}).get("images") or [])
-        u = (((imgs[0] if imgs else {}).get("imageURL") or {}).get("urlList") or [None])[0]
-        if it.get("id") and u: out.setdefault(str(it["id"]), u)
-for f in glob.glob(os.path.join(d, "searches", "*.json")):
-    if os.path.basename(f).startswith("photo."): continue
-    try: r = json.load(open(f))
-    except Exception: continue
-    for it in r if isinstance(r, list) else []:
-        u = (it.get("video") or {}).get("cover") if isinstance(it, dict) else None
-        if isinstance(it, dict) and it.get("id") and u: out.setdefault(str(it["id"]), u)
-for k, u in out.items(): print(f"{k}\t{u}")
-PY
-HAVE=0; GOT=0; MISS=0
-while IFS=$'\t' read -r ID URL; do
-  [ -n "$ID" ] || continue
-  if [ -s "$NICHE/covers/$ID.jpg" ]; then HAVE=$((HAVE + 1)); continue; fi
-  if fetch_cdn "$URL" "$NICHE/covers/$ID.src"; then
-    to_jpg "$NICHE/covers/$ID.src" "$NICHE/covers/$ID.jpg" 700 && GOT=$((GOT + 1)) || MISS=$((MISS + 1))
-    rm -f "$NICHE/covers/$ID.src"
-  else MISS=$((MISS + 1)); fi
-done < "$NICHE/searches/.covers.tsv"
-rm -f "$NICHE/searches/.covers.tsv"
-echo "  $GOT fetched, $HAVE already on disk, $MISS not fetched$([ "$MISS" -gt 0 ] && echo ' (a blocked CDN host: another network or a VPN, then the same command)')"
+# ------------------------------------------------------------ spend
+USD=$(python3 -c "print(f'{$PHOTO_CALLS * $PER_PAGE + $VIDEO_CALLS * $MAXITEMS * $PER_RESULT + $IG_CALLS * $IG_PER_PAGE:.4f}')")
+if [ "$PHOTO_CALLS" -gt 0 ] || [ "$VIDEO_CALLS" -gt 0 ] || [ "$IG_CALLS" -gt 0 ]; then spend "$SLUG" "$USD" "niche search: $PHOTO_CALLS Photo tab pages, $VIDEO_CALLS video searches (video at maxItems; the real count is in NICHE.md), $IG_CALLS Instagram pages"; fi
 
-# ------------------------------------------------------------ spend and the index
-USD=$(python3 -c "print(f'{$PHOTO_CALLS * $PER_PAGE + $VIDEO_CALLS * $MAXITEMS * $PER_RESULT:.4f}')")
-if [ "$PHOTO_CALLS" -gt 0 ] || [ "$VIDEO_CALLS" -gt 0 ]; then spend "$SLUG" "$USD" "niche search: $PHOTO_CALLS Photo tab pages, $VIDEO_CALLS video searches (video at maxItems; the real count is in NICHE.md)"; fi
-
-if command -v node >/dev/null 2>&1 && [ -d "$ROOT/atlas" ]; then
-  ( cd "$ROOT/atlas" && ATLAS_ROOT="$ROOT" node scripts/build-niche.mjs ) || echo "  the niche index did not build; run: scripts/atlas.sh --index" >&2
-fi
+# ------------------------------------------------------------ covers, now, before the urls die; the index
+"$SCRIPTS/niche-import.sh" "$SLUG" || echo "  covers or the index did not finish: run scripts/niche-import.sh $SLUG again, soon (the urls expire)" >&2
 echo
 echo "next: the spread is on http://localhost:3210/app/$SLUG/niche. The Photo tab is not recency-sorted:"
 echo "      what wins now comes from the scroll. Run the niche-hunt skill."

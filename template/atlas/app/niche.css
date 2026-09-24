@@ -78,3 +78,7 @@
   padding-bottom: 6px; text-transform: none !important; letter-spacing: 0 !important;
   font: 400 0.9rem var(--sans) !important; color: var(--ink) !important;
 }
+
+/* A niche with Instagram posts: the platform icon before the handle, and no views on a photo or a carousel. */
+.niche-tile__head a .pf { margin-right: 4px; }
+.niche-tile__head strong.is-none { color: var(--ink-4); }
