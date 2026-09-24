@@ -70,7 +70,7 @@ which adds a third door: TikHub `fetch_hashtag_posts`, `top` and `recent`, $0.00
 ($0.03 a keyword at five pages of two feeds), into
 `apps/<slug>/niche/instagram/searches/hashtag.<tag>.<feed>.p<N>.json`. The covers go to
 `instagram/covers/<id>.jpg`, fetched at once: `thumbnail_url` is signed and expires within
-days. A no leaves TikTok alone, as before. `scripts/niche-import.sh <slug>` fetches any cover still missing and rebuilds the
+days. A no runs TikTok alone. `scripts/niche-import.sh <slug>` fetches any cover still missing and rebuilds the
 page, at no cost.
 
 On the niche page a platform switch shows both, TikTok or Instagram, and a handle links
@@ -81,11 +81,10 @@ the post is `instagram.com/p/<code>/`, a reel `/reel/<code>/`). Instagram report
 saves and no shares (null, not 0), no views on a photo or a carousel, and no likes when
 the author hides them. So its winners are its own: a reel at 50,000 views or more and
 likes per view at the median of the Instagram reels over 50,000 views; a photo or a
-carousel at 50,000 × that median in likes (1,647 on CatWise's first search); hidden likes
+carousel at 50,000 × that median in likes; hidden likes
 never win on likes. A post also wins on shares, by the same two rules with shares in place
-of likes, whenever the pages report shares (`share_count` or `reshare_count`). The hashtag
-pages of 2026-09-24 report no shares on any of the 397 posts, so today the share bar is
-empty and only likes win. The views floor holds a photo or a carousel to the same
+of likes, whenever the pages report shares (`share_count` or `reshare_count`). When no post
+reports shares, the share bar is empty and only likes win. The views floor holds a photo or a carousel to the same
 likes-for-views rate.
 
 ## Sources

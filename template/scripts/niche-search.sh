@@ -7,8 +7,7 @@
 #       DOORS=photo,general   the default: the Photo tab door and the general search door.
 #                        Add instagram (DOORS=photo,general,instagram, or DOORS=instagram
 #                        alone) for the Instagram hashtag door, only after the user said yes.
-#                        video (the apidojo keyword search) is no longer a default; name it
-#                        to run it (see the niche-search skill for why).
+#                        video (the apidojo keyword search) runs only when named.
 #       PAGES=5          pages per keyword for every paged door (Photo tab, general), and
 #                        per keyword and feed for Instagram
 #       GENERAL_TIME=30  the general door's publish_time: 30 is the last month (0: no filter)
@@ -37,7 +36,7 @@
 # a killed run resumes.
 set -euo pipefail
 
-[ $# -ge 2 ] || { sed -n 2,16p "$0"; exit 2; }
+[ $# -ge 2 ] || { sed -n 2,15p "$0"; exit 2; }
 SLUG=$1; shift
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPTS/monid.sh"

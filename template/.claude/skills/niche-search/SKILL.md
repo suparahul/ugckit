@@ -29,7 +29,7 @@ With the keywords agreed, ask one question, with its cost, and wait for the answ
 > keywords as Instagram hashtags (top and recent posts), $0.003 a page: five pages of
 > two feeds is $0.03 a keyword, $0.06 for two.
 
-Yes: `DOORS=photo,general,instagram`. No: the defaults, TikTok alone, as before. Ask
+Yes: `DOORS=photo,general,instagram`. No: the defaults, TikTok alone. Ask
 it again at a later run only if the user brings it up.
 
 ## The doors, and what each costs
@@ -39,21 +39,14 @@ it again at a later run only if the user brings it up.
 | Photo tab | `tikhub /api/v1/tiktok/web/fetch_search_photo`, 20 a page, `PAGES` pages | slideshows (photo posts) | slideshows only, every slide's url, full counts including saves | $0.0015 a page; $0.0075 a keyword |
 | General search | `tikhub /api/v1/tiktok/app/v3/fetch_general_search_result`, `sort_type` 1 (most likes), `publish_time` 30, count 20, `PAGES` pages | recent videos, sorted | mostly videos (a rare slideshow: `aweme_type` 150), full counts including saves | $0.0015 a page; up to $0.0075 a keyword |
 | Instagram (after a yes) | `tikhub /api/v1/instagram/v2/fetch_hashtag_posts`, `feed_type` top and recent, about 30 a page, `PAGES` pages per feed | the same niche on Instagram | photos, carousels and reels, likes and comments; views on reels only; **no saves and no shares** | $0.003 a page; $0.03 a keyword |
-| Video (only when named) | `apify /apidojo/tiktok-scraper`, `MOST_LIKED`, a date window | nothing by default | videos, never a slideshow | $0.00045 a result, billed at `MAXITEMS`: up to $0.045 a window |
 
 TikTok, two keywords at the defaults: about $0.03 (up to 20 pages at $0.0015). With
 Instagram: about $0.09. Say the figure, wait for the yes, then run it in the
 background: it is serial on purpose (rule 13).
 
-**Why the general search replaced the video door** (CatWise, 2026-09-24, in its
-`niche/NICHE.md` and `searches/*-REPORT.md`): on `cattips` the video door returned 10
-of 100 results for `THIS_MONTH`, and its newest post was 2026-09-15, nine days old.
-The general search, the same day and keyword, honoured its date filter on the server,
-sorted by likes, and had a post from the day before. It costs $0.0015 a page, where
-the video door bills up to $0.045 a window. On `catmom` both stayed current to the day,
-so the video door is not broken; it is slower to show what is new and costs more.
-Two facts about the general door: pages overlap a little (de-duplicate by id), and the
-next page's `offset` is the previous page's `cursor`, not `offset + count`.
+Three facts about the general search door: `publish_time` and `sort_type` are applied on
+the server; pages overlap a little (de-duplicate by id), and the next page's `offset` is
+the previous page's `cursor`, not `offset + count`.
 
 Three facts about the Photo tab door, so you do not look for parameters it does not
 have: there is no sort and no date filter (both are local; extra params are ignored);
@@ -76,8 +69,8 @@ slide of every slideshow, the cover of every video) and `instagram/covers/<id>.j
 12; Instagram's `oe=` expiry is days away), and `atlas/data/niche-<slug>.json`. A file
 that exists and parses is reused for free, so a killed run resumes.
 
-Search pages that landed by another road (a page pulled by hand, an older
-`searches/<kw>.<WINDOW>.json` of the video door) are read by the niche page as they are:
+Search pages that landed by another road (a page pulled by hand, an apidojo
+`searches/<kw>.<WINDOW>.json`) are read by the niche page as they are:
 run `scripts/niche-import.sh <slug>` for their covers and the page, at no cost.
 
 ## What wins, per platform
@@ -87,8 +80,8 @@ median of the TikTok slideshows over 50,000 views. Instagram has no saves and no
 a photo or a carousel, so it is judged against itself, on likes or on shares (either
 wins): a reel at 50,000 views or more and likes per view at the median of the Instagram
 reels over 50,000 views; a photo or a carousel at the likes such a reel has (50,000 ×
-that median); the same two rules with shares, whenever posts report shares (the hashtag
-pages of 2026-09-24 report none, so today only likes win). The rule is in
+that median); the same two rules with shares, whenever posts report shares (when none do,
+only likes win). The rule is in
 `atlas/lib/niche-win.ts`.
 
 ## Finish

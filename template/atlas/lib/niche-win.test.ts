@@ -12,7 +12,7 @@ const tt = (views: number, saves: number, kind: Rated["kind"] = "slideshow"): Ra
 const reel = (views: number, likes: number | null): Rated => ({ platform: "instagram", kind: "video", views, likes, saves: null, win_: false, strength: null });
 const carousel = (likes: number | null): Rated => ({ platform: "instagram", kind: "slideshow", views: null, likes, saves: null, win_: false, strength: null });
 
-test("TikTok: 50,000 views and saves per view at the median of the slideshows over 50,000 (as before)", () => {
+test("TikTok: 50,000 views and saves per view at the median of the slideshows over 50,000", () => {
   const tiles = [tt(100_000, 1000), tt(100_000, 3000), tt(100_000, 5000), tt(10_000, 9000), tt(200_000, 8000, "video")];
   const rule = markWins(tiles);
   assert.equal(rule.tiktok.median, 0.03);

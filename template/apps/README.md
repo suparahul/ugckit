@@ -11,7 +11,7 @@ is a pending slot on the canvas, never an error.
       niche/
         NICHE.md                 the keywords, the doors run, the search log
         searches/                photo.<kw>.p<N>.json (the Photo tab door: slideshows), general.<kw>.p<N>.json
-                                 (the general search door: recent videos); <kw>.<WINDOW>.json from the older video door
+                                 (the general search door: recent videos); <kw>.<WINDOW>.json (the apidojo video search)
         covers/<postId>.jpg      the first slide of every slideshow found, the cover of every video
         instagram/               only when you said yes to Instagram niche research: searches/hashtag.<tag>.<feed>.p<N>.json,
                                  covers/<id>.jpg

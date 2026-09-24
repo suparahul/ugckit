@@ -16,8 +16,7 @@
  *   - likes hidden by the author: never a win on likes.
  *   - shares, by the same two rules with shares in place of likes, measured over the
  *     Instagram reels that reached 50,000 views and report shares. With no such reel
- *     there is no share bar, and no post wins on shares (the hashtag pages of
- *     2026-09-24 report no shares on any post).
+ *     there is no share bar, and no post wins on shares.
  * `strength` is how far a post stands over its own bar (1 = on it; on Instagram the
  * higher of the likes bar and the share bar), so one sort can rank both platforms.
  */
