@@ -63,15 +63,20 @@ An account that needs a reconnect: reconnect it in Post Bridge, then run
 
 ## Instagram in the niche
 
-`DOORS=photo,video,instagram scripts/niche-search.sh <slug> cattips catmom` adds a third
-door: TikHub `fetch_hashtag_posts`, `top` and `recent`, $0.003 a page, into
+An optional step of the niche search: before the run, the `niche-search` skill asks
+whether you also want Instagram niche research along with TikTok, and says the cost. A
+yes runs `DOORS=photo,general,instagram scripts/niche-search.sh <slug> cattips catmom`,
+which adds a third door: TikHub `fetch_hashtag_posts`, `top` and `recent`, $0.003 a page
+($0.03 a keyword at five pages of two feeds), into
 `apps/<slug>/niche/instagram/searches/hashtag.<tag>.<feed>.p<N>.json`. The covers go to
 `instagram/covers/<id>.jpg`, fetched at once: `thumbnail_url` is signed and expires within
-days. `scripts/niche-import.sh <slug>` fetches any cover still missing and rebuilds the
+days. A no leaves TikTok alone, as before. `scripts/niche-import.sh <slug>` fetches any cover still missing and rebuilds the
 page, at no cost.
 
 On the niche page a platform switch shows both, TikTok or Instagram, and a handle links
-to its own platform. A post carries `platform: "instagram"` and its shortcode (`code`;
+to its own platform. Every tile opens a detail page, `/app/<slug>/niche/post/<platform>/<id>`:
+the Atlas post page with the niche post in it, a dash for a count Instagram does not report,
+and a link out to instagram.com. A post carries `platform: "instagram"` and its shortcode (`code`;
 the post is `instagram.com/p/<code>/`, a reel `/reel/<code>/`). Instagram reports no
 saves and no shares (null, not 0), no views on a photo or a carousel, and no likes when
 the author hides them. So its winners are its own: a reel at 50,000 views or more and

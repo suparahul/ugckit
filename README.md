@@ -203,7 +203,7 @@ files exist, nothing is recorded. Ask the agent for the skill by name.
 | 1 | setup | `setup` | environment, keys, the brain in place | — |
 | 2 | the app | `product` | `APP.md`, `product.json` and the icon from the App Store, a repo or a website | — |
 | 3 | competitor apps | `apps` → `teardown`, then `apps-learnings` | the R1–R5 research above, then its lessons written into the findings | ~$0.75 for five apps |
-| 4 | the niche | `niche-search`, `niche-hunt`, `niche-fetch`, `niche-read` | search the niche's slideshows, scroll for the best by hand, pull one batch, read it | ~$0.20 search, ~$0.03 a batch |
+| 4 | the niche | `niche-search`, `niche-hunt`, `niche-fetch`, `niche-read` | search the niche's slideshows, scroll for the best by hand, pull one batch, read it | ~$0.03 search (~$0.09 with Instagram), ~$0.03 a batch |
 | 5 | account architecture | `account-architecture` | how many handles, which role each plays, approved on the strategy page | — |
 | 6 | handle identities | `handles`, `persona-identity` | one handle at a time: the identity, the reference pictures, the account on TikTok (and on Instagram, when it reposts there) | — |
 | 7 | app fit and plan | `app-fit`, `plan` | where the app sits in the post, then two posts a day per handle as `PLAN.md` | $0.0015 a tag if measured |

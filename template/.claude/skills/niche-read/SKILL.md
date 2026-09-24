@@ -6,7 +6,14 @@ description: Phase 4, the read — every slide, contact sheet and transcript of 
 # Phase 4 — the read (niche-read)
 
     scripts/niche-stats.py <slug> <date>        the batch table, the medians, the spread, the handles with 2+ posts
-    scripts/niche-stats.py <slug> --searches    the same counts over the search files, TikTok and Instagram
+    scripts/niche-stats.py <slug> --searches    the same counts over the search files: TikTok's Photo tab and
+                                                general search pages, and Instagram's hashtag pages when they ran
+
+The search files read here are the ones `niche-search` wrote: `searches/photo.*` (the
+slideshows), `searches/general.*` (recent videos, most likes first), and, only if the user
+said yes to Instagram, `instagram/searches/hashtag.*`. Instagram's numbers are likes,
+comments and, on reels, views: never compare its likes with TikTok's saves; say which
+platform a number is from.
 
 The script counts. You judge, guided by the brain: read `brain/learnings-slideshows.md`
 (the format definitions, the hook shapes, "Finding Ideas & Vetting Formats") before the

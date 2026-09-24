@@ -149,7 +149,7 @@ export default async function NichePage({ params, searchParams }: { params: Prom
   const band = phase.state !== "done" ? (
     <StateBand
       state={phase.state}
-      text="The niche phase fills this page: two searches through the Photo tab and the keywords, then up to ten posts from your own scroll, pulled slide by slide and read. The findings are written into three files and shown here as they are."
+      text="The niche phase fills this page: two TikTok searches, the Photo tab for slideshows and the general search for recent videos (and the Instagram hashtags, if you say yes when the agent asks), then up to ten posts from your own scroll, pulled slide by slide and read. The findings are written into three files and shown here as they are."
       ask={phase.ask ?? (phase.state === "todo" ? "nothing yet; the phase starts once the app is read" : null)}
       phase="phase 4 · the niche"
     />

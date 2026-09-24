@@ -10,8 +10,11 @@ is a pending slot on the canvas, never an error.
       icon.jpg                   the App Store icon
       niche/
         NICHE.md                 the keywords, the doors run, the search log
-        searches/                photo.<kw>.p<N>.json (the Photo tab door), <kw>.<WINDOW>.json (the video door)
+        searches/                photo.<kw>.p<N>.json (the Photo tab door: slideshows), general.<kw>.p<N>.json
+                                 (the general search door: recent videos); <kw>.<WINDOW>.json from the older video door
         covers/<postId>.jpg      the first slide of every slideshow found, the cover of every video
+        instagram/               only when you said yes to Instagram niche research: searches/hashtag.<tag>.<feed>.p<N>.json,
+                                 covers/<id>.jpg
         batches/<date>/          one scrolled batch: LINKS.md (what you brought, verbatim), posts.raw.json,
                                  <handle>/<postId>/ (slides or video + contact sheets + transcript, comments, post.json),
                                  screenshots/, BATCH.md (the read)

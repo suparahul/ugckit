@@ -50,7 +50,7 @@ export const PHASES: { key: PhaseKey; title: string; line: string }[] = [
   { key: "setup", title: "Setup", line: "The kit checks the machine and asks which way in: a reference video, an app, or a niche." },
   { key: "app", title: "The app", line: "The store listing, the website or the repository read: the niche phrase, the hero features, the store facts." },
   { key: "apps", title: "Competitor apps", line: "Apps in the niche found, their networks harvested, one teardown each, then one read across all of them." },
-  { key: "niche", title: "The niche", line: "Two searches, then the posts you bring from your own scroll, read slide by slide. The findings written." },
+  { key: "niche", title: "The niche", line: "The TikTok searches (and Instagram's, if you say yes), then the posts you bring from your own scroll, read slide by slide. The findings written." },
   { key: "accounts", title: "Account architecture", line: "How many handles, the role of each, the name pattern, the cadence." },
   { key: "handles", title: "Handle identities", line: "One handle at a time: persona, references, picture and bio, defaults." },
   { key: "fit", title: "App fit and plan", line: "Every parameter fitted from the two sources, then the week’s plan." },

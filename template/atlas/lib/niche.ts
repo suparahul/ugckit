@@ -3,7 +3,8 @@
  *
  *   The searches: data/niche-<slug>.json, built by scripts/build-niche.mjs
  *   from niche/searches/ (the Photo tab pages, the general search pages and
- *   the apidojo keyword files) and niche/instagram/searches/ (the hashtag pages).
+ *   any older apidojo keyword files) and, when the user said yes to Instagram,
+ *   niche/instagram/searches/ (the hashtag pages).
  *   The batches: niche/batches/<date>/, what you brought from your own scroll
  *   and the agent pulled through Monid — LINKS.md (verbatim), posts.raw.json,
  *   <handle>/<id>/slide-NN.jpg, BATCH.md (the read). Read live.

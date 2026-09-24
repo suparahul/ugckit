@@ -90,7 +90,7 @@ ugckit — a niche or a reference video in, a recreation out.
 
   the slideshow path (an app in, two slideshows a day per handle out):
   ugckit product-facts <slug> [--id N | --repo P | --website U | --typed ...]
-  ugckit niche-search <slug> "<keyword>" ...     the Photo tab door and the video door (DOORS=...,instagram adds Instagram)
+  ugckit niche-search <slug> "<keyword>" ...     the Photo tab and general search doors (DOORS=...,instagram adds Instagram)
   ugckit niche-import <slug>                     the covers and the niche page from the searches on disk (free)
   ugckit niche-fetch <slug> <date>               the posts you brought, through Monid
   ugckit niche-stats <slug> <date>               the counting parts of the read

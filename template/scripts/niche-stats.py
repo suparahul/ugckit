@@ -9,7 +9,7 @@ For a batch it reads batches/<date>/<handle>/<id>/post.json (and comments.json) 
 the batch table in BATCH.md's column order (handle, id, date, views, likes, comments,
 shares, saves, slides or seconds, saves/view, shares/view, likes/view, sound, kind), then
 the medians by kind, the view spread, and the handles with 2+ posts. For the searches it
-reads niche/searches/*.json (the Photo tab, the general search, the video door) and
+reads niche/searches/*.json (the Photo tab, the general search, an older video door) and
 niche/instagram/searches/hashtag.*.json, and prints the spread of views (of likes for an
 Instagram photo or carousel, which reports no views), the share from the last 90 days, and
 the handles with 2+ posts, by platform and kind. No verdicts.
