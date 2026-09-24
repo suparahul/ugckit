@@ -68,14 +68,15 @@ function tilesOf(posts: NichePost[], scrolled: BatchPost[]): Tile[] {
   return out;
 }
 
-/** The figures under a tile: TikTok's saves and shares; Instagram's likes (per view on a reel) and comments. */
+/** The figures under a tile: TikTok's saves and shares; Instagram's likes (per view on a reel), its shares when reported, and comments. */
 function Nums({ t }: { t: Tile }) {
   const w = t.win_ ? "is-win" : "";
   if (t.platform === "tiktok") return <p className="niche-tile__nums"><span className={w}><b>{pct(t.saves ?? 0, t.views ?? 0)}</b> saves/view</span><span><b>{n(t.saves ?? 0)}</b> saves</span><span><b>{n(t.shares ?? 0)}</b> shares</span></p>;
-  if (t.likes === null) return <p className="niche-tile__nums"><span>likes hidden</span><span><b>{n(t.comments)}</b> comments</span></p>;
+  const shares = t.shares !== null ? <span><b>{n(t.shares)}</b> shares</span> : null;
+  if (t.likes === null) return <p className="niche-tile__nums"><span>likes hidden</span>{shares}<span><b>{n(t.comments)}</b> comments</span></p>;
   return t.views
-    ? <p className="niche-tile__nums"><span className={w}><b>{pct(t.likes, t.views)}</b> likes/view</span><span><b>{n(t.likes)}</b> likes</span><span><b>{n(t.comments)}</b> comments</span></p>
-    : <p className="niche-tile__nums"><span className={w}><b>{n(t.likes)}</b> likes</span><span><b>{n(t.comments)}</b> comments</span></p>;
+    ? <p className="niche-tile__nums"><span className={w}><b>{pct(t.likes, t.views)}</b> likes/view</span><span><b>{n(t.likes)}</b> likes</span>{shares ?? <span><b>{n(t.comments)}</b> comments</span>}</p>
+    : <p className="niche-tile__nums"><span className={w}><b>{n(t.likes)}</b> likes</span>{shares}<span><b>{n(t.comments)}</b> comments</span></p>;
 }
 
 function TileCard({ t, mixed }: { t: Tile; mixed: boolean }) {
@@ -249,8 +250,8 @@ export default async function NichePage({ params, searchParams }: { params: Prom
                 <p className="state">Today {rule.tiktok.wins} of {rule.tiktok.slideshows} {onIg ? "TikTok " : ""}slideshows win. The median is worked out again on every visit, over the {rule.tiktok.over} slideshows with 50,000 views or more.</p>
                 {onIg ? (
                   <>
-                    <p><b>On Instagram</b> there are no saves, and a photo or a carousel shows no views, so Instagram is judged on likes, against itself. A reel wins at 50,000 views or more with likes per view at the median of the Instagram reels that reached 50,000 views, <b>{(100 * rule.instagram.median).toFixed(2)}%</b>. A photo or a carousel wins at <b>{n(rule.instagram.likesFloor)}</b> likes or more: what a reel has at 50,000 views and that median. A post whose likes are hidden does not win.</p>
-                    <p className="state">Today {rule.instagram.wins} of {rule.instagram.posts} Instagram posts win. The views floor holds a photo or a carousel to the likes a reel would have at that many views.</p>
+                    <p><b>On Instagram</b> there are no saves, and a photo or a carousel shows no views, so Instagram is judged against itself, on likes or on shares: a post wins on either. On likes, a reel wins at 50,000 views or more with likes per view at the median of the Instagram reels that reached 50,000 views, <b>{(100 * rule.instagram.median).toFixed(2)}%</b>, and a photo or a carousel at <b>{n(rule.instagram.likesFloor)}</b> likes or more: what a reel has at 50,000 views and that median. A post whose likes are hidden does not win on likes. On shares, the same two rules with shares in place of likes{rule.instagram.sharesFloor !== null ? <>: <b>{(100 * rule.instagram.shareMedian).toFixed(2)}%</b> shares per view on a reel, <b>{n(rule.instagram.sharesFloor)}</b> shares on a photo or a carousel</> : null}.</p>
+                    <p className="state">Today {rule.instagram.wins} of {rule.instagram.posts} Instagram posts win: {rule.instagram.likeWins} on likes, {rule.instagram.shareWins} on shares. {rule.instagram.withShares ? `${rule.instagram.withShares} Instagram posts report shares.` : "No Instagram post in these searches reports shares, so no post can win on shares yet."} The views floor holds a photo or a carousel to the likes a reel would have at that many views.</p>
                   </>
                 ) : null}
               </div>

@@ -6,16 +6,20 @@
  * the TikTok slideshows that reached 50,000 views.
  *
  * Instagram reports no saves, and no views on a photo or a carousel, so it is
- * judged on likes, against itself:
+ * judged against itself, on likes OR on shares (a post wins on either):
  *   - a video (a reel): 50,000 views or more, and likes per view at the median of
  *     the Instagram videos that reached 50,000 views (the TikTok rule, likes in
  *     place of saves);
  *   - a photo or a carousel: at least the likes a reel has at 50,000 views and
  *     that median rate (50,000 x the median, rounded). With no reel to measure,
  *     IG_LIKES_FLOOR.
- *   - likes hidden by the author: never a win.
- * `strength` is how far a post stands over its own bar (1 = on it), so one sort
- * can rank both platforms side by side.
+ *   - likes hidden by the author: never a win on likes.
+ *   - shares, by the same two rules with shares in place of likes, measured over the
+ *     Instagram reels that reached 50,000 views and report shares. With no such reel
+ *     there is no share bar, and no post wins on shares (the hashtag pages of
+ *     2026-09-24 report no shares on any post).
+ * `strength` is how far a post stands over its own bar (1 = on it; on Instagram the
+ * higher of the likes bar and the share bar), so one sort can rank both platforms.
  */
 
 import type { Platform } from "./platform.ts";
@@ -30,6 +34,8 @@ export type Rated = {
   views: number | null;
   likes: number | null;
   saves: number | null;
+  /** Instagram's second measure; null when not reported. Absent: not reported. */
+  shares?: number | null;
   win_: boolean;
   /** The rate against the post's own bar; null when the post has no measure. */
   strength: number | null;
@@ -37,7 +43,14 @@ export type Rated = {
 
 export type WinRule = {
   tiktok: { median: number; over: number; wins: number; slideshows: number };
-  instagram: { median: number; over: number; likesFloor: number; wins: number; posts: number };
+  instagram: {
+    median: number; over: number; likesFloor: number;
+    /** Shares per view at the median of the reels over WIN_VIEWS that report shares; 0 when none do (no share bar). */
+    shareMedian: number; shareOver: number;
+    /** 50,000 x shareMedian: a photo's or a carousel's share bar; null when there is no share bar. */
+    sharesFloor: number | null;
+    wins: number; likeWins: number; shareWins: number; posts: number; withShares: number;
+  };
 };
 
 const medianOf = (xs: number[]) => {
@@ -67,16 +80,30 @@ export function markWins<T extends Rated>(tiles: T[]): WinRule {
   const reels = ig.filter((t) => t.kind === "video" && (t.views ?? 0) >= WIN_VIEWS && t.likes !== null);
   const igMedian = medianOf(reels.map((t) => rateOf(t)!));
   const likesFloor = igMedian > 0 ? Math.round(WIN_VIEWS * igMedian) : IG_LIKES_FLOOR;
+  const shareReels = ig.filter((t) => t.kind === "video" && (t.views ?? 0) >= WIN_VIEWS && t.shares != null);
+  const shareMedian = medianOf(shareReels.map((t) => t.shares! / t.views!));
+  const sharesFloor = shareMedian > 0 ? Math.round(WIN_VIEWS * shareMedian) : null;
+  let likeWins = 0, shareWins = 0;
   for (const t of ig) {
-    const r = rateOf(t);
-    if (t.likes === null) { t.win_ = false; t.strength = null; }
-    else if (t.views) { t.win_ = t.views >= WIN_VIEWS && igMedian > 0 && r! >= igMedian; t.strength = igMedian > 0 ? r! / igMedian : null; }
-    else { t.win_ = t.likes >= likesFloor; t.strength = t.likes / likesFloor; }
+    /* On likes: a reel by likes per view, a photo or carousel by the likes floor. */
+    let onLikes = false, likeStrength: number | null = null;
+    if (t.likes !== null && t.views) { const r = t.likes / t.views; onLikes = t.views >= WIN_VIEWS && igMedian > 0 && r >= igMedian; likeStrength = igMedian > 0 ? r / igMedian : null; }
+    else if (t.likes !== null) { onLikes = t.likes >= likesFloor; likeStrength = t.likes / likesFloor; }
+    /* On shares: the same, when the post reports shares and a share bar exists. */
+    let onShares = false, shareStrength: number | null = null;
+    if (t.shares != null && shareMedian > 0) {
+      if (t.views) { const r = t.shares / t.views; onShares = t.views >= WIN_VIEWS && r >= shareMedian; shareStrength = r / shareMedian; }
+      else { onShares = t.shares >= sharesFloor!; shareStrength = t.shares / sharesFloor!; }
+    }
+    t.win_ = onLikes || onShares;
+    if (onLikes) likeWins++;
+    if (onShares) shareWins++;
+    t.strength = likeStrength === null && shareStrength === null ? null : Math.max(likeStrength ?? 0, shareStrength ?? 0);
   }
 
   return {
     tiktok: { median: ttMedian, over: ttOver, wins: tt.filter((t) => t.win_ && t.kind === "slideshow").length, slideshows: tt.filter((t) => t.kind === "slideshow").length },
-    instagram: { median: igMedian, over: reels.length, likesFloor, wins: ig.filter((t) => t.win_).length, posts: ig.length },
+    instagram: { median: igMedian, over: reels.length, likesFloor, shareMedian, shareOver: shareReels.length, sharesFloor, wins: ig.filter((t) => t.win_).length, likeWins, shareWins, posts: ig.length, withShares: ig.filter((t) => t.shares != null).length },
   };
 }
 

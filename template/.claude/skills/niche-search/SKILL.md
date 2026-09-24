@@ -63,9 +63,11 @@ page, at no cost.
 
 The niche page marks the winners. TikTok: 50,000 views or more and saves per view at the
 median of the TikTok slideshows over 50,000 views. Instagram has no saves and no views on
-a photo or a carousel, so it is judged against itself: a reel at 50,000 views or more and
-likes per view at the median of the Instagram reels over 50,000 views; a photo or a
-carousel at the likes such a reel has (50,000 × that median). The rule is in
+a photo or a carousel, so it is judged against itself, on likes or on shares (either
+wins): a reel at 50,000 views or more and likes per view at the median of the Instagram
+reels over 50,000 views; a photo or a carousel at the likes such a reel has (50,000 ×
+that median); the same two rules with shares, whenever posts report shares (the hashtag
+pages of 2026-09-24 report none, so today only likes win). The rule is in
 `atlas/lib/niche-win.ts`.
 
 ## Finish

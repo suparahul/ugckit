@@ -77,7 +77,11 @@ saves and no shares (null, not 0), no views on a photo or a carousel, and no lik
 the author hides them. So its winners are its own: a reel at 50,000 views or more and
 likes per view at the median of the Instagram reels over 50,000 views; a photo or a
 carousel at 50,000 × that median in likes (1,647 on CatWise's first search); hidden likes
-never win. The views floor holds a photo or a carousel to the same likes-for-views rate.
+never win on likes. A post also wins on shares, by the same two rules with shares in place
+of likes, whenever the pages report shares (`share_count` or `reshare_count`). The hashtag
+pages of 2026-09-24 report no shares on any of the 397 posts, so today the share bar is
+empty and only likes win. The views floor holds a photo or a carousel to the same
+likes-for-views rate.
 
 ## Sources
 

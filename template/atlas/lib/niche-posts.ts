@@ -5,7 +5,8 @@
  *
  * A post names its platform; absent means TikTok, the kit's rule (lib/platform.ts),
  * so a niche file built before Instagram reads as it did. A count a platform does
- * not report is null, never 0: Instagram reports no saves and no shares, no views
+ * not report is null, never 0: Instagram reports no saves, no shares on the hashtag
+ * pages seen so far (read when a page carries share_count or reshare_count), no views
  * on a photo or a carousel, and no likes when the author hides them.
  */
 
@@ -117,7 +118,7 @@ export function igPost(it: Record<string, any>, keyword: string, window: string)
     likes: it.like_and_view_counts_disabled && !count(it.like_count) ? null : count(it.like_count),
     comments: count(it.comment_count) ?? 0,
     saves: null,
-    shares: null,
+    shares: it.share_count_disabled ? null : count(it.share_count) ?? count(it.reshare_count),
     saveRate: null,
     date: dateOf(it.taken_at ?? it.taken_at_ts),
     caption: oneLine(it.caption_text ?? it.caption?.text),

@@ -61,3 +61,37 @@ test("overFloor: views as they are; a post with no views by its likes at the Ins
   assert.equal(overFloor(carousel(1999), 50_000, rule), false);
   assert.equal(overFloor(carousel(null), 0, rule), true);
 });
+
+const reelS = (views: number, likes: number | null, shares: number | null): Rated => ({ ...reel(views, likes), shares });
+const carouselS = (likes: number | null, shares: number | null): Rated => ({ ...carousel(likes), shares });
+
+test("Instagram with no shares reported: no share bar, the likes rule alone decides", () => {
+  const tiles = [reel(100_000, 2000), reel(100_000, 4000), reel(100_000, 6000), carousel(2000), carousel(10)];
+  const rule = markWins(tiles);
+  assert.equal(rule.instagram.sharesFloor, null);
+  assert.equal(rule.instagram.shareWins, 0);
+  assert.equal(rule.instagram.withShares, 0);
+  assert.equal(rule.instagram.likeWins, 3);
+  assert.deepEqual(tiles.map((t) => t.win_), [false, true, true, true, false]);
+});
+
+test("Instagram shares: a post wins on likes OR on shares", () => {
+  const tiles = [
+    reelS(100_000, 2000, 100), reelS(100_000, 4000, 200), reelS(100_000, 6000, 300), // likes/view 2%, 4%, 6%
+    reelS(100_000, 1000, 500), // likes/view 1%, shares/view 0.5%: wins on shares only
+    carouselS(10, 150), // 50,000 x the share median (0.3%) = 150 shares: wins on shares
+    carouselS(10, 149), // under both bars
+    carouselS(null, 400), // likes hidden, wins on shares
+  ];
+  const rule = markWins(tiles);
+  assert.equal(rule.instagram.median, 0.04);
+  assert.equal(rule.instagram.shareMedian, 0.003);
+  assert.equal(rule.instagram.sharesFloor, 150);
+  assert.equal(rule.instagram.withShares, 7);
+  assert.deepEqual(tiles.map((t) => t.win_), [false, true, true, true, true, false, true]);
+  assert.equal(rule.instagram.likeWins, 2);
+  assert.equal(rule.instagram.shareWins, 4);
+  assert.equal(rule.instagram.wins, 5);
+  assert.ok(Math.abs(tiles[3].strength! - 0.005 / 0.003) < 1e-9); // the higher of the two bars
+  assert.ok(Math.abs(tiles[6].strength! - 400 / 150) < 1e-9);
+});

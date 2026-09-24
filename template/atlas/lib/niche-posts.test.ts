@@ -54,6 +54,14 @@ test("igPost: a photo is a slideshow of one; hidden likes are null; no code, no 
   assert.equal(igPost({ id: "6", media_type: 1 }, "cattips", "IG_TOP"), null);
 });
 
+test("igPost: shares when the page carries a count; null when it does not, or when they are disabled", () => {
+  const base = { id: "7", code: "S", media_type: 2, like_count: 5, play_count: 100, user: { username: "u" } };
+  assert.equal(igPost(base, "k", "IG_TOP")!.shares, null);
+  assert.equal(igPost({ ...base, share_count: 42 }, "k", "IG_TOP")!.shares, 42);
+  assert.equal(igPost({ ...base, reshare_count: 9 }, "k", "IG_TOP")!.shares, 9);
+  assert.equal(igPost({ ...base, share_count: 42, share_count_disabled: true }, "k", "IG_TOP")!.shares, null);
+});
+
 test("generalPost: an aweme from the TikTok general search", () => {
   const [a] = generalItems({ data: [{ aweme_info: { aweme_id: "7", desc: "tips", create_time: 1790000000, author: { unique_id: "h" }, statistics: { play_count: 1000, digg_count: 50, comment_count: 2, share_count: 3, collect_count: 20 }, image_post_info: { images: [{ display_image: { url_list: ["https://t/1.jpg"] } }, {}] } } }, { other: 1 }] });
   const p = generalPost(a, "cattips");
