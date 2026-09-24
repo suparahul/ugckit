@@ -38,6 +38,8 @@ This is the slideshow learnings file. `learnings.md` is its sibling and holds on
 | https://x.com/rsalimx/status/2098164559865315748 | Salim (@rsalimx) | "it's really this simple guys 😭", Sep 11, 2026, with a 14-second screen recording. 4,150 views. Bias: scroll.show founder. Frames in `media/x-articles/rsalimx-2098164559865315748/`, read in `X-SLIDESHOW-BATCH-2026-09-11.md` §5. |
 | https://x.com/type_tjay/status/2094611382537011676 | Tjay (@type_tjay) | "TikTok Slideshow Conversion Paths: Link, Profile, Comment, or DM?", Sep 1, 2026. 5,123 views, 167 bookmarks. Bias: Ghostfeed product piece; no accounts, no results; keep for the framework. |
 | X @duynn1998, 26 Aug 2026 (status id not captured) | Ethan Nguyen (@duynn1998) | "I Read the B2C App Revenue Flexes on X. The Slideshow Is Not the Secret.", Aug 26, 2026. 351 views. Bias: he sells nothing. All his numbers are second-hand, from Alberto, Mau Baron and two unnamed operators. Captured verbatim in `X-ETHAN-NGUYEN-SLIDESHOW-NOT-THE-SECRET.md`. |
+| https://x.com/yassratti/status/2101417993552945583 | Yassr (@yassratti) | "if you dominate a niche with slideshows, you already won", Sep 20, 2026. 25,935 views, 887 bookmarks. Four TikTok profile screenshots: `@sydneysynced`, `@selfbysarah`, `@heather.xoxo`, `@oliviatok88`. Bias: bio "@scrolldotshow", the company of Salim (@rsalimx). The post does not name the app behind its "$100k a month". Raw notes in `X-SLIDESHOW-BATCH-2026-09-24.md` § Post 1. |
+| https://x.com/brainextends/status/2099496707209994736 | Brain (@brainextends) | "this app went from $1k/mo to $5k/mo in 7 days", Sep 14, 2026. 15,858 views, 500 bookmarks. A 10-second screen recording of `@madison.valerab` and an App Store Tracker card for Your 20s - Daily Motivation. Bias: the first comment links his free guide. The tracker card reads "Est. revenue <$5K" and "Est. downloads <5K", so it does not confirm the $5k/mo claim. Raw notes and frames in `X-SLIDESHOW-BATCH-2026-09-24.md` § Post 2. |
 | X @wesocialgrowth, cited by post date | Social Growth Engineers (@wesocialgrowth) | The X account of socialgrowthengineers.com. Bias: every post also advertises the subscription. Their numbers are unverified here. |
 | X search "tiktok slideshows app MRR views", 2026-09-10 | @iamgdsa, @gauravsbuilding, @Jarthurwins, @manucastilloll | One-line claims. Full article text not pulled. |
 
@@ -75,6 +77,7 @@ Post URLs for the X posts are not captured. See Still open.
 - Localize. "french, spanish, portuguese accounts consistently outperform english-only". cray cray's best account is French, `@questionsprofondes1`, 6M views a month for over a year.
 - Cadence. Lino: 3–4 posts a day, "This is a volume game." New accounts warm up for a few weeks at 2–4 posts a day. Patiri: 1–3 posts per day per account. Pedro, when testing: "3 different formats per account, per day." Nicholas, for SEO: "at least 1 time per day for at least 3 months".
 - Warm the research account too. Nicholas: TikTok suggests keywords only to an active account.
+- Own the niche (claim, no data). Yassr: "the second they do, they get served another one of your posts / you're everywhere, and your app is always sitting in one of the slides / so a normal user thinks "this app has genuinely helped so many people" / not "this is an ad"". On `@oliviatok88`, the one account of the four opened, the app is named as plain text inside one body slide ("wellness ai"), `ACCOUNT-INSPECT-oliviatok88-2026-09-24.md` § 3.
 
 ## Format Portfolio
 
@@ -183,6 +186,14 @@ Compact specs. Only known fields are listed. The unknowns are collected at the e
 - Pedro's three tests for a format: viral repeatedly, works across niches, CTA on slide 2 through the notification.
 - Evidence: original post 1.2M views, 178.9K likes, 3,424 comments, 7,683 saves, 9,079 shares. His Spanish replica ("Ana Castro ❤️‍🩹", app Zenit) seven days later: 2.0M views, 239.8K likes, 5,256 comments, 17.8K saves, 12.7K shares. Two near-identical proposal-story hooks did 3.8M and 1.5M.
 - Replication method: reverse-engineer each image with a prompt builder. Regenerate it with the original as a reference, plus his own avatar for a consistent character.
+
+**Two-slide notification slideshow** — Your 20s - Daily Motivation, on `@madison.valerab` (Brain, 14 Sep 2026). Niche: emotional story, for a motivation app whose product is a daily notification.
+- Structure: 2 slides. Brain: "-> 2 slides -> AI generated visuals -> notification style copy -> app comes in naturally". Slide 1: the story hook over a recurring AI woman, sad in a car or a bed. Slide 2 of 2: a short quote line in a small serif font on a pale sky ("Some things become beautiful when you stop trying to control them."), then a long iMessage from "Dad", then the app's own notification, "Your 20s / Everything is about to work out [better than] you imagined. Keep going. You['re just] getting started." No payoff slide. Pedro's version adds one on slide 3.
+- Hook: an age, a setback, then "[dad / mom / she] texted me this…". "i'm 24 years old. I left my best friend's engagement brunch early. i smiled in every photo. i cried the whole drive home. then she texted me this…" 680.4K. "I'm 26 years old and tonight i moved back into my childhood bedroom after losing my job. Before i went inside, my dad texted me this…" 233.7K. The sender and the setback rotate. The shape stays.
+- Product: slide 2 of 2, the last slide. The notification copy matches the store screenshots, which show three "Your 20s" notifications on a lock screen.
+- Caption: "nobody tells you the hardest part is actually walking in #24 #laidoff #storytime #s…", with "Contains AI-generated media" under it.
+- Bio: "obsessed with my Your 20s streak 💕".
+- Evidence: the post open in the video, 46.3K likes, 1,146 comments, 2,108 saves, 1,100 shares. Views are not in the frame. Brain claims "the post did 1M+ views" and "$1k/mo to $5k/mo in 7 days". The tracker card shows 81 ratings, released 129 days at the read, "Est. revenue <$5K". The revenue claim is unverified.
 
 **Phone notification slideshow (older note)** — Pedro, 19 Aug 2026. Screenshots of notifications strung into a story. His controversy example: a boyfriend's questionable comment in a notification.
 
