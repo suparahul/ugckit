@@ -25,7 +25,7 @@ export type NicheData = {
   builtAt: string;
   slug: string;
   files: number;
-  totals: { rows: number; posts: number; slideshows: number; videos: number; handles: number; /** Absent in a file built before Instagram: all TikTok. */ platforms?: Partial<Record<Platform, number>> };
+  totals: { rows: number; posts: number; slideshows: number; videos: number; handles: number; /** Absent: all TikTok. */ platforms?: Partial<Record<Platform, number>> };
   keywords: string[];
   windows: string[];
   posts: NichePost[];

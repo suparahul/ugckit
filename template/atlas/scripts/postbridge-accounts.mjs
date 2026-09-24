@@ -5,7 +5,7 @@
  * Bridge. Each identity's HANDLE.md declares its accounts (the `## Accounts`
  * table: TikTok, and Instagram when it reposts there, each with its own name);
  * an account matches when the platform AND the username are the declared ones.
- * No table: one TikTok account with the handle's name, as before. Asks nothing.
+ * No table: one TikTok account with the handle's name. Asks nothing.
  * An account not connected yet is written as null, and the UI says "connect".
  *
  *   node scripts/postbridge-accounts.mjs <app slug>

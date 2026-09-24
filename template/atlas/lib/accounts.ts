@@ -12,7 +12,7 @@
  *     | instagram | @hannah.catmom_ | 2026-09-22 | repost | connected |
  *
  * No table: one account, from the `Handle:`, `Platform:` and `Created:` head
- * lines, so every HANDLE.md written before this reads as it did. The Status
+ * lines. The Status
  * cell is for the eye; the truth is posting-accounts.json.
  *
  * Pure apart from reading the files: the scripts import it too.

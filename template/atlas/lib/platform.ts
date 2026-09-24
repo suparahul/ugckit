@@ -1,7 +1,6 @@
 /**
  * The platforms a post can go to, and the one rule every reader shares: a
- * file, a plan row or a log line that names no platform means TikTok. So
- * everything written before Instagram existed reads as it did.
+ * file, a plan row or a log line that names no platform means TikTok.
  *
  * Our own Instagram posts are a repost of the same deck. In the research, the
  * apps, their promoters and the harvest (R1 to R5) stay TikTok only; the niche

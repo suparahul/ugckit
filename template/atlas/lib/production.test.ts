@@ -1,7 +1,6 @@
 /**
  * The legs of a post (lib/production.ts): one per platform, read from the log.
- * A line with no platform is TikTok's, so a log written before Instagram reads
- * as it did. No file, no network. Run with `npm test` (node --test).
+ * A line with no platform is TikTok's. No file, no network. Run with `npm test` (node --test).
  */
 
 import assert from "node:assert/strict";
@@ -43,7 +42,7 @@ test("platformsOf: the row's cell; else the handle's declared accounts, kept to 
   assert.deepEqual(platformsOf({ ...row, platforms: ["tiktok"] }, {}, ["tiktok", "instagram"]), ["tiktok"], "the row's own cell wins");
 });
 
-test("a log with no platform gives one TikTok leg, exactly as before", () => {
+test("a log with no platform gives one TikTok leg", () => {
   const log = [
     ev("08:00", "posting.sent", { provider: "postbridge", id: "pb1", account: 97911, media: "m1 m2", status: "processing", mode: "draft" }),
     ev("09:00", "posted", { time: "09:00", url: "https://www.tiktok.com/@hannah.catmom/photo/1" }),
@@ -57,7 +56,7 @@ test("a log with no platform gives one TikTok leg, exactly as before", () => {
   assert.deepEqual(tt.sent?.media, ["m1", "m2"]);
   assert.equal(tt.posted?.time, "09:00");
   assert.equal(tt.link, "https://www.tiktok.com/@hannah.catmom/photo/1");
-  assert.equal(tt.synced?.source, "monid", "Monid first, as before");
+  assert.equal(tt.synced?.source, "monid", "Monid first");
   assert.equal(tt.synced?.saves, 4);
   const ig = legState(log, "instagram");
   assert.equal(ig.sent, null);

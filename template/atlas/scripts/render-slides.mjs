@@ -373,7 +373,7 @@ async function instagramSet(key, deck, outDir, { force, override, burned }) {
     writeFileSync(join(igDir, `slide-${nn(slide.n)}.jpg`), await toInstagram(readFileSync(png), FR.dimension));
   }
   if (tmp) rmSync(tmp, { recursive: true, force: true });
-  /* A 0.4.0 test render wrote its own caption and first comment here; the send no longer reads them. */
+  /* The send takes the caption from the post, not from this folder: a caption or first comment here is removed. */
   for (const f of ["caption.txt", "first-comment.txt"]) rmSync(join(igDir, f), { force: true });
   console.log(`${key}: wrote the Instagram set in ${igDir} (${deck.slides.length} JPEG slides at 4:5 ${IG.w}×${IG.h}, cover text burned; the caption is caption.txt, as on TikTok)`);
   if (deck.slides.length > IG.maxSlides) console.log(`${key}: WARNING — ${deck.slides.length} slides; Instagram takes ${IG.maxSlides}. A handle on TikTok and Instagram plans its decks at ${IG.maxSlides} slides or fewer: cut the deck.`);

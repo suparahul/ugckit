@@ -3,11 +3,10 @@
  * scripts/build-niche.mjs imports this (Node strips the types); lib/niche.ts
  * re-exports the type for the page.
  *
- * A post names its platform; absent means TikTok, the kit's rule (lib/platform.ts),
- * so a niche file built before Instagram reads as it did. A count a platform does
- * not report is null, never 0: Instagram reports no saves, no shares on the hashtag
- * pages seen so far (read when a page carries share_count or reshare_count), no views
- * on a photo or a carousel, and no likes when the author hides them.
+ * A post names its platform; absent means TikTok, the kit's rule (lib/platform.ts).
+ * A count a platform does not report is null, never 0: Instagram reports no saves,
+ * shares only when a page carries share_count or reshare_count, no views on a photo
+ * or a carousel, and no likes when the author hides them.
  */
 
 import type { Platform } from "./platform.ts";

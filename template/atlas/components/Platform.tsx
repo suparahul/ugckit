@@ -104,7 +104,7 @@ const short = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1).rep
 /**
  * The small line under a post: each leg's views, or its state when it has no
  * read yet ("failed", "not on Instagram", "waiting"). Null for a post with one
- * TikTok leg, so a TikTok-only week looks exactly as before.
+ * TikTok leg: a TikTok-only week shows no split line.
  */
 export function LegSplit({ s, className }: { s: PostState; className?: string }) {
   const platforms = s.platforms ?? ["tiktok"];

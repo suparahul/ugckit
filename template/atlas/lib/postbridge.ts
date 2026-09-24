@@ -99,7 +99,7 @@ export type TiktokConfig = {
  * Instagram has no draft: a post is published when Post Bridge processes it
  * (its API reference has no draft field for Instagram; `is_draft` only holds
  * the post in Post Bridge). `media` and `caption` override the post's for the
- * Instagram account; the kit sends no `first_comment` (Rahul, 2026-09-23: the
+ * Instagram account; the kit sends no `first_comment` (the
  * hashtags stay in the caption). Carousels take 1–10 images, JPEG, 4:5 to 1.91:1.
  */
 export type InstagramConfig = { caption?: string; media?: string[]; first_comment?: string; placement?: "story" };
@@ -347,8 +347,8 @@ export type Leg = { platform: Platform; account: number };
 
 /**
  * One request for every leg of a post: the accounts together, one time for all
- * (Rahul, 2026-09-23: Instagram posts at the same time as TikTok). TikTok gets
- * the draft or the direct configuration as before; Instagram gets its own
+ * (Instagram posts at the same time as TikTok). TikTok gets
+ * the draft or the direct configuration; Instagram gets its own
  * slides (4:5 JPEG) and the same caption, hashtags included, with no first
  * comment. With no TikTok leg, the post's own media and caption are
  * Instagram's.
@@ -510,7 +510,7 @@ export function mapAccounts(identities: MapIdentity[], accounts: PBAccount[], no
 
 export type SyncReport = { post: string; pbPost: string; /** The leg; absent for TikTok. */ platform?: Platform; written: boolean; outcome: OutcomeSync | null; note: string; /** The send's result in words: queued, draft created, error: … */ result: string };
 
-/** One send to read: the Post Bridge post and its legs. No legs: one TikTok leg, as every send before Instagram. */
+/** One send to read: the Post Bridge post and its legs. No legs: one TikTok leg. */
 export type SentPost = { post: string; pbPost: string; legs?: Leg[] };
 
 /**
@@ -543,7 +543,7 @@ export async function syncOutcomesWith(
     for (const leg of legsOf(x)) {
       const tag = leg.platform === "tiktok" ? {} : { platform: leg.platform };
       const ls = legStatusOf(pbp, results, leg);
-      /* One leg's word; a send with one TikTok leg keeps the post's word, as before. */
+      /* One leg's word; a send with one TikTok leg keeps the post's word. */
       const result = x.legs?.length ? (ls.word === "error" ? `error: ${ls.error}` : ls.word) : st.word === "error" ? `error: ${st.error}` : st.word;
       if (x.legs?.length) onLeg?.(post, pbPost, leg, ls, pbp);
       const a = leg.platform === "tiktok" ? rows.find((r) => r.platform === "tiktok") ?? (x.legs?.length ? undefined : rows[0]) : rows.find((r) => platformOf(r.platform) === leg.platform);

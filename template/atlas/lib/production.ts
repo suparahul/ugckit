@@ -231,9 +231,9 @@ export const storeOf = (slug: string) => join(appDir(slug), "production");
 export const logOf = (slug: string) => join(storeOf(slug), "log.jsonl");
 export const filesRoot = (slug: string) => join(storeOf(slug), "files");
 
-/** `images.approve` and `images.sendback` are no longer written: the images
- * gate folded into the final one on 2026-09-16. They stay here so the old
- * lines in the log still type-check and print. */
+/** `images.approve` and `images.sendback` are not written: the final gate
+ * covers the images. They stay in the type so a log that holds them still
+ * type-checks and prints. */
 export type EventKind =
   | "idea.approve"
   | "idea.sendback"
@@ -592,7 +592,7 @@ function checksFor(row: PlanRow, deck: Deck, deckFile: DeckFile, app: RegExp | n
   ];
 }
 
-/** The 10-slide rule: a post that also goes to Instagram has 10 slides at most (Rahul, 2026-09-23). No check for TikTok alone. */
+/** The 10-slide rule: a post that also goes to Instagram has 10 slides at most. No check for TikTok alone. */
 export function slideLimitCheck(slides: number, platforms: Platform[]): PostState["checks"] {
   const max = slideLimit(platforms);
   if (max === null) return [];

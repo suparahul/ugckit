@@ -110,7 +110,7 @@ export function Deck({ state, deck, deckFile, initial, src, overlayOff, readOnly
   const ss = state.slides[n - 1];
   /* An illustrated deck (the item row `Slide style: illustrated`): the generator drew the text into the picture, so the
    * replica shows the picture as the finished slide — no text blocks, no layout to lock — with the callout card on the
-   * product slide where the compositor pastes it. An absent row, or `photo`, is the replica as before. */
+   * product slide where the compositor pastes it. An absent row, or `photo`, is the photo replica. */
   const illustrated = /^illustrated/i.test(deck.items?.["Slide style"] ?? "");
   const empty = state.slides.filter((s) => !s.current).length;
   const srcThumb = deck.sourceSlides[n - 1] ?? null;

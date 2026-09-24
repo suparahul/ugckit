@@ -32,15 +32,14 @@ export function slidesOf(s: PostState): string[] {
 /**
  * The format's name without its note: the words before the first `,` `;` `:` or `(`.
  * A plan row's format cell often carries the whole reasoning ("paragraph density,
- * 9 slides: hook, one food per slide …"), which made the grid cards grow to ten
- * lines (Rahul, 2026-09-23). The card shows the name; the whole cell is its tooltip
+ * 9 slides: hook, one food per slide …"), too long for a grid card. The card shows the name; the whole cell is its tooltip
  * and stays on the post page.
  */
 export function formatHead(format: string): string {
   return format.split(/[,;:(]/)[0].trim() || format;
 }
 
-/** `view`: the numbers of one platform, or of both with the split line under them. Absent: the post's numbers, as before two platforms. */
+/** `view`: the numbers of one platform, or of both with the split line under them. Absent: the primary leg's numbers. */
 export function PostedShow({ s, handle, view }: { s: PostState; handle: Handle | null; view?: View }) {
   const srcs = slidesOf(s);
   const nb = numbersIn(s, view ?? "both");

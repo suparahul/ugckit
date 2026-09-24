@@ -43,7 +43,7 @@ function Series({ reads, postedAt }: { reads: { at: string; views: number }[]; p
 /**
  * `view`: one platform's read, or "both" (the legs added up; the series and the
  * saves stay TikTok's, since no source gives Instagram's saves). A post with one
- * TikTok leg reads exactly as before.
+ * TikTok leg reads TikTok's numbers only.
  */
 export function Reads({ s, view = "both" }: { s: PostState; view?: View }) {
   const leg = view === "both" ? s.primary ?? "tiktok" : view;

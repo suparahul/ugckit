@@ -158,7 +158,7 @@ export function selectSends(slug: string, sel: SendSelect): SendPlan[] {
         : null;
       return { platform: p, account: account?.id ?? null, skip, sent };
     });
-    /* The 10-slide rule (Rahul, 2026-09-23): a deck over the limit of a platform stops the send; no slide is dropped. */
+    /* The 10-slide rule: a deck over the limit of a platform stops the send; no slide is dropped. */
     const over = legs.map((l) => l.platform).filter((p) => MAX_SLIDES[p] !== null && slides > MAX_SLIDES[p]!);
     const tooLong = over.length ? `${slides} slides; ${over.map((p) => `${PLATFORM_NAME[p]} takes ${MAX_SLIDES[p]}`).join(", ")}: cut the deck to ${Math.min(...over.map((p) => MAX_SLIDES[p]!))} (the deck skill)${s.platforms.includes("tiktok") && !sel.only ? ", or send TikTok alone with --only tiktok" : ""}` : null;
     const primaryLeg = legs.find((l) => l.platform === primaryOf(wanted)) ?? legs[0];
@@ -170,7 +170,7 @@ export function selectSends(slug: string, sel: SendSelect): SendPlan[] {
       : !info.keySet ? info.why
       : !legs.length ? "no platform left: every leg was taken off"
       : tooLong ? tooLong
-      /* Nothing left to send; or the primary leg cannot go (not connected, needs a reconnect): the post stops, as before.
+      /* Nothing left to send; or the primary leg cannot go (not connected, needs a reconnect): the post stops.
          A primary leg sent already lets the other legs go (the retry of a failed Instagram leg). */
       : !open.length ? primaryLeg.skip
       : primaryLeg.skip && !primaryLeg.sent ? primaryLeg.skip

@@ -121,10 +121,9 @@ export default function AccountCarousel({ accounts }: { accounts: CarouselAccoun
       state.target = state.base;
       stage.style.setProperty("--pointer-x", "50%");
     };
-    // A trackpad swipe fires dozens of wheel events for one gesture, and each
-    // one used to move a full card — a single flick could spin through the
-    // whole deck with no way to stop on one. Throttled to one card-step per
-    // ~110ms, which is enough to move fast but leaves the deck restable.
+    // A trackpad swipe fires dozens of wheel events for one gesture. Throttled
+    // to one card-step per ~110ms, so one flick moves fast but can still stop
+    // on a card.
     let lastWheelAt = 0;
     const onWheel = (event: WheelEvent) => {
       const direction = Math.sign(Math.abs(event.deltaY) > Math.abs(event.deltaX) ? event.deltaY : event.deltaX);
@@ -257,7 +256,7 @@ export default function AccountCarousel({ accounts }: { accounts: CarouselAccoun
               </span>
 
               {/* The authored numbered identity footer, carrying the account's
-                  own figures where the job title used to go. */}
+                  own figures in the job-title slot. */}
               <span className="ccard__footer">
                 <span className="ccard__index">{String(i + 1).padStart(2, "0")}</span>
                 <span className="ccard__meta">

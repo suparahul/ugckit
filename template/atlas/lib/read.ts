@@ -62,7 +62,7 @@ function legNumbers(s: PostState, p: Platform): PostNumbers | null {
   return { views: y.views, likes: y.likes, comments: y.comments, saves: y.saves ?? 0, shares: y.shares, source: y.source, at: y.syncedAt || y.at, legs: [p], savesKnown: y.saves !== null, savesViews: y.saves !== null ? y.views : 0 };
 }
 
-/** The primary leg's numbers: exactly the rule from before two platforms. */
+/** The primary leg's numbers: typed outcomes first, then the synced read. */
 function primaryNumbers(s: PostState): PostNumbers | null {
   if (s.outcomes) {
     const o = s.outcomes;
@@ -73,7 +73,7 @@ function primaryNumbers(s: PostState): PostNumbers | null {
   return null;
 }
 
-/** Posted: the primary leg is posted, as before two platforms. One argument: it is passed to `filter` as it is. */
+/** Posted: the primary leg is posted and the post is not killed. One argument: it is passed to `filter` as it is. */
 export const isPosted = (s: PostState) => !!s.posted && !s.killed;
 /** Posted in the view: the primary leg for "both", else that platform's leg. */
 export const isPostedIn = (s: PostState, view: View) => !s.killed && (view === "both" || view === (s.primary ?? "tiktok") ? !!s.posted : !!s.legs?.[view]?.posted);

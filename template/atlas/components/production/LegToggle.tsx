@@ -3,7 +3,7 @@
 /**
  * "Do not post on Instagram" / "Post on Instagram again": one `leg.drop` or
  * `leg.add` line through /api/production/decide. The send reads it: a dropped
- * leg is left out, and the TikTok leg goes as before.
+ * leg is left out, and the TikTok leg goes alone.
  */
 
 import { useRouter } from "next/navigation";
