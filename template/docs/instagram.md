@@ -76,7 +76,7 @@ the post is `instagram.com/p/<code>/`, a reel `/reel/<code>/`). Instagram report
 saves and no shares (null, not 0), no views on a photo or a carousel, and no likes when
 the author hides them. So its winners are its own: a reel at 50,000 views or more and
 likes per view at the median of the Instagram reels over 50,000 views; a photo or a
-carousel at 50,000 × that median in likes (1,645 on CatWise's first search); hidden likes
+carousel at 50,000 × that median in likes (1,647 on CatWise's first search); hidden likes
 never win. The views floor holds a photo or a carousel to the same likes-for-views rate.
 
 ## Sources
