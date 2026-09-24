@@ -213,7 +213,7 @@ the Organic Factory UI reads them in place, and "filled" is derived from the fil
 | 1 | Setup | `setup` | the state file, the keys, the brain in place | `setup` done |
 | 2 | The app | `product` (`product-facts.sh`) | `apps/<slug>/APP.md`, `product.json`, `icon.jpg` | both exist and `product.json` has a source |
 | 3 | Competitor apps | `apps` → `teardown` as above, then `apps-learnings` | the ledger, the teardowns; the first sections of `niche/{learnings,anatomy,architecture}.md`, marked `competitor apps` | every ledger app has a teardown |
-| 4 | The niche | `niche-search` (`niche-search.sh`), `niche-hunt`, `niche-fetch` (`niche-fetch.sh`), `niche-read` (`niche-stats.py`) | `niche/NICHE.md`, `searches/`, `covers/`, `batches/<date>/{LINKS.md, …, BATCH.md}`; the `niche` sections and rows of the findings trio | one batch read and the trio exists |
+| 4 | The niche | `niche-search` (`niche-search.sh`, `niche-import.sh`), `niche-hunt`, `niche-fetch` (`niche-fetch.sh`), `niche-read` (`niche-stats.py`) | `niche/NICHE.md`, `searches/`, `covers/`, `instagram/{searches,covers}/` when asked, `batches/<date>/{LINKS.md, …, BATCH.md}`; the `niche` sections and rows of the findings trio | one batch read and the trio exists |
 | 5 | Account architecture | `account-architecture` | `strategy/ACCOUNTS.md` | it exists; the user approves on the strategy page |
 | 6 | Handle identities | `handles`, `persona-identity` | `handles/<handle>/HANDLE.md`, `references/` | one handle complete at five steps; two recommended |
 | 7 | App fit and plan | `app-fit`, `plan` (`hashtag-pool.sh`) | `strategy/APP-FIT.md`, `production/PLAN.md`, optionally `strategy/HASHTAG-POOL.md` | the fit exists and the plan parses with a handle and a row |
@@ -224,8 +224,11 @@ the Organic Factory UI reads them in place, and "filled" is derived from the fil
 own name (`handles` step 1; see `docs/instagram.md`). A post has one deck, one approval
 and one leg per platform, sent in one call at the same time; Instagram is always
 published directly, as 4:5 JPEG slides, with no music (the user adds it in the Instagram
-app), and a deck on such a handle has 10 slides or fewer. The research stays TikTok
-only. A file, a plan row or a log line that names no platform means TikTok, so
+app), and a deck on such a handle has 10 slides or fewer. The research R1 to R5 stays
+TikTok only; the niche search (phase 4) can read Instagram hashtags too
+(`DOORS=...,instagram`), and a niche post then carries its platform; Instagram's niche
+winners are judged on likes, not saves (`niche-search`). A file, a plan row, a log line or
+a niche post that names no platform means TikTok, so
 everything written before reads as it did. The log adds `data.platform`, `data.legs` on
 `posting.sent`, `posting.failed` (a leg the platform refused, in its words), `leg.drop`
 and `leg.add`. Instagram saves are not reported by any source; saves/view is TikTok's.

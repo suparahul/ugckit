@@ -3,7 +3,9 @@
  * file, a plan row or a log line that names no platform means TikTok. So
  * everything written before Instagram existed reads as it did.
  *
- * Instagram is a repost of the same deck: the research half stays TikTok only.
+ * Our own Instagram posts are a repost of the same deck. In the research, the
+ * apps, their promoters and the harvest (R1 to R5) stay TikTok only; the niche
+ * search reads Instagram hashtags too, and a niche post carries its platform.
  * Pure: the scripts import it too (Node strips the types).
  */
 
@@ -47,3 +49,7 @@ export function slideLimit(platforms: Platform[]): number | null {
 
 /** The primary platform of a list: TikTok when it is there, else the first. */
 export const primaryOf = (platforms: Platform[]): Platform => (platforms.includes("tiktok") || !platforms.length ? "tiktok" : platforms[0]);
+
+/** A handle's profile on its platform. */
+export const profileUrl = (p: Platform, handle: string): string =>
+  p === "instagram" ? `https://www.instagram.com/${handle}/` : `https://www.tiktok.com/@${handle}`;

@@ -1,7 +1,8 @@
 /**
  * /app/<slug>/niche — the niche of the app. What wins across the searched
  * posts and the posts from your own scroll (one row of pickers, every pick
- * a URL); the scrolled posts as playable previews; the findings the agent
+ * a URL, the platform too when the searches hold Instagram posts); the
+ * scrolled posts as playable previews; the findings the agent
  * wrote, the verdict open and one fold per note, then the post table, the
  * parameter values and the accounts. Informative only. Before the phase
  * starts the page shows its state band and the rooms.
@@ -17,10 +18,13 @@ import { canvasOf } from "@/lib/canvas";
 import { day7Rows, readAccountTable, readFindings, readPostTable, readValues, type FindingBlock } from "@/lib/findings";
 import { listHandles } from "@/lib/handles";
 import { getNiche, listBatches, type BatchPost, type NichePost } from "@/lib/niche";
+import { markWins, overFloor, WIN_VIEWS, type Rated } from "@/lib/niche-win";
+import { PLATFORM_NAME, profileUrl, type Platform } from "@/lib/platform";
 import { dmy, n, pct, Room, Section } from "@/components/factory/Bits";
 import { Anat } from "@/components/factory/Anat";
 import { BatchShow } from "@/components/factory/Cards";
 import { NicheFilters, type Pick } from "@/components/factory/NicheFilters";
+import { PlatformIcon, PlatformSwitch, viewOf } from "@/components/Platform";
 import { StateBand } from "@/components/factory/StateBand";
 
 export const dynamic = "force-dynamic";
@@ -34,16 +38,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 /* ------------------------------------------------------------- the tiles */
 
-type Tile = {
-  id: string; src: "search" | "scroll"; kind: "slideshow" | "video"; kw: string; win: string; date: string;
-  handle: string; views: number; saves: number; shares: number; rate: number; shrate: number; slides: number | null;
-  cover: string | null; caption: string; url: string; win_: boolean;
+/** One post on the grid. A count the platform does not report is null (Instagram: saves, shares, a photo's views). */
+type Tile = Rated & {
+  id: string; src: "search" | "scroll"; kw: string; win: string; date: string;
+  handle: string; comments: number; shares: number | null; shrate: number; slides: number | null;
+  cover: string | null; caption: string; url: string;
 };
 
-const WIN_VIEWS = 50_000;
 const PAGE = 24;
 
-const winLabel = (w: string) => ({ LAST_THREE_MONTHS: "last three months", PHOTO_TAB: "photo tab", THIS_MONTH: "this month", SCROLL: "your scroll" }[w] ?? w.toLowerCase().replace(/_/g, " "));
+const winLabel = (w: string) => ({ LAST_THREE_MONTHS: "last three months", PHOTO_TAB: "photo tab", THIS_MONTH: "this month", SCROLL: "your scroll", GENERAL: "general search", IG_TOP: "Instagram top", IG_RECENT: "Instagram recent" }[w] ?? w.toLowerCase().replace(/_/g, " "));
 const cut = (t: string, max = 120) => (t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t);
 const viewsLabel = (v: number) => (v ? `${v >= 1_000_000 ? `${v / 1_000_000}M` : `${v / 1000}K`} and up` : "any");
 
@@ -51,38 +55,43 @@ function tilesOf(posts: NichePost[], scrolled: BatchPost[]): Tile[] {
   const seen = new Set<string>();
   const out: Tile[] = [];
   for (const p of posts) {
-    if (seen.has(p.id)) continue;
-    seen.add(p.id);
-    out.push({ id: p.id, src: "search", kind: p.mediaType, kw: p.keyword, win: p.window, date: p.date, handle: p.handle, views: p.views, saves: p.saves, shares: p.shares, rate: p.views ? p.saves / p.views : 0, shrate: p.views ? p.shares / p.views : 0, slides: p.slideCount, cover: p.coverLocal ? p.cover : null, caption: p.caption, url: p.url, win_: false });
+    const platform: Platform = p.platform ?? "tiktok";
+    if (seen.has(`${platform}:${p.id}`)) continue;
+    seen.add(`${platform}:${p.id}`);
+    out.push({ id: p.id, platform, src: "search", kind: p.mediaType, kw: p.keyword, win: p.window, date: p.date, handle: p.handle, views: p.views, likes: p.likes, comments: p.comments, saves: p.saves, shares: p.shares, shrate: p.views && p.shares ? p.shares / p.views : 0, slides: p.slideCount, cover: p.coverLocal ? p.cover : null, caption: p.caption, url: p.url, win_: false, strength: null });
   }
   for (const p of scrolled) {
-    if (seen.has(p.id) || !p.views) continue;
-    seen.add(p.id);
-    out.push({ id: p.id, src: "scroll", kind: "slideshow", kw: "", win: "SCROLL", date: p.date ?? "", handle: p.handle, views: p.views, saves: p.saves, shares: p.shares, rate: p.saves / p.views, shrate: p.shares / p.views, slides: p.slideCount || null, cover: p.slides[0] ?? null, caption: p.caption, url: p.url, win_: false });
+    if (seen.has(`tiktok:${p.id}`) || !p.views) continue;
+    seen.add(`tiktok:${p.id}`);
+    out.push({ id: p.id, platform: "tiktok", src: "scroll", kind: "slideshow", kw: "", win: "SCROLL", date: p.date ?? "", handle: p.handle, views: p.views, likes: p.likes, comments: p.comments, saves: p.saves, shares: p.shares, shrate: p.shares / p.views, slides: p.slideCount || null, cover: p.slides[0] ?? null, caption: p.caption, url: p.url, win_: false, strength: null });
   }
   return out;
 }
 
-/** The win rule: 50,000 views or more, and saves per view at the median of the slideshows that reached 50,000 views. */
-function markWins(tiles: Tile[]) {
-  const base = tiles.filter((t) => t.kind === "slideshow" && t.views >= WIN_VIEWS).map((t) => t.rate).sort((a, b) => a - b);
-  const median = base.length ? base[Math.floor(base.length / 2)] : 0;
-  for (const t of tiles) t.win_ = t.views >= WIN_VIEWS && t.rate >= median && median > 0;
-  return { median, over: base.length, wins: tiles.filter((t) => t.win_ && t.kind === "slideshow").length, slideshows: tiles.filter((t) => t.kind === "slideshow").length };
+/** The figures under a tile: TikTok's saves and shares; Instagram's likes (per view on a reel), its shares when reported, and comments. */
+function Nums({ t }: { t: Tile }) {
+  const w = t.win_ ? "is-win" : "";
+  if (t.platform === "tiktok") return <p className="niche-tile__nums"><span className={w}><b>{pct(t.saves ?? 0, t.views ?? 0)}</b> saves/view</span><span><b>{n(t.saves ?? 0)}</b> saves</span><span><b>{n(t.shares ?? 0)}</b> shares</span></p>;
+  const shares = t.shares !== null ? <span><b>{n(t.shares)}</b> shares</span> : null;
+  if (t.likes === null) return <p className="niche-tile__nums"><span>likes hidden</span>{shares}<span><b>{n(t.comments)}</b> comments</span></p>;
+  return t.views
+    ? <p className="niche-tile__nums"><span className={w}><b>{pct(t.likes, t.views)}</b> likes/view</span><span><b>{n(t.likes)}</b> likes</span>{shares ?? <span><b>{n(t.comments)}</b> comments</span>}</p>
+    : <p className="niche-tile__nums"><span className={w}><b>{n(t.likes)}</b> likes</span>{shares}<span><b>{n(t.comments)}</b> comments</span></p>;
 }
 
-function TileCard({ t }: { t: Tile }) {
+function TileCard({ t, mixed }: { t: Tile; mixed: boolean }) {
   const ext = { target: "_blank", rel: "noreferrer" } as const;
+  const badge = t.kind === "video" ? (t.platform === "instagram" ? "reel" : "video") : t.platform === "instagram" && t.slides === 1 ? "photo" : t.slides ? `${t.slides} slides` : "slideshow";
   return (
     <li className={`niche-tile niche-tile--${t.kind}${t.win_ ? " is-win" : ""}`}>
       <a className="niche-tile__cover" href={t.url} {...ext}>
         {t.cover ? <img src={t.cover} alt="" loading="lazy" /> : <span className="niche-tile__nocover">{t.kind}<small>cover not held on disk</small></span>}
-        <span className="niche-tile__badge">{t.kind === "video" ? "video" : t.slides ? `${t.slides} slides` : "slideshow"}</span>
+        <span className="niche-tile__badge">{badge}</span>
         {t.src === "scroll" ? <span className="niche-tile__src">your scroll</span> : null}
       </a>
       <div className="niche-tile__body">
-        <div className="niche-tile__head"><a href={`https://www.tiktok.com/@${t.handle}`} {...ext}>@{t.handle}</a><strong>{n(t.views)}<small>views</small></strong></div>
-        <p className="niche-tile__nums"><span className={t.win_ ? "is-win" : ""}><b>{pct(t.saves, t.views)}</b> saves/view</span><span><b>{n(t.saves)}</b> saves</span><span><b>{n(t.shares)}</b> shares</span></p>
+        <div className="niche-tile__head"><a href={profileUrl(t.platform, t.handle)} {...ext}>{mixed ? <PlatformIcon p={t.platform} /> : null}@{t.handle}</a>{t.views !== null ? <strong>{n(t.views)}<small>views</small></strong> : <strong className="is-none">—<small>no views reported</small></strong>}</div>
+        <Nums t={t} />
         <p className="niche-tile__caption">{cut(t.caption) || "no caption"}</p>
         <div className="niche-tile__foot"><span>{[t.date ? dmy(t.date) : null, t.kw ? `#${t.kw}` : null, winLabel(t.win)].filter(Boolean).join(" · ")}</span><a href={t.url} {...ext}>open ↗</a></div>
       </div>
@@ -156,48 +165,62 @@ export default async function NichePage({ params, searchParams }: { params: Prom
   }
 
   /* ---- the filters, from the URL */
+  const view = viewOf(sp.platform);
   const q = {
+    platform: view === "both" ? "" : view,
     src: one("src"), kind: one("kind", "slideshow"), kw: one("kw"), win: one("win"), min: one("min", String(WIN_VIEWS)),
     recent: one("recent"), winners: one("winners"), sort: one("sort", "rate"),
   };
   const tiles = tilesOf(niche?.posts ?? [], scrolled);
   const rule = markWins(tiles);
+  const onIg = tiles.some((t) => t.platform === "instagram");
   const min = Number(q.min) || 0;
   const since = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
+  const inView = (t: Tile) => view === "both" || t.platform === view;
   const match = tiles.filter((t) =>
+    inView(t) &&
     (!q.src || t.src === q.src) &&
     (q.kind === "both" || t.kind === q.kind) &&
     (!q.kw || t.kw === q.kw) &&
     (!q.win || t.win === q.win) &&
-    t.views >= min &&
+    overFloor(t, min, rule) &&
     (q.recent !== "1" || t.date >= since) &&
     (q.winners !== "1" || t.win_),
   );
-  const key: Record<string, (t: Tile) => number | string> = { rate: (t) => t.rate, views: (t) => t.views, saves: (t) => t.saves, shrate: (t) => t.shrate, date: (t) => t.date };
+  /* "rate" is the rate against the post's own bar: saves per view over the TikTok median, likes over the Instagram one; within one platform it orders as the rate itself. Posts with no measure go last. */
+  const key: Record<string, (t: Tile) => number | string> = { rate: (t) => t.strength ?? -1, views: (t) => t.views ?? -1, saves: (t) => t.saves ?? -1, likes: (t) => t.likes ?? -1, shrate: (t) => t.shrate, date: (t) => t.date };
   const k = key[q.sort] ?? key.rate;
   match.sort((a, b) => (k(b) > k(a) ? 1 : k(b) < k(a) ? -1 : 0));
   const shown = Math.min(match.length, Math.max(PAGE, Number(one("n")) || PAGE));
   const winsIn = match.filter((t) => t.win_).length;
-  const count = (f: (t: Tile) => boolean) => tiles.filter(f).length;
+  const count = (f: (t: Tile) => boolean) => tiles.filter((t) => inView(t) && f(t)).length;
   const picks: Pick[] = [
     { key: "src", label: "source", def: "", opts: [{ v: "", label: "search and your scroll" }, { v: "search", label: "search only", n: count((t) => t.src === "search") }, { v: "scroll", label: "your scroll only", n: count((t) => t.src === "scroll") }] },
     { key: "kind", label: "kind", def: "slideshow", opts: [{ v: "slideshow", label: "slideshows", n: count((t) => t.kind === "slideshow") }, { v: "video", label: "videos", n: count((t) => t.kind === "video") }, { v: "both", label: "both" }] },
     { key: "kw", label: "keyword", def: "", opts: [{ v: "", label: (niche?.keywords.length ?? 0) === 2 ? "both" : "every keyword" }, ...(niche?.keywords ?? []).map((w) => ({ v: w, label: `#${w}`, n: count((t) => t.kw === w) }))] },
-    { key: "win", label: "window", def: "", opts: [{ v: "", label: "every window" }, ...(niche?.windows ?? []).map((w) => ({ v: w, label: winLabel(w), n: count((t) => t.win === w) }))] },
+    { key: "win", label: "window", def: "", opts: [{ v: "", label: "every window" }, ...(niche?.windows ?? []).filter((w) => count((t) => t.win === w)).map((w) => ({ v: w, label: winLabel(w), n: count((t) => t.win === w) }))] },
     { key: "min", label: "views", def: String(WIN_VIEWS), opts: [0, 10_000, 50_000, 100_000, 1_000_000].map((v) => ({ v: String(v), label: viewsLabel(v) })) },
   ];
-  const sortPick: Pick = { key: "sort", label: "sort by", def: "rate", opts: [{ v: "rate", label: "saves/view" }, { v: "views", label: "views" }, { v: "saves", label: "saves" }, { v: "shrate", label: "shares/view" }, { v: "date", label: "date" }] };
+  const rateWord = view === "tiktok" || !onIg ? "saves/view" : view === "instagram" ? "likes against the bar" : "rate against its bar";
+  const sortPick: Pick = { key: "sort", label: "sort by", def: "rate", opts: [{ v: "rate", label: rateWord }, { v: "views", label: "views" }, ...(view !== "instagram" ? [{ v: "saves", label: "saves" }] : []), ...(onIg && view !== "tiktok" ? [{ v: "likes", label: "likes" }] : []), ...(view !== "instagram" ? [{ v: "shrate", label: "shares/view" }] : []), { v: "date", label: "date" }] };
+  const hrefWith = (params: Record<string, string>) => {
+    const u = new URLSearchParams();
+    for (const [kk, v] of Object.entries(params)) { const def = kk === "kind" ? "slideshow" : kk === "min" ? String(WIN_VIEWS) : kk === "sort" ? "rate" : ""; if (v && v !== def) u.set(kk, v); }
+    const qs = u.toString();
+    return `/app/${s}/niche${qs ? `?${qs}` : ""}`;
+  };
   const moreHref = () => {
     const u = new URLSearchParams();
     for (const [kk, v] of Object.entries(q)) { const def = kk === "kind" ? "slideshow" : kk === "min" ? String(WIN_VIEWS) : kk === "sort" ? "rate" : ""; if (v && v !== def) u.set(kk, v); }
     u.set("n", String(shown + PAGE));
     return `/app/${s}/niche?${u.toString()}#wins`;
   };
-  const sortWord = sortPick.opts.find((o) => o.v === q.sort)?.label ?? "saves/view";
+  const sortWord = sortPick.opts.find((o) => o.v === q.sort)?.label ?? rateWord;
+  const byPlatform = niche?.totals.platforms ?? { tiktok: niche?.totals.posts ?? 0 };
 
   const searchWord = niche ? `${niche.keywords.length === 2 ? "two" : niche.keywords.length} search${niche.keywords.length === 1 ? "" : "es"}` : "no search";
   const counts = [
-    niche ? <><b>{n(niche.totals.posts)}</b> posts from {searchWord} (<b>{n(niche.totals.slideshows)}</b> slideshows · <b>{n(niche.totals.videos)}</b> videos · <b>{n(niche.totals.handles)}</b> handles)</> : "no search yet",
+    niche ? <><b>{n(niche.totals.posts)}</b> posts from {searchWord} (<b>{n(niche.totals.slideshows)}</b> slideshows · <b>{n(niche.totals.videos)}</b> videos · <b>{n(niche.totals.handles)}</b> handles{onIg ? <> · {(Object.entries(byPlatform) as [Platform, number][]).map(([pf, c], i) => <span key={pf}>{i ? " · " : ""}<b>{n(c)}</b> {PLATFORM_NAME[pf]}</span>)}</> : null})</> : "no search yet",
     scrolled.length ? <><b>{scrolled.length}</b> posts from your scroll, read slide by slide</> : batches.length ? <>{batches[0].links.length} links from your scroll, not read yet</> : "nothing from your scroll yet",
     findings ? <>findings of {dmy(findings.date)}</> : "no findings yet",
   ];
@@ -223,8 +246,14 @@ export default async function NichePage({ params, searchParams }: { params: Prom
                 <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" strokeWidth="1.3" /><circle cx="8" cy="4.9" r="0.9" fill="currentColor" /><path d="M8 7.2v4.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
               </summary>
               <div className="info__pop">
-                <p><b>How a win is defined.</b> A post wins when at least 50,000 people saw it and its saves per view reach the niche median, <b>{(100 * rule.median).toFixed(2)}%</b>. Saves count more than views: a saved post is one the viewer kept.</p>
-                <p className="state">Today {rule.wins} of {rule.slideshows} slideshows win. The median is worked out again on every visit, over the {rule.over} slideshows with 50,000 views or more.</p>
+                <p><b>How a win is defined.</b> A post wins when at least 50,000 people saw it and its saves per view reach the niche median, <b>{(100 * rule.tiktok.median).toFixed(2)}%</b>. Saves count more than views: a saved post is one the viewer kept.</p>
+                <p className="state">Today {rule.tiktok.wins} of {rule.tiktok.slideshows} {onIg ? "TikTok " : ""}slideshows win. The median is worked out again on every visit, over the {rule.tiktok.over} slideshows with 50,000 views or more.</p>
+                {onIg ? (
+                  <>
+                    <p><b>On Instagram</b> there are no saves, and a photo or a carousel shows no views, so Instagram is judged against itself, on likes or on shares: a post wins on either. On likes, a reel wins at 50,000 views or more with likes per view at the median of the Instagram reels that reached 50,000 views, <b>{(100 * rule.instagram.median).toFixed(2)}%</b>, and a photo or a carousel at <b>{n(rule.instagram.likesFloor)}</b> likes or more: what a reel has at 50,000 views and that median. A post whose likes are hidden does not win on likes. On shares, the same two rules with shares in place of likes{rule.instagram.sharesFloor !== null ? <>: <b>{(100 * rule.instagram.shareMedian).toFixed(2)}%</b> shares per view on a reel, <b>{n(rule.instagram.sharesFloor)}</b> shares on a photo or a carousel</> : null}.</p>
+                    <p className="state">Today {rule.instagram.wins} of {rule.instagram.posts} Instagram posts win: {rule.instagram.likeWins} on likes, {rule.instagram.shareWins} on shares. {rule.instagram.withShares ? `${rule.instagram.withShares} Instagram posts report shares.` : "No Instagram post in these searches reports shares, so no post can win on shares yet."} The views floor holds a photo or a carousel to the likes a reel would have at that many views.</p>
+                  </>
+                ) : null}
               </div>
             </details>
           </h2>
@@ -232,9 +261,10 @@ export default async function NichePage({ params, searchParams }: { params: Prom
         </div>
         {tiles.length ? (
           <>
+            {onIg ? <PlatformSwitch href={hrefWith({ ...q, platform: "" })} view={view} counts={{ both: tiles.length, tiktok: tiles.filter((t) => t.platform === "tiktok").length, instagram: tiles.filter((t) => t.platform === "instagram").length }} /> : null}
             <NicheFilters picks={picks} checks={[{ key: "recent", label: "last 90 days" }, { key: "winners", label: "winners only" }]} values={q} sort={sortPick} />
             <p className="state hx__count" aria-live="polite"><b>{n(match.length)}</b> match · <b>{n(winsIn)}</b> win · showing <b>{n(shown)}</b>{match.length > shown ? <> · then {PAGE} more each time</> : null}</p>
-            {match.length ? <ul className="niche-grid">{match.slice(0, shown).map((t) => <TileCard key={t.id} t={t} />)}</ul> : <p className="niche-empty">No post matches these filters. Lower the views floor or widen the window.</p>}
+            {match.length ? <ul className="niche-grid">{match.slice(0, shown).map((t) => <TileCard key={`${t.platform}:${t.id}`} t={t} mixed={onIg} />)}</ul> : <p className="niche-empty">No post matches these filters. Lower the views floor or widen the window.</p>}
             {match.length > shown ? <p style={{ marginTop: 14 }}><Link className="read__again" href={moreHref()} scroll={false}>Show {Math.min(PAGE, match.length - shown)} more</Link></p> : null}
           </>
         ) : (

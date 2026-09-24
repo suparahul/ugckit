@@ -2,7 +2,8 @@
  * The niche of an app: apps/<slug>/niche/. Two parts are read here.
  *
  *   The searches: data/niche-<slug>.json, built by scripts/build-niche.mjs
- *   from niche/searches/ (the Photo tab pages and the apidojo keyword files).
+ *   from niche/searches/ (the Photo tab pages, the general search pages and
+ *   the apidojo keyword files) and niche/instagram/searches/ (the hashtag pages).
  *   The batches: niche/batches/<date>/, what you brought from your own scroll
  *   and the agent pulled through Monid — LINKS.md (verbatim), posts.raw.json,
  *   <handle>/<id>/slide-NN.jpg, BATCH.md (the read). Read live.
@@ -13,34 +14,17 @@
 
 import { join } from "node:path";
 
+import type { NichePost } from "./niche-posts";
+import type { Platform } from "./platform";
 import { appDir, exists, listDirs, listFiles, mtimeOf, readJson, readText, tableOf } from "./root";
 
-export type NichePost = {
-  id: string;
-  keyword: string;
-  window: string;
-  handle: string;
-  mediaType: "slideshow" | "video";
-  slideCount: number | null;
-  views: number;
-  likes: number;
-  comments: number;
-  saves: number;
-  shares: number;
-  saveRate: number;
-  date: string;
-  caption: string;
-  /** A /media URL when the cover is held on disk. */
-  cover: string | null;
-  coverLocal: boolean;
-  url: string;
-};
+export type { NichePost } from "./niche-posts";
 
 export type NicheData = {
   builtAt: string;
   slug: string;
   files: number;
-  totals: { rows: number; posts: number; slideshows: number; videos: number; handles: number };
+  totals: { rows: number; posts: number; slideshows: number; videos: number; handles: number; /** Absent in a file built before Instagram: all TikTok. */ platforms?: Partial<Record<Platform, number>> };
   keywords: string[];
   windows: string[];
   posts: NichePost[];

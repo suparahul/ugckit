@@ -18,9 +18,10 @@ import { APPS_DIR, RESEARCH_DIR } from "@/lib/root";
 
 const MEDIA_ROOT = resolve(RESEARCH_DIR);
 /* apps/<slug>/… is served too, read-only: the app's icon, a handle's
- * references, the niche covers and the scrolled batches. Only those folders. */
+ * references, the niche covers (TikTok's and Instagram's) and the scrolled
+ * batches. Only those folders. */
 const APPS_ROOT = resolve(APPS_DIR);
-const APP_SERVED = /^[^/]+\/(icon\.(jpg|jpeg|png|webp)$|handles\/[^/]+\/references\/|niche\/(covers|batches)\/)/;
+const APP_SERVED = /^[^/]+\/(icon\.(jpg|jpeg|png|webp)$|handles\/[^/]+\/references\/|niche\/(covers|batches|instagram\/covers)\/)/;
 
 const TYPES: Record<string, string> = {
   jpg: "image/jpeg",

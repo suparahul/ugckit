@@ -2,7 +2,8 @@
 
 Since 0.4.0 an identity can repost its slideshows on Instagram. The research, the
 formats and the plan stay TikTok's; Instagram gets the same deck, sent in the same call
-and at the same time as TikTok, through the same posting service (Post Bridge).
+and at the same time as TikTok, through the same posting service (Post Bridge). Since
+0.4.1 the niche search can read Instagram too (below).
 
 ## Add Instagram to an identity
 
@@ -59,6 +60,28 @@ it; the TikTok leg is not touched. The retry, after a yes:
 
 An account that needs a reconnect: reconnect it in Post Bridge, then run
 `posting-accounts.mjs` again.
+
+## Instagram in the niche
+
+`DOORS=photo,video,instagram scripts/niche-search.sh <slug> cattips catmom` adds a third
+door: TikHub `fetch_hashtag_posts`, `top` and `recent`, $0.003 a page, into
+`apps/<slug>/niche/instagram/searches/hashtag.<tag>.<feed>.p<N>.json`. The covers go to
+`instagram/covers/<id>.jpg`, fetched at once: `thumbnail_url` is signed and expires within
+days. `scripts/niche-import.sh <slug>` fetches any cover still missing and rebuilds the
+page, at no cost.
+
+On the niche page a platform switch shows both, TikTok or Instagram, and a handle links
+to its own platform. A post carries `platform: "instagram"` and its shortcode (`code`;
+the post is `instagram.com/p/<code>/`, a reel `/reel/<code>/`). Instagram reports no
+saves and no shares (null, not 0), no views on a photo or a carousel, and no likes when
+the author hides them. So its winners are its own: a reel at 50,000 views or more and
+likes per view at the median of the Instagram reels over 50,000 views; a photo or a
+carousel at 50,000 × that median in likes (1,647 on CatWise's first search); hidden likes
+never win on likes. A post also wins on shares, by the same two rules with shares in place
+of likes, whenever the pages report shares (`share_count` or `reshare_count`). The hashtag
+pages of 2026-09-24 report no shares on any of the 397 posts, so today the share bar is
+empty and only likes win. The views floor holds a photo or a carousel to the same
+likes-for-views rate.
 
 ## Sources
 

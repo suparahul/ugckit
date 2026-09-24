@@ -6,7 +6,7 @@ description: Phase 4, the read — every slide, contact sheet and transcript of 
 # Phase 4 — the read (niche-read)
 
     scripts/niche-stats.py <slug> <date>        the batch table, the medians, the spread, the handles with 2+ posts
-    scripts/niche-stats.py <slug> --searches    the same counts over the search files
+    scripts/niche-stats.py <slug> --searches    the same counts over the search files, TikTok and Instagram
 
 The script counts. You judge, guided by the brain: read `brain/learnings-slideshows.md`
 (the format definitions, the hook shapes, "Finding Ideas & Vetting Formats") before the
