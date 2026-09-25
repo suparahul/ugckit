@@ -50,6 +50,17 @@
 }
 .read__totals .is-zero b { color: var(--ink-4); }
 .read__totals .is-ratio b { font-size: clamp(18px, 1.8vw, 22px); }
+/* The change against the previous period (week or month view): ink when up, Ink 4 when down. Never Ember. */
+.read__delta {
+  margin-left: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.read__delta.is-up { color: var(--ink-2); }
+.read__delta.is-down { color: var(--ink-4); }
 .read__line {
   grid-column: 1;
   margin: 0;

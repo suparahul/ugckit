@@ -1,20 +1,30 @@
 /**
  * The numbers, in one card: the period and its arrows on the left, the
  * day · week · month toggle and the accounts picker on the right, then the
- * read strip of the period with the week's columns. Every filter is a URL.
+ * read strip of the period with its columns. Every filter is a URL.
+ *
+ * Periods are calendar periods, never the plan's weeks: a week is Monday to
+ * Sunday, a month is the 1st to the last day. The arrows step one whole period.
+ * The columns: in day view the seven days of the day's week; in week view the
+ * last WEEKS weeks; in month view the last MONTHS months, with the change
+ * against the previous period on the headline numbers.
  */
 
 import Link from "next/link";
 
 import type { Handle } from "@/lib/handles";
-import { addDays, dateParts, type PostState } from "@/lib/production";
+import { addDays, dateParts, mondayOf, today, type PostState } from "@/lib/production";
 import { PLATFORMS, PLATFORM_NAME } from "@/lib/platform";
-import { dayViews, isPosted, isPostedIn, readOf, readSentence, weekDays, type View } from "@/lib/read";
+import { addMonths, calendarWeek, dayViews, isPosted, isPostedIn, monthEnd, monthStart, readOf, readSentence, spansOf, spanViews, type Span, type View } from "@/lib/read";
 import { hasSecondPlatform, onPlatform, PlatformIcon, viewOf } from "@/components/Platform";
 import { n } from "./Bits";
 import { ReadStrip } from "./Read";
 
 export type Period = "day" | "week" | "month";
+
+const WEEKS = 8;
+const MONTHS = 6;
+const MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export type FiguresQuery = { period: Period; day: string; account: string | null; /** One platform, or both; "both" when no post goes to more than TikTok. */ platform?: View };
 
@@ -36,14 +46,20 @@ export function Figures({ slug, states, handles, q, base }: { slug: string; stat
   const two = hasSecondPlatform(states);
   const onView = (s: PostState) => onPlatform(s, view);
   const mine = (account ? states.filter((s) => s.row.short === account) : states).filter(onView);
-  const week = weekDays(slug, day);
-  const ym = day.slice(0, 7);
-  const inPeriod = (s: PostState) => (period === "day" ? s.row.date === day : period === "week" ? week.includes(s.row.date) : s.row.date.startsWith(ym));
+  const week = calendarWeek(day);
+  /* The period as a from–to of posting days (plan dates, YYYY-MM-DD, compared as strings: no clock, no time zone). */
+  const spanAt = (iso: string): Span => (period === "day" ? { key: iso, from: iso, to: iso } : period === "week" ? { key: mondayOf(iso), from: mondayOf(iso), to: addDays(mondayOf(iso), 6) } : { key: monthStart(iso), from: monthStart(iso), to: monthEnd(iso) });
+  const cur = spanAt(day);
+  const within = (sp: Span) => (s: PostState) => s.row.date >= sp.from && s.row.date <= sp.to;
+  const inPeriod = within(cur);
   const shown = mine.filter(inPeriod);
   const r = readOf(shown, view);
+  /* The period before, for the week-over-week or month-over-month change. */
+  const prev = period === "day" ? undefined : readOf(mine.filter(within(spanAt(period === "week" ? addDays(cur.from, -7) : addMonths(cur.from, -1)))), view);
+  const vs = period === "week" ? "WoW" : period === "month" ? "MoM" : undefined;
   const p = dateParts(day);
   const w0 = dateParts(week[0]), w6 = dateParts(week[6]);
-  const label = period === "day" ? `${p.weekday.slice(0, 3)} ${p.d} ${p.month.slice(0, 3)}` : period === "week" ? `${w0.weekday.slice(0, 3)} ${w0.d} – ${w6.weekday.slice(0, 3)} ${w6.d} ${w6.month.slice(0, 3)}` : `${p.month} ${p.y}`;
+  const label = period === "day" ? `${p.weekday.slice(0, 3)} ${p.d} ${p.month.slice(0, 3)}` : period === "week" ? `${w0.weekday.slice(0, 3)} ${w0.d}${w0.m !== w6.m ? ` ${w0.month.slice(0, 3)}` : ""} – ${w6.weekday.slice(0, 3)} ${w6.d} ${w6.month.slice(0, 3)}` : `${p.month} ${p.y}`;
   const href = (patch: Partial<FiguresQuery>) => {
     const u = new URLSearchParams();
     const v = { period, day, account, platform: view, ...patch };
@@ -53,7 +69,8 @@ export function Figures({ slug, states, handles, q, base }: { slug: string; stat
     if (v.platform && v.platform !== "both") u.set("platform", v.platform);
     return `${base}?${u.toString()}`;
   };
-  const step = (k: number) => (period === "month" ? new Date(Date.UTC(p.y, p.m - 1 + k, 1)).toISOString().slice(0, 10) : addDays(day, period === "week" ? 7 * k : k));
+  /* One whole period, from its first day: a Monday for a week, the 1st for a month. */
+  const step = (k: number) => (period === "month" ? addMonths(cur.from, k) : period === "week" ? addDays(cur.from, 7 * k) : addDays(day, k));
   const isOn = (s: PostState) => (two ? isPostedIn(s, view) : isPosted(s));
   const posted = shown.filter(isOn).length;
   const planned = shown.filter((s) => !isOn(s) && !s.killed).length;
@@ -62,7 +79,14 @@ export function Figures({ slug, states, handles, q, base }: { slug: string; stat
   const split = two && view === "both" ? PLATFORMS.map((p) => ({ p, r: readOf(shown.filter((s) => onPlatform(s, p)), p) })).filter((x) => x.r.posted) : [];
   const acctWord = account ? handles.find((h) => h.short === account)?.handle ?? account : "all accounts";
   const nOf = (short: string | null) => states.filter(inPeriod).filter((s) => !short || s.row.short === short).length;
-  const views = dayViews(mine, week, view);
+  /* The columns: the day's week in day view; recent weeks or months otherwise, the shown one dark. */
+  const latest = states.filter(isPosted).map((s) => s.row.date).reduce((a, b) => (b > a ? b : a), today());
+  const spans = period === "day" ? [] : spansOf(period, cur.from, latest, period === "week" ? WEEKS : MONTHS);
+  const cols = period === "day" ? week : spans.map((x) => x.key);
+  const views = period === "day" ? dayViews(mine, week, view) : spanViews(mine, spans, view);
+  const colLabel = period === "week" ? (k: string): [string, string] => { const a = dateParts(k), b = dateParts(addDays(k, 6)); return [`${a.d} ${MON3[a.m - 1]}`, `to ${b.d}${b.m !== a.m ? ` ${MON3[b.m - 1]}` : ""}`]; }
+    : period === "month" ? (k: string): [string, string] => { const a = dateParts(k); return [MON3[a.m - 1], String(a.y)]; } : undefined;
+  const colName = period === "week" ? (k: string) => `Week of ${dateParts(k).weekday.slice(0, 3)} ${dateParts(k).d} ${MON3[dateParts(k).m - 1]}` : period === "month" ? (k: string) => `${dateParts(k).month} ${dateParts(k).y}` : undefined;
   return (
     <div className="figures" id="figures">
       <div className="figures__bar" role="toolbar" aria-label="Period and accounts">
@@ -99,7 +123,7 @@ export function Figures({ slug, states, handles, q, base }: { slug: string; stat
       </div>
       <div className="figures__set">
         <p className="figures__what">{what}{r.lastAt ? ` · read ${r.lastAt.slice(0, 10)} ${r.lastAt.slice(11, 16)} UTC` : ""} · <Link href={`/production/${encodeURIComponent(slug)}?view=list&zoom=${period}&date=${day}`} title="Every post of the period as a list in the studio">every post →</Link></p>
-        <ReadStrip r={r} sentence={readSentence(r)} days={week} views={views} shown={period === "day" ? day : null} hrefFor={(d) => `/production/${encodeURIComponent(slug)}?zoom=day&date=${d}`} label="Views by posting day; each day is a link to the studio" none={period === "day" ? `Nothing posted ${label}.` : `Nothing posted in this ${period}.`} >
+        <ReadStrip r={r} sentence={readSentence(r)} days={cols} views={views} shown={period === "day" ? day : cur.key} hrefFor={period === "day" ? (d) => `/production/${encodeURIComponent(slug)}?zoom=day&date=${d}` : (k) => href({ day: k })} label={period === "day" ? "Views by posting day; each day is a link to the studio" : `Views by ${period}; each column shows that ${period}`} none={period === "day" ? `Nothing posted ${label}.` : `Nothing posted in this ${period}.`} prev={prev} vs={vs} labelOf={colLabel} nameOf={colName} >
           {split.length > 1 ? (
             <div className="pfsplit" aria-label="The figures per platform">
               {split.map(({ p, r: x }) => (

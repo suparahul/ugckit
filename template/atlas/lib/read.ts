@@ -11,7 +11,7 @@
  */
 
 import type { Platform } from "./platform.ts";
-import { addDays, weekStartOf, type PostState } from "./production.ts";
+import { addDays, mondayOf, weekStartOf, type PostState } from "./production.ts";
 
 /** One platform, or both added up. */
 export type View = Platform | "both";
@@ -111,6 +111,55 @@ export function readSentence(r: Read): string {
 export function weekDays(slug: string, iso: string): string[] {
   const start = weekStartOf(slug, iso);
   return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+}
+
+/** The seven days of the calendar week a date falls in, Monday to Sunday. The numbers card uses this, not the plan week. */
+export function calendarWeek(iso: string): string[] {
+  const start = mondayOf(iso);
+  return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+}
+
+/** The first day of the calendar month a date falls in. */
+export const monthStart = (iso: string) => `${iso.slice(0, 7)}-01`;
+
+/** The first day of the month k months after the month of a date (k may be negative). UTC, so no local clock moves it. */
+export function addMonths(iso: string, k: number): string {
+  const [y, m] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1 + k, 1)).toISOString().slice(0, 10);
+}
+
+/** The last day of the calendar month a date falls in. */
+export const monthEnd = (iso: string) => addDays(addMonths(iso, 1), -1);
+
+/** A span of posting days, from and to inclusive, keyed by its first day. */
+export type Span = { key: string; from: string; to: string };
+
+/**
+ * The columns of a week or month view: `count` periods, the latest last. The
+ * window ends at the current period (or at the shown one, if later) and pages
+ * back by whole windows, so stepping inside a window never moves the columns.
+ */
+export function spansOf(period: "week" | "month", shown: string, now: string, count: number): Span[] {
+  const idx = (iso: string) => (period === "week" ? Math.round(Date.parse(mondayOf(iso) + "T00:00:00Z") / (7 * 86400000)) : Number(iso.slice(0, 4)) * 12 + Number(iso.slice(5, 7)) - 1);
+  const back = Math.max(0, idx(now) - idx(shown));
+  const endBack = back < count ? Math.min(0, idx(now) - idx(shown)) : Math.floor(back / count) * count;
+  const start = (k: number) => (period === "week" ? addDays(mondayOf(now), 7 * k) : addMonths(now, k));
+  return Array.from({ length: count }, (_, i) => {
+    const from = start(-endBack - (count - 1 - i));
+    return { key: from, from, to: period === "week" ? addDays(from, 6) : monthEnd(from) };
+  });
+}
+
+/** Views by span (a week or a month): a number, "unread" (posted, no read yet) or null (nothing posted). */
+export function spanViews(states: PostState[], spans: Span[], view: View = "both"): Record<string, number | "unread" | null> {
+  const out: Record<string, number | "unread" | null> = {};
+  for (const sp of spans) {
+    const mine = states.filter((s) => isPostedIn(s, view) && postedDay(s) >= sp.from && postedDay(s) <= sp.to);
+    if (!mine.length) { out[sp.key] = null; continue; }
+    const nums = mine.map((s) => numbersIn(s, view)).filter((x): x is NonNullable<typeof x> => !!x);
+    out[sp.key] = nums.length ? nums.reduce((t, x) => t + x.views, 0) : "unread";
+  }
+  return out;
 }
 
 /** Views by posting day: a number, "unread" (posted, no read yet) or null (nothing posted). */
