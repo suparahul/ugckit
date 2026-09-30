@@ -70,6 +70,8 @@ export type PBAnalytics = {
   comment_count: number;
   share_count: number;
   share_url: string | null;
+  /** TikTok's own publish time of the post, when Post Bridge has synced it. */
+  platform_created_at?: string | null;
   last_synced_at: string;
   match_confidence: string | null;
 };

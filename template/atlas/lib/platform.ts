@@ -31,6 +31,17 @@ export function platformOf(x: unknown): Platform | null {
   return isPlatform(p) ? p : null;
 }
 
+/**
+ * The platform of a log line: its `data.platform`. A line that names none is
+ * TikTok's, unless its url is an Instagram one: an Instagram line written
+ * without its platform still reads as Instagram. The log is append-only, so
+ * every reader reads the lines through this.
+ */
+export function linePlatform(data: { platform?: unknown; url?: unknown } | null | undefined): Platform | null {
+  if (data?.platform == null && /^https?:\/\/(www\.)?instagram\.com\//i.test(String(data?.url ?? ""))) return "instagram";
+  return platformOf(data?.platform);
+}
+
 /** `tiktok, instagram` → both, in display order. Blank or a dash → null ("not stated here"). Unknown names are dropped. */
 export function parsePlatforms(cell: string | null | undefined): Platform[] | null {
   const t = String(cell ?? "").replace(/`/g, "").trim();

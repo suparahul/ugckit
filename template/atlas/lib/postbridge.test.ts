@@ -9,6 +9,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
+import { sentPostsOf } from "./postbridge-flow.ts";
+import type { Event } from "./production.ts";
 import { accountsOf, legStatusOf, legsPost, mapAccounts, outcomeOf, postBridge, PostBridgeError, readKey, sendStatusOf, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type PBAnalytics, type PBPost, type PBPostResult } from "./postbridge.ts";
 
 type Call = { url: string; method: string; headers: Record<string, string>; body: unknown };
@@ -326,4 +328,14 @@ test("syncOutcomesWith: a TikTok-only send makes exactly the calls it made befor
   ]);
   assert.equal("platform" in (lines[0] as object), false);
   assert.equal(heard, 0, "a send with no legs is not a two-platform send");
+});
+
+test("sentPostsOf: an Instagram reel sent on its own line is an Instagram leg; a TikTok draft alone stays legless", () => {
+  const log: Event[] = [
+    { at: "2026-05-04T14:38:15.000Z", post: "p", kind: "posting.sent", data: { id: "tt", account: 1, mode: "draft" } },
+    { at: "2026-05-04T14:47:10.000Z", post: "p", kind: "posting.sent", data: { id: "ig", account: 2, platform: "instagram", format: "reel" } },
+    { at: "2026-05-04T14:47:20.000Z", post: "q", kind: "posting.sent", data: { id: "other", account: 1 } },
+  ];
+  const sends = [...sentPostsOf(log, ["p"]).values()];
+  assert.deepEqual(sends.map((x) => [x.pbPost, x.legs ?? null]), [["tt", null], ["ig", [{ platform: "instagram", account: 2 }]]]);
 });

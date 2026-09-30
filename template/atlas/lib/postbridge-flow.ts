@@ -25,11 +25,11 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { identitiesOf } from "./accounts.ts";
-import { MAX_SLIDES, PLATFORM_NAME, platformOf, primaryOf, type Platform } from "./platform.ts";
+import { MAX_SLIDES, PLATFORM_NAME, linePlatform, platformOf, primaryOf, type Platform } from "./platform.ts";
 import { slotKey, slotTimes } from "./slots.ts";
 import { accountsOf, hasKey, legsPost, postBridge, sendStatusOf, type Leg, type SentPost, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type AccountsFile, type PBAccount, type SendStatus, type SyncReport } from "./postbridge.ts";
 import { allStates, appendEvent, filesRoot, fileKey, getProduction, isSent, legsOfSent, postingStep, readLog, storeOf, type Event, type PostState } from "./production.ts";
-import { findLinks, type LinkReport } from "./tiktok-link.ts";
+import { findLinks, monidRuns, savedRunsFetch, type LinkReport } from "./tiktok-link.ts";
 import { fmtBoth, postingZone, zonedToUtc } from "./when.ts";
 
 const run = promisify(execFile);
@@ -344,23 +344,22 @@ export async function withStatusWords<T extends PostState>(states: T[]): Promise
 /* ---------------------------------------------------------------- sync */
 
 /**
- * The Post Bridge half of the sync: reads the analytics of every sent post (or
- * the ones named) and appends one `outcome.sync` line per post whose numbers
- * changed since the last Post Bridge line (the Monid lines are a separate
- * series). The core is syncOutcomesWith. Post Bridge rarely has numbers for a
- * draft published from the phone; Monid (syncAll) is the first source.
+ * The Post Bridge posts the analytics pass reads, from the log: per post and
+ * platform, the last send that carried that leg, grouped by Post Bridge post.
+ * Pure. A send with no `legs` is one leg on `data.platform` (TikTok when
+ * absent). A leg that is not TikTok is always passed as a leg, so its numbers
+ * are written with its platform: an Instagram reel sent on its own line
+ * (`data.platform: "instagram"`, no `legs`) must never read as the TikTok leg.
+ * A TikTok-only send stays legless, as before (the post's own status word).
  */
-export async function syncOutcomes(slug: string, sel: { date?: string; keys?: string[] } = {}): Promise<{ refreshed: boolean; reports: SyncReport[] }> {
-  const log = readLog(slug);
-  const wanted = sel.keys ?? (sel.date ? getProduction(slug).rows.filter((r) => r.date === sel.date).map((r) => r.key) : null);
-  /* Per post and platform, the last send that carried that leg; then grouped by Post Bridge post. A send with no `legs` is one TikTok leg. */
+export function sentPostsOf(log: Event[], wanted: string[] | null = null): Map<string, SentPost & { at: string }> {
   const lastSend = new Map<string, { at: string; pbPost: string; leg: Leg; legs: boolean }>();
   for (const e of log) {
     if (!isSent(e.kind) || !e.post || !e.data?.id || (wanted && !wanted.includes(e.post))) continue;
     const many = Array.isArray(e.data.legs);
     for (const l of legsOfSent(e)) {
       const p = platformOf(l.platform);
-      if (p) lastSend.set(`${e.post}\u0000${p}`, { at: e.at, pbPost: String(e.data.id), leg: { platform: p, account: Number(l.account ?? 0) }, legs: many });
+      if (p) lastSend.set(`${e.post}\u0000${p}`, { at: e.at, pbPost: String(e.data.id), leg: { platform: p, account: Number(l.account ?? 0) }, legs: many || p !== "tiktok" });
     }
   }
   const sends = new Map<string, SentPost & { at: string }>();
@@ -371,11 +370,25 @@ export async function syncOutcomes(slug: string, sel: { date?: string; keys?: st
     if (v.legs) x.legs!.push(v.leg);
     sends.set(id, x);
   }
-  const lineOf = (post: string, kind: Event["kind"], p: Platform, after = "") => log.some((e) => e.post === post && e.kind === kind && (platformOf(e.data?.platform) ?? "tiktok") === p && e.at >= after);
+  return sends;
+}
+
+/**
+ * The Post Bridge half of the sync: reads the analytics of every sent post (or
+ * the ones named) and appends one `outcome.sync` line per post whose numbers
+ * changed since the last Post Bridge line (the Monid lines are a separate
+ * series). The core is syncOutcomesWith. Post Bridge rarely has numbers for a
+ * draft published from the phone; Monid (syncAll) is the first source.
+ */
+export async function syncOutcomes(slug: string, sel: { date?: string; keys?: string[] } = {}): Promise<{ refreshed: boolean; reports: SyncReport[] }> {
+  const log = readLog(slug);
+  const wanted = sel.keys ?? (sel.date ? getProduction(slug).rows.filter((r) => r.date === sel.date).map((r) => r.key) : null);
+  const sends = sentPostsOf(log, wanted);
+  const lineOf = (post: string, kind: Event["kind"], p: Platform, after = "") => log.some((e) => e.post === post && e.kind === kind && (linePlatform(e.data) ?? "tiktok") === p && e.at >= after);
   return syncOutcomesWith(
     postBridge(),
     [...sends.values()],
-    (post, p) => ([...log].reverse().find((e) => e.post === post && e.kind === "outcome.sync" && e.data?.source !== "monid" && (platformOf(e.data?.platform) ?? "tiktok") === p)?.data as Record<string, unknown> | undefined) ?? null,
+    (post, p) => ([...log].reverse().find((e) => e.post === post && e.kind === "outcome.sync" && e.data?.source !== "monid" && (linePlatform(e.data) ?? "tiktok") === p)?.data as Record<string, unknown> | undefined) ?? null,
     (post, o) => { appendEvent(slug, { post, kind: "outcome.sync", actor: "agent", data: { source: "postbridge", ...o } }); },
     /* A leg of a two-platform send: its failure once (the platform's words), and an Instagram leg's post and link once it is published. */
     (post, pbPost, leg, st, pbp) => {
@@ -395,17 +408,25 @@ export type SyncAll = { links: LinkReport[]; refreshed: boolean; reports: SyncRe
 
 /**
  * The whole sync, the same for the button and scripts/postbridge-sync.mjs:
- * first "find the link" and the numbers through Monid (lib/tiktok-link.ts),
- * then the Post Bridge analytics as the second source when it has data.
- * A Post Bridge failure (no key, an API error) does not undo the Monid half.
- * `noMonid` skips the Monid half entirely (no calls, no cost) — for a run
- * where every sent post's link is already known, from the log or from
- * Post Bridge's own analytics (`pbLinkOf` in findLinks handles that case even
- * without this flag; `noMonid` is for skipping the Monid call outright, e.g.
- * when nothing new needs a link and only fresh numbers are wanted).
+ * first "find the link" (lib/tiktok-link.ts findLinks), then the Post Bridge
+ * analytics as the second source when it has data. A Post Bridge failure (no
+ * key, an API error) does not undo the link half.
+ * The link comes from Post Bridge for every post Post Bridge published live
+ * (a `direct` send) and from Monid only for a post it did not (a draft
+ * published by hand from the phone) — AGENTS.md rule 15.
+ * `noMonid` makes no Monid call at all: the Post Bridge links are still
+ * written; a post only Monid can link is reported as skipped.
+ * `refreshStats` (passed straight to `findLinks`) fetches every handle in
+ * scope from Monid on purpose, even one with nothing unlinked, so an older
+ * post's numbers (saves included) get refreshed too — see
+ * `monidFetchPlan` for the cost estimate before spending it.
+ * `monidRuns` reads the Monid posts from those saved runs instead of a new
+ * paid fetch (`savedRunsFetch`); a handle with no saved run is reported as an
+ * error, never fetched.
  */
-export async function syncAll(slug: string, sel: { date?: string; keys?: string[] } = {}, opts: { noMonid?: boolean } = {}): Promise<SyncAll> {
-  const links = opts.noMonid ? [] : await findLinks(slug, sel);
+export async function syncAll(slug: string, sel: { date?: string; keys?: string[] } = {}, opts: { noMonid?: boolean; refreshStats?: boolean; monidRuns?: string[] } = {}): Promise<SyncAll> {
+  const fetch = opts.monidRuns?.length && !opts.noMonid ? savedRunsFetch(await monidRuns(opts.monidRuns)) : undefined;
+  const links = await findLinks(slug, sel, fetch, { refreshStats: opts.refreshStats && !opts.noMonid, noMonid: opts.noMonid });
   if (!hasKey()) return { links, refreshed: false, reports: [], postBridgeError: "POST_BRIDGE_API_KEY is not set" };
   try {
     const { refreshed, reports } = await syncOutcomes(slug, sel);

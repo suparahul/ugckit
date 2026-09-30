@@ -114,6 +114,14 @@ like success* — the run keeps going and leaves plausible files behind.
     content — `ffprobe` the download and confirm it has a real video stream, count the
     bytes against what you expected. `verify_video` exists for this and deletes what fails.
 
+15. **A POST THAT POST BRIDGE SENT LIVE NEEDS NO MONID FOR ITS LINK.** Post Bridge gives
+    the link. The sync reads the post id from Post Bridge (`platform_video_id`, else the
+    analytics `share_url`) and builds `tiktok.com/@<handle>/photo/<id>` (`/video/` for a
+    video). If the id is not there yet, run the sync again later. Do not use Monid for
+    it. Monid finds the link only of a post Post Bridge did not publish, such as a draft
+    published by hand from the phone. Do not use `platform_data.id` (`p_pub_url~v2.<n>`):
+    that number is not the post id.
+
 ---
 
 ## STATE

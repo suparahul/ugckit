@@ -26,7 +26,7 @@ import { join, resolve } from "node:path";
 import { appDir } from "./root.ts";
 import { fmtBoth, setZones } from "./when.ts";
 import { declaredPlatforms } from "./accounts.ts";
-import { PLATFORMS, PLATFORM_NAME, platformOf, primaryOf, slideLimit, type Platform } from "./platform.ts";
+import { PLATFORMS, PLATFORM_NAME, linePlatform, platformOf, primaryOf, slideLimit, type Platform } from "./platform.ts";
 
 /* ------------------------------------------------------------------- authored */
 
@@ -615,7 +615,7 @@ export function platformsOf(row: PlanRow, plan: Pick<Production["plan"], "platfo
   return PLATFORMS.filter((p) => list.includes(p));
 }
 
-const onLeg = (e: Event, p: Platform) => platformOf(e.data?.platform) === p;
+const onLeg = (e: Event, p: Platform) => linePlatform(e.data) === p;
 
 /** The legs of a `posting.sent` line: its `legs`, or one leg on `data.platform` (TikTok when absent). */
 export function legsOfSent(e: Event): LegData[] {

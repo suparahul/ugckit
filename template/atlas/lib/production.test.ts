@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { parsePlatforms, platformOf, primaryOf, slideLimit } from "./platform.ts";
+import { linePlatform, parsePlatforms, platformOf, primaryOf, slideLimit } from "./platform.ts";
 import { legState, legsOfSent, platformsOf, slideLimitCheck, type Event, type PlanRow } from "./production.ts";
 
 const P = "2026-09-23/hannah/1";
@@ -129,4 +129,22 @@ test("the read: views add up over the legs; saves come only from the leg that kn
   assert.equal(igOnly.savesKnown, false);
   assert.equal(readOf([s], "instagram").views, 400);
   assert.equal(readOf([s]).views, 1400);
+});
+
+test("linePlatform: data.platform first; a line with none is TikTok's unless its url is Instagram's", () => {
+  assert.equal(linePlatform({ platform: "instagram" }), "instagram");
+  assert.equal(linePlatform({ url: "https://www.tiktok.com/@x/video/1" }), "tiktok");
+  assert.equal(linePlatform({ url: "https://www.instagram.com/reel/AbC123/" }), "instagram");
+  assert.equal(linePlatform(null), "tiktok");
+});
+
+test("legState: an Instagram reel's numbers written without the platform count for Instagram, and the TikTok leg keeps its own", () => {
+  const log: Event[] = [
+    { at: "2026-05-04T14:38:15.000Z", post: "p", kind: "posting.sent", data: { id: "tt", account: 1, mode: "draft" } },
+    { at: "2026-05-04T14:47:10.000Z", post: "p", kind: "posting.sent", data: { id: "ig", account: 2, platform: "instagram", format: "reel" } },
+    { at: "2026-05-05T13:51:48.000Z", post: "p", kind: "outcome.sync", data: { source: "postbridge", views: 400, url: "https://www.tiktok.com/@x/video/789?utm_campaign=a" } },
+    { at: "2026-05-05T13:51:51.000Z", post: "p", kind: "outcome.sync", data: { source: "postbridge", views: 10, url: "https://www.instagram.com/reel/AbC123/" } },
+  ];
+  assert.equal(legState(log, "tiktok").synced?.views, 400);
+  assert.equal(legState(log, "instagram").synced?.views, 10);
 });

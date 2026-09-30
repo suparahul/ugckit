@@ -6,7 +6,7 @@
  */
 
 import type { PostState } from "@/lib/production";
-import { platformOf } from "@/lib/platform";
+import { linePlatform, platformOf } from "@/lib/platform";
 import { numbersIn, type View } from "@/lib/read";
 import { n, pct } from "./Bits";
 
@@ -53,7 +53,7 @@ export function Reads({ s, view = "both" }: { s: PostState; view?: View }) {
   const two = view !== "both" || (nb?.legs?.length ?? 1) > 1;
   /* Saves: TikTok's alone. On the Instagram view there are none to show. */
   const saves = leg === "instagram" ? null : two ? numbersIn(s, "tiktok") : nb;
-  const reads = s.log.filter((e) => e.kind === "outcome.sync" && e.data && (platformOf(e.data.platform) ?? "tiktok") === leg).map((e) => ({ at: String(e.data!.syncedAt ?? e.at), views: Number(e.data!.views ?? 0), source: String(e.data!.source ?? "postbridge") }));
+  const reads = s.log.filter((e) => e.kind === "outcome.sync" && e.data && (linePlatform(e.data) ?? "tiktok") === leg).map((e) => ({ at: String(e.data!.syncedAt ?? e.at), views: Number(e.data!.views ?? 0), source: String(e.data!.source ?? "postbridge") }));
   const monid = reads.filter((r) => r.source === "monid");
   const series = monid.length ? monid : reads;
   const z = (v: number) => (v === 0 ? " is-zero" : "");
