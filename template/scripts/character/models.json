@@ -1,0 +1,36 @@
+{
+  "_comment": "The character pipeline's own model file. It is not the recreation pipeline's templates.json, and the recreation scripts never read it. The character scripts (scripts/character/generate.sh and the model command of scripts/character/state.py) read it to refuse an impossible request before it costs anything, and to compute cost. Same shape as known_model_limits in templates.json, plus min_duration_s. MiniMax H3 is the default. Add another model only with a measured cap and price.",
+  "default": "minimax-h3-reference-to-video",
+  "known_model_limits": {
+    "minimax-h3-reference-to-video": {
+      "min_duration_s": 5,
+      "max_duration_s": 15,
+      "price_per_s": 0.06,
+      "max_resolution": "768p"
+    }
+  },
+  "output": {
+    "_comment": "Generate at 768p, 9:16. Upscale once to 1080x1920 at assembly (lanczos). Never 4K. 9:16 is the only size for now; more sizes are added later when needed.",
+    "aspect_ratio": "9:16",
+    "generate_resolution": "768P",
+    "final_resolution": "1080x1920"
+  },
+  "duration_rules": {
+    "_comment": "The recreation rules (state.py model set, generate.sh, AGENTS.md rules 6 and 7), restated for the character copies, with this model's minimum.",
+    "whole_seconds": "The duration is a whole number of seconds, from min_duration_s (5) to max_duration_s (15). Supagen allows 5 to 15 for this model. A segment planned shorter than 5 s is generated at 5 s and trimmed at assembly.",
+    "cap": "Check the range when the model is chosen (state.py model set) and again before each generation (generate.sh).",
+    "unknown_model": "Refuse a model slug that is not in known_model_limits.",
+    "duration_field": "Set video_settings.duration to null and put the integer in extensions.duration. fal serialises an integer duration as \"20s\" and rejects its own string.",
+    "resolution_field": "Put the resolution in extensions as \"768P\" (uppercase), beside the duration.",
+    "cost": "Computed cost = price_per_s x seconds. It is a computed figure, not the billed amount (see supagen_findings.billing).",
+    "active_version": "The REST invoke endpoint ignores version_number and runs the active version. Change the active version (activate_version over MCP) and the selected model (state.py model set) together, never one without the other."
+  },
+  "supagen_findings": {
+    "_comment": "Read-only check on 2026-10-02 through the Supagen MCP: the model record, the versions of the earlier reference template, the invocation list and one trace. No generation.",
+    "price": "price_per_s 0.06 is the 768p price set on 2026-10-02. Supagen's model record lists $0.13 per second.",
+    "billing": "PARTLY OPEN. Supagen records $0.65 for every run of this model (seven runs, 5 to 15 s, 9:16 and 16:9): the list price x the 5 s minimum, whatever the duration. MiniMax H3 Max shows the same pattern ($0.20 a run). So Supagen's cost record is per run. What the provider charges cannot be read from Supagen: compare the provider account after the first paid run. Until then, plan each run at $0.65 as the worst case.",
+    "template_settings": "SETTLED. The earlier reference template had three versions: aspect_ratio 9:16, n 1, extensions {duration: 15, 5 or 6, resolution: \"768P\"}, audio on at 15 s and off at 5 and 6 s. The ugc-character template does not exist in Supagen yet. It is created with these settings before the first paid run, after a yes; nothing before that needs it.",
+    "resolution": "SETTLED. Allowed: 480p, 768p, 2K, 4K (768p native; 2K and 4K are provider upscales). \"768P\" in extensions worked in every run. Send that; upscale to 1080p at assembly.",
+    "output_length": "SETTLED BY MEASUREMENT. Outputs run 0.1 to 0.6 s long: 5 s gave 5.184 s, 6 s gave 6.592 s, 15 s gave 15.104 s. Trim to the planned length at assembly."
+  }
+}
