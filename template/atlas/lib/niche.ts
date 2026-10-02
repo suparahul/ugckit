@@ -7,7 +7,7 @@
  *   niche/instagram/searches/ (the hashtag pages).
  *   The batches: niche/batches/<date>/, what you brought from your own scroll
  *   and the agent pulled through Monid — LINKS.md (verbatim), posts.raw.json,
- *   <handle>/<id>/slide-NN.jpg, BATCH.md (the read). Read live.
+ *   <handle>/<id>/slide-NN.jpg (a video: cover.jpg), BATCH.md (the read). Read live.
  *
  * The findings trio (learnings.md, anatomy.md, architecture.md) is read by
  * the niche page itself, section by section.
@@ -15,7 +15,7 @@
 
 import { join } from "node:path";
 
-import { nicheDetailOf, scrollDetailOf, type NicheDetail, type NichePost } from "./niche-posts";
+import { batchKindOf, batchSlideCount, nicheDetailOf, scrollDetailOf, type NicheDetail, type NichePost } from "./niche-posts";
 import type { Platform } from "./platform";
 import { appDir, exists, listDirs, listFiles, mtimeOf, readJson, readText, tableOf } from "./root";
 
@@ -61,9 +61,10 @@ export type BatchPost = {
   slideCount: number;
   caption: string;
   sound: string | null;
-  /** The slides on disk, as /media URLs. */
+  /** The slides on disk, as /media URLs; for a video, its cover.jpg. */
   slides: string[];
   url: string;
+  kind: "slideshow" | "video";
 };
 
 export type Batch = {
@@ -74,6 +75,15 @@ export type Batch = {
   /** BATCH.md exists: the agent read the posts. */
   read: boolean;
   posts: BatchPost[];
+};
+
+/** The first markdown table of a text: its contiguous run of "|" lines. */
+const firstTable = (text: string) => {
+  const lines = text.split("\n");
+  const start = lines.findIndex((l) => /^\|/.test(l));
+  if (start < 0) return "";
+  const end = lines.findIndex((l, i) => i > start && !/^\|/.test(l));
+  return lines.slice(start, end < 0 ? undefined : end).join("\n");
 };
 
 const num = (v: unknown) => Number(String(v ?? "0").replace(/,/g, "")) || 0;
@@ -92,19 +102,21 @@ function readBatch(slug: string, date: string): Batch {
     raws.push(...(Array.isArray(j) ? j : j?.items ?? []));
   }
   const posts = new Map<string, BatchPost>();
-  /* The BATCH.md table names every post that was read; the raw scrape adds the caption and the sound. */
-  const table = read ? tableOf((readText(join(dir, "BATCH.md")) ?? "").split("\n").filter((l) => /^\|/.test(l)).join("\n")) : { head: [], rows: [] as string[][] };
+  /* The BATCH.md table (the first table in the file) names every post that was read; the raw scrape adds the caption and the sound. */
+  const table = read ? tableOf(firstTable(readText(join(dir, "BATCH.md")) ?? "")) : { head: [], rows: [] as string[][] };
   for (const r of table.rows) {
     const m = r[0]?.match(/@([\w.]+)/);
     const id = r[1]?.match(/\d{15,}/)?.[0];
     if (!m || !id) continue;
-    posts.set(id, { handle: m[1], id, date: r[2] || null, views: num(r[3]), likes: num(r[4]), comments: num(r[5]), shares: num(r[6]), saves: num(r[7]), slideCount: num(r[8]), caption: "", sound: r[12] || null, slides: [], url: `https://www.tiktok.com/@${m[1]}/photo/${id}` });
+    const kind = batchKindOf(r[8], r[13]);
+    posts.set(id, { handle: m[1], id, date: r[2] || null, views: num(r[3]), likes: num(r[4]), comments: num(r[5]), shares: num(r[6]), saves: num(r[7]), slideCount: batchSlideCount(r[8], kind), caption: "", sound: r[12] || null, slides: [], url: `https://www.tiktok.com/@${m[1]}/${kind === "video" ? "video" : "photo"}/${id}`, kind });
   }
   for (const raw of raws) {
     if (!raw.id) continue;
     const handle = raw.channel?.username ?? raw.inputSource?.match(/@([\w.]+)/)?.[1] ?? "";
     const have = posts.get(raw.id);
-    const p: BatchPost = have ?? { handle, id: raw.id, date: raw.uploadedAtFormatted?.slice(0, 10) ?? null, views: num(raw.views), likes: num(raw.likes), comments: num(raw.comments), shares: num(raw.shares), saves: num(raw.bookmarks), slideCount: Array.isArray(raw.images) ? raw.images.length : 0, caption: "", sound: null, slides: [], url: `https://www.tiktok.com/@${handle}/photo/${raw.id}` };
+    const kind = Array.isArray(raw.images) && raw.images.length ? "slideshow" : "video";
+    const p: BatchPost = have ?? { handle, id: raw.id, date: raw.uploadedAtFormatted?.slice(0, 10) ?? null, views: num(raw.views), likes: num(raw.likes), comments: num(raw.comments), shares: num(raw.shares), saves: num(raw.bookmarks), slideCount: kind === "slideshow" ? raw.images!.length : 0, caption: "", sound: null, slides: [], url: `https://www.tiktok.com/@${handle}/${kind === "video" ? "video" : "photo"}/${raw.id}`, kind };
     p.caption ||= raw.title ?? "";
     p.sound ||= raw.song ? [raw.song.title, raw.song.artist].filter(Boolean).join(" — ") : null;
     if (!have && handle) posts.set(raw.id, p);
@@ -112,16 +124,19 @@ function readBatch(slug: string, date: string): Batch {
   for (const p of posts.values()) {
     const d = join(dir, p.handle, p.id);
     if (exists(d)) {
-      const files = listFiles(d).filter((f) => /^slide-\d+\.(jpe?g|png|webp)$/i.test(f)).sort();
-      p.slides = files.map((f) => `${base}/${encodeURIComponent(p.handle)}/${p.id}/${f}`);
-      if (!p.slideCount) p.slideCount = files.length;
+      const all = listFiles(d);
+      const files = all.filter((f) => /^slide-\d+\.(jpe?g|png|webp)$/i.test(f)).sort();
+      /* A video has no slides; its cover stands for it. */
+      const pics = files.length ? files : all.includes("cover.jpg") ? ["cover.jpg"] : [];
+      p.slides = pics.map((f) => `${base}/${encodeURIComponent(p.handle)}/${p.id}/${f}`);
+      if (!p.slideCount && p.kind === "slideshow") p.slideCount = files.length;
     }
   }
   /* A batch with no table and no raw file: the folders themselves. */
   if (!posts.size) {
     for (const h of listDirs(dir)) for (const id of listDirs(join(dir, h))) {
       const files = listFiles(join(dir, h, id)).filter((f) => /^slide-\d+\.(jpe?g|png|webp)$/i.test(f)).sort();
-      posts.set(id, { handle: h, id, date: null, views: 0, likes: 0, comments: 0, shares: 0, saves: 0, slideCount: files.length, caption: "", sound: null, slides: files.map((f) => `${base}/${encodeURIComponent(h)}/${id}/${f}`), url: `https://www.tiktok.com/@${h}/photo/${id}` });
+      posts.set(id, { handle: h, id, date: null, views: 0, likes: 0, comments: 0, shares: 0, saves: 0, slideCount: files.length, caption: "", sound: null, slides: files.map((f) => `${base}/${encodeURIComponent(h)}/${id}/${f}`), url: `https://www.tiktok.com/@${h}/photo/${id}`, kind: "slideshow" });
     }
   }
   /* The posts that were read (the table's rows, with slides on disk) first, newest first; the rest of a profile scrape after them. */

@@ -67,7 +67,7 @@ export function PostedShow({ s, handle, view }: { s: PostState; handle: Handle |
 export function BatchShow({ p, href }: { p: BatchPost; href: string }) {
   const body = (
     <>
-      <span className="show__handle"><span>@{p.handle}</span><small>{p.date ? dmy(p.date) : ""}{p.slideCount ? ` · ${p.slideCount} slides` : ""}</small></span>
+      <span className="show__handle"><span>@{p.handle}</span><small>{p.date ? dmy(p.date) : ""}{p.kind === "video" ? " · video" : p.slideCount ? ` · ${p.slideCount} slides` : ""}</small></span>
       <span className="show__hook">{p.caption || "no caption"}</span>
       <span className="show__nums"><span><b>{n(p.views)}</b> views</span><span>{word(p.saves, "save")}</span><span>{pct(p.saves, p.views)} saves/view</span></span>
     </>

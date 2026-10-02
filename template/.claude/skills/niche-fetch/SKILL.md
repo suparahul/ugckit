@@ -39,9 +39,14 @@ parses is reused).
 `resolved.tsv` (short link → full url), `posts.raw.json`, `<handle>.profile.raw.json`,
 and per post `<handle>/<postId>/`: `post.json`, `comments.json`, `slide-NN.jpg` for a
 slideshow (every slide, verified as a real image), or `video.mp4` (ffprobed, rule 14)
-with `sheet-N.jpg` contact sheets at 1 fps and `transcript.txt` from the local Whisper
-(the `deepen` and `transcribe` methods, free) for a video. From a profile it reads the
-top three posts by views; from a link, that post.
+with `sheet-N.jpg` contact sheets at 1 fps, `transcript.txt` from the local Whisper
+(the `deepen` and `transcribe` methods, free) and `cover.jpg` for a video. From a profile
+it reads the top three posts by views; from a link, that post.
+
+`posts.raw.json` holds the raw record of every post read, the links and the profile
+picks, once each (`scripts/niche-raw.py`). The Atlas niche page reads it with `LINKS.md`
+and `BATCH.md`; every batch writes it, a hand-in or the weekly refresh. A link already in
+it is not fetched again.
 
 ## What can go wrong, and what to say
 
@@ -58,5 +63,5 @@ top three posts by views; from a link, that post.
 ## Finish
 
 Report: posts read (slideshows, videos), profiles pulled, screenshots matched or not,
-slides on disk, links that did not resolve, the computed spend. Then run the
-`niche-read` skill.
+slides on disk, the posts in `posts.raw.json`, links that did not resolve, the computed
+spend. Then run the `niche-read` skill.

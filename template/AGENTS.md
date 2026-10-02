@@ -221,11 +221,21 @@ the Organic Factory UI reads them in place, and "filled" is derived from the fil
 | 1 | Setup | `setup` | the state file, the keys, the brain in place | `setup` done |
 | 2 | The app | `product` (`product-facts.sh`) | `apps/<slug>/APP.md`, `product.json`, `icon.jpg` | both exist and `product.json` has a source |
 | 3 | Competitor apps | `apps` → `teardown` as above, then `apps-learnings` | the ledger, the teardowns; the first sections of `niche/{learnings,anatomy,architecture}.md`, marked `competitor apps` | every ledger app has a teardown |
-| 4 | The niche | `niche-search` (`niche-search.sh`, `niche-import.sh`), `niche-hunt`, `niche-fetch` (`niche-fetch.sh`), `niche-read` (`niche-stats.py`) | `niche/NICHE.md`, `searches/` (TikTok: the Photo tab for slideshows, the general search for recent videos), `covers/`, `instagram/{searches,covers}/` after a yes, `batches/<date>/{LINKS.md, …, BATCH.md}`; the `niche` sections and rows of the findings trio | one batch read and the trio exists |
+| 4 | The niche | `niche-search` (`niche-search.sh`, `niche-import.sh`), `niche-hunt`, `niche-fetch` (`niche-fetch.sh`, `niche-raw.py`), `niche-read` (`niche-stats.py`) | `niche/NICHE.md`, `searches/` (TikTok: the Photo tab for slideshows, the general search for recent videos), `covers/`, `instagram/{searches,covers}/` after a yes, `batches/<date>/{LINKS.md, posts.raw.json, …, BATCH.md}`; the `niche` sections and rows of the findings trio | one batch read and the trio exists |
 | 5 | Account architecture | `account-architecture` | `strategy/ACCOUNTS.md` | it exists; the user approves on the strategy page |
 | 6 | Handle identities | `handles`, `persona-identity` | `handles/<handle>/HANDLE.md`, `references/` | one handle complete at five steps; two recommended |
 | 7 | App fit and plan | `app-fit`, `plan` (`hashtag-pool.sh`) | `strategy/APP-FIT.md`, `production/PLAN.md`, optionally `strategy/HASHTAG-POOL.md` | the fit exists and the plan parses with a handle and a row |
 | 8 | Production | per post: `deck`, `images` (`images.sh`, `codex-images.sh`), `callout` (`render-callout.mjs`), `render` (`render-slides.mjs`), `post` (`posting-send.mjs`; `posting-provider` once, `posting-accounts.mjs`), `sync` (`posting-sync.mjs`); per week: `read` | `production/decks/`, `files/<post>/`, the log lines, `posting-accounts.json`; the day-7 rows in `niche/anatomy.md` | the first `posted` line |
+
+**The niche refresh.** Phase 4 runs again each week, in a new batch folder
+`batches/<date>/`: the handles to follow as `@handle` rows of `LINKS.md` (`niche-hunt`,
+refresh mode), then `niche-fetch`, then `niche-read`. Every batch, a hand-in or a
+refresh, ends with the three files the Atlas niche page reads from the folder:
+`LINKS.md`, `posts.raw.json` (`niche-fetch.sh` writes the raw record of every post read)
+and `BATCH.md` (the post table first). Before the table, the read drops the off-niche
+posts (`niche-raw.py drop`): their folders go, they leave the three files, and the paid
+`<handle>.profile.raw.json` fetch files stay untouched. A batch is not done until all
+three exist.
 
 **Two platforms.** An identity posts on TikTok, and may repost on Instagram: its
 `HANDLE.md` then has an `## Accounts` table, one row per platform, each account with its

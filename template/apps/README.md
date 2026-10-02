@@ -15,9 +15,11 @@ is a pending slot on the canvas, never an error.
         covers/<postId>.jpg      the first slide of every slideshow found, the cover of every video
         instagram/               only when you said yes to Instagram niche research: searches/hashtag.<tag>.<feed>.p<N>.json,
                                  covers/<id>.jpg
-        batches/<date>/          one scrolled batch: LINKS.md (what you brought, verbatim), posts.raw.json,
-                                 <handle>/<postId>/ (slides or video + contact sheets + transcript, comments, post.json),
-                                 screenshots/, BATCH.md (the read)
+        batches/<date>/          one batch (a hand-in or the weekly refresh): LINKS.md (what you brought,
+                                 verbatim), posts.raw.json (every post read), <handle>/<postId>/ (slides, or
+                                 video + cover + contact sheets + transcript, comments, post.json),
+                                 screenshots/, BATCH.md (the read), dropped.tsv (the off-niche posts taken out);
+                                 the niche page reads LINKS.md, posts.raw.json and BATCH.md
         learnings.md             your findings, dated sections, the shape of brain/learnings-slideshows.md
         anatomy.md               your findings' post-table rows, the shape of brain/SLIDESHOW-ANATOMY.md
         architecture.md          your findings' account-table rows, the shape of brain/ACCOUNT-ARCHITECTURE.md

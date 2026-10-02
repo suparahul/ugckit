@@ -14,6 +14,10 @@
  *   apps/<slug>/niche/instagram/searches/hashtag.<kw>.<top|recent>.p<N>.json
  *                                                     TikHub Instagram fetch_hashtag_posts pages
  *                                                     (output.data.items[]), windows IG_TOP, IG_RECENT
+ *   apps/<slug>/niche/batches/<date>/posts.raw.json and <handle>.profile*.raw.json
+ *                                                     the apidojo arrays niche-fetch.sh writes, window
+ *                                                     BATCH_<date>; `held` says whether the video or
+ *                                                     slides are on disk or the post is metadata only
  * Covers under apps/<slug>/niche/covers/<id>.jpg (TikTok) and
  * niche/instagram/covers/<id>.jpg (Instagram) are served by /media;
  * scripts/niche-import.sh fetches them. A post found by two searches is one post
@@ -131,6 +135,34 @@ function build(slug) {
       posts.push({ id: r.id, keyword, window: window ?? "SEARCH", handle: r.channel?.username ?? "", mediaType: slideshow ? "slideshow" : "video", slideCount: slideshow ? images.length : null, views, likes: Number(r.likes ?? 0), comments: Number(r.comments ?? 0), saves, shares: Number(r.shares ?? 0), saveRate: views > 0 ? saves / views : 0, date: (r.uploadedAtFormatted ?? "").slice(0, 10), caption: (r.title ?? "").replace(/\s+/g, " ").trim(), cover: local ?? (slideshow ? images[0]?.url : r.video?.cover) ?? null, coverLocal: !!local, url: r.postPage ?? (r.channel?.username ? `https://www.tiktok.com/@${r.channel.username}/${slideshow ? "photo" : "video"}/${r.id}` : "") });
     }
   }
+
+  /* The batches: niche/batches/<date>/posts.raw.json and every <handle>.profile*.raw.json, the posts a
+     fetch pulled and every post of a profile scrape, window BATCH_<date>. A post whose video.mp4 or
+     slide-NN.jpg is on disk under <handle>/<id>/ is held; the rest are metadata only. They go first,
+     so a post that a search also found keeps its held mark on the page. */
+  const batchPosts = [];
+  const batchRoot = join(nicheDir, "batches");
+  const batchDates = existsSync(batchRoot) ? readdirSync(batchRoot).filter((d) => /^\d{4}-\d{2}-\d{2}/.test(d)).sort() : [];
+  for (const date of batchDates) {
+    const bdir = join(batchRoot, date);
+    const byId = new Map();
+    for (const file of readdirSync(bdir).filter((f) => /^(posts|.+\.profile\d*)\.raw\.json$/.test(f))) {
+      const rows = readJson(join(bdir, file));
+      if (!Array.isArray(rows)) { notes.push(`batches/${date}/${file}: not an array`); continue; }
+      for (const r of rows) { if (!r?.id || !r.channel?.username) continue; const prev = byId.get(r.id); if (!prev || (r.views ?? 0) > (prev.views ?? 0)) byId.set(r.id, r); }
+    }
+    for (const r of byId.values()) {
+      const handle = r.channel.username;
+      const images = Array.isArray(r.images) ? r.images : [];
+      const slideshow = images.length > 0;
+      const pdir = join(bdir, handle, String(r.id));
+      const held = existsSync(join(pdir, "video.mp4")) ? "video" : existsSync(join(pdir, "slide-01.jpg")) ? "slides" : "metadata";
+      const views = Number(r.views ?? 0), saves = Number(r.bookmarks ?? 0);
+      const local = coverUrl(r.id);
+      batchPosts.push({ id: r.id, keyword: "batch", window: `BATCH_${date}`, handle, mediaType: slideshow ? "slideshow" : "video", slideCount: slideshow ? images.length : null, views, likes: Number(r.likes ?? 0), comments: Number(r.comments ?? 0), saves, shares: Number(r.shares ?? 0), saveRate: views > 0 ? saves / views : 0, date: (r.uploadedAtFormatted ?? "").slice(0, 10), caption: (r.title ?? "").replace(/\s+/g, " ").trim(), cover: local ?? (slideshow ? images[0]?.url : r.video?.cover) ?? null, coverLocal: !!local, url: r.postPage ?? `https://www.tiktok.com/@${handle}/${slideshow ? "photo" : "video"}/${r.id}`, held, durationS: slideshow ? null : Number(r.video?.duration ?? 0) || null });
+    }
+  }
+  posts.unshift(...batchPosts);
 
   const key = (p) => `${p.platform ?? "tiktok"}:${p.id}`;
   const ids = new Set(posts.map(key));

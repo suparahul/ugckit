@@ -123,7 +123,7 @@ PY
       fi
       verify_video "$P/video.mp4" || continue
       if ! ls "$P"/sheet_*.png >/dev/null 2>&1; then
-        ffmpeg -y -loglevel error -i "$P/video.mp4" \
+        ffmpeg -nostdin -y -loglevel error -i "$P/video.mp4" \
           -vf "fps=1,scale=270:480,tile=4x4:padding=4:color=white" "$P/sheet_%02d.png"
       fi
       echo "     video.mp4 + $(ls "$P"/sheet_*.png 2>/dev/null | wc -l | tr -d ' ' || true) contact sheet(s)"

@@ -38,6 +38,10 @@ export type NichePost = {
   cover: string | null;
   coverLocal: boolean;
   url: string;
+  /** A batch post (window BATCH_<date>): its video or slides are on disk, or it is metadata only. */
+  held?: "video" | "slides" | "metadata";
+  /** A batch video's length in seconds. */
+  durationS?: number | null;
 };
 
 /**
@@ -223,13 +227,31 @@ export function nicheDetailOf(posts: NichePost[], platform: Platform, id: string
   };
 }
 
-/** The detail of a post from your own scroll (a read batch; TikTok): the slides are on disk. */
-export function scrollDetailOf(p: { id: string; handle: string; url: string; date: string | null; views: number; likes: number; comments: number; shares: number; saves: number; slideCount: number; caption: string; sound: string | null; slides: string[] }): NicheDetail {
+/** The detail of a post from your own scroll (a read batch; TikTok): the slides, or a video's cover, are on disk. */
+export function scrollDetailOf(p: { id: string; handle: string; url: string; date: string | null; views: number; likes: number; comments: number; shares: number; saves: number; slideCount: number; caption: string; sound: string | null; slides: string[]; kind?: "slideshow" | "video" }): NicheDetail {
+  const video = p.kind === "video";
   return {
     platform: "tiktok", id: p.id, src: "scroll", handle: p.handle, url: p.url, date: p.date ?? "",
-    mediaType: "slideshow", slideCount: p.slideCount || p.slides.length || null,
+    mediaType: video ? "video" : "slideshow", slideCount: video ? null : p.slideCount || p.slides.length || null,
     views: p.views, likes: p.likes, comments: p.comments, shares: p.shares, saves: p.saves,
     caption: p.caption, hashtags: hashtagsOf(p.caption), cover: p.slides[0] ?? null, slides: p.slides, sound: p.sound,
     found: [{ keyword: "", window: "SCROLL" }],
   };
+}
+
+/**
+ * The kind of a post in a BATCH.md table: its Kind cell ("slideshow" | "video", the
+ * last of niche-stats.py's columns) or, in an older table without one, its
+ * "Slides / length" cell ("9", "9 slides", or "45 s" for a video).
+ */
+export function batchKindOf(slidesCell: string | undefined, kindCell: string | undefined): "slideshow" | "video" {
+  const k = (kindCell ?? "").trim().toLowerCase();
+  if (k === "video" || k === "slideshow") return k;
+  return /\d\s*s$/i.test((slidesCell ?? "").trim()) ? "video" : "slideshow";
+}
+
+/** The slide count in a "Slides / length" cell: "9" or "9 slides" is 9; a video's "45 s" is 0. */
+export function batchSlideCount(slidesCell: string | undefined, kind: "slideshow" | "video"): number {
+  if (kind === "video") return 0;
+  return Number((slidesCell ?? "").match(/^\s*([\d,]+)/)?.[1]?.replace(/,/g, "") ?? 0) || 0;
 }

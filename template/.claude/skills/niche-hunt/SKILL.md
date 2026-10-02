@@ -1,6 +1,6 @@
 ---
 name: niche-hunt
-description: Phase 4, the scroll — two modes. Recipe mode prints the seven-line scroll recipe for the user's phone. Hand-in mode takes what the user found on their own. Both write batches/<date>/LINKS.md verbatim. No script, no cost.
+description: Phase 4, the scroll — three modes. Recipe mode prints the seven-line scroll recipe for the user's phone. Hand-in mode takes what the user found on their own. Refresh mode starts the weekly niche refresh from the handles already followed. All write batches/<date>/LINKS.md. No script, no cost.
 ---
 
 # Phase 4 — the scroll (niche-hunt)
@@ -33,7 +33,16 @@ The user searched on their own, before or without the recipe, and hands over lin
 handles or screenshots. Take them as they are. Ask one thing only, for the record:
 "what did you type into search?" Do not ask them to redo the scroll by the recipe.
 
-## What both modes write
+## Refresh mode
+
+The weekly niche refresh: the same handles again, for their new posts. The list is the
+handles of the earlier batches (their `LINKS.md` rows and `<handle>.profile.raw.json`
+files) plus any the user adds; ask once whether to drop or add one. Write one `@handle`
+row per handle, `Source` = `own search`, and in the note why the handle is followed (for
+example "from the batch of <date>"). `Searched:` names the refresh and its window
+("weekly refresh, posts since <the last batch date>").
+
+## What every mode writes
 
 `apps/<slug>/niche/batches/<date>/LINKS.md`, `<date>` today. One line per thing the
 user brought, **verbatim**: never rewrite, shorten or resolve a link here (a short
@@ -55,6 +64,9 @@ in the note column, unchanged. A second hand-in on the same day appends rows to 
 same file.
 
 Tick nothing yourself: the canvas's "links brought" count comes from this file.
+
+`LINKS.md` is the first of the three files the Atlas niche page reads from a batch
+folder; `niche-fetch` writes `posts.raw.json` and `niche-read` writes `BATCH.md`.
 
 ## Finish
 

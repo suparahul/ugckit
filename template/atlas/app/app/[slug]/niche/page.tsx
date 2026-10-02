@@ -42,9 +42,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 /** One post on the grid. A count the platform does not report is null (Instagram: saves, shares, a photo's views). */
 type Tile = Rated & {
-  id: string; src: "search" | "scroll"; kw: string; win: string; date: string;
+  id: string; src: "search" | "scroll" | "batch"; kw: string; win: string; date: string;
   handle: string; comments: number; shares: number | null; shrate: number; slides: number | null;
   cover: string | null; caption: string; url: string;
+  /** A batch post: its video or slides on disk, or metadata only. */
+  held?: "video" | "slides" | "metadata";
 };
 
 const PAGE = 24;
@@ -56,16 +58,19 @@ const viewsLabel = (v: number) => (v ? `${v >= 1_000_000 ? `${v / 1_000_000}M` :
 function tilesOf(posts: NichePost[], scrolled: BatchPost[]): Tile[] {
   const seen = new Set<string>();
   const out: Tile[] = [];
+  /* A batch post that was also read from your scroll keeps its scroll tile. */
+  const fromScroll = new Set(scrolled.filter((p) => p.views).map((p) => p.id));
   for (const p of posts) {
     const platform: Platform = p.platform ?? "tiktok";
-    if (seen.has(`${platform}:${p.id}`)) continue;
+    const batch = p.window.startsWith("BATCH_");
+    if (seen.has(`${platform}:${p.id}`) || (batch && fromScroll.has(p.id))) continue;
     seen.add(`${platform}:${p.id}`);
-    out.push({ id: p.id, platform, src: "search", kind: p.mediaType, kw: p.keyword, win: p.window, date: p.date, handle: p.handle, views: p.views, likes: p.likes, comments: p.comments, saves: p.saves, shares: p.shares, shrate: p.views && p.shares ? p.shares / p.views : 0, slides: p.slideCount, cover: p.coverLocal ? p.cover : null, caption: p.caption, url: p.url, win_: false, strength: null });
+    out.push({ id: p.id, platform, src: batch ? "batch" : "search", held: p.held, kind: p.mediaType, kw: p.keyword, win: p.window, date: p.date, handle: p.handle, views: p.views, likes: p.likes, comments: p.comments, saves: p.saves, shares: p.shares, shrate: p.views && p.shares ? p.shares / p.views : 0, slides: p.slideCount, cover: p.coverLocal ? p.cover : null, caption: p.caption, url: p.url, win_: false, strength: null });
   }
   for (const p of scrolled) {
     if (seen.has(`tiktok:${p.id}`) || !p.views) continue;
     seen.add(`tiktok:${p.id}`);
-    out.push({ id: p.id, platform: "tiktok", src: "scroll", kind: "slideshow", kw: "", win: "SCROLL", date: p.date ?? "", handle: p.handle, views: p.views, likes: p.likes, comments: p.comments, saves: p.saves, shares: p.shares, shrate: p.shares / p.views, slides: p.slideCount || null, cover: p.slides[0] ?? null, caption: p.caption, url: p.url, win_: false, strength: null });
+    out.push({ id: p.id, platform: "tiktok", src: "scroll", kind: p.kind, kw: "", win: "SCROLL", date: p.date ?? "", handle: p.handle, views: p.views, likes: p.likes, comments: p.comments, saves: p.saves, shares: p.shares, shrate: p.shares / p.views, slides: p.slideCount || null, cover: p.slides[0] ?? null, caption: p.caption, url: p.url, win_: false, strength: null });
   }
   return out;
 }
@@ -90,7 +95,7 @@ function TileCard({ t, mixed, slug }: { t: Tile; mixed: boolean; slug: string })
       <Link className="niche-tile__cover" href={nichePostHref(slug, t.platform, t.id)} aria-label={`@${t.handle} on ${PLATFORM_NAME[t.platform]}: the post in detail`}>
         {t.cover ? <img src={t.cover} alt="" loading="lazy" /> : <span className="niche-tile__nocover">{t.kind}<small>cover not held on disk</small></span>}
         <span className="niche-tile__badge">{badge}</span>
-        {t.src === "scroll" ? <span className="niche-tile__src">your scroll</span> : null}
+        {t.src === "scroll" ? <span className="niche-tile__src">your scroll</span> : t.src === "batch" ? <span className="niche-tile__src">{t.held === "metadata" ? "metadata only" : `${t.held} on disk`}</span> : null}
       </Link>
       <div className="niche-tile__body">
         <div className="niche-tile__head"><a href={profileUrl(t.platform, t.handle)} {...ext}>{mixed ? <PlatformIcon p={t.platform} /> : null}@{t.handle}</a>{t.views !== null ? <strong>{n(t.views)}<small>views</small></strong> : <strong className="is-none">—<small>no views reported</small></strong>}</div>
@@ -198,7 +203,7 @@ export default async function NichePage({ params, searchParams }: { params: Prom
   const winsIn = match.filter((t) => t.win_).length;
   const count = (f: (t: Tile) => boolean) => tiles.filter((t) => inView(t) && f(t)).length;
   const picks: Pick[] = [
-    { key: "src", label: "source", def: "", opts: [{ v: "", label: "search and your scroll" }, { v: "search", label: "search only", n: count((t) => t.src === "search") }, { v: "scroll", label: "your scroll only", n: count((t) => t.src === "scroll") }] },
+    { key: "src", label: "source", def: "", opts: [{ v: "", label: "search, batches and your scroll" }, { v: "search", label: "search only", n: count((t) => t.src === "search") }, { v: "batch", label: "batches only", n: count((t) => t.src === "batch") }, { v: "scroll", label: "your scroll only", n: count((t) => t.src === "scroll") }] },
     { key: "kind", label: "kind", def: "slideshow", opts: [{ v: "slideshow", label: "slideshows", n: count((t) => t.kind === "slideshow") }, { v: "video", label: "videos", n: count((t) => t.kind === "video") }, { v: "both", label: "both" }] },
     { key: "kw", label: "keyword", def: "", opts: [{ v: "", label: (niche?.keywords.length ?? 0) === 2 ? "both" : "every keyword" }, ...(niche?.keywords ?? []).map((w) => ({ v: w, label: `#${w}`, n: count((t) => t.kw === w) }))] },
     { key: "win", label: "window", def: "", opts: [{ v: "", label: "every window" }, ...(niche?.windows ?? []).filter((w) => count((t) => t.win === w)).map((w) => ({ v: w, label: winLabel(w), n: count((t) => t.win === w) }))] },

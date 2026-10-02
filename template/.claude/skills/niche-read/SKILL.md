@@ -28,7 +28,31 @@ One post at a time, under `apps/<slug>/niche/batches/<date>/<handle>/<postId>/`:
 slides at once. Transcribe the on-image text **verbatim**: original spelling,
 capitalisation, typos, emoji.
 
+## 1b. Drop the off-niche posts
+
+A post that is not about the niche (another animal, the creator's life, a fan-art meme,
+a clinic scene with no subject of the niche) is clutter on the niche page. While you
+read, note each one with a short reason; then drop them all, before the counting:
+
+    scripts/niche-raw.py drop apps/<slug>/niche/batches/<date> <id> "<reason>" [<id> "<reason>" ...]
+
+It deletes the post's folder (slides, cover, sheets, transcript, comments), takes it out
+of `posts.raw.json` and lists it in `dropped.tsv`, so a second fetch neither reads nor
+merges it again. The paid fetch files (`<handle>.profile.raw.json`) stay as they are: they
+are the record of what was bought. A post link in `LINKS.md` whose post was dropped
+loses its row; a handle row stays while the handle has a post on the niche. Every batch
+does this, a hand-in or the weekly refresh. Say the count dropped, by handle, in
+`BATCH.md` § Method and cost.
+
 ## 2. Write `batches/<date>/BATCH.md`
+
+Every batch writes it, a hand-in or the weekly refresh: it is the third file the Atlas
+niche page reads, beside `LINKS.md` and `posts.raw.json`, and a batch without it shows
+as "not read yet". The page reads the first table in the file as the post table, by
+column position: keep the script's fourteen columns first and in order (`Handle` as
+`@handle`, `Post id`, …, `Sound`, `Kind`). Tags of your own (format, topic, angle,
+hook, hit) go in more columns after `Kind`, never before it. No other table comes
+before the post table.
 
 The shape of the reference batch file, in this order:
 
@@ -81,6 +105,9 @@ another date is a second folder and a second dated section.
 
     scripts/state.py set <slug> niche done
 
+Check that the batch folder holds `LINKS.md`, `posts.raw.json` and `BATCH.md`, and
+that the niche page (http://localhost:3210/app/<slug>/niche) shows the batch's posts and
+none of the dropped ones.
 Report the batch file, the three findings files with their row counts, and the two or
 three findings the strategy will use (the format that repeats across handles, the
 density-to-saves rule, the app slot the app accounts use). Stage 3 is filled when one

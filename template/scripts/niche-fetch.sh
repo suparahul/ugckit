@@ -10,14 +10,19 @@
 # caption in its note. Then:
 #   1. short links (tiktok.com/t/...) are resolved: curl -sIL first, then unshorten.me
 #      (free, ten a day) when TikTok is blocked from this network -> resolved.tsv
-#   2. one apidojo call with every post url in startUrls ($0.00045 a post) -> posts.raw.json;
-#      one apidojo call per handle, the profile url, 30 posts ($0.0135) -> <handle>.profile.raw.json
+#   2. one apidojo call with every post url in startUrls ($0.00045 a post), only the posts
+#      not yet in posts.raw.json; one apidojo call per handle, the profile url, 30 posts
+#      ($0.0135) -> <handle>.profile.raw.json
 #   3. a screenshot row is matched to a profile post by its caption (word overlap); no
 #      match, or no handle on the row, and it stays evidence only, said in the report
 #   4. TikHub fetch_video_comments per post, 20 comments ($0.0015) -> <handle>/<id>/comments.json
 #   5. every slide from the signed urls, now (rule 12) -> slide-NN.jpg; a video post ->
 #      video.mp4 (ffprobed, rule 14) + sheet-N.jpg contact sheets + transcript.txt (local
-#      Whisper, free); post.json per post
+#      Whisper, free) + cover.jpg (the Atlas niche page shows it); post.json per post
+#   6. posts.raw.json: the raw record of every post read (the links and the profile picks),
+#      once each. LINKS.md (niche-hunt), this file and BATCH.md (niche-read) are the three
+#      files the Atlas niche page reads from a batch folder. A post the read drops as
+#      off-niche (niche-raw.py drop -> dropped.tsv) is not read or merged again.
 # Ten posts and one profile: about $0.03. Files that exist are reused; a killed run resumes.
 set -euo pipefail
 
@@ -93,12 +98,20 @@ fi
 # ---------------------------------------------------------------- 2. the calls
 CALLS_RESULTS=0; CALLS_COMMENTS=0
 if [ "$NP" -gt 0 ]; then
-  OUT="$B/posts.raw.json"
-  BEFORE=$([ -s "$OUT" ] && echo 1 || echo 0)
-  URLS=$(printf '%s\n' "${POSTS[@]}" | python3 -c "import json,sys; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))")
-  echo "== $NP posts (one call) =="
-  monid_run apify /apidojo/tiktok-scraper "{\"startUrls\":$URLS,\"maxItems\":$NP}" "$OUT" || true
-  [ "$BEFORE" = 0 ] && [ -s "$OUT" ] && CALLS_RESULTS=$((CALLS_RESULTS + NP))
+  # posts.raw.json also holds the profile picks of an earlier run (step 6): call only for the links not in it
+  URLS=$(printf '%s\n' "${POSTS[@]}" | python3 "$SCRIPTS/niche-raw.py" missing "$B/posts.raw.json")
+  NNEW=$(printf '%s' "$URLS" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")
+  if [ "$NNEW" -gt 0 ]; then
+    OUT="$B/.links.raw.json"; rm -f "$OUT"
+    echo "== $NNEW posts (one call) =="
+    if monid_run apify /apidojo/tiktok-scraper "{\"startUrls\":$URLS,\"maxItems\":$NNEW}" "$OUT" && [ -s "$OUT" ]; then
+      CALLS_RESULTS=$((CALLS_RESULTS + NNEW))
+      python3 "$SCRIPTS/niche-raw.py" merge "$B/posts.raw.json" "$OUT"
+    fi
+    rm -f "$OUT"
+  else
+    echo "== $NP posts: all in posts.raw.json already -- skipping =="
+  fi
 fi
 for H in "${HANDLES[@]:-}"; do
   [ -n "$H" ] || continue
@@ -145,15 +158,19 @@ for h in handles:
             if s > score: best, score = r, s
         if best and score >= 0.6: add(best, f"screenshot {os.path.basename(shot)} matched ({int(score*100)}%)")
         else: print(f"screenshot {os.path.basename(shot)}: no post of @{h} matches its caption; kept as evidence only", file=sys.stderr)
+# a post dropped as off-niche (niche-raw.py drop, the niche-read skill) is not read again
+dp = os.path.join(b, "dropped.tsv")
+off = {l.split("\t")[0] for l in open(dp) if l.strip()} if os.path.exists(dp) else set()
 for pid, (u, r, why) in rows.items():
+    if pid in off: continue
     imgs = [i.get("url") for i in (r.get("images") or []) if isinstance(i, dict) and i.get("url")]
-    print("\t".join([u, pid, "photo" if imgs else "video", str(r.get("views") or 0), ((r.get("video") or {}).get("url") or ""), "\x1f".join(imgs), why]))
+    print("\t".join([u, pid, "photo" if imgs else "video", str(r.get("views") or 0), ((r.get("video") or {}).get("url") or ""), "\x1f".join(imgs), why, ((r.get("video") or {}).get("cover") or "")]))
 PY
 
 # ---------------------------------------------------------------- 4 and 5. comments, slides, videos, sheets, transcripts
 NREAD=$(wc -l < "$B/.read.tsv" | tr -d ' ')
 echo "== $NREAD posts to read =="
-while IFS=$'\t' read -r H ID KIND VIEWS VURL IMGS WHY; do
+while IFS=$'\t' read -r H ID KIND VIEWS VURL IMGS WHY COVER; do
   P="$B/$H/$ID"; mkdir -p "$P"
   echo "  -- @$H $ID  $KIND  $VIEWS views  ($WHY)"
   # post.json: the raw record of this post, from whichever file holds it
@@ -185,11 +202,16 @@ PY
     echo "     ${NS:-0} slides$([ "$BAD" -gt 0 ] && echo ", $BAD not a real image and removed")"
     [ "${NS:-0}" -gt 0 ] || echo "     no slides downloaded -- the urls have expired or the CDN host is blocked (rule 12)"
   else
+    # the cover: the Atlas niche page shows it for a video, which has no slides
+    if [ ! -s "$P/cover.jpg" ] && [ -n "$COVER" ]; then
+      if fetch_cdn "$COVER" "$P/cover.src"; then to_jpg "$P/cover.src" "$P/cover.jpg" 1080; else echo "     cover download failed"; fi
+      rm -f "$P/cover.src"
+    fi
     if [ ! -s "$P/video.mp4" ]; then fetch_cdn "$VURL" "$P/video.mp4" || { echo "     video download failed"; continue; }; fi
     verify_video "$P/video.mp4" || continue
-    ls "$P"/sheet-*.jpg >/dev/null 2>&1 || ffmpeg -y -loglevel error -i "$P/video.mp4" -vf "fps=1,scale=270:480,tile=4x4:padding=4:color=white" "$P/sheet-%d.jpg"
+    ls "$P"/sheet-*.jpg >/dev/null 2>&1 || ffmpeg -nostdin -y -loglevel error -i "$P/video.mp4" -vf "fps=1,scale=270:480,tile=4x4:padding=4:color=white" "$P/sheet-%d.jpg"
     if [ ! -s "$P/transcript.txt" ]; then
-      ffmpeg -y -loglevel error -i "$P/video.mp4" -vn -ac 1 -ar 16000 "$P/.audio.wav" && "$PY" - "$P/.audio.wav" "$P/transcript.txt" <<'PY' || echo "     transcript failed (faster-whisper missing? .venv/bin/pip install -r requirements.txt)"
+      ffmpeg -nostdin -y -loglevel error -i "$P/video.mp4" -vn -ac 1 -ar 16000 "$P/.audio.wav" && "$PY" - "$P/.audio.wav" "$P/transcript.txt" <<'PY' || echo "     transcript failed (faster-whisper missing? .venv/bin/pip install -r requirements.txt)"
 import sys
 from faster_whisper import WhisperModel
 m = WhisperModel("base.en", device="cpu", compute_type="int8")
@@ -202,10 +224,14 @@ PY
     echo "     video.mp4 + $(ls "$P"/sheet-*.jpg 2>/dev/null | wc -l | tr -d ' ') sheet(s)$([ -s "$P/transcript.txt" ] && echo ' + transcript')"
   fi
 done < "$B/.read.tsv"
+
+# ---------------------------------------------------------------- 6. posts.raw.json: every post read, once
+python3 "$SCRIPTS/niche-raw.py" merge "$B/posts.raw.json" "$B"/*/*/post.json
 rm -f "$B/.rows.tsv" "$B/.read.tsv"
 
 USD=$(python3 -c "print(f'{$CALLS_RESULTS * $PER_RESULT + $CALLS_COMMENTS * $PER_COMMENTS:.4f}')")
 [ "$CALLS_RESULTS" -gt 0 ] || [ "$CALLS_COMMENTS" -gt 0 ] && spend "$SLUG" "$USD" "niche batch $DATE: $CALLS_RESULTS results, $CALLS_COMMENTS comment calls" || true
 echo
 echo "next: the niche-read skill -- read every slide, sheet and transcript under $B from disk;"
-echo "      scripts/niche-stats.py $SLUG $DATE does the counting."
+echo "      scripts/niche-stats.py $SLUG $DATE does the counting. Its BATCH.md is the third file"
+echo "      the Atlas niche page reads, beside LINKS.md and posts.raw.json."
