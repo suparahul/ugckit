@@ -194,7 +194,7 @@ paths are in a user's workspace.
 | The finished file, the end of the pipeline | `pipeline/character/<video>/final/` | `character-deliver` (P6) |
 | `approval.json` | `pipeline/character/<video>/` | P1, P3, P6 |
 | The pipeline's state | `pipeline/character/state.json` | the character scripts; the recreation `pipeline.json` is not touched |
-| The scripts | `scripts/character/`: `generate.sh`, `character/qc.py`, `screen_comp.py`, `assemble.sh`, `lint_prompt.py`, `state.py`, `models.json` | the character skills |
+| The scripts | `scripts/character/`: `generate.sh`, `qc.py`, `screen_comp.py`, `shots.py`, `keyframes.sh`, `lint_prompt.py`, `assemble.sh`, `state.py`, `models.json`, `templates.json` | the character skills |
 | The failure ledger, per model | `pipeline/character/model-failures.md`, **the user's file**: written once by the installer (the § 9.4 table and one empty table per model), never overwritten by an upgrade | P3 writes, P1 reads |
 | What the kit knows about each model | `docs/character-model-known.md`, **the kit's file**: the § 9.4 table, updated by every upgrade, never written by the pipeline | P1 reads |
 | The orchestrator section for character videos (§ 2.4) | `template/AGENTS.md` | orchestrator update, shipped with the skills |
@@ -232,6 +232,14 @@ shipped with its skills (§ 16), says:
 > voice reference. Never an app UI, a screenshot or a screen recording as a reference.
 > `scripts/character/generate.sh` refuses a `refs.json` with any other role, and asks
 > for an explicit opt-in on each referenced run, like the recreation `ALLOW_REFS=1`.
+
+**Shipped in Phase 2** (2026-10-02) as the section "Character videos" of
+`template/AGENTS.md`, after the recreation table; rule 1 and the three flows are kept
+and scoped to recreation. `refs.json` is now
+`{"references": [{"kind", "file", "binding"}]}`, written by `scripts/character/shots.py
+refs` from the shot file; the kinds are `keyframe`, `hero`, `anchor`, `subject`, `set`,
+`neighbour-frame` and `voice`. `generate.sh` refuses any other kind and any file from the
+screen library.
 
 ### 2.5 The input: a locked, approved plan
 
@@ -1659,6 +1667,11 @@ Paths inside it are relative to the handle's folder, `apps/<slug>/handles/<handl
 }
 ```
 
+Added in Phase 2: `phone.screen_id` (the `SCREENS.md` row of an O, G, S, H or F
+segment), `keyframe_prompt`, `keyframe_references` (hero, outfit anchor, set plate, each
+fixed subject in the shot; each with a `kind`), `keyframe_end_prompt` (H only), and a
+`kind` on every entry of `video.references`. `docs/character/shot.example.json` has them.
+
 ### 15.3 The video shot — the `video` block of the same shot file; compiled to `prompt.txt`
 
 ```json
@@ -1950,6 +1963,46 @@ pipeline exists; that UI is designed later, for the whole video pipeline (decisi
 The orchestrator section of § 2.4 ships in `template/AGENTS.md` in this phase, with
 `character-generate`, not before. Done when: one video has an approved storyboard,
 from a hand-written locked plan (the planning system does not exist yet).
+
+**Built 2026-10-02** (branch `ai-ugc-character-pipeline`), on the founder's word: "Let's
+go ahead with phase two building. And once it is ready by the time will have something
+from our local organic factory for you to test on."
+- `character-shots` (P1): the plan and character check, the cut rules, the shot files
+  and `video.json`, the keyframes, the prompt order with the fixed sentences pasted in
+  (the stability paragraph, the flat-on sentence, the H and F sentences), the lint, and
+  gate A by word into `approval.json`.
+- `character-generate` (P2): one segment per run, a yes per run, `ALLOW_REFS=1` per
+  referenced run; the active version and the selected length change together.
+- `scripts/character/shots.py`: `check` (the plan is approved, 9:16, `app_insertion` a
+  boolean, no app beat without app insertion, each screen in `SCREENS.md`, the pins
+  resolve to a creator file at `video-setup` or `live`, the set, the outfit, the hero, the
+  anchors and the fixed subjects exist; then `state.py init` with the plan's
+  `app_insertion`), `validate` (`video.json` and the shot files against the plan: the
+  types, no app type without app insertion, 5 to 15 s generated and 3 s or more planned,
+  the lines in order and all carried, 15 words per 4 s, no line in H or F, a job for each
+  hand, the phone of a phone segment, the reference kinds and the 4-picture limit, a
+  keyframe reference on every segment, the voice on every talking one), `refs` (writes
+  `refs.json`, and a first `insert.json` for a phone segment), `job` and `verify` (the
+  keyframes, 1080x1920), `storyboard` (`keyframes/storyboard.jpg`).
+- `scripts/character/keyframes.sh`: the Codex bridge of `codex-images.sh`, for keyframes.
+- `scripts/character/lint_prompt.py`: the checks of § 12, plus the shot times within the
+  generated length and the reference-picture limit.
+- `generate.sh`, before any cost: gate A approved in `approval.json`; every pinned
+  character `live`; the segment planned at the selected length; the reference kinds.
+- `template/AGENTS.md` and `CLAUDE.md`: the character pipeline section (§ 2.4).
+- Tested in the scratchpad only, with a hand-written plan and a scratch character whose
+  pictures were plain placeholders (only the keyframes were made by Codex): a plan with
+  no app insertion (two T segments) and one with app insertion (T, G, H and an R); each
+  check refused a broken copy (an app beat without app insertion, a 4 s generation, a
+  hand with no job, a screen as a reference, six pictures, a G segment without app
+  insertion, a missing screen list); the lint found a booster word, a missing end state,
+  a missing flat-on sentence, a word that angles the phone, a spoken line in H and shot
+  times past the length; `generate.sh` stopped at each gate and, with all passed, printed
+  $0.40 and refused without `CONFIRM=1`. No video was generated and nothing was spent.
+- **Not done:** the "done when" of this phase (one video with an approved storyboard)
+  needs a real character and the user's approval: the founder's first test from Organic
+  Factory. The `ugc-character` template has only the 5 s version; a segment at another
+  length needs its own version, created over MCP before its run.
 
 **Phase 3 — the insertion upgrades in the character copy (local, free).**
 The `screens` skill and `apps/<slug>/screens/SCREENS.md`. In
