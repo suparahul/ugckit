@@ -1,0 +1,8 @@
+interface:
+  display_name: "UGC Ultra System"
+  short_description: "Reference ad → locked creator → production-ready UGC → 50 controlled variants"
+  brand_color: "#111111"
+  default_prompt: "Use UGC Ultra System. Analyze what I sent, choose the right mode, lock the creator and product, and build the strongest production-ready UGC output without identity drift."
+
+policy:
+  allow_implicit_invocation: true

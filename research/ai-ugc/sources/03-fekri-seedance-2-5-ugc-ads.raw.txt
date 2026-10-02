@@ -1,0 +1,277 @@
+To view keyboard shortcuts, press question mark
+View keyboard shortcuts
+3
+Article
+Conversation
+Fekri
+@fekdaoui
+Everything you need to know to make Seedance 2.5 UGC ads that convert
+8
+16
+158
+84K
+A decent UGC creator costs $150 to $400 for a video. Two videos a week is about $1,300 a month. If you want to have ten creators, you're easily paying $13,000/mo.
+Most of those will underperform, but you'll only find out which ones after paying for all ten.
+A 30-second Seedance 2.5 generation like this one costs $6.93:
+Which means anyone can run ads now.
+A few months ago you needed to have a large budget, find creators, send thousands of emails to only get a handful of replies, and that was just to get started. After that, you still needed to manage, brief, train and chase them.
+Today the only thing you need is the idea.
+The problem we have now is almost nobody knows how to use it properly yet.
+So a lot of people are about to burn thousands on ads, get nothing back, and decide that AI video doesn't work. It does. But you can't prompt your way out of bad marketing fundamentals.
+That's why I'm writing this.
+Almost everything being posted about Seedance right now is prompt tricks with no marketing underneath. Prompt tricks get you a beautiful video nobody buys from.
+So this article covers both. Marketing fundamentals first, then prompting.
+(you'll want to save this one, it's long and meant to be worked through, not read once)
+What we cover
+Your product: what pain are you actually solving, and which human desire sits underneath it.
+Ad fundamentals: a simple framework to learn how to make a good ad
+Competitor research: how to do competitor research so you don't waste $1000's of dollars on research the big players have already done (with real examples)
+Seedance 2.5: what makes this model different and why it changes everything
+Prompt anatomy: how to write good prompts so you don't waste $$ on failed generations
+The full flow: we'll go through every step together to show you exactly how you can apply this to your own product
+Who this is for
+Founders and small teams who need a steady flow of creative and cannot justify paying thousands of dollars for UGC creators that will flop.
+Anyone already running UGC who wants to test multiple angles quickly.
+Marketers who can write, and want video to stop being the bottleneck.
+People who tried AI video, got something almost right, and could not work out what was off.
+1. What are you actually selling?
+I'm sure your product has tens of amazing features. As a builder, it's easy to get lost in the cool stuff you've built (I do too) - but if you want people to actually buy your product, you need to think from their perspective.
+What does your ideal customer want? What is their desired transformation? What is the underlying human need they are trying to address?
+Every purchase comes back to one of eight human desires. Drew Eric Whitman calls them the Life-Force 8 in Ca$hvertising:
+To stay alive, feel well, and live longer
+To enjoy food and drink
+To be free from fear, pain and danger
+To find a partner
+To live comfortably
+To be better than the people around you
+To look after the people you love
+To be liked and respected
+Those eight sell more than every other human want combined. So answer two questions before you write anything:
+What problem are you really solving?
+What changes for this person afterwards?
+That painful moment is your ad, and that change is what you are selling.
+Let's work through the rest of this together with a case study.
+Take a fictional calorie tracking app for women called Sona. We'll use this as a working example and build everything together.
+Our fictional app has some amazing features: logs food from pictures, scans barcodes, counts macros, syncs to your watch, charts your week and can even order food for you.
+But none of them really matter. What matters, is the following:
+The problem/pain we are solving: Standing on the scale after six weeks of eating well and still seeing the same number
+What changes for this person afterwards: She feels better and healthier. She's more confident, and people treat her differently for it, like they like her more and respect her more. She can go to the beach without being ashamed of her body.
+Based on this + competitor research, we'll build a framework to make killer ads that convert and avoid wasting
+$1000s
+of dollars on bad UGC ads.
+2. Research what already works
+If you skip this part, you will make a good looking video that doesn't convert, and you'll conclude that "AI ads don't work". They do. But you did not do the work.
+Your competitors already paid to find out what converts. That information is public.
+The Meta Ads Library
+is free and you can find any competitor running ads in any country. The rule of thumb is that a long-running ad is usually a winning ad. Nobody keeps paying to serve a loser. It is not always true, but it is a good proxy.
+For this research we look at one of the biggest apps in the category, Cal AI.
+As of 9 August 2026 they have roughly 650 live ads in the library. I took the top 25 by impressions, pulled the videos and transcribed all of them.
+Every one of those 25 started on 13 or 14 April 2026 and is still running four months later, in three to nine variants each. By the rule of thumb above, all of them are working.
+Six formats carry the entire account:
+The bet: someone on the street is asked to guess the calories in their food. "If you guys can guess how many calories are in your food, I will pay for it."
+Before and after: a body, then what he did to get there. "Look, the only way you guys are going to make a transformation like this is if you're in a calorie deficit."
+It's not your fault: "You're not overweight because you eat too much, you just have no idea how much you're actually eating."
+A 17 year old built it: "A 17 year old just changed the fitness industry by making it so easy to track your calories."
+The news clip: a real Fox Business segment about the app, cut into an ad.
+No talking. Someone eats, the number appears over the food, and nobody says anything at all.
+Four things repeat in all of them:
+No hook is about the product. Every opener is a person, a bet, a physique or an accusation. The app never appears before second eight.
+The mechanic is said out loud, in almost the same words every time: "You take a picture of your food and it tells you the calories and macros." That is give-away-the-secrets, proven with somebody else's money.
+They promise less work, not more weight: "No typing, no mental math." Nobody promises a number of pounds.
+They answer the obvious doubt with a number. The doubt is whether a photo can really know what is on your plate. "FDA food labels have 80% accuracy, this app has 90%."
+They do a really good job at reframing the problem their customer is facing. The pain is not that tracking is hard. It is that you have been blaming yourself for what was actually a measurement problem.
+"It's not because they're lazy, but because they're guessing".
+Every strong ad in the set does a version of it.
+Now do it on your own market. Open the Meta Ads Library, find your competitors, and actually watch twenty or thirty of their ads with a pen next to you.
+For each one, write down the first line word for word, the pain it goes after, the objection it answers, and the format it uses.
+By about the fifteenth ad the same three or four pains will keep coming back, and those are the ones your market has already validated with real money.
+You do not need to reinvent the wheel. Take the best script you found, and either say it better than they do, or say it from a person they are not using.
+You can also check our
+viral library
+, which indexes organic content by niche instead of paid ads. Paid ads shows what a marketer chose to say. Organic shows what an audience chose to spread. When both point at the same pain, you can be confident to build on that one.
+ALT
+3. Learn how an ad is built
+You don't need a marketing degree to write good ads. You need a bit of common sense and to be willing to learn what a good ad is. Plenty of books go deep on this and for this article, we'll use the framework outlined by Alex Hormozi' in
+$100M Leads
+.
+A good ad has three parts: the call out, the value, and the call to action.
+The call out
+The opener stops the right person and lets everyone else scroll. Hormozi calls it the cocktail party effect, the way you hear your own name across a loud room. A call out aimed at everybody stops nobody.
+He puts about eighty percent of the outcome on this alone. If the first two seconds fail, nothing after them is ever seen.
+The call out is not just the first line. It is the line, the way it is said, and what is on screen while it is said, and all three of those land in the same two seconds.
+The line names a person. It hands the viewer their own situation, so it has to be about them rather than about you.
+You need a new call out for every ad you make. Hormozi gives four shapes you can use, and you have already seen all four running on Cal AI's account.
+Labels name the group out loud, like "women over 35" or "new mums".
+Yes-questions ask something they have to agree with: "You eat well all week and you still can't work out why nothing happens".
+If-then statements: "If you've been eating well for six weeks and the scale hasn't moved, it isn't your body."
+Ridiculous results are an outcome big enough that it needs explaining, like "Her salad had more calories than a Big Mac."
+The visuals and sounds in your ad are also part of the call out.
+Six of Cal AI's live ads have no script in them at all, just someone eating with the number appearing over the food.
+The bet ads open on a plate held out to a stranger before anybody has spoken, and the transformation ads open on a body. In all three cases you know what the ad is about before the first word.
+The value
+What they get, and the more specific you are the better it works.
+Say exactly how it works, out loud. Hormozi calls this giving away the secrets and selling the implementation.
+Bad: "It just knows what you're eating."
+Good: "You just snap a picture of your food and it instantly tracks your calories and macros for you."
+Cal AI uses the good one in almost every ad in the set that has a script in it. A company at that spend does not repeat the same sentence twenty times by accident.
+Then answer one objection.
+There are five reasons somebody doesn't buy. They don't need it, can't afford it, aren't in a hurry, don't want it enough, or don't believe you.
+Here are two examples of how Cal AI handles objections in their ads:
+They don't believe you: "While FDA food labels have 80% accuracy, this has 90% accuracy."
+They don't think they need it: "That's why most people aren't losing weight. It's not because they're lazy, but because they're guessing their diet."
+Pick the one your buyer most likely has and answer that one properly, rather than gesturing at all five and landing none of them.
+The call to action
+The entire point of the ad is that somebody does something at the end of it, so the last line has to tell them what that something is, in the words they would use themselves.
+Cal AI closes almost every ad with the same two part move.
+"So if you're serious about getting in shape, stop guessing and start tracking the smart way."
+"If you're serious about locking in with your diet, use the link below and download CalAI."
+The first half qualifies the viewer, so anyone it is not for can leave without clicking. The second half names the app and points at the tap.
+The winning script, taken apart
+The best written ad in the set is the reframe, and every piece of this part is in it. It's about 106 words in about thirty seconds, which is the pace you should be writing at.
+You're not overweight because you eat too much, you just have no idea how much you're actually eating. Like be honest, you guess your calories and you forget snacks and by the end of the day you're way off. That was literally me until I found this. It's called CalAI. You just snap a picture of your food and it instantly tracks your calories and macros for you. No typing, no guessing, no effort, it made dieting stupid simple. Like now I actually know what I'm eating and it shows. So if you're serious about getting in shape, stop guessing and start tracking the smart way.
+The call out. "You're not overweight because you eat too much, you just have no idea how much you're actually eating."
+The problem. "Like be honest, you guess your calories and you forget snacks and by the end of the day you're way off."
+The value, with the implementation given away. "You just snap a picture of your food and it instantly tracks your calories and macros for you. No typing, no guessing, no effort."
+The objection, which is trust. "Like now I actually know what I'm eating and it shows."
+The call to action. "So if you're serious about getting in shape, stop guessing and start tracking the smart way."
+Thirty seconds is enough room for those three parts to stretch into five beats. The call out is the first one. The value takes the middle three, because you have the time to name the problem, show the mechanic and hand over a piece of proof. The call to action is the last.
+Hook → Problem → Demo → Proof → CTA
+Every ad on that account worth watching runs on those five.
+Our version
+We keep the pain, the reframe and all five beats, and change four things.
+Who says it. Their creators are men in gyms and strangers stopped in the street. Ours is one woman at her own kitchen table at night.
+What's in front of her. They open on a plate held out to a stranger. We open on one dinner taken completely apart into five small bowls with a scale in the middle.
+One number, for trust. We're two months in. Cal AI never gives a weight figure, so neither do we.
+The product name. Everything else stays where it is, including the order of the beats.
+Six stages, thirty seconds, 112 words.
+Hook. "You're not overweight because you eat too much. You just have no idea how much you're actually eating."
+Problem. "Like be honest, you're guessing your calories, you forget the snacks you had standing at the fridge, and by the end of the day you're way off."
+Turn. "That was literally me, until I found this. It's called Sona."
+Demo. "You just take a picture of your food and it works out the calories and the macros in about four seconds. No typing, no guessing, no effort."
+Proof. "Now I actually know what I'm eating, and two months in, it shows."
+CTA. "So if you're serious about getting in shape, stop guessing and start tracking the smart way."
+Get this one working before you make any others.
+Once it does, the variants are cheap: the same script with a different woman in a different room, with a different hook or answering a different objection.
+4. Why Seedance 2.5 for this
+Why is this model such a gamechanger for UGC ads?
+Go back to the ads we pulled apart. Nineteen of those twenty five run longer than fifteen seconds.
+The median is twenty one, and nine of them run past twenty five. Fifteen seconds was the cap before this model. So a thirty second ad meant making it in two halves and joining them, and the second half never quite matched the first.
+Thirty seconds in one go. The whole ad is one generation now, so the woman at the end is the same woman as at the start.
+The voice is better. Plenty of models talk now. This one holds the same voice, in sync, for the full thirty seconds.
+The physics are better. She picks things up, puts them down, eats. It gets that right far more often than the models before it.
+You can steer it. Write out six stages and it works through them in order. Which means we can be very specific in how we write our prompts and guide the model really well.
+5. Prompt anatomy
+We've done the research and wrote our script. Now we need to think about the scenery and how to prompt it correctly.
+There are two ways to do this: you can prompt the video model directly, or you can generate a storyboard first with all the different scenes.
+I always generate a storyboard first, because it's cheaper and faster to iterate over images until you have your desired results.
+Do I like this woman, or does she look like an ad? Is the room right, or is it too tidy and too styled? Is she holding the thing she's meant to be holding?
+By the time the board looks right, every creative decision has already been made and approved.
+There's a second reason too. The board is a reference you feed forward, which also ensures you get better results in your generated video by reinforcing what you want both in the prompt and in the reference image.
+Here the storyboard I generated:
+I sent the following prompt in
+Genviral Studio
+but you can use any provider that allows you to interact with GPT-Image 2:
+Create ONE single wide 16:9 annotated production STORYBOARD page for a 30 second vertical UGC advert. This output is a director's board document, not six loose photos, not a collage, and not a contact sheet without labels. PAGE = STORYBOARD. The entire canvas is one working board on plain off-white paper. You must show the board chrome: title bar, frame borders, numbered labels, annotation text under each frame, and a timing strip. If the title bar, annotations or timing strip are missing, the image is wrong — regenerate as a storyboard, not as photos. LAYOUT: EXACTLY 6 SCENE FRAMES inset into that board in a single horizontal row, numbered 1 to 6, equal size, with generous white paper showing between them. Each inset is a sequential shot keyframe a video model will expand into motion, so every inset has to work on its own as a still — but they live on the board page, they are not separate deliverables. BOARD DESIGN: a working director's board on plain off-white paper, not a clean grid of product photographs and not a seamless photo montage. A title bar across the top with the concept name "Sona — reframe (brunette)" and the runtime "30s", and the GenViral logo small in its top right corner. Thin dark borders around each of the six frames. Under the row of frames, a thin timing strip divided into the six beat lengths (5s, 3s, 6s, 7s, 5s, 4s). Two short hand-drawn arrows between frames, one between 3 and 4 marking the swap from five bowls to one plate, one between 4 and 5 marking the cut from night to daylight. Readable text is allowed on the board chrome and nowhere inside the scene frames. BOARD ANNOTATIONS, outside the scene frames only, printed under each frame in small readable type: its number, the shot name, whether the beat is spoken to camera or an insert, the camera note, the beat length in seconds, a continuity note, and the spoken line for that beat. SCENE FRAMES (the six insets only): photographic, not illustrated, 9:16 inside each bordered frame. The artwork inside every frame is text-free: no words, captions, subtitles, speech bubbles, UI copy, wordmarks, labels, packaging text or device text. INSIDE EACH SCENE FRAME: treat the inset as a frame paused out of a front-camera phone video, not a studio still. Film the talking-head insets the way a TikTok hot-take confessional looks: phone propped at eye level, her face filling most of the frame, eyes locked on the lens, subtle micro-shake and a slight off-centre tilt, mild wide-angle phone distortion, mild sensor noise. Soft practical face light from a warm lamp near the phone, not a beauty ring light and not portrait retouching. Pores around the nose and cheeks must be visible in every face inset, with natural slight unevenness and only a soft sheen on the nose and forehead — camera-roll skin, not influencer-grid skin. Catch her mid-sentence: mouth open on a consonant, one eyebrow lifted, a tiny nose scrunch, not a held pose. Frame 1 must stop the scroll on its own — a long shiny olive-oil pour mid-stream into a bowl, face filling the shot, not a static fork pose. Never a beauty portrait, never squared catalogue posing, never a symmetrical food flat-lay. If a face inset would pass as an influencer grid still, it is wrong. The standing-snack insert is the only non-face inset and should look like a paused phone POV, not food photography — one punchy mid-bite, not a cooking sequence. HANDS: every hand in a frame has an explicit job and an explicit place, and any hand without one is out of frame. Prefer one readable hand on talking-head frames. A visible hand is large enough to read, fully inside the frame, and doing one clear thing. Never finger counting or holding up one, two or three fingers. Never a hand half hidden in a lap, tucked against a body, or cropped by a frame edge. SHOT LADDER: mild on purpose for the confession beats, like a real front-camera creator who barely moves the phone. Face frames are all eye-level front camera with small height/distance changes…
+FRAME 6, DAYLIGHT, spoken to camera: MEDIUM CHEST-UP at the front door, front camera at arm's length but still eye-level and close, a clean modern hallway and a strip of street soft behind her rather than a wide establishing shot. Camera hand out of frame behind the lens; other hand grips a tote strap high on her chest, fully readable. She talks to the lens and starts to laugh at her own last line. Slight tilt, a little overexposed by the open door. OBJECT-STATE CONTINUITY: five bowls, scale and oil pour in frames 1 and 3; single plate from frame 4 onward. Frames 1–4 night, 5–6 daylight. Same face, dark brunette hair and clothes across every cut. Kitchen stays clean and modern in every kitchen frame. One person only. NEGATIVE, inside the scene-frame insets only: no studio lighting, no professional camera look, no cinematic grade, no overhead hero food angle, no low tabletop hero angle, no wide establishing shot, no side three-quarter interview angle, no food photography styling, no cluttered counters, no dirty dishes, no dish rack, no fridge, no open fridge, no fridge magnets, no takeaway menus, no crumbs, no plastic leftover tubs, no catalogue posing, no beauty retouching, no doll skin, no porcelain skin, no airbrushed skin, no skin blur, no glossy plastic finish, no blonde hair, no blonde highlights, no bronde, no dirty blonde, no two-tone hair, no bleach tips, no second person, no phone or screen, no unassigned second hand, no finger counting, no warped or extra fingers, no long snack-prep sequence in frame 2, no second cracker being spread in frame 2. FINAL CHECK: this must read as one annotated storyboard page at a glance — off-white paper, title bar, GenViral logo, six bordered insets, labels under each, timing strip, two arrows. If it looks like six naked photos or a collage with no board chrome, it is wrong. Readable text only outside the frames, logo only in the title bar. Six frames, no extras. Face insets should look like the same propped front-camera confession with mild reframes, not six different film setups. Frame 1 must read as a mid-pour oil stream, not a static fork hold. Count the hands in every frame. BOARD NEGATIVE: no six separate images, no full-bleed photos without a board, no missing title bar, no missing annotations, no missing timing strip, no seamless collage, no contact sheet without labels, no mood board, no poster.
+The video prompt
+There's no official guide to writing one of these, so I made one.
+I read about 3,000 posts across 150 searches. I read the ByteDance documentation, which contradicts a good half of them. It says negative constraints only work for subtitles and music, while on X it seems the people getting the best results write long ban lists anyway.
+So I ran close to a hundred generations to find out who was right.
+A good Seedance 2.5 prompt has twelve blocks. Write them as ALL-CAPS labels with plain sentences underneath.
+The start and the end of a prompt count for more than the middle. So the references and the camera go first, and the bans go last.
+The start and the end of a prompt count for more than the middle. So the references and the camera go first, and the bans go last.
+REFERENCES: If you attach files, this is the first thing you mention. Each image gets its own line and you describe what that image controls and what it does not. An untagged image will still get used, just however the model feels like using it.
+One subject per line, and say what each image does not control as well as what it does.
+@Image
+1 defines Sofia's face, hair and build.
+@Image
+2 defines the kitchen, its layout and its lighting. Do not use the people in
+@Image
+2. Do not use the background from
+@Image
+1.
+CAMERA: You say what it is filmed on, who is holding it, and how it moves. If you want it to look like UGC, this is also where you ask for the flaws by name, like shake, drifting frames, hunting focus and uneven light. Seedance defaults to clean and steady if you let it, so you need to prompt the little flaws that make it look natural into it.
+LOOK: You write the light, the colour and the grain as things you could point at. The skin clauses live here too:
+realistic skin texture, visible pores around the nose and cheeks, natural slight unevenness, no filter quality
+no doll skin, no porcelain skin, no airbrushed skin, no skin blur, no glossy plastic finish
+STYLE: You set how it is performed, in our case, she talks on camera in every shot her face is in, and the voiceover only runs over the one insert where she is not on screen. You write that here, again on every stage, and again in CONSTRAINTS. If you drop one of the three, about half your takes come back as narrated b-roll.
+VOICE: You cast the voice the way you cast the face, with pitch, pace, accent and speech habits, then the sound you do not want.
+CHARACTER: You give the age, the build, the hair, the clothes and three or four things about the face.
+SETTING: You describe the room. In our case, we'll add a bit of a mess to make it look more natural. You name every place the ad visits and ban the rest, or the model invents one. You can skip this block when your stages already describe the space.
+STAGES: This is the body of the ad, one beat at a time. Each beat gets one change and an end state, because the end state is what the model steers toward. For a 30 second video, you write 110 to 120 words. Then you size each window to the line inside it, at 15 words per four seconds. Mine run 5, 7, 3, 7, 4, 4.
+BRAND: You say what gets spoken out loud, who says it, and how to pronounce it. You never say what gets shown, because Seedance mangles text and always will.
+AUDIO: You name the sound effects as physical events, cast the voice, and make a decision about music. For example:
+[SOUND] Strictly only naturally occurring sound and foley, no music allowed.
+CONSISTENCY: You list what cannot change between cuts, which is the face, the clothes, the props, the counts and the geography. You write the counts as numbers, because those drift first. Anything you leave out here is free to move, and across six cuts it will.
+CONSTRAINTS: This is the ban list and it always goes last. This is a list I've compiled after making tens-hundreds of generations.
+All of it together
+Here is every block above assembled into the prompt that made the ad at the top of this article: thirty seconds, one pass, six cuts.
+REFERENCES: @Image 1 is the approved production board for this ad, six frames in order. Use its frames as the shot plan for the six stages below and expand them into one moving piece. It defines Lena's face, hair, build and wardrobe, and the kitchen and its clutter. It is not a first frame, a poster, a collage or a grid, and nothing belonging to the board itself appears in the video: no panel borders, no frame numbers, no annotation text, no timing strip, no arrows, and not the logo in its title bar. CAMERA: Vertical 9:16 smartphone footage, multi-cut, filmed by Lena herself on her own front camera. Talking-head stages are hands-free: phone propped at eye level against something on the table or counter. Six distinct shots with clean cuts between them, listed in STAGES. Keep subtle handheld micro-shake, drifting composition, autofocus hunting once, uneven exposure shifts and slightly off-centre, slightly tilted framing. Shot ladder is mild on purpose — like a TikTok confessional, not a film: stage one medium chest-up at the island with the oil pour, stage two close standing-snack hands insert on the counter, stage three tighter face-and-shoulders, stage four medium close-up pulled half a step back, stage five medium chest-up at the counter, stage six medium chest-up at the front door. No overhead tabletop hero, no low-angle plate hero, no wide establishing shot, no cinematic camera movement. The phone is the camera, so it is never visible, and no phone or screen of any kind appears anywhere in the video. LOOK: Soft practical face light on every talking-head stage from a warm lamp near the phone, not a beauty ring light and not a polished key. Small natural catch lights are fine; do not flatten or glaze the face. The kitchen behind her falls a stop darker. Stages one, three and four are night under that lamp in the clean modern kitchen. Stage two is soft warm under-cabinet glow only on the quartz counter and her hands, the rest of the room falling darker. Stages five and six are daylight: stage five soft window fill at the counter, stage six a little overexposed by open daylight at the door. Warm skin tones, true-to-life colour, mild sensor noise, gentle motion blur on a gesturing hand and on the oil stream. Realistic skin texture with visible pores around the nose and cheeks, natural slight unevenness, a soft sheen on the nose and forehead, no filter quality. It should look like footage from someone's actual camera roll. No cinematic grade, no studio lighting, no ring light, no beauty key, no moody lighting, no beauty filter, no airbrushed skin, no doll skin, no porcelain skin, no skin blur, no glossy plastic finish. STYLE: A young woman delivering a hot-take confessional into her front camera, the way TikTok calorie-tracking commentary does. Direct, slightly conspiratorial, amused at how wrong everyone is about why the scale will not move. She speaks every line out loud on camera with accurate natural lip sync in stages one, three, four, five and six, looking down the lens. Stage two is the only insert: hands and the standing counter snack only, face completely out of frame, voice continues as voiceover. Never run voiceover over a shot where her face is visible. Never go silent while her mouth moves. VOICE: A warm mid-range woman's voice in her mid twenties, natural London English with the light cadence of a bilingual Spanish speaker. Quick and bright, sentences run into each other with short caught breaths rather than clean pauses. She stresses the reframe words ("you just have no idea", "literally me", "no guessing") a little harder than the rest. Real breath, one short laugh in the final stage. Intimate and close, the way a front-camera mic picks someone up at arm's length. No announcer tone, no narrator delivery, no radio voice, no rising question intonation at the end of statements, no over-articulated consonants. CHARACTER: LENA, a strikingly pretty 26 year old brunette woman with a warm olive complexion, large dark brow…
+[26-30s] CUT. Spoken to camera, lips moving in sync. MEDIUM CHEST-UP at the front door of the same flat, front camera at arm's length but still eye-level and close, a clean modern hallway and a soft strip of street behind her rather than a wide establishing shot. Slight tilt, a little overexposed by the open door. She is on her way out with a tote over one shoulder, talking to the lens, then breaks into a short laugh at her own last line. One hand grips the bag strap high on her chest; camera hand stays behind the lens, out of frame. She says, direct to camera: {So if you're serious about getting in shape, stop guessing and start tracking the smart way.} End state: she holds the last look into the lens for half a second, then pulls the door shut behind her. BRAND: One product name is spoken once, in stage three, on camera. "Sona", pronounced "SOH-nuh", said naturally mid-sentence, never emphasised or announced like an advert. AUDIO: Real location sound in every shot. <matte bowls touching a quartz island> <a kitchen scale clicking as something is set on it> <oil pouring in a continuous stream into a ceramic bowl> <a glass bottle tip upright> <a knife stuck in a peanut butter jar ticking once> <a crisp cracker bite> <a fork against a ceramic plate> <a spoon against a breakfast bowl> <a front door opening onto a quiet residential street, birds and distant traffic> <a bag strap shifting on a shoulder> <a door pulled shut>. Her voice is close, intimate, unamplified, the way a front-camera mic picks someone up at arm's length. Room tone stays soft in the night kitchen, brighter in daylight, open at the door. [SOUND] Strictly only naturally occurring sound and foley, no music allowed. No subtitles. CONSISTENCY: Same face, same long dark brunette hair with no blonde highlights, same silver hair clips on both temples, same black ribbed tank, same taupe nails, same gold watch and rings, same gold nose stud in all six shots, across the cut to daylight as well. Exactly one person on screen in every shot. The same clean modern kitchen in stages one to five, and the front door of that same flat in stage six, and no other location anywhere in the video. No fridge appears in any stage. The five bowls, the scale and the oil pour are present in stages one and three, and replaced by a single plated dinner from stage four onward. Stage two is a three-second mid-bite punch only: peanut butter jar, knife in jar, one cracker already spread, lifted and bitten — no spreading sequence. Kitchen stays clean and modern through the daylight beats. No phone or screen is visible in any stage. Natural human timing, accurate hands with five natural fingers whenever a hand is visible, realistic skin texture throughout, visible pores and natural slight unevenness retained across every talking-head stage. Talking-head lighting stays soft practical lamp light, never a beauty ring; only the standing-snack insert and the daylight cuts change the light state, never inside one stage. CONSTRAINTS: No background music, no on-screen text, no captions, no subtitles, no logos, no phone visible in any shot, no screen content, no app interface, no readable scale display, no voiceover over any shot where her face is visible, no face or head visible in the stage two insert, no silent talking head, no mouth moving out of sync with the words, no second person in any shot, no setup other than the three named in SETTING, no fridge, no open fridge, no cinematic camera movement, no slow motion, no overhead hero food angle, no low tabletop hero angle, no wide establishing shot, no side three-quarter interview framing, no studio lighting, no professional camera look, no food photography styling, no cluttered counters, no dirty dishes, no dish rack, no fridge magnets, no plastic leftover tubs, no catalogue posing, no finger counting, no holding up one two or three fingers, no counting gestures, no beauty filter, no plastic or airbrushed skin, no doll skin, no porcelain skin, no skin b…
+6. What came out
+So here is the end-result. We researched the angle, understood what ads are working in our niche, generated a board and then composed our prompt using the building blocks above.
+Then we sent the board + our prompt to Seedance 2.5 on
+Genviral Studio
+, and this is what came out:
+That's it
+I hope this was useful, and that it gave you something you can actually use rather than another list of prompt tricks.
+None of it is specific to a calorie tracker, or to Sona, or to me. Swap the product and swap the person and apply it to your own product. I wrote this as a guide for myself, first and foremost, and contains everything you need to run good UGC ads for your product.
+To summarize:
+Work out what you actually sell. Not the feature but the moment it hurts, and the Life-Force desire sitting underneath it.
+Spend an hour in the Meta Ads Library. Your competitors already paid to find out what converts, and their winners are public. Take the best one and either say it better or say it from a person they are not using.
+Write the ad on a structure that already works. Call out, value, call to action, laid out as hook, problem, demo, proof and CTA.
+Generate the storyboard before the video. An image comes back in seconds for cents and tells you whether the idea looks right, which is a much cheaper way to find out than a video is.
+Write the video prompt as blocks. You can be very detailed in how you build your prompt
+Finally, I built
+Genviral
+with my co-founder
+@onlinedopamine
+, and all five of those steps are baked into Vira, the agent inside it.
+It runs the competitor research, writes the spec, generates the board, generates the video, then schedules it across every platform you're connected to.
+If you want this working out of the box instead of assembling it yourself, that is what it is for, and there's an
+MCP server
+if you'd rather drive it from Claude or any of your agents.
+Thanks for reading!
+12:39 AM · Aug 12, 2026
+84.1K
+Views
+8
+16
+158
+550
+Relevant
+View quotes
+Post your reply
+Reply
+Search query
+Relevant people
+Fekri
+@fekdaoui
+Follow
+founder
+@genviral_
+Trending now
+What’s happening
+UpstoxHaiTohBetterHai
+Upstox, helping traders get better
+Promoted by Upstox
+Entertainment · Trending
+#Sigma
+Trending in India
+#Drishyam3OnDistrict
+Trending in India
+Meenu
+Show more
+Terms
+·
+Privacy
+·
+Cookies
+·
+Accessibility
+·
+Ads Info
+·
+More
+© 2026 X Corp.
+--- 93 643
