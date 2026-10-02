@@ -82,7 +82,7 @@
       "ui overlays"
     ],
     "earned": [
-      "<at most five, each with its row in docs/character-model-failures.md>"
+      "<at most five, each with its row in pipeline/character/model-failures.md>"
     ]
   },
   "video": {

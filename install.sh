@@ -255,6 +255,9 @@ for f in .env.example .gitignore requirements.txt; do copy_once "$f"; done
   [ -f "$DEST/$d/.gitkeep" ] || touch "$DEST/$d/.gitkeep"
 done
 ok "pipeline/ and research/ directories"
+# The character failure ledger is the user's: written once, never overwritten. What the
+# kit learns later reaches them in docs/character-model-known.md, a managed file.
+copy_once "pipeline/character/model-failures.md"
 
 chmod +x "$DEST/ugckit" "$DEST"/scripts/*.sh "$DEST"/scripts/*.py 2>/dev/null || true
 

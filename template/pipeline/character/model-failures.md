@@ -1,18 +1,24 @@
 # Character pipeline: the failure ledger, per model
 
+**Your file.** The installer writes it once, into a new workspace, and no kit upgrade
+overwrites it. What the kit learns later reaches you in `docs/character-model-known.md`,
+which upgrades replace; read both.
+
 P3 (`character-review`) adds a row to the model's table for every rejected segment.
-P1 (`character-shots`) reads the model's table before it writes a prompt. A negative
-enters a prompt only from this ledger.
+P1 (`character-shots`) reads the model's table, here, and the model's row in
+`docs/character-model-known.md`, before it writes a prompt. A negative enters a prompt
+only from this ledger. A model with no table here gets one, in the shape below, at its
+first rejected segment.
 
 Repair is by layer: face drift goes to the references and the keyframe; plastic skin to
 the casting and the light; bad hands to a simpler shot; warped UI cannot happen (the app
 is inserted, never generated); bad lip sync to fewer words; room or outfit drift to the
 exact lock restated; a polished look to stripping cinema words.
 
-A model gets its own table here when it is added to `scripts/character/models.json`,
-with its measured cap and price.
+## What was known before the first run
 
-## What is known before the first run
+As the kit shipped it when this workspace was made. The kit's current version is
+`docs/character-model-known.md`.
 
 | Model | Known failure or limit | Source |
 |---|---|---|
