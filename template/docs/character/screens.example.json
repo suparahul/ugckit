@@ -1,0 +1,62 @@
+{
+  "_comment": "apps/<slug>/screens/screens.json: the screen library of an app, for character videos with app insertion. scripts/character/screens.py index adds the user's recordings and stills and measures them; the screens skill describes each row with the user; screens.py check tests it; SCREENS.md is written from this file.",
+  "app": "<slug>",
+  "screens": [
+    {
+      "id": "<screen-id>",
+      "file": "<screen-id>.mp4",
+      "kind": "recording | still",
+      "job": "<the one job the recording shows>",
+      "size": [
+        1179,
+        2556
+      ],
+      "fps": 60,
+      "duration_s": 6.2,
+      "events": [
+        {
+          "t": 0.8,
+          "gesture": "tap | scroll | swipe",
+          "region": "<where on the screen>",
+          "label": "<what it does>"
+        }
+      ],
+      "hero": {
+        "text": "<the one string the viewer must read, exactly as the app shows it>",
+        "rect_source_px": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "t": 3.0,
+        "needs": "recognition | large type | body text"
+      },
+      "mode": "light | dark",
+      "app_version": "<x.y.z>",
+      "date": "<YYYY-MM-DD>",
+      "stills": {
+        "start": "<screen-id>-start.png",
+        "end": "<screen-id>-end.png",
+        "long": "<screen-id>-long.png"
+      },
+      "patches": [
+        {
+          "label": "<what is covered>",
+          "window": [
+            0.0,
+            0.0
+          ],
+          "from_t": 0.0,
+          "region": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "expired": false
+    }
+  ]
+}

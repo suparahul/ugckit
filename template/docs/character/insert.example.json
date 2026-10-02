@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to pipeline/character/<video>/segments/<nn>-<type>/insert.json, only for a segment that inserts the app. A superset of docs/insert.example.json: every existing key keeps its meaning, and the new keys are optional, so an old file still runs.",
+  "_comment": "Copy to pipeline/character/<video>/segments/<nn>-<type>/insert.json, only for a segment that inserts the app. A superset of docs/insert.example.json: every existing key keeps its meaning, and the new keys are optional, so an old file still runs. scripts/character/screens.py fill writes it from the screen row; composite.sh reads it. source is a list of two stills for a finger-driven swipe.",
   "mode": "over-shoulder | in-hand | show-to-camera | push | finger",
   "screen_id": "<row id in apps/<slug>/screens/SCREENS.md>",
   "source": "apps/<slug>/screens/<id>.mp4",
@@ -71,9 +71,11 @@
     "despill": "whole finger"
   },
   "finger": {
+    "gesture": "scroll | swipe | tap",
     "contact_frame": null,
     "release_frame": null,
     "tip_track": "the point of the finger matte furthest into the screen",
+    "momentum_tau_s": 0.5,
     "scroll_follow_tolerance_pct_screen_h": 5
   },
   "motion_blur": {
@@ -109,5 +111,7 @@
       "finger_sheet": "no app pixel on the finger, no green on it",
       "scroll_follow_pct_screen_h_max": 5
     }
-  }
+  },
+  "source_width_px": null,
+  "_source_width_px": "null: twice the widest screen quad, from 480 to 1440 px"
 }

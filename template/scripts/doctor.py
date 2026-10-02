@@ -318,6 +318,15 @@ else:
         warn(f"character model {chr_model} is not in scripts/character/models.json",
              "run: scripts/character/state.py model set <slug> <seconds> with a known slug")
 
+# The OCR test of a character video's app screen (the hero element must read).
+if shutil.which("tesseract"):
+    ok("OCR for character videos", "tesseract")
+elif shutil.which("swift") and sys.platform == "darwin":
+    ok("OCR for character videos", "macOS Vision, through swift")
+else:
+    warn("no OCR engine for character videos with app insertion",
+         "brew install tesseract  (macOS)  |  sudo apt install tesseract-ocr  (Debian/Ubuntu)")
+
 say("")
 if FAIL:
     say(f"\033[31m{len(FAIL)} blocking problem(s):\033[0m")

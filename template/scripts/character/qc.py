@@ -1,15 +1,24 @@
 #!/usr/bin/env python3
-"""P3: measure a generated segment. Numbers only -- the agent supplies the verdict.
+"""P3 and P4: measure a generated segment, and gate its phone screen. Free, local.
 
-    scripts/character/qc.py <video> <segment> [video.mp4]
+    scripts/character/qc.py <video> <segment> [video.mp4]        the plate (P3, gate B)
+    scripts/character/qc.py <video> <segment> --keyframe         the flat-on gate on the keyframe (gate A)
+    scripts/character/qc.py <video> <segment> --composite [mp4]  the insertion gates on the composite (P4)
 
-A copy of scripts/qc.py, pointed at pipeline/character/<video>/segments/<segment>/.
+Started from scripts/qc.py, pointed at pipeline/character/<video>/segments/<segment>/.
 
-Writes a contact sheet and per-shot frames next to the video and prints:
+On the plate it writes a contact sheet and per-shot frames next to the video and prints:
   - detected cuts vs the cut times the prompt asked for
   - green-screen quality, if there is any green (flatness is what keying cares about)
   - the spoken dialogue, transcribed back, for diffing against the script
   - pitch spread per 2s window, which is how you catch a monotone read
+  - for a phone segment (O, G, S, H, F), the insertion gates of the plate: the screen
+    flat-on to the lens, the drift, the screen width against the hero element's need,
+    and for H and F the motion gates (holds, the push angle, the corner track)
+On the composite: no strict green left, the corner sheet, the OCR of the hero element,
+and for F the finger sheet, the finger occlusion and the UI sync.
+The gates print PASS or FAIL and go to qc/gates.json; the agent still supplies the
+verdict, by eye.
 
 Looking at the frames is still your job. This tool cannot tell you the tripod is in shot.
 """
@@ -19,11 +28,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 if len(sys.argv) < 3:
-    sys.exit("usage: scripts/character/qc.py <video> <segment> [video.mp4]")
+    sys.exit(__doc__)
 video, seg = sys.argv[1], sys.argv[2]
+SEGMENT = seg            # `seg` is reused below for audio windows
 SEGDIR = f"{ROOT}/pipeline/character/{video}/segments/{seg}"
-vids = sys.argv[3:4] or sorted(glob.glob(f"{SEGDIR}/generated/*.mp4"),
-                               key=os.path.getmtime, reverse=True)
+rest = sys.argv[3:]
+if "--keyframe" in rest or "--composite" in rest:
+    import screen_gates
+    sys.exit(screen_gates.main(ROOT, video, seg, rest))
+vids = rest[:1] or sorted(glob.glob(f"{SEGDIR}/generated/*.mp4"),
+                          key=os.path.getmtime, reverse=True)
 if not vids:
     sys.exit(f"no video in pipeline/character/{video}/segments/{seg}/generated/")
 V = vids[0]
@@ -185,6 +199,14 @@ if has_audio:
                     print(f"    {w0:>3}-{w0+2:<3}s   {spread:5.2f} st{flag}")
     except Exception as e:
         print(f"\nprosody: skipped ({e})")
+
+# ---------------------------------------------------------------- the insertion gates
+if os.path.exists(f"{SEGDIR}/insert.json") or SEGMENT.split("-")[-1].upper() in ("O", "G", "S", "H", "F"):
+    try:
+        import screen_gates
+        screen_gates.plate_gates(ROOT, video, SEGMENT, V, OUT)
+    except ImportError as e:
+        print(f"\ninsertion gates: skipped ({e})")
 
 print(f"\nartifacts in {OUT}/")
 print("Now LOOK at the contact sheet. Measurements do not catch a hallucinated tripod,")
