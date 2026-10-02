@@ -65,8 +65,6 @@ means a mangled `.env` (`scripts/doctor.py`).
 The script records the stage and the computed cost in `pipeline/character/state.json`
 and warns when the file has no sound track. The file is in
 `segments/<nn>-<type>/generated/`. **Never report a generation as good before looking at
-it.** The next stage is P3, gate B, for this segment only. Until the `character-review` skill
-exists, review by eye with `scripts/character/qc.py <video> <nn>-<type>` and the user's
-word, and write a reject into `pipeline/character/model-failures.md`. A reject
+it.** The next stage is P3, gate B, for this segment only (`character-review`). A reject
 regenerates this segment alone, from the same keyframe, with the one change the failure
-calls for.
+calls for, and with its own yes.

@@ -333,10 +333,10 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
 | | D2 voice | `character-voice` | the approved voice reference |
 | B, per video | P1 shots | `character-shots` | segments, shot files, `video.json`, keyframes, prompts, `refs.json`; **gate A**, the storyboard the user approves |
 | | P2 generate | `character-generate` | one segment per run, after the user's yes to its computed cost |
-| | P3 review | `character-review` *(not built yet)* | keep, reject or regenerate one segment; gate B |
-| | P4 composite | `character-composite` *(not built yet)* | the app on the green phone; **skipped when `app_insertion` is false** |
-| | P5 assemble | `character-assemble` *(not built yet)* | one file from `video.json` |
-| | P6 deliver | `character-deliver` *(not built yet)* | the finished file; the pipeline ends here |
+| | P3 review | `character-review` | keep, reject or regenerate one segment; **gate B**; a reject adds a ledger row |
+| | P4 composite | `character-composite` (with `screens`, the screen library) | the real app on the green phone, at 1080x1920, and its insertion gates; **skipped when `app_insertion` is false** |
+| | P5 assemble | `character-assemble` | one 1080x1920 file from `video.json`: trims, R and P, sound, captions, the export pass |
+| | P6 deliver | `character-deliver` | **gate C**, then the finished file in `final/`; the pipeline ends here |
 
 - **Production starts only from `pipeline/character/<video>/plan.json`**, locked and
   approved by the user. No production stage edits it. Casting never runs per video: a
@@ -357,8 +357,18 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
   before it prints a cost.
 - **Rules 2 to 9 hold here too**: REST for generation, messages-only templates, the
   5,000-character limit, the duration in `extensions`, the computed cost, a yes per run.
+- **No phone plate is corrected in compositing when it is not flat-on to the lens.** The
+  flat-on gate (`scripts/character/qc.py`) is the hard rule of every O, G, S and F plate
+  and of the holds of an H plate; a plate that fails it is regenerated from a redone
+  keyframe.
+- **Every approval is the user's words**, recorded by `scripts/character/review.py` in
+  `approval.json`: gate B per segment, the composite, gate C for the file. Never report a
+  segment or a file as good before looking at it.
 - **The failure ledger is the user's file**, `pipeline/character/model-failures.md`;
-  what the kit knows about each model is `docs/character-model-known.md`.
+  `review.py` adds a row for every rejected segment. What the kit knows about each model is
+  `docs/character-model-known.md`.
+- **The pipeline ends at the finished file** (`pipeline/character/<video>/final/`). No
+  posting, no music in the file.
 
 ## MODELS
 

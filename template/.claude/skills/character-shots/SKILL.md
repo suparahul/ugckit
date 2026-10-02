@@ -103,6 +103,15 @@ redone, never fixed later); for H the end still too; for F the other hand alread
 beside the phone. Redo a failed still with `--only`. Each keyframe that shows her face
 counts toward her twenty-generation gate.
 
+For every phone segment, measure the flat-on rule on the still itself:
+
+    scripts/character/qc.py <video> <nn>-<type> --keyframe
+
+It fits the green screen's corners and passes when the opposite edges are within 3%,
+every corner within 3° of 90 and the long edges within 3° of vertical; for H it checks
+the end still too, and that the push grows the screen to over half the frame width. A
+still that fails is redone before gate A.
+
 ## 5. The prompts and the lint
 
 Write `segments/<nn>-<type>/prompt.txt` for each generated segment, from `creator.json`,

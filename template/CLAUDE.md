@@ -24,8 +24,10 @@ The slideshow path, when the user has an app to grow (AGENTS.md § The slideshow
 
 Character videos, a separate pipeline (AGENTS.md § Character videos), from a locked,
 approved plan: part A once per character (`persona-identity` video half,
-`character-voice`), then per video `character-shots` (the storyboard, gate A) and
-`character-generate`, one segment per run.
+`character-voice`), then per video `character-shots` (the storyboard, gate A),
+`character-generate` (one segment per run), `character-review` (gate B),
+`character-composite` with `screens` (only with app insertion), `character-assemble` and
+`character-deliver` (gate C, the finished file).
 
 `atlas` is not a stage: it shows the user what the research found, in a browser. Run it
 after a harvest, after a teardown, and whenever they ask what was found.

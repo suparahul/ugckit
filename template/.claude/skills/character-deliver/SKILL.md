@@ -1,0 +1,39 @@
+---
+name: character-deliver
+description: P6 of the character pipeline, gate C — show the user the assembled file, record their decision with their words in approval.json, and copy the approved export to pipeline/character/<video>/final/. The pipeline ends at the finished file; nothing is posted. Free.
+---
+
+# P6 — deliver (gate C)
+
+**Nothing is handed over without the user's approval, in their words.**
+
+## 1. Show the user the file
+
+The assembled file `pipeline/character/<video>/assembly/<video>.mp4`, its contact sheet,
+and the checks of `assembly/assembly.json`. On the first real use case, both exports: the
+default and `<video>-grain.mp4`; the user picks one (the grain test). Walk the final
+checklist with them: the face, the outfit and the set hold across every segment; the
+voice and the room agree across every join; no join inside a sentence; the app's strings
+are real and readable; the captions match the frozen script and the house style.
+
+## 2. Record their decision
+
+    scripts/character/review.py final <video> --decision approve --words "<the user's words>" [--export grain]
+    scripts/character/review.py final <video> --decision regenerate --segment <n> --words "<the user's words>"
+    scripts/character/review.py final <video> --decision reject --words "<the user's words>"
+
+A regenerate goes back to that segment alone: `character-generate` (a paid run, with its
+own yes), `character-review`, then P4 and P5 again. A reject stops the video; say why in
+the notes (`scripts/character/state.py note <video> "<why>"`).
+
+## 3. Deliver
+
+    scripts/character/deliver.sh <video>
+
+It refuses unless gate C is approved with the user's words, and refuses an assembly made
+after gate C. It copies the export the user chose to `final/<video>.mp4` and writes
+`final/delivery.json` (the file, its checksum, the user's words, the segments, the
+computed spend), and marks P6 done.
+
+**The pipeline ends here.** Posting, sound choice and the caption text of the post are
+outside it.
