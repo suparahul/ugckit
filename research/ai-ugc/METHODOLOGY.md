@@ -186,16 +186,16 @@ paths are in a user's workspace.
 | Anchors: angle views, expression sheet, hands, outfits (and the hero of any other character) | `characters/<character>/references/anchors/` | `persona-identity`, video half |
 | The handle's world: the fixed subjects (a pet) and the sets (the rooms of the home) | `world.json`; pictures in `references/subject-<name>.png` and `references/sets/<set-id>.png` | `persona-identity` |
 | Voice reference clip, its source, the room tones | `characters/<character>/references/voice/` | `character-voice`, the **voice reference setup** (§ 7.2) |
-| Screen library: real recordings and screenshots of the app | `apps/<slug>/screens/` with `SCREENS.md` | `screens`, only for a plan with app insertion: the user provides the recordings; the agent checks and indexes them |
+| Screen library: real recordings and screenshots of the app | `apps/<slug>/screens/`: `screens.json` (the data) and `SCREENS.md` (written from it) | `screens` (`scripts/character/screens.py`), only for a plan with app insertion: the user provides the recordings; the agent checks and indexes them |
 | The locked plan | `pipeline/character/<video>/plan.json` | written by the planning system, approved by the user; read-only to production |
 | `video.json`, the shot files, the keyframes | `pipeline/character/<video>/` | `character-shots` (P1) |
 | One folder per generated segment | `pipeline/character/<video>/segments/<nn>-<type>/` | P2 to P4 |
-| The assembled file | `pipeline/character/<video>/assembled/` | `character-assemble` (P5) |
+| The assembled file, its manifest and contact sheet | `pipeline/character/<video>/assembly/` | `character-assemble` (P5) |
 | The finished file, the end of the pipeline | `pipeline/character/<video>/final/` | `character-deliver` (P6) |
 | `approval.json` | `pipeline/character/<video>/` | P1, P3, P6 |
 | The pipeline's state | `pipeline/character/state.json` | the character scripts; the recreation `pipeline.json` is not touched |
-| The scripts | `scripts/character/`: `generate.sh`, `qc.py`, `screen_comp.py`, `shots.py`, `keyframes.sh`, `lint_prompt.py`, `assemble.sh`, `state.py`, `models.json`, `templates.json` | the character skills |
-| The failure ledger, per model | `pipeline/character/model-failures.md`, **the user's file**: written once by the installer (the § 9.4 table and one empty table per model), never overwritten by an upgrade | P3 writes, P1 reads |
+| The scripts | `scripts/character/`: `generate.sh`, `qc.py` (with `screen_gates.py`), `screen_comp.py` (with `screen_track.py`), `composite.sh`, `screens.py`, `review.py`, `shots.py`, `keyframes.sh`, `lint_prompt.py`, `assemble.sh` (with `assemble.py` and `captions.mjs`), `deliver.sh`, `ocr.py` (with `ocr.swift`), `state.py`, `models.json`, `templates.json` | the character skills |
+| The failure ledger, per model | `pipeline/character/model-failures.md`, **the user's file**: written once by the installer (the § 9.4 table and one empty table per model), never overwritten by an upgrade | P3 writes (`review.py segment` with `--class`; `--fixed-by` fills the fix), P1 reads |
 | What the kit knows about each model | `docs/character-model-known.md`, **the kit's file**: the § 9.4 table, updated by every upgrade, never written by the pipeline | P1 reads |
 | The orchestrator section for character videos (§ 2.4) | `template/AGENTS.md` | orchestrator update, shipped with the skills |
 
@@ -1302,8 +1302,9 @@ the blur its recording already has, and the finger is the plate's own pixels. To
 | the finger passes through the phone, or a sixth finger | a hand failure | P1: a simpler gesture (a tap before a scroll); regenerate |
 | the hand enters from outside the frame | the hand was not in the first frame | P1: redo the keyframe with the hand raised beside the phone |
 
-**What our tools cannot do yet.** None of these exist today; each is Phase 3 work, in the character copies
-(§ 16), local and free:
+**What our tools could not do, before Phase 3.** All but the last were built on
+2026-10-02 in the character copies (§ 16, Phase 3) and tested on drawn plates only; each
+is proven only on the first real motion plate (Phase 5, run 3):
 
 - the `motion` track mode in `character/screen_comp.py` (today: a 9-frame median, a 7 to 31 frame
   smoother, frames under a quarter of the largest green area dropped, quads over 90% of
@@ -2017,12 +2018,96 @@ sync check. All can be developed against plates already on disk; the motion work
 proven only on the Phase 5 motion plate (run 3). Done when: an old plate passes the new gates,
 or fails them with a clear reason.
 
+**Built 2026-10-02** (branch `ai-ugc-character-pipeline`), on the request to "build
+the remaining free, local stages so the pipeline is complete end to end".
+- `screens` and `scripts/character/screens.py`: `index` (the user's recordings and stills
+  into `screens.json`, measured; `SCREENS.md` written from it), `check` (the capture recipe
+  as checks: at most three gestures, the 0.5 s first hold, 0.4 s after a tap, the 1 s end
+  hold, the hero rect inside the source, the hero string read by OCR in the source),
+  `fill` (a phone segment's `insert.json` from the row: the mode, the source kind, the
+  beats as a first guess, the hero, the track mode, the F matte, motion blur for H).
+- `scripts/character/screen_track.py` (shared by the compositor and the gates): the
+  recreation corner fit, the join of several green regions, the `per-frame`, `locked`
+  and `motion` track modes, the flat-on measure, the holds, the corner jumps, the finger
+  matte with the dark exception kept to the notch zone and the edge band, the fingertip
+  tracker, and contact and release.
+- `scripts/character/screen_comp.py`: the plate upscaled once to 1080x1920 before the
+  composite; the source scaled to twice the widest quad and its width read from the file
+  (the patch coordinates follow); the `still` and `finger-driven` source kinds (a long
+  screenshot for a scroll, two stills for a swipe, with momentum after release); the
+  finger matte and the despill on the whole finger; motion blur as a 180-degree shutter
+  (the app averaged over the quads between the neighbouring frames, so a push blurs from
+  its centre); `--propose-grade` (sharpness, noise and black level measured in a ring
+  beside the bezel); the track of each composite kept for the gates and for assembly.
+- `scripts/character/qc.py` with `screen_gates.py`: on the plate, the flat-on gate, the
+  drift, the screen width against the hero's need, and for H the holds, the push angle
+  and the corner track; `--keyframe`, the flat-on gate on the keyframe and the H end
+  still (added to gate A in `character-shots`); `--composite`, no green left (a pixel of
+  the plate's green still the plate's colour, so green in the app's own pixels is not
+  counted), the corner sheet, the OCR of the hero element, and for F the finger
+  occlusion, the finger sheet and the UI sync. `ocr.py`: tesseract, else the macOS Vision
+  framework through `ocr.swift`; with neither, the test is NOT RUN, never passed.
+  `doctor.py` reports which.
+- `composite.sh` and `character-composite` (P4), `review.py` and `character-review` (P3:
+  gate B by the user's words, a ledger row for every reject, `--fixed-by`, the keep rate
+  per type and per set with the stop rule).
+- Evidence, in the scratchpad only, on plates already on disk and drawn plates; no video
+  was generated and nothing was spent. **The old over-the-shoulder plate fails the new
+  gates with a clear reason**: the screen 11° from vertical and its opposite edges 15%
+  apart (the plate was made before the flat-on rule), and a drift of 12% of the screen
+  width; its keyframe fails the same way (9.9°). Composited anyway for the test, at
+  1080x1920: no green left, the corner sheet clean, the hero string read by OCR with a
+  similarity of 1.0. With `"composite_resolution": "plate"`, an old recreation
+  `insert.json` gives the recreation compositor's result within a mean of 0.64 of 255
+  per frame. Two drawn plates, flat-on, on a room frame: a push (H) and a finger scroll
+  (F) with a shadowed finger. Every plate gate passed (the holds 0.57 s and 3.73 s, the
+  push 0.3° from square, the corner jumps at most 1.16%); the fingertip tracker found
+  contact at 1.00 s and release at 1.60 s, as drawn; the finger differed from the plate
+  by at most 3.8 of 255 and carried no green; the scrolled content stayed within 0.1% of
+  the screen height of the fingertip; the hero read on the H end hold and on the F final
+  state. Faults found and fixed during the test: the green gate counted green pixels of
+  the app itself; `fill` laid beats out of order on a recording longer than the plate;
+  the first blur followed only the screen's centre, so a push got none.
+- **Not done:** the motion work is proven only on drawn plates. The thresholds are
+  starting values. The tap alignment of O, G and S is checked by eye. An end frame
+  together with references: no model in `templates.json` states both.
+
 **Phase 4 — P5 and P6, assembly and delivery (local, free).**
 `character-assemble` and `scripts/character/assemble.sh`: trim, upscale, join, punch-in,
 loudness, room tone, R and P building, captions, the export pass with its optional grain
 variant, the final OCR. `character-deliver`: gate C and the finished file in `final/`, where the pipeline
 ends. Done
 when: segments already on disk assemble into one file from a `video.json`.
+
+**Built 2026-10-02**, with Phase 3:
+- `scripts/character/assemble.sh` (`assemble.py`): the approved files from gate B (the
+  composite for a phone segment), the trim by faster-whisper word times (0.15 s before
+  the first word, 0.2 s after the last) or by `trim` or `trim_to_seconds`, the upscale
+  once, `punch_in`, R (9:16 around the hero, a slow punch-in to 1.25, a 0.3 px blur) and
+  P (her demo performance in a round bubble, 28% of the width, untrimmed), `audio_from`,
+  one loudness (-16 LUFS), a 30 ms fade at each join, the room tone looped under, the
+  captions spelled from the frozen script and timed by the word times (3 to 6 words, the
+  house style, drawn by `captions.mjs` with the Atlas's renderer, moved to the top when
+  the hero is in the caption band), the title overlay only when the plan asks, the
+  export pass (a phone-like intermediate encode, then the final 1080x1920 30 fps H.264),
+  `--grain` for the grain variant, and the checks on the final file: the format, the
+  sound, the loudness, the OCR of every hero element (and on the grain file), no green
+  left. `assembly/assembly.json` keeps the timeline and the captions.
+- `scripts/character/deliver.sh` and `character-deliver`: gate C by the user's words
+  (`review.py final`), refused without them, refused for an assembly newer than gate C or
+  a grain export that was not made; the chosen export copied to `final/` with
+  `delivery.json` (the checksum, the words, the computed spend).
+- Evidence, in the scratchpad: a 29.8 s video from the old plates (T, the G composite, an
+  R, a T with a punch-in, a P), with two shared segments of another video folder: every
+  final check passed (1080x1920 30 fps H.264, -16.4 LUFS, the hero read by OCR at 1.0 in
+  the G, the R and the P, on both exports, no green left); the captions ran through the
+  whole file. A video without app insertion (two T segments, a title overlay for 3 s):
+  assembled; `composite.sh` and `screens.py fill` refused it. Gate C and the delivery
+  refused each wrong case. Fault found and fixed: image overlays chained in one
+  ffmpeg graph dropped every caption after the first segment change; the captions are now
+  one layer, encoded first.
+- **Not done:** the "done when" is met on old plates, not on a real character's
+  segments. The grain test needs the first real use case.
 
 **Phase 5 — the small paid test (under $2 in total; each run needs a yes).**
 The founder, 2026-10-02: "We can test on small video portions and the real test can
