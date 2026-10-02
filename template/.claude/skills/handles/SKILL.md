@@ -5,7 +5,7 @@ description: Phase 6 — create one handle identity at a time, in five steps: ro
 
 # Phase 6 — the handle identities
 
-No script of its own; the references come from the `persona-identity` stage. One handle
+No script of its own; the references come from the `persona-identity` skill. One handle
 at a time, one step at a time, from the rows of `strategy/ACCOUNTS.md`. The sixth step
 of the Organic Factory UI's list, the connection to the posting service, is **not** here: it runs at
 the first send (`posting-provider`). A handle is complete for this phase at five steps.
@@ -75,10 +75,14 @@ named reader, the subject (the exact cats, the room), the place. Short prose and
 table. The brand handle's persona is the app: no "I", the voice is second person or
 neutral. The user approves on the handle page (`persona.approve`) or here.
 
-**3. References.** Rendered subject → run the `persona-identity` stage now: the face
-(`references/face.png`), each subject (`references/subject-<name>.png`), the style
-photo (`references/style.png`). Real subject → skip; write `## References` with the line
-"own camera; references pending" and go on. Write the table:
+**3. References.** Rendered subject → run the `persona-identity` skill now, its identity
+half (mode 1): the casting brief from `## Persona`, the vibe references, the locked
+JSON, four face candidates, the user picks the hero (`references/face.png`); then each
+subject (`references/subject-<name>.png`) and the style photo (`references/style.png`).
+It also writes `characters/<character>/creator.json` and `world.json`, and the
+`## Characters` table under `## References`; the slides do not read them. The video half
+waits for the first character video. Real subject → skip; write `## References` with the
+line "own camera; references pending" and go on. Write the table:
 
     ## References
     | File | Role | What it is | Used for |
@@ -93,7 +97,7 @@ is attached to every generation. The user approves each file (`reference.approve
 asks for a new one (`reference.reject` with a note); regenerate that one only.
 
 **4. Profile picture and bio.** Generate `references/profile.png` from the face and the
-subjects (the `persona-identity` stage again). A brand handle uses the app's logo as its
+subjects (the `persona-identity` skill again). A brand handle uses the app's logo as its
 profile picture. An extra brand handle uses the same logo and the same display name as
 the first. Draft `## Bio` by the tier's rule: the
 persona bio never names the app; the brand bio is the search instruction ("Search
