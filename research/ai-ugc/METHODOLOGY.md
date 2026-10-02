@@ -166,7 +166,7 @@ segments alone.
 | Real creator clips for the voice reference, frames for casting | `harvest`, `deepen`, `niche-fetch` save posts with their audio; `ingest` cuts frames; `transcribe.sh` gives word times | reads their output files |
 | The handle and its identity | `apps/<slug>/handles/<handle>/HANDLE.md` and `references/`; the `handles` and `persona-identity` skills | **shares them**: `persona-identity` is the one identity process (§ 2, § 4.9); the handle's approved face is the hero of its character (§ 2.6, § 4.6) |
 | Pictures without API spend | the Codex image tool through `scripts/codex-images.sh` and the `images` skill | calls it, unchanged (decision 4) |
-| Generation with references, the cost line, the duration cap | `scripts/generate.sh`, `scripts/state.py model`, `scripts/templates.json` `known_model_limits` | **its own copy**, `scripts/character/generate.sh`, with its own model file `scripts/character/models.json` (same shape as `known_model_limits`) and its own Supagen template `ugc-character`. The recreation files are not changed. |
+| Generation with references, the cost line, the duration cap | `scripts/generate.sh`, `scripts/state.py model`, `scripts/templates.json` `known_model_limits` | **its own copy**, `scripts/character/generate.sh`, with its own model file `scripts/character/models.json` (same shape as `known_model_limits`) and its own Supagen template `ugc-character`, defined in `scripts/character/templates.json` and created in each workspace by the `setup` skill. The recreation files are not changed. |
 | QC of a generation | `scripts/qc.py` (cuts, green, transcript, pitch spread, drift) | **its own copy**, `scripts/character/qc.py`, which adds the new gates |
 | App insertion | `scripts/composite.sh`, `scripts/screen_comp.py`, the `insert.json` format | **its own copy**, `scripts/character/screen_comp.py`, which adds the upgrades of § 11.7 and § 11.12; its insert spec is a superset of `insert.json` (§ 15.5) |
 | Review UI and feedback | `ugckit ui`, approval by word | approval by word now; the storyboard approval will need an Atlas UI (decision 7), designed later for the whole video pipeline |
@@ -195,7 +195,7 @@ paths are in a user's workspace.
 | `approval.json` | `pipeline/character/<video>/` | P1, P3, P6 |
 | The pipeline's state | `pipeline/character/state.json` | the character scripts; the recreation `pipeline.json` is not touched |
 | The scripts | `scripts/character/`: `generate.sh`, `character/qc.py`, `screen_comp.py`, `assemble.sh`, `lint_prompt.py`, `state.py`, `models.json` | the character skills |
-| The failure ledger, per model | `docs/character-model-failures.md` (shipped with one empty table per model) | P3 writes, P1 reads |
+| The failure ledger, per model | `docs/character-model-failures.md` (shipped with one empty table per model; kept, the founder 2026-10-02) | P3 writes, P1 reads |
 | The orchestrator section for character videos (§ 2.4) | `template/AGENTS.md` | orchestrator update, shipped with the skills |
 
 ### 2.4 Segments, flows and references
@@ -487,9 +487,9 @@ picture, the `## Characters` table, and `world.json` from the existing
 `subject-<name>.png` files and the `## Persona` text. Then the video half. A slideshow
 handle that never makes a video never needs any of it.
 
-**Not decided, and not changed:** a multi-character handle in the slideshow path. The
-`## References` table keeps the identity character's face only, so the slides behave as
-today; slides with a second character need their own decision.
+**Out of scope for this work, and not changed:** a multi-character handle in the
+slideshow path (§ 17 question 15). The `## References` table keeps the identity
+character's face only, so the slides behave as today.
 
 ---
 
@@ -2086,14 +2086,25 @@ Questions about the script are in `SCRIPT-LEARNINGS.md` § 16.
        six versions at 5 to 15 s) and the earlier H3 reference template (9:16, three
        versions) both used `n` 1 and `extensions`
        `{ "duration": <seconds>, "resolution": "768P" }`; the H3 Max versions had audio
-       on. **The `ugc-character` template was created on 2026-10-02 (the founder's yes)**,
-       with no generation and no spend: template id
-       `4611b06f-5bfb-4766-97c6-93d383d2d1f6`, slug `ugc-character`, video output,
-       messages only (no system instructions, no variables). Version 1, `v1-5s-9x16`, id
-       `1b56fe91-398f-4c9b-bf37-7cb44d735820`, **active**: model
-       `minimax-h3-max-reference-to-video`, `aspect_ratio` 9:16, `n` 1, `duration` null,
-       `extensions` `{ "duration": 5, "resolution": "768P" }`, audio on. It had no
-       invocation when it was recorded.
+       on. **The `ugc-character` template is part of the kit** (the founder, 2026-10-02):
+       its desired state is `template/scripts/character/templates.json`, beside
+       `models.json` and in the shape of the recreation `scripts/templates.json`, which
+       is not changed. The `setup` skill reads it after the recreation file and creates,
+       through MCP, what is missing in each user's workspace: the template `ugc-character`
+       (video output, messages only: no system instructions, no variables) and its version
+       `v1-5s-9x16` (model `minimax-h3-max-reference-to-video`, `aspect_ratio` 9:16,
+       `n` 1, `duration` null, `extensions` `{ "duration": 5, "resolution": "768P" }`,
+       audio on), activated when the template has no active version. An existing
+       `ugc-character` is kept: only versions missing by name are created. Setup then
+       records the version in `pipeline/character/state.json` (`scripts/character/state.py
+       model set minimax-h3-max-reference-to-video 5`), and `scripts/doctor.py` warns
+       while that record is missing, which is also the case for a workspace set up
+       before the template existed.
+       **In the founder's workspace** it was created on 2026-10-02 by hand, with no
+       generation and no spend: template id `4611b06f-5bfb-4766-97c6-93d383d2d1f6`,
+       version 1 `v1-5s-9x16`, id `1b56fe91-398f-4c9b-bf37-7cb44d735820`, active, with
+       exactly the settings above. These ids are not in any shipped file; setup finds
+       the template there by its slug and creates nothing.
     3. **Resolution. Settled.** H3 Max reference takes 480p, 768p or 1080p (768p is
        native; 1080p is the provider's refinement, with no separate price listed). H3
        reference takes 480p, 768p, 2K or 4K. We send `"768P"` (uppercase) inside
@@ -2118,5 +2129,12 @@ Questions about the script are in `SCRIPT-LEARNINGS.md` § 16.
     and the videos use one picture. The slideshow keeps its files, names and
     `## References` table; an existing handle migrates without re-casting (§ 4.9). The
     handle's world (fixed subjects such as a cat, the sets of the home) has its place in
-    `world.json` and `references/`; its rules are expanded later. Still open: slides
-    with a second character on a multi-character handle.
+    `world.json` and `references/`; its rules are expanded later.
+15. **Slides with a second character. Out of scope for this work** (the founder,
+    2026-10-02: "leave slideshows alone for now. It is a separate concern."). On a
+    multi-character handle the `## References` table keeps the identity character's
+    face only, and the slides behave as today (§ 4.9). Nothing in the slideshow path
+    changes for a second character.
+16. **The failure ledger. Kept** (the founder, 2026-10-02). It stays at
+    `docs/character-model-failures.md` for now; where it lives is still the founder's
+    question.
