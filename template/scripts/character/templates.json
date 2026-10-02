@@ -1,0 +1,33 @@
+{
+  "_comment": "The character pipeline's desired state in Supagen. The setup skill reads this file after scripts/templates.json and creates, through MCP, what is missing in the user's workspace; it never creates a slug or a version that already exists. It is separate from scripts/templates.json so that the recreation templates and their behaviour do not change. Model limits and prices are in models.json beside this file.",
+  "templates": [
+    {
+      "slug": "ugc-character",
+      "name": "ugc-character",
+      "output_type": "video",
+      "required": true,
+      "description": "Character pipeline segments (scripts/character/generate.sh). MiniMax H3 Max reference-to-video, 9:16, 768P, audio on. Messages-only: the segment prompt and its references arrive in the invocation messages. Duration in video_settings.extensions; top-level duration null. Generated at 768P and upscaled once to 1080x1920 at assembly.",
+      "_version_rules": "Every version here MUST keep system_instructions unset, variables empty, duration null, and the integer duration inside extensions, as in scripts/templates.json. One version per duration: the REST invoke endpoint runs the ACTIVE version, so a run at another length is a new version, activated together with scripts/character/state.py model set.",
+      "versions": [
+        {
+          "name": "v1-5s-9x16",
+          "activate": true,
+          "default": true,
+          "model_slug": "minimax-h3-max-reference-to-video",
+          "model_id_hint": "b1223f92-e1fc-44e7-9296-fdde0278d9bb",
+          "_model_note": "DEFAULT. $0.08/s, 5 to 15 s, at most 4 reference images. 5 s is the model's minimum and the length of every planned test run.",
+          "video_settings": {
+            "aspect_ratio": "9:16",
+            "generate_audio": true,
+            "n": 1,
+            "duration": null,
+            "extensions": {
+              "duration": 5,
+              "resolution": "768P"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

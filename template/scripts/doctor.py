@@ -293,6 +293,31 @@ else:
     warn("Supagen templates not yet set up",
          "run the `setup` skill -- it creates them in your workspace via MCP")
 
+# The character template (scripts/character/templates.json). Setup records its active
+# version in pipeline/character/state.json; a workspace set up before the template
+# existed has setup done but no record, so this is checked on its own.
+CHR_STATE = os.path.join(ROOT, "pipeline", "character", "state.json")
+CHR_MODELS = os.path.join(ROOT, "scripts", "character", "models.json")
+chr_model = None
+if os.path.exists(CHR_STATE):
+    try:
+        chr_model = (json.load(open(CHR_STATE)).get("model") or {}).get("slug")
+    except Exception:
+        pass
+if not chr_model:
+    warn("character template ugc-character not recorded",
+         "run the `setup` skill again -- it creates only what is missing")
+else:
+    try:
+        known = json.load(open(CHR_MODELS))["known_model_limits"]
+    except Exception:
+        known = {}
+    if chr_model in known:
+        ok("character template ugc-character recorded", chr_model)
+    else:
+        warn(f"character model {chr_model} is not in scripts/character/models.json",
+             "run: scripts/character/state.py model set <slug> <seconds> with a known slug")
+
 say("")
 if FAIL:
     say(f"\033[31m{len(FAIL)} blocking problem(s):\033[0m")

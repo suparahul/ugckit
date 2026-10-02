@@ -233,6 +233,13 @@ templates in their workspace; running setup again must create nothing that exist
    - `duration` must be `null` with the integer inside `extensions` (rule 6). Copying
      the integer into `duration` is the commonest way to break this.
 5. `activate_version` on the model the user chose.
+6. **Then the character template.** Read `scripts/character/templates.json`, the
+   desired state of the character pipeline, and apply items 1 to 4 to it the same way:
+   `ugc-character` with its version `v1-5s-9x16`. A workspace that already has a
+   `ugc-character` template keeps it: create only the versions that are missing by
+   name, and never a second template. There is no model question here: activate the
+   version marked `"activate": true` only when the template has no active version; an
+   active version is the user's choice and stays.
 
 ## 6. Record the choice in BOTH places
 
@@ -243,6 +250,12 @@ runs whatever version is ACTIVE** — tested: a request for version 99, which do
 exist, ran the active version anyway. So Supagen decides *which model runs* and the state
 file decides *what cost is quoted and what duration cap is enforced*. If they drift apart,
 `generate.sh` quotes the wrong price for the wrong model.
+
+The character pipeline has its own state file. After step 5, record the active
+`ugc-character` version in it the same way (the model and the duration of that
+version; for `v1-5s-9x16`, `minimax-h3-max-reference-to-video` and 5):
+
+    scripts/character/state.py model set <model-slug> <duration-seconds>
 
 Changing model later is always both:
 
@@ -257,8 +270,8 @@ Then re-run `scripts/doctor.py` and confirm it is clean.
 
 ## 8. Tell the user what they have, then ask the one question
 
-Briefly: which templates were created, which model is active and what a run costs, how
-to switch model; that the brain is in place, read-only. Then — and only now — the
+Briefly: which templates were created (`ugc-character` too, or "already there"), which
+model is active and what a run costs, how to switch model; that the brain is in place, read-only. Then — and only now — the
 fork, in one sentence each, and wait for the answer. Three answers:
 
 - **They have a reference video** → the `ingest` skill (the video pipeline, stages 1 to
