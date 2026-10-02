@@ -38,10 +38,19 @@
     "_comment": "Read-only checks through the Supagen MCP on 2026-10-02: the model records of both reference models, the versions of earlier templates, the invocation list and traces. No generation.",
     "price": "minimax-h3-max-reference-to-video: price_per_s 0.08, the founder's figure; Supagen's model record lists the same, $0.08 per second. minimax-h3-reference-to-video: price_per_s 0.06, the founder's 768p figure; Supagen's record lists $0.13 per second.",
     "billing": "PARTLY OPEN. minimax-h3-reference-to-video: Supagen records $0.65 for every run (seven runs, 5 to 15 s), the list price x the 5 s minimum. The H3 Max family (text-to-video and image-to-video): Supagen records $0.20 for every run, at 10 s and at 15 s alike, which is less than $0.08 x 5 s. No run of minimax-h3-max-reference-to-video exists yet. What the provider charges cannot be read from Supagen: compare the provider account after the first paid run. Until then, plan each H3 Max run at the computed figure, $0.08 x seconds, which is the higher of the two.",
-    "template_settings": "SETTLED. The earlier H3 Max templates (text-to-video, 16:9, six versions) used video_settings {aspect_ratio, n 1, generate_audio true, extensions {duration: 5 to 15, resolution: \"768P\"}}. The earlier H3 reference template used the same shape at 9:16. The ugc-character template does not exist in Supagen yet. It is created before the first paid run, after a yes, with one version on minimax-h3-max-reference-to-video: aspect_ratio 9:16, n 1, extensions {duration: 5, resolution: \"768P\"}, audio on. Nothing before that run needs it.",
+    "template_settings": "SETTLED. The earlier H3 Max templates (text-to-video, 16:9, six versions) used video_settings {aspect_ratio, n 1, generate_audio true, extensions {duration: 5 to 15, resolution: \"768P\"}}. The ugc-character template was created on 2026-10-02 with no generation: template id 4611b06f-5bfb-4766-97c6-93d383d2d1f6, video output, messages only. Version 1 (v1-5s-9x16, id 1b56fe91-398f-4c9b-bf37-7cb44d735820) is active: minimax-h3-max-reference-to-video, aspect_ratio 9:16, n 1, duration null, extensions {duration: 5, resolution: \"768P\"}, audio on. A run at another length needs its own version, activated together with state.py model set.",
     "resolution": "SETTLED. minimax-h3-max-reference-to-video allows 480p, 768p, 1080p (768p native; 1080p is the provider's refinement, price at 1080p not listed). minimax-h3-reference-to-video allows 480p, 768p, 2K, 4K. Send \"768P\"; upscale once to 1080p at assembly.",
     "audio": "OPEN. The H3 Max reference record says supports_audio_generation true and its description keeps the self-composed soundtrack, but its capabilities list audio_output false. The H3 Max text-to-video runs had audio on. Check the first paid run for a sound track before any talking segment counts on it.",
     "references": "minimax-h3-max-reference-to-video takes at most 4 reference images (minimax-h3-reference-to-video takes 9), and also video and audio references. It has no video extension.",
     "output_length": "SETTLED BY MEASUREMENT for minimax-h3-reference-to-video: outputs run 0.1 to 0.6 s long (5 s gave 5.184 s, 6 s gave 6.592 s, 15 s gave 15.104 s). Not measured yet for H3 Max reference. Trim to the planned length at assembly."
+  },
+  "supagen_template": {
+    "_comment": "The template in the kit's own Supagen workspace, created 2026-10-02. generate.sh calls it by slug only; in another workspace, create a template with this slug and these settings, and its ids differ.",
+    "slug": "ugc-character",
+    "template_id": "4611b06f-5bfb-4766-97c6-93d383d2d1f6",
+    "active_version": 1,
+    "active_version_id": "1b56fe91-398f-4c9b-bf37-7cb44d735820",
+    "active_version_model": "minimax-h3-max-reference-to-video",
+    "active_version_duration_s": 5
   }
 }
