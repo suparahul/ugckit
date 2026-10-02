@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to pipeline/character/<video>/video.json. Written by character-shots (P1) from the locked plan; nothing can be assembled without it. With app_insertion false, it has no O, G, S, H, F, R or P segment.",
+  "_comment": "Copy to pipeline/character/<video>/video.json. Written by character-shots (P1) from the locked plan; nothing can be assembled without it. With app_insertion false, it has no O, G, S, H, F, R or P segment. Optional per segment, read by assemble.sh: trim [in, out] in seconds of the source; punch_in; audio_from <video>.<seg> (another approved segment's voice under this one); for R and P screen_id and punch_in_to_hero.",
   "video_id": "<video>",
   "characters": [
     "<character>@v<n>"
@@ -38,10 +38,27 @@
     },
     {
       "n": 4,
+      "type": "H",
+      "project": "<video>.04-h",
+      "script_lines": [],
+      "shared": false,
+      "audio_from": "<character>-shared.<screen-id>-vo",
+      "_note": "an H or F segment speaks no line; its audio is the demo performance or the next line"
+    },
+    {
+      "n": 5,
       "type": "T",
-      "project": "<character>-shared.04-t",
+      "project": "<character>-shared.05-t",
       "script_lines": "<ids>",
       "shared": true
+    },
+    {
+      "n": 6,
+      "type": "P",
+      "screen_id": "<id>",
+      "audio_from": "<character>-shared.<screen-id>-vo",
+      "shared": true,
+      "_note": "the recording with her demo performance in a round bubble; its audio is not trimmed"
     }
   ],
   "joins": {
@@ -61,7 +78,8 @@
   },
   "title_overlay": {
     "burn": "<true only when the plan asks for it>",
-    "text": "<the line, or null>"
+    "text": "<the line, or null>",
+    "until_s": "<seconds, or null for the whole video>"
   },
   "export": {
     "upscale": "lanczos, once, to 1080x1920",
