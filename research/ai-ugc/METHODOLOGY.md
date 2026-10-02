@@ -336,7 +336,7 @@ The founder reviewed this table on 2026-10-01. Each row states the result: **agr
 | 3 | Whose voice is the reference? | [Jason]: clip the audio of the trending video you liked and pass it as the reference; rhythm transfers. [Vlad]: generate one clip, pull its audio, reference that on the rest. | **Changed 2026-10-01: [Jason]'s way, as a setup step.** The voice reference is set up once per character, by the agent together with the user, before the character's first AI UGC video is generated: the **voice reference setup** (§ 7.2). The candidates are real creator clips found in the niche and competitor research. The user approves the clip. It is attached as the audio reference of every talking segment. A clip cut from our own approved generation ([Vlad]'s way) is a fallback only, when the research gives no usable clip. | The research already finds and saves the clips, so the setup is easy and costs nothing [repo]. A real clip carries real rhythm, breath and room, which a voice cast from text must find by trial. The focus is that the generated voice does not sound robotic or AI. The setup checks the first approved generation for that, and every talking segment is checked again at gate B (§ 7.2, § 14.2). |
 | 4 | Which image model casts the character? | [Jason]: same JSON on five models; Gemini 3 Pro most real, GPT Image 2.5 keeps doll eyes; run GPT Image, Gemini 3 Pro and Seedream side by side. [Vlad]: Nano Banana or GPT Image, four at once. [Fekri]: GPT Image for the board. | **Changed 2026-10-01: no bake-off. The Codex image tool makes every picture of every character**: the casting candidates, the hero, the anchors and the keyframes. Future work: a fallback on the Supagen image generation models, for when Codex refuses or fails a shot (§ 16 Phase 6). | Codex is on the user's plan and already wired [repo]; the others cost API money and need a yes. Changing model between the hero and its keyframes is itself a drift source, so one tool makes all of a character's pictures. The model matters even with the right prompt [Jason], so the de-slop check (§ 4.4) and the founder's pick (§ 4.5) are where Codex is judged. A character whose face is already approved is not re-cast (§ 4.6). |
 | 5 | Text-only face or image reference? | [PC], [Vlad], [Jason]: a fully locked JSON, no reference image, gives a new person with the same vibe. [Ultra]: once an image is bound, the image carries identity and text only reinforces. [Enzo]: creator file plus a start still. | **Agreed 2026-10-01.** **Both, in order.** Casting is text-only from a locked JSON. The vibe reference is one or more pictures: Pinterest pictures or frames of real creators are both valid, and several may be given. It is used only to write the locked JSON; the agent changes at least three identity traits (§ 4.3); it is never attached to the image tool. After the user approves the hero, the hero picture is attached as the identity reference of every later keyframe and video, and the creator file shrinks to a short lock. | Text-only casting is what makes the person new and not a copy. Image binding is what makes her the same on day 40. |
-| 6 | Higgsfield or BytePlus for Seedance 2.5? | [Jason]: Seedance refuses hyper-real face references; Higgsfield has a bypass endpoint at 2 to 3 times the cost; BytePlus lets you register a digital character asset, with approval hurdles. [Enzo] runs on Higgsfield. | **Changed 2026-10-01: Supagen is the system. The default video model is MiniMax H3. The alternates are Seedance, Wan Prime, Kling and Gemini Omni, all through Supagen. No BytePlus registration and no Higgsfield in the default path.** The character pipeline keeps its own model file, `scripts/character/models.json`, in the shape of `known_model_limits` (§ 2.2). It ships with MiniMax H3 only. **Built 2026-10-01, price fixed 2026-10-02:** `template/scripts/character/models.json` holds one entry, `minimax-h3-reference-to-video` (5 to 15 s, about $0.06/s at 768p; generated at 768p, upscaled once to 1080p at assembly; the default), with the duration rules and the Supagen findings (§ 17, question 13). The MiniMax H3 Max text-to-video and image-to-video entries (O plates, and any segment with no references) are not in it yet; they are added on the founder's word. The alternates are added by the user, at their end, with a measured cap and price; no Kling or Seedance reference entry ships now. For reference, the kit's recreation `templates.json` today holds `minimax-h3-max-*`, `wan-3-prime-*` (with `-reference-to-video` in its limits), `gemini-omni-flash-1-1-*` and `seedance-2-fast-text-to-video`; it does not hold `minimax-h3-reference-to-video`. | One system means one upload path, one cost record and one set of quirks [repo `templates.json`, AGENTS rules 2 to 7]. An alternate is used when the failure ledger shows MiniMax H3 failing a segment type (§ 9.3). Limits that follow: Gemini Omni cannot take references through Supagen, so it is an alternate only for segments with no references; Seedance is in `templates.json` as text-to-video only, with no price; Kling needs a template version and a price before its first use. |
+| 6 | Higgsfield or BytePlus for Seedance 2.5? | [Jason]: Seedance refuses hyper-real face references; Higgsfield has a bypass endpoint at 2 to 3 times the cost; BytePlus lets you register a digital character asset, with approval hurdles. [Enzo] runs on Higgsfield. | **Changed 2026-10-01: Supagen is the system. The default video model was MiniMax H3; since 2026-10-02 it is MiniMax H3 Max reference-to-video (the founder). The alternates are Seedance, Wan Prime, Kling and Gemini Omni, all through Supagen. No BytePlus registration and no Higgsfield in the default path.** The character pipeline keeps its own model file, `scripts/character/models.json`, in the shape of `known_model_limits` (§ 2.2). It ships with the two MiniMax reference models only. **Built 2026-10-01, price fixed and default changed 2026-10-02:** `template/scripts/character/models.json` holds `minimax-h3-max-reference-to-video` (the default: 5 to 15 s, $0.08/s, at most 4 reference images) and `minimax-h3-reference-to-video` (the second entry: 5 to 15 s, about $0.06/s at 768p, at most 9 reference images), both generated at 768p and upscaled once to 1080p at assembly, with the duration rules and the Supagen findings (§ 17, question 13). The MiniMax H3 Max text-to-video and image-to-video entries (O plates, and any segment with no references) are not in it yet; they are added on the founder's word. The alternates are added by the user, at their end, with a measured cap and price; no Kling or Seedance reference entry ships now. For reference, the kit's recreation `templates.json` today holds `minimax-h3-max-*`, `wan-3-prime-*` (with `-reference-to-video` in its limits), `gemini-omni-flash-1-1-*` and `seedance-2-fast-text-to-video`; it holds neither reference model of MiniMax. | One system means one upload path, one cost record and one set of quirks [repo `templates.json`, AGENTS rules 2 to 7]. An alternate is used when the failure ledger shows the MiniMax H3 models failing a segment type (§ 9.3). Limits that follow: Gemini Omni cannot take references through Supagen, so it is an alternate only for segments with no references; Seedance is in `templates.json` as text-to-video only, with no price; Kling needs a template version and a price before its first use. |
 | 7 | Storyboard grid or separate keyframes? | [Fekri]: one annotated six-frame board, fed as the reference of a 30 s generation. [SD]: independent keyframe images align better than a grid. [Enzo]: one start still per shot. | **Agreed 2026-10-01.** **Separate keyframes, one per generated segment. The contact sheet of keyframes is the storyboard the founder approves.** The approval will need an Atlas UI, probably like the slideshow pipeline UI. Its design is out of scope here; it is done later for the whole video pipeline at once. | [SD] is the model's own guide and says the grid is the weaker input. Our segments are short, so each needs one start frame. Fekri's real point survives: decide in pictures first. |
 | 8 | Long ban lists or none? | [SD]: negatives work only for subtitles and music. [Fekri]: about 100 generations say long ban lists help. [Ultra]: add a negative only after a failure. [PC]: full negatives always. | **Agreed 2026-10-01.** **Images: the full [PC] negative block, always. Video: a fixed base list of about 400 characters at the end of the prompt, plus at most five bans earned by a failure and recorded in the failure ledger.** | The image prompt has no length limit that matters. The video prompt has 5,000 characters [repo rule 5], and the start and the end of a prompt weigh most [Fekri], so the end is spent on bans that have earned their place. |
 | 9 | Phone in the frame from frame 0, or nothing in the hands? | [Ultra] Mode B: phone in hand from frame 0. [Vlad]: the avatar holds nothing until the product beat. [Fekri]: no phone in any shot. | **Agreed 2026-10-01, with a hard rule added.** **A phone is always in the first frame of its own segment, already up and already green. A talking segment has no phone and free hands. Hard rule: the phone is held at a completely direct angle to the camera: the screen plane square to the lens, flat-on, no tilt and no perspective** (§ 11.5). This is the default for the static plates O, G and S. The motion shots H and F, added by the founder on 2026-10-01, have their own rules (§ 11.12): F keeps the phone flat-on in every frame; H is flat-on at its start and end holds. | The flat-on screen makes the insertion easy: the quad is a near rectangle, the type is not compressed, and the corner fit has the least to correct. An object that enters mid-clip is invented on the spot, which is how hands and phones break. Because the phone shot is its own segment, both rules hold at once. When in the video that segment sits is a script matter (`SCRIPT-LEARNINGS.md` § 7). |
@@ -750,7 +750,8 @@ lock restated; a polished look to stripping cinema words.
 | every model | hands first, then teeth, then eye movement | [Vlad] |
 | every model | captions added unprompted; an animal that vanishes between shots; a hand or prop that swaps sides; a hallucinated object | [repo `review`] |
 | MiniMax H3 Max, text-to-video and image-to-video (`minimax-h3-max-text-to-video`, `minimax-h3-max-image-to-video`) | 15 s, 768p, $0.04/s in `templates.json` (Supagen now lists $0.08/s and records $0.20 a run); not in the character `models.json` yet; the planned model for a segment with no references (an O plate); tuned for prompt adherence | [repo `templates.json`] |
-| MiniMax H3, reference-to-video (`minimax-h3-reference-to-video`) | 5 to 15 s, whole seconds; generated at 768p; about $0.06/s at 768p (the founder, 2026-10-02; Supagen lists $0.13/s and records $0.65 a run, § 17 question 13); **the default for every segment with references** (decision 6); takes the face, the sheets of fixed subjects, earlier frames and a voice clip. Earlier prompts needed guards against an extra animal, a wrong animal size and an object appearing from nowhere. | [repo, earlier character videos] |
+| MiniMax H3 Max, reference-to-video (`minimax-h3-max-reference-to-video`) | **the default for every segment with references** (the founder, 2026-10-02). 5 to 15 s, whole seconds; 480p, 768p, 1080p (768p native, 1080p the provider's refinement); generated at 768p; **at most 4 reference images**, plus video and audio references; no video extension; $0.08/s (the founder's figure; Supagen lists the same). Its record says it generates sound, but its capability list says it has no audio output: open until the first run (§ 17 question 13). Not run yet: no measured failure and no measured output length. | [Supagen model record, read 2026-10-02] |
+| MiniMax H3, reference-to-video (`minimax-h3-reference-to-video`) | 5 to 15 s, whole seconds; 480p, 768p, 2K, 4K; generated at 768p; at most 9 reference images; about $0.06/s at 768p (the founder, 2026-10-02; Supagen lists $0.13/s and records $0.65 a run, § 17 question 13); the default until 2026-10-02, **now the second entry in `models.json`**; takes the face, the sheets of fixed subjects, earlier frames and a voice clip. Earlier prompts needed guards against an extra animal, a wrong animal size and an object appearing from nowhere. | [repo, earlier character videos] |
 | Wan 3 Prime, alternate (`wan-3-prime-*`) | the only one past 15 s (30 s); in reference mode the app UI came back as nonsense strings and the framing drifted from over-the-shoulder to frontal; green less flat (G std 14.6) | [repo, measured] |
 | Gemini Omni Flash 1.1, alternate (`gemini-omni-flash-1-1-*`) | best per second, word-perfect dialogue, a true over-the-shoulder, the flattest green (G std 12.3); 10 s cap; a tripod hallucinated into shot; UI ghosting baked into the green; references cannot reach it through Supagen, so it serves only segments with no references | [repo, measured; `templates.json`] |
 | Seedance, alternate (`seedance-2-fast-text-to-video` in `templates.json`: text-to-video, 15 s, 720p, no price yet) | from the sources, on Seedance 2.5 outside Supagen: 30 s in one pass; refuses hyper-real face references by default; mangles on-screen text, always; falls back to narrated b-roll unless on-camera speech is stated in the style, in each stage and in the constraints; counts drift first, so write them as numbers. Not measured here. | [Jason, Fekri; repo `templates.json`] |
@@ -758,7 +759,7 @@ lock restated; a polished look to stripping cinema words.
 
 **9.5 The failure census** [Vlad]. For a new model or a new character: run the same
 short script five times, note what breaks, write around it. An alternate model is
-tried only through Supagen, and only when the ledger shows MiniMax H3 failing a segment
+tried only through Supagen, and only when the ledger shows the MiniMax H3 models failing a segment
 type (decision 6). It costs money and needs a
 yes. The five-run census is not part of the test phase (§ 16 Phase 5, under $2); it
 runs on the first real use case in a consumer workspace.
@@ -816,6 +817,13 @@ recording on camera. Its audio goes under R; its picture goes into the P bubble 
   character video made with the kit did this with two frames of the first half [repo].
 - **The voice reference on every talking segment**, so the voice does not change at a
   join (§ 7.2).
+- **At most four pictures per run on the default model.** MiniMax H3 Max
+  reference-to-video takes at most 4 reference images (`max_reference_images` in
+  `models.json`; `generate.sh` refuses more). The voice clip is audio and does not
+  count. Choose in this order: the segment's keyframe; the hero; the sheet of each fixed
+  subject in the shot; then one more, the angle anchor or the frame of the neighbour.
+  The keyframe already carries the outfit and the set, so their anchors are not
+  attached again. A shot with two fixed subjects has no room for the fourth picture.
 - **The room tone under all of it**, laid by `character-assemble` (§ 7.5).
 
 **10.5 A segment can serve several videos.** Because the outfit, the set and the
@@ -1448,25 +1456,28 @@ A segment type under 40% after ten generations is not retried. The prompt, the s
 the model is changed. That is the stop rule.
 
 **14.6 Cost, computed.** From the price in `scripts/character/models.json`; these are
-computed figures, not charges [repo rule 8]. Model: MiniMax H3 reference-to-video
-(`minimax-h3-reference-to-video`), about $0.06/s at 768p, the default (decision 6). The
-model takes 5 to 15 s only, so a segment planned shorter than 5 s is generated at 5 s
-and trimmed at assembly; it costs 5 s. **Supagen records a flat $0.65 for every run of
-this model** (§ 17, question 13). Until the billing is settled, each figure is given
-twice: per second at $0.06/s, and per run at $0.65.
+computed figures, not charges [repo rule 8]. Model: MiniMax H3 Max reference-to-video
+(`minimax-h3-max-reference-to-video`), **$0.08/s at 768p**, the default (the founder,
+2026-10-02). The model takes 5 to 15 s only, so a segment planned shorter than 5 s is
+generated at 5 s and trimmed at assembly; it costs 5 s. Supagen records **$0.20 for
+every run** of the H3 Max text-to-video and image-to-video models, at 10 s and at 15 s
+alike, which is less than $0.08 × 5 s; no run of the reference model exists yet (§ 17,
+question 13). So the computed figure, $0.08 × seconds, is the higher of the two, and the
+figures below use it.
 
 A 20 s video in four segments: T 4 s + T 6 s + R 6 s + T 4 s, with a 6 s demo
 performance for the voice under R. In a set of ten videos, the first T is unique to
 each video and the rest is shared (§ 10.5). This is a planning example, not a test.
 
-| Item | Generated | Per second, one run | Per second at the keep rate | Per run at the keep rate |
-|---|---|---|---|---|
-| the T segment unique to a video | 5 s (trimmed to 4) | $0.30 | $0.50 at 60% | $1.08 |
-| two shared T segments | 5 s + 5 s | $0.60 | $1.00 | $2.17 |
-| demo performance (shared) | 6 s | $0.36 | $0.60 | $1.08 |
-| R cutaway | none | $0.00 | $0.00 | $0.00 |
-| **ten videos that share the rest** | | | **$6.60, about $0.66 per video** | **$14.08, about $1.41 per video** |
-| an O plate on MiniMax H3 Max | | not computed: the model is not in `models.json` yet | | |
+| Item | Generated | One run, $0.08/s | At the keep rate |
+|---|---|---|---|
+| the T segment unique to a video | 5 s (trimmed to 4) | $0.40 | $0.67 at 60% |
+| two shared T segments | 5 s + 5 s | $0.80 | $1.33 |
+| demo performance (shared) | 6 s | $0.48 | $0.80 |
+| R cutaway | none | $0.00 | $0.00 |
+| **ten videos that share the rest** | | | **$8.80, about $0.88 per video** |
+| the same on the second entry, MiniMax H3 at $0.06/s | | | $6.60, about $0.66 per video (or $14.08 at its $0.65 a run) |
+| an O plate on MiniMax H3 Max text-to-video | | not computed: that model is not in `models.json` | |
 
 A video with no app insertion has no R, P or plate segments; its cost is its T
 segments only. For comparison, the sources report $2.02 per clip [Enzo], four clips
@@ -1621,7 +1632,7 @@ Paths inside it are relative to the handle's folder, `apps/<slug>/handles/<handl
   "video": {
     "segment_project": "<video>.01-t",
     "flow": "referenced | complex | complex+refs",
-    "model": "<slug in scripts/character/models.json; default minimax-h3-reference-to-video; the active version must match>",
+    "model": "<slug in scripts/character/models.json; default minimax-h3-max-reference-to-video; the active version must match>",
     "duration_seconds": 5,
     "trim_to_seconds": "<the planned length when it is under the model's 5 s minimum, else null>",
     "start_frame": "keyframes/01-t.png",
@@ -1859,7 +1870,10 @@ recreation scripts do, and the recreation scripts are byte-for-byte unchanged.
   the `video` block of § 15.3), `video.example.json` (§ 15.6 with the `voiceover`
   block of § 15.4), `insert.example.json` (§ 15.5), `approval.example.json` (§ 15.7).
 - `docs/character-model-failures.md`: § 9.4 as the seed, and an empty table for
-  `minimax-h3-reference-to-video`.
+  `minimax-h3-reference-to-video`. Later on 2026-10-02 the default became
+  `minimax-h3-max-reference-to-video`: it has its own empty table, `models.json` has
+  both entries, and `generate.sh` refuses a `refs.json` with more pictures than the
+  model takes.
 - `pipeline/character/`: the empty folder the installer makes.
 - Evidence: on an old app-insertion plate, the copies and the recreation scripts gave
   the same `qc.py` report, the same contact sheet and a byte-identical composite (same
@@ -1926,25 +1940,29 @@ happen on an actual use case when we adopt this in my organic factory." So this 
 tests small portions only. The full test, the failure census of § 9.5 and the first
 set of videos happen later, on the first real use case in a consumer workspace.
 
-**Sized to the billing.** Supagen records a flat $0.65 for every run of this model,
-whatever the duration (§ 17, question 13). A shorter clip therefore saves nothing, and
-the model refuses less than 5 s. Every run here is **one 5 s clip, 9:16, 768p**, and
-the plan holds at most **three runs**, which stays under $2 in every billing case:
+**Sized to the price.** The default model is MiniMax H3 Max reference-to-video at
+**$0.08/s** (§ 14.6). It refuses less than 5 s, so every run here is **one 5 s clip,
+9:16, 768p, $0.40**, with at most four reference pictures (§ 10.4). Supagen records
+$0.20 a run for the H3 Max models it has run so far, so $0.40 is the higher figure and
+the plan uses it. The plan holds at most **three runs**:
 
-| Run | What it tests | Segment | Per second, $0.06/s | Per run, $0.65 |
-|---|---|---|---|---|
-| 1 | identity from the anchors, lip sync, and the natural-voice check of § 7.2 with the approved voice reference | T, 5 s | $0.30 | $0.65 |
-| 2 | flat green, flat-on to the lens, with a face reference: the flat-on gate | G, 5 s | $0.30 | $0.65 |
-| 3 | the motion shot of § 11.12, a finger on the screen: the motion gates | F, 5 s; only after the Phase 3 motion work exists | $0.30 | $0.65 |
-| **Total** | | | **$0.90** | **$1.95** |
+| Run | What it tests | Segment | Computed, $0.08/s |
+|---|---|---|---|
+| 1 | identity from the hero and one anchor, lip sync, the sound track, and the natural-voice check of § 7.2 with the approved voice reference | T, 5 s | $0.40 |
+| 2 | flat green, flat-on to the lens, with a face reference: the flat-on gate | G, 5 s | $0.40 |
+| 3 | the motion shot of § 11.12, a finger on the screen: the motion gates | F, 5 s; only after the Phase 3 motion work exists | $0.40 |
+| **Total** | | | **$1.20** |
 
 Rules: no retry inside the budget; a failed run is a finding for the failure ledger,
 not a reason to pay again. Runs 2 and 3 are for app insertion; a user whose plans have
-no app insertion runs run 1 only ($0.30 or $0.65). **The first run also settles the
-billing**: after it, compare the cost Supagen records with the charge on the provider
-account. If the charge is per second at $0.06/s, the same $2 cap allows up to six
-5 s runs ($1.80), and the extra runs repeat run 1 for the voice check. An alternate
-model is not tested in this phase.
+no app insertion runs run 1 only ($0.40). **The first run also settles three open
+points** (§ 17, question 13): whether the model gives a sound track (if it gives none,
+run 1 cannot test the voice; stop and ask before runs 2 and 3), the real output length,
+and the billing (compare the cost Supagen records with the charge on the provider
+account). After the billing is settled, one more 5 s run that repeats run 1 for the
+voice check still fits under $2 ($1.60); if the charge is $0.20 a run, up to nine runs
+fit ($1.80). The second entry, MiniMax H3 reference-to-video, and the alternate models
+are not tested in this phase.
 
 **Phase 6 — measured numbers.**
 From the first real use case in a consumer workspace: set usable rates are written back into the handle's `world.json`, keep rates into each
@@ -1995,13 +2013,16 @@ Questions about the script are in `SCRIPT-LEARNINGS.md` § 16.
    pipeline's concern (§ 11.4). Not every video inserts the app: `app_insertion` is a
    per-plan option, and a video with no app segment skips the screen stages (§ 2, § 2.5).
 9. **Money. Decided 2026-10-02: the whole paid test phase stays under $2.** Small
-   portions only: at most three 5 s runs, $0.90 per second or $1.95 per run (§ 16
-   Phase 5). The real test happens later, on the first real use case in a consumer
+   portions only: at most three 5 s runs, $1.20 at $0.08/s on MiniMax H3 Max
+   reference-to-video (§ 16 Phase 5). The real test happens later, on the first real use case in a consumer
    workspace. Each run still needs its own yes. The image part is decided 2026-10-01:
    no paid bake-off; the Codex image tool makes every character picture (decision 4).
-10. **The video model. Decided 2026-10-01.** Supagen is the system. MiniMax H3 is the
-    default; Seedance, Wan Prime, Kling and Gemini Omni are the alternates, all through
-    Supagen. No BytePlus registration and no Higgsfield (decision 6).
+10. **The video model. Decided 2026-10-01; default changed 2026-10-02.** Supagen is the
+    system. MiniMax H3 was the default; since 2026-10-02 the default is **MiniMax H3 Max
+    reference-to-video** (`minimax-h3-max-reference-to-video`, the founder), and MiniMax
+    H3 reference-to-video stays in `models.json` as the second entry. Seedance, Wan
+    Prime, Kling and Gemini Omni are the alternates, all through Supagen. No BytePlus
+    registration and no Higgsfield (decision 6).
 11. **The vibe reference. Decided 2026-10-01: yes.** One or more references (Pinterest
     pictures or real creator frames) are used only to write the locked JSON; the agent
     changes at least three identity traits (§ 4.3); a reference is never attached to
@@ -2014,39 +2035,57 @@ Questions about the script are in `SCRIPT-LEARNINGS.md` § 16.
     outside `template/`, and are never shipped. What ships is skills, scripts and
     orchestrator updates in `template/`. The kit never names a user's app, handle or
     character.
-13. **The model file. Built 2026-10-01; price fixed and Supagen read 2026-10-02.**
-    `template/scripts/character/models.json` holds `minimax-h3-reference-to-video`, the
-    default and the only model: 5 to 15 s, about **$0.06/s at 768p** (the founder);
-    generated at 768p and upscaled once to 1080p at assembly, never 4K. Its duration
-    rules: whole seconds, **at least 5** (the model's minimum; a shorter planned segment
-    is generated at 5 s and trimmed); the 15 s cap checked at model choice and before
-    each generation; `duration` null with the integer in `extensions.duration`; cost =
-    price × seconds; the active version and the selected model change together.
-    What a read-only check of Supagen showed on 2026-10-02 (the model record, the three
-    versions of the earlier reference template, the invocation list and one trace; no
-    generation):
-    1. **Billing. Partly settled.** Supagen records exactly **$0.65 for every run** of
-       this model: seven runs, four on the earlier 9:16 reference template (asked at 15,
-       5, 6 and 15 s) and three on a 16:9 template. $0.65 is the list price, $0.13/s,
-       times the model's 5 s minimum. MiniMax H3 Max shows the same pattern: $0.20 for
-       every run of a template whose versions are 8 to 15 s. So Supagen's cost record is per run,
-       not per second of the duration sent in `extensions.duration`. What the provider
-       charges cannot be read from Supagen; compare after the first run of the test
-       (§ 16 Phase 5). The founder's figure of about $0.06/s at 768p is in
-       `models.json`; Supagen's model record still lists $0.13/s.
-    2. **Template settings. Settled.** The earlier reference template had three
-       versions, all `aspect_ratio` 9:16, `n` 1, and `extensions`
-       `{ "duration": <15, 5 or 6>, "resolution": "768P" }`; audio on at 15 s, off at
-       5 and 6 s. The `ugc-character` template does not exist in Supagen yet; it is
-       created with these settings before the first paid run (§ 16 Phase 5), after a yes;
-       Phase 0 does not need it.
-    3. **Resolution. Settled.** The model takes 480p, 768p, 2K or 4K (768p is native;
-       2K and 4K are the provider's upscale). The value that worked, in every run, is
-       `"768P"` (uppercase) inside `extensions`, as for MiniMax H3 Max. We send that,
-       and upscale to 1080p ourselves.
-    4. **Output length. Settled by measurement.** Outputs run 0.1 to 0.6 s long (5 s →
-       5.184 s, 6 s → 6.592 s, 15 s → 15.104 s, measured on the files). Assembly trims
-       to the planned length. Supagen does not record the output length.
+13. **The model file. Built 2026-10-01; price fixed, Supagen read and default changed
+    2026-10-02.** `template/scripts/character/models.json` holds two entries, both 5 to
+    15 s, generated at 768p and upscaled once to 1080p at assembly, never 4K:
+    - **`minimax-h3-max-reference-to-video`, the default:** **$0.08/s** (the founder;
+      Supagen lists the same), at most **4 reference images**.
+    - `minimax-h3-reference-to-video`, the second entry: about **$0.06/s at 768p** (the
+      founder; Supagen lists $0.13/s), at most 9 reference images.
+
+    The duration rules: whole seconds, **at least 5** (the minimum of both; a shorter
+    planned segment is generated at 5 s and trimmed); the 15 s cap checked at model
+    choice and before each generation; `duration` null with the integer in
+    `extensions.duration`; cost = price × seconds; the active version and the selected
+    model change together; `generate.sh` refuses a `refs.json` with more pictures than
+    `max_reference_images`.
+    What read-only checks of Supagen showed on 2026-10-02 (the model records of both
+    reference models, the versions of the earlier templates, the invocation list and
+    traces; no generation):
+    1. **Billing. Partly settled.** MiniMax H3 reference-to-video: Supagen records
+       exactly **$0.65 for every run**, seven runs asked at 5 to 15 s; that is its list
+       price, $0.13/s, times the 5 s minimum. The H3 Max text-to-video and
+       image-to-video models: **$0.20 for every run**, at 10 s and at 15 s alike, which
+       is less than $0.08 × 5 s. **No run of H3 Max reference-to-video exists yet.** So
+       Supagen's cost record is per run, not per second. What the provider charges
+       cannot be read from Supagen; compare after the first run of the test (§ 16
+       Phase 5). Until then the plan uses the computed $0.08 × seconds, the higher
+       figure.
+    2. **Template settings. Settled.** The earlier H3 Max template (text-to-video, 16:9,
+       six versions at 5 to 15 s) and the earlier H3 reference template (9:16, three
+       versions) both used `n` 1 and `extensions`
+       `{ "duration": <seconds>, "resolution": "768P" }`; the H3 Max versions had audio
+       on. The `ugc-character` template does not exist in Supagen yet. **The proposed
+       first version:** model `minimax-h3-max-reference-to-video`, `aspect_ratio` 9:16,
+       `n` 1, `extensions` `{ "duration": 5, "resolution": "768P" }`, audio on. It is
+       created before the first paid run (§ 16 Phase 5), after a yes; Phase 0 does not
+       need it.
+    3. **Resolution. Settled.** H3 Max reference takes 480p, 768p or 1080p (768p is
+       native; 1080p is the provider's refinement, with no separate price listed). H3
+       reference takes 480p, 768p, 2K or 4K. We send `"768P"` (uppercase) inside
+       `extensions`, the value that worked in every H3 and H3 Max run, and upscale to
+       1080p ourselves (the founder's rule).
+    4. **Output length.** Settled by measurement for H3 reference: outputs run 0.1 to
+       0.6 s long (5 s → 5.184 s, 6 s → 6.592 s, 15 s → 15.104 s). Not measured for H3
+       Max reference; the first run measures it. Assembly trims to the planned length.
+    5. **Sound. Open.** The H3 Max reference record says the model generates sound and
+       keeps "the self-composed soundtrack", but its capability list says it has no
+       audio output (H3 reference lists audio output). A talking segment needs the
+       model's own speech. The first run (§ 16 Phase 5) checks for a sound track before
+       any talking segment counts on it.
+    6. **References.** H3 Max reference takes at most 4 reference images, plus video and
+       audio references; it has no video extension. § 10.4 gives the order in which the
+       four places are filled.
 14. **One identity process. Decided 2026-10-02.** The casting method (§ 4 to § 6) is
     the `persona-identity` skill, for slideshow handles and character videos alike;
     there is no separate `character-cast`. Identity is made once per handle: the
