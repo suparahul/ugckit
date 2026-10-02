@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to pipeline/character/<video>/shots/<nn>-<type>.json. Written by character-shots (P1). The video block is compiled to segments/<nn>-<type>/prompt.txt. Character and world paths are relative to the handle's folder; keyframes/ is relative to the video's folder.",
+  "_comment": "Copy to pipeline/character/<video>/shots/<nn>-<type>.json. Written by character-shots (P1). The video block is compiled to segments/<nn>-<type>/prompt.txt. Character and world paths are relative to the handle's folder; keyframes/ is relative to the video's folder. scripts/character/shots.py validate checks it; shots.py refs writes refs.json from video.references; scripts/character/keyframes.sh renders keyframe_prompt with keyframe_references.",
   "shot_id": "<video>.01-t",
   "character_ref": "<character>@v<n>",
   "character_file": "apps/<slug>/handles/<handle>/characters/<character>/creator.json",
@@ -22,6 +22,7 @@
   "phone": {
     "present": false,
     "screen": "none | green",
+    "screen_id": "<O, G, S, H, F: the row id in apps/<slug>/screens/SCREENS.md; else null>",
     "angle": "flat-on: screen plane square to the lens, upright, no tilt, no perspective (hard rule)",
     "share_of_frame_width": null,
     "gesture_rung": null
@@ -53,6 +54,22 @@
     },
     "on_camera_line": "none"
   },
+  "keyframe_prompt": "<the still that opens the segment: the same person in the outfit, in the set, in the first-frame pose; for O, G, S, H, F the phone already up and flat solid green; for F the other hand already raised beside the phone. A real phone photo, no text.>",
+  "keyframe_references": [
+    {
+      "file": "references/face.png",
+      "kind": "hero"
+    },
+    {
+      "file": "characters/<character>/references/anchors/outfits/<outfit-id>.png",
+      "kind": "anchor"
+    },
+    {
+      "file": "references/sets/<set-id>.png",
+      "kind": "set"
+    }
+  ],
+  "keyframe_end_prompt": "<H only: the end still, the phone at its end size and flat-on; else null>",
   "keyframe": "pipeline/character/<video>/keyframes/01-t.png",
   "keyframe_approved": "<the user's words and the date>",
   "priority_order": [
@@ -92,20 +109,23 @@
     "duration_seconds": 5,
     "trim_to_seconds": "<the planned length when it is under the model's 5 s minimum, else null>",
     "start_frame": "keyframes/01-t.png",
-    "_references_comment": "At most max_reference_images pictures in models.json (4 on the default model), the start frame included. The voice clip is not counted.",
+    "_references_comment": "kind is one of keyframe, hero, anchor, subject, set, neighbour-frame, voice; nothing else, and never a screen. At most max_reference_images pictures in models.json (4 on the default model), the keyframe first. The voice clip is not counted. role is the binding sentence for the REFERENCES section of the prompt.",
     "references": [
       {
         "file": "keyframes/01-t.png",
+        "kind": "keyframe",
         "role": "the first frame: composition, pose, set, light",
         "not": "nothing else"
       },
       {
         "file": "references/face.png",
+        "kind": "hero",
         "role": "the character's face and hair (characters/<character>/references/anchors/hero.png for a character that is not the handle's identity)",
         "not": "its background"
       },
       {
         "file": "characters/<character>/references/voice/voice-reference.mp3",
+        "kind": "voice",
         "role": "the voice only: tone, pitch, accent, pace",
         "not": "its words"
       }

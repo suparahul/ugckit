@@ -12,6 +12,10 @@
 #
 # This script SPENDS MONEY. It refuses to run without CONFIRM=1 so that no agent can
 # bill you by reflex. It prints the computed cost first; approve, then re-run.
+#
+# It also refuses, before any cost: a video whose storyboard (gate A) is not approved in
+# approval.json; a pinned character whose status is not 'live'; a refs.json reference of
+# a kind the character pipeline does not allow (an app screen is never a reference).
 set -euo pipefail
 
 [ $# -ge 2 ] || { echo "usage: $0 <video> <segment> [template_slug] [prompt_file]" >&2; exit 2; }
@@ -40,20 +44,62 @@ USE_REFS=0
 if [ -f "$REFS" ]; then
   if [ "${ALLOW_REFS:-0}" != "1" ]; then
     cat >&2 <<'WARN'
-refs.json is present, which would switch this run to REFERENCE-TO-VIDEO.
+refs.json is present, so this run is REFERENCE-TO-VIDEO.
 
-Reference conditioning preserves style and motion but CANNOT reproduce text. App UI
-comes back as a convincing pastiche with nonsense strings. If you are trying to show a
-real app screen, use the green-screen composite flow instead (insert.json), which is
-what this pipeline is built around.
-
-If you genuinely want reference conditioning, re-run with ALLOW_REFS=1.
-Otherwise delete or rename refs.json.
+In the character pipeline references are the standard mode, but each referenced run is
+still an explicit opt-in. The references carry the person, the room and the voice; they
+never carry the app: reference conditioning cannot reproduce text, and the app is
+inserted at P4. Re-run with ALLOW_REFS=1 after the user's yes.
 WARN
     exit 1
   fi
   USE_REFS=1
 fi
+
+# ---- the gates before any cost: the storyboard, the character, the kinds of reference.
+python3 - "$PROJ" "$VIDEO" "$SEG" "$([ "$USE_REFS" = 1 ] && echo "$REFS")" <<'GATES' || exit 1
+import json, os, re, sys
+root, video, seg, refs = sys.argv[1:5]
+vd = os.path.join(root, "pipeline", "character", video)
+ap = os.path.join(vd, "approval.json")
+a = (json.load(open(ap)).get("gate_a_storyboard") or {}) if os.path.exists(ap) else {}
+if a.get("decision") != "approve" or not a.get("words") or "<" in str(a.get("words")):
+    sys.exit("FATAL: the storyboard of this video is not approved (approval.json "
+             "gate_a_storyboard: decision 'approve' with the user's words) -- run character-shots")
+plan = json.load(open(os.path.join(vd, "plan.json")))
+hdir = os.path.join(root, "apps", plan["app"], "handles", plan["handle"].lstrip("@"))
+for pin in plan.get("characters") or []:
+    m = re.fullmatch(r"(.+)@v(\d+)", pin)
+    cdir = os.path.join(hdir, "characters", m.group(1)) if m else ""
+    cur = os.path.join(cdir, "creator.json")
+    c = json.load(open(cur)) if m and os.path.exists(cur) else {}
+    if m and c.get("version") != f"v{m.group(2)}":
+        old = os.path.join(cdir, "versions", f"v{m.group(2)}.json")
+        c = json.load(open(old)) if os.path.exists(old) else {}
+    if c.get("status") != "live":
+        sys.exit(f"FATAL: {pin} is not live (status {c.get('status')!r}) -- the video half, the "
+                 "voice reference and the twenty-generation gate come first (persona-identity)")
+# The active Supagen version has one length; the segment must be planned at that length.
+shot = os.path.join(vd, "shots", f"{seg}.json")
+st = os.path.join(root, "pipeline", "character", "state.json")
+if os.path.exists(shot) and os.path.exists(st):
+    want = (json.load(open(shot)).get("video") or {}).get("duration_seconds")
+    have = (json.load(open(st)).get("model") or {}).get("duration_s")
+    if want and have and int(want) != int(have):
+        sys.exit(f"FATAL: {seg} is planned at {want}s but the selected length is {have}s -- activate "
+                 f"the ugc-character version at {want}s and run: scripts/character/state.py "
+                 f"model set <slug> {want}")
+if refs:
+    allowed = {"keyframe", "hero", "anchor", "subject", "set", "neighbour-frame", "voice"}
+    spec = json.load(open(refs))
+    if "references" not in spec:
+        sys.exit("FATAL: refs.json has no 'references' list -- write it with "
+                 "scripts/character/shots.py refs")
+    for r in spec["references"]:
+        if r.get("kind") not in allowed or "/screens/" in r.get("file", ""):
+            sys.exit(f"FATAL: refs.json reference {r.get('file')} of kind {r.get('kind')!r} is not "
+                     f"allowed; only {', '.join(sorted(allowed))}. The app is never a reference.")
+GATES
 
 # ---- cost, computed from list price x seconds. Reported costs are unreliable (rule 7).
 # The model comes from pipeline/character/state.json, not from the template: the REST invoke endpoint
@@ -84,7 +130,7 @@ if lim.get("min_duration_s") and dur < lim["min_duration_s"]:
              " -- generate at the minimum and trim at assembly (state.py model set does this)")
 # A run with more pictures than the model takes is refused by the provider after upload.
 if refs and lim.get("max_reference_images"):
-    n = len(json.load(open(refs)).get("image") or [])
+    n = sum(1 for r in json.load(open(refs))["references"] if r.get("kind") != "voice")
     if n > lim["max_reference_images"]:
         sys.exit(f"FATAL: {m['slug']} takes at most {lim['max_reference_images']} reference "
                  f"images but refs.json lists {n} -- drop the least needed ones")
@@ -124,10 +170,14 @@ if [ "$USE_REFS" = 1 ]; then
   echo "== uploading references =="
   python3 - "$REFS" <<'REFLIST' > "$OUT/reflist-$STAMP.txt"
 import json, sys
-spec = json.load(open(sys.argv[1]))
-for kind in ("video", "audio", "image"):
-    for f in spec.get(kind) or []:
-        print(kind, f)
+# Pictures first, in the order of refs.json (the keyframe leads), then the voice clip.
+refs = json.load(open(sys.argv[1]))["references"]
+for r in refs:
+    if r["kind"] != "voice":
+        print("image", r["file"])
+for r in refs:
+    if r["kind"] == "voice":
+        print("audio", r["file"])
 REFLIST
   while read -r KIND FILE; do
     [ -n "$KIND" ] || continue
