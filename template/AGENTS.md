@@ -9,7 +9,9 @@ who really promotes each one, pull their content, and write one teardown per app
 best post becomes the reference for stage 1, or the teardowns become the brief for
 `originate`. Given an app to grow, you walk the slideshow path (§ The slideshow path):
 the research, then the niche, the account set, the handle identities, the plan, and
-production, two slideshows a day per handle.
+production, two slideshows a day per handle. Given a locked, approved plan for a video
+of one of the handle's characters, you walk the character video path (§ Character
+videos), a separate pipeline with its own skills, scripts, state and template.
 
 **The unit of research is the app.** Not the niche, not the handle. Everything in R1–R5
 is "which apps, and how is each one promoted".
@@ -315,6 +317,49 @@ video` is made by `originate` (stage 5) and joins production at `post`.
 
 `setup` runs once per machine/workspace, not once per project.
 
+### Character videos — part A once, then P1 to P6 per video
+
+A video of one repeatable character, the handle's own, with the real app inserted only
+when the plan asks for it. **A separate pipeline from recreation**: it never uses the
+recreation stages, `pipeline/state/pipeline.json` or `scripts/templates.json`, and it
+never changes them. Its state is `pipeline/character/state.json` (`scripts/character/state.py`),
+its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
+(`scripts/character/templates.json`, created by `setup`), its models and limits are in
+`scripts/character/models.json`.
+
+| Part | Stage | Skill | Produces |
+|---|---|---|---|
+| A, once per character | D1 identity | `persona-identity` (mode 3, the video half) | anchors, set plates, signature details, the twenty-generation gate |
+| | D2 voice | `character-voice` | the approved voice reference |
+| B, per video | P1 shots | `character-shots` | segments, shot files, `video.json`, keyframes, prompts, `refs.json`; **gate A**, the storyboard the user approves |
+| | P2 generate | `character-generate` | one segment per run, after the user's yes to its computed cost |
+| | P3 review | `character-review` *(not built yet)* | keep, reject or regenerate one segment; gate B |
+| | P4 composite | `character-composite` *(not built yet)* | the app on the green phone; **skipped when `app_insertion` is false** |
+| | P5 assemble | `character-assemble` *(not built yet)* | one file from `video.json` |
+| | P6 deliver | `character-deliver` *(not built yet)* | the finished file; the pipeline ends here |
+
+- **Production starts only from `pipeline/character/<video>/plan.json`**, locked and
+  approved by the user. No production stage edits it. Casting never runs per video: a
+  plan whose character is not ready stops and asks for part A.
+- **`app_insertion` false** means no app segment (no O, G, S, H, F, R or P) and no screen
+  stage; `scripts/character/state.py` shows P4 as `n/a`.
+- **References are the standard mode here.** Rule 1 and the three flows are the
+  recreation pipeline's. In the character pipeline, a segment may carry `refs.json` with
+  only these kinds: the character's anchors (and her hero), the segment's approved
+  keyframe, a frame of the neighbour segment, a set plate, a fixed subject's picture, the
+  character's voice reference. **Never an app UI, a screenshot or a screen recording as a
+  reference**: reference conditioning cannot reproduce text; the app is inserted at P4.
+  `scripts/character/generate.sh` refuses any other kind, refuses more pictures than the
+  model takes (4 on the default), and asks for an explicit opt-in (`ALLOW_REFS=1`) on
+  each referenced run.
+- **No segment is generated before gate A** (the storyboard approved by word, in
+  `approval.json`) **or while the character is not `live`.** `generate.sh` checks both
+  before it prints a cost.
+- **Rules 2 to 9 hold here too**: REST for generation, messages-only templates, the
+  5,000-character limit, the duration in `extensions`, the computed cost, a yes per run.
+- **The failure ledger is the user's file**, `pipeline/character/model-failures.md`;
+  what the kit knows about each model is `docs/character-model-known.md`.
+
 ## MODELS
 
 One template, `ugc-recreation`, with a version per model. Default is **MiniMax H3 Max**
@@ -324,6 +369,10 @@ caps at 10s. `scripts/templates.json` holds the measured caps and prices; `gener
 rejects an over-length request before it costs anything.
 
 Length is what forces the choice. Ask how long the piece is before recommending a model.
+
+Character videos use their own template, `ugc-character`, and their own model file,
+`scripts/character/models.json`: MiniMax H3 Max reference-to-video by default, $0.08/s,
+5 to 15 s, at most 4 reference pictures.
 
 ---
 
