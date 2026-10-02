@@ -539,6 +539,13 @@ function linkViaPostBridge(s: PostState, pb: { url: string; id: string }): LinkR
   return { ...base, status: "linked", url, tiktokId: pb.id, note: "linked from Post Bridge's own analytics; no Monid call was made" };
 }
 
+export const ZERO_KEPT_NOTE = "Monid returned 0; kept the last numbers";
+
+/** True when Monid reads 0 views for a post whose last Monid line holds more than 0: views never fall, so it is a failed read. Pure. */
+export function zeroOverReal(prev: Record<string, unknown> | null, o: MonidOutcome): boolean {
+  return o.views === 0 && Number(prev?.views ?? 0) > 0;
+}
+
 /**
  * A link already known to have this `id`, matched against a Monid fetch: an
  * `outcome.sync` line (source "monid") when the record is in the fetch and
@@ -551,6 +558,7 @@ function syncOutcomeFromRecords(s: PostState, status: LinkReport["status"], url:
   if (!record) return { ...base, status, url, tiktokId: id, outcome: null, written: false, note: `linked, but the post is not among the latest ${records.length} Monid records; no numbers` };
   const o = outcomeOfMonid(record, url);
   const prev = [...s.log].reverse().find((e) => e.kind === "outcome.sync" && e.data?.source === "monid")?.data ?? null;
+  if (zeroOverReal(prev, o)) return { ...base, status, url, tiktokId: id, outcome: null, written: false, note: ZERO_KEPT_NOTE };
   const same = !!prev && (["views", "likes", "comments", "saves", "shares"] as const).every((k) => Number(prev[k] ?? -1) === o[k]);
   if (!same) appendEvent(s.row.slug, { post: s.row.key, kind: "outcome.sync", actor: "sync", data: { ...o } });
   return { ...base, status, url, tiktokId: id, outcome: o, written: !same, note: same ? "numbers unchanged" : "numbers written" };

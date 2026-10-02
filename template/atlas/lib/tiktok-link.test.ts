@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { captionMatch, captionTokens, directLinkFrom, directLinkOf, handPostedLine, linkOf, matchByTime, matchPosts, maxItemsFor, MONID_COST_PER_POST, monidCostEstimate, outcomeOfMonid, pbLinkOf, pickRecord, postKindOf, savedRunsFetch, sinceOf, tiktokIdOf, tiktokUrl, type MatchTarget, type MonidPost } from "./tiktok-link.ts";
+import { captionMatch, captionTokens, directLinkFrom, directLinkOf, handPostedLine, linkOf, matchByTime, matchPosts, maxItemsFor, MONID_COST_PER_POST, monidCostEstimate, outcomeOfMonid, pbLinkOf, zeroOverReal, ZERO_KEPT_NOTE, pickRecord, postKindOf, savedRunsFetch, sinceOf, tiktokIdOf, tiktokUrl, type MatchTarget, type MonidPost } from "./tiktok-link.ts";
 import type { Event } from "./production.ts";
 import type { PBAnalytics, PBPost, PBPostResult } from "./postbridge.ts";
 
@@ -218,4 +218,14 @@ test("savedRunsFetch: each handle from its latest completed saved run, marked wi
   assert.equal(posts[0].views, 120);
   assert.equal(outcomeOfMonid(posts[0], "u").syncedAt, "2026-05-05T13:49:38.581Z", "the numbers carry the time they were read");
   await assert.rejects(fetch("@example.two", 10), /no saved run/);
+});
+
+test("zeroOverReal: a 0-view Monid read never replaces a real number", () => {
+  const rec = (views: number): MonidPost => ({ id: "7", postPage: "p", uploadedAtFormatted: "2026-09-26T19:25:59.000Z", views, likes: 0, comments: 2, shares: 0, bookmarks: 0, title: "t", images: [{}] });
+  const zero = outcomeOfMonid(rec(0), "u");
+  assert.equal(zeroOverReal({ views: 1970, likes: 30, comments: 2, saves: 7, shares: 5 }, zero), true, "0 over 1970 is a failed read");
+  assert.equal(zeroOverReal(null, zero), false, "no earlier line: a first 0 is written");
+  assert.equal(zeroOverReal({ views: 0 }, zero), false, "0 over 0 is a real 0");
+  assert.equal(zeroOverReal({ views: 1970 }, outcomeOfMonid(rec(1978), "u")), false, "a real read is written");
+  assert.equal(ZERO_KEPT_NOTE, "Monid returned 0; kept the last numbers");
 });
