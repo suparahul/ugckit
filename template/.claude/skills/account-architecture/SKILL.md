@@ -28,12 +28,19 @@ Every value you propose names its source: `brain`, `competitor apps` or `niche`.
    recommendation once and take the user's answer.
 2. **The role of each.** The default from the architecture: a persona handle that never
    names the app, plus the brand handle whose bio carries the search instruction. Other
-   sets: two personas; brand only. Say what the competitor apps and the niche run.
+   sets: two personas; brand only; more than one brand handle. Six of 11 networks run
+   more than one brand handle (brain Layer 4, "More than one brand handle"). Say what
+   the competitor apps and the niche run.
 3. **The subject.** Rendered (the default: the pictures are generated, the identity
    stage makes the references) or real (the user's own camera; the references wait
    until a plan exists).
 4. **The name pattern.** From Layer 1 and the niche's handles: `<firstname>.<niche
-   word>` for a persona, the app's name for the brand.
+   word>` for a persona. The brand handle takes the app's name, alone or with one short
+   part: `app`, a domain part, a verb before the name (`get`, `use`, `try`), or a niche
+   word. An extra brand handle takes the app's name with a different part. It keeps
+   the same display name and logo. Never propose a narrow sub-topic (`<app>.feeding`).
+   Never propose a brand handle without the app's name. The evidence is in Layer 1,
+   "Brand handle name".
 5. **The cadence.** Two posts a day per handle is the recommendation.
 6. **A video arm.** Only if phases 3 and 4 found a video format that clearly wins: note
    it here as "worth a plan row later"; it is not a handle decision.
@@ -50,7 +57,7 @@ Every value you propose names its source: `brain`, `competitor apps` or `niche`.
     | Handle | Role | Bio rule | Subject | Name pattern | Cadence | Status | Source |
     |---|---|---|---|---|---|---|---|
     | @<to name> | main persona | never names the app | rendered | <firstname>.<niche> | 2/day | proposed | brain Layer 4; niche: 7 of 9 winning posts are personas |
-    | @<app name> | brand handle | "Search <App> in the App Store" | rendered | the app's name | 2/day | proposed | competitor apps: all three run a brand handle |
+    | @<app name> | brand handle | "Search <App> in the App Store" | rendered | <app>, or <app> + one short part | 2/day | proposed | competitor apps: all three run a brand handle |
 
     ## Why this set
     Short prose, one paragraph per decision, each with its citation.

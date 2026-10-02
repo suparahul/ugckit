@@ -22,12 +22,14 @@ approval line the Organic Factory UI writes to the log. Say "tick it on the hand
 silently.
 
 **1. Role and name.** From the row's pattern, propose three handle strings; check each
-is free on TikTok only if the user asks (there is no free way to check from here). The
-user picks one and **creates the account on TikTok by hand**, then ticks "created".
+is free on TikTok only if the user asks (there is no free way to check from here). For
+a brand handle, all three strings carry the app's name. Use the shapes in
+`brain/ACCOUNT-ARCHITECTURE.md` Layer 1, "Brand handle name". The user picks one and
+**creates the account on TikTok by hand**, then ticks "created".
 Write `HANDLE.md` with the head lines:
 
-    # @hannah.catmom
-    Handle: @hannah.catmom
+    # @maya.petmom
+    Handle: @maya.petmom
     Platform: tiktok
     Role: main persona
     Tier: persona handle
@@ -36,8 +38,8 @@ Write `HANDLE.md` with the head lines:
 Then ask one question: **does this identity also post on Instagram?** Instagram is a
 repost of the same decks (the research stays TikTok only). When the answer is yes:
 
-- propose the Instagram name. It may differ from the TikTok one (`@hannah.catmom_`
-  when `@hannah.catmom` is taken there); nothing derives one from the other;
+- propose the Instagram name. It may differ from the TikTok one (`@maya.petmom_`
+  when `@maya.petmom` is taken there); nothing derives one from the other;
 - the user creates the account in the Instagram app by hand and makes it a
   **professional account** (Business or Creator: Settings → Account type and tools).
   Publishing through the posting service works only on a professional account; a
@@ -49,8 +51,8 @@ repost of the same decks (the research stays TikTok only). When the answer is ye
 
       | Platform | Account | Created | Role | Status |
       |---|---|---|---|---|
-      | tiktok | @hannah.catmom | 2026-09-14 | primary | connected |
-      | instagram | @hannah.catmom_ | 2026-09-22 | repost | not connected |
+      | tiktok | @maya.petmom | 2026-09-14 | primary | connected |
+      | instagram | @maya.petmom_ | 2026-09-22 | repost | not connected |
 
   The Status cell is for the eye; the truth is `posting-accounts.json`. No table means
   one TikTok account, which is every handle written before this.
@@ -91,7 +93,9 @@ is attached to every generation. The user approves each file (`reference.approve
 asks for a new one (`reference.reject` with a note); regenerate that one only.
 
 **4. Profile picture and bio.** Generate `references/profile.png` from the face and the
-subjects (the `persona-identity` stage again). Draft `## Bio` by the tier's rule: the
+subjects (the `persona-identity` stage again). A brand handle uses the app's logo as its
+profile picture. An extra brand handle uses the same logo and the same display name as
+the first. Draft `## Bio` by the tier's rule: the
 persona bio never names the app; the brand bio is the search instruction ("Search
 <App> in the App Store"). Quote it in a `>` line, then the rule line. The user approves
 (`bio.approve`), sets both on TikTok by hand, and ticks "set on TikTok". An identity
