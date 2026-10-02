@@ -88,10 +88,11 @@
   "video": {
     "segment_project": "<video>.01-t",
     "flow": "referenced | complex | complex+refs",
-    "model": "<slug in scripts/character/models.json; default minimax-h3-reference-to-video; the active version must match>",
+    "model": "<slug in scripts/character/models.json; default minimax-h3-max-reference-to-video; the active version must match>",
     "duration_seconds": 5,
     "trim_to_seconds": "<the planned length when it is under the model's 5 s minimum, else null>",
     "start_frame": "keyframes/01-t.png",
+    "_references_comment": "At most max_reference_images pictures in models.json (4 on the default model), the start frame included. The voice clip is not counted.",
     "references": [
       {
         "file": "keyframes/01-t.png",

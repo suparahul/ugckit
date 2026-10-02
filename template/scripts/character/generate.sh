@@ -61,9 +61,10 @@ fi
 # state file is the only place that knows which model is really going to run. Keep the
 # two in step -- `state.py model set` and `activate_version` are one operation in
 # two places, and the setup skill does both.
-read -r MODEL DUR PRICE TRIM < <(python3 - "$PROJ" <<'COST'
+REFS_ARG=""; [ "$USE_REFS" = 1 ] && REFS_ARG="$REFS"
+read -r MODEL DUR PRICE TRIM < <(python3 - "$PROJ" "$REFS_ARG" <<'COST'
 import json, os, sys
-root = sys.argv[1]
+root, refs = sys.argv[1], sys.argv[2]
 state = os.path.join(root, "pipeline", "character", "state.json")
 if not os.path.exists(state):
     sys.exit("no pipeline/character/state.json -- run: scripts/character/state.py model set <slug> <seconds>")
@@ -81,6 +82,12 @@ if lim.get("max_duration_s") and dur > lim["max_duration_s"]:
 if lim.get("min_duration_s") and dur < lim["min_duration_s"]:
     sys.exit(f"FATAL: {m['slug']} takes at least {lim['min_duration_s']}s but {dur}s is selected"
              " -- generate at the minimum and trim at assembly (state.py model set does this)")
+# A run with more pictures than the model takes is refused by the provider after upload.
+if refs and lim.get("max_reference_images"):
+    n = len(json.load(open(refs)).get("image") or [])
+    if n > lim["max_reference_images"]:
+        sys.exit(f"FATAL: {m['slug']} takes at most {lim['max_reference_images']} reference "
+                 f"images but refs.json lists {n} -- drop the least needed ones")
 print(m["slug"], dur, lim.get("price_per_s") or 0, m.get("trim_to_s") or 0)
 COST
 )

@@ -1,12 +1,20 @@
 {
-  "_comment": "The character pipeline's own model file. It is not the recreation pipeline's templates.json, and the recreation scripts never read it. The character scripts (scripts/character/generate.sh and the model command of scripts/character/state.py) read it to refuse an impossible request before it costs anything, and to compute cost. Same shape as known_model_limits in templates.json, plus min_duration_s. MiniMax H3 is the default. Add another model only with a measured cap and price.",
-  "default": "minimax-h3-reference-to-video",
+  "_comment": "The character pipeline's own model file. It is not the recreation pipeline's templates.json, and the recreation scripts never read it. The character scripts (scripts/character/generate.sh and the model command of scripts/character/state.py) read it to refuse an impossible request before it costs anything, and to compute cost. Same shape as known_model_limits in templates.json, plus min_duration_s and max_reference_images. MiniMax H3 Max reference-to-video is the default; MiniMax H3 reference-to-video stays as a second entry. Add another model only with a measured cap and price. max_reference_images is the most pictures one run may attach; every image counts, the start frame too, and the voice clip does not.",
+  "default": "minimax-h3-max-reference-to-video",
   "known_model_limits": {
+    "minimax-h3-max-reference-to-video": {
+      "min_duration_s": 5,
+      "max_duration_s": 15,
+      "price_per_s": 0.08,
+      "max_resolution": "768p",
+      "max_reference_images": 4
+    },
     "minimax-h3-reference-to-video": {
       "min_duration_s": 5,
       "max_duration_s": 15,
       "price_per_s": 0.06,
-      "max_resolution": "768p"
+      "max_resolution": "768p",
+      "max_reference_images": 9
     }
   },
   "output": {
@@ -17,20 +25,23 @@
   },
   "duration_rules": {
     "_comment": "The recreation rules (state.py model set, generate.sh, AGENTS.md rules 6 and 7), restated for the character copies, with this model's minimum.",
-    "whole_seconds": "The duration is a whole number of seconds, from min_duration_s (5) to max_duration_s (15). Supagen allows 5 to 15 for this model. A segment planned shorter than 5 s is generated at 5 s and trimmed at assembly.",
+    "whole_seconds": "The duration is a whole number of seconds, from min_duration_s (5) to max_duration_s (15). Supagen allows 5 to 15 for both models. A segment planned shorter than 5 s is generated at 5 s and trimmed at assembly.",
     "cap": "Check the range when the model is chosen (state.py model set) and again before each generation (generate.sh).",
     "unknown_model": "Refuse a model slug that is not in known_model_limits.",
     "duration_field": "Set video_settings.duration to null and put the integer in extensions.duration. fal serialises an integer duration as \"20s\" and rejects its own string.",
-    "resolution_field": "Put the resolution in extensions as \"768P\" (uppercase), beside the duration.",
+    "resolution_field": "Put the resolution in extensions as \"768P\" (uppercase), beside the duration. Every H3 and H3 Max template version so far used this form.",
     "cost": "Computed cost = price_per_s x seconds. It is a computed figure, not the billed amount (see supagen_findings.billing).",
-    "active_version": "The REST invoke endpoint ignores version_number and runs the active version. Change the active version (activate_version over MCP) and the selected model (state.py model set) together, never one without the other."
+    "active_version": "The REST invoke endpoint ignores version_number and runs the active version. Change the active version (activate_version over MCP) and the selected model (state.py model set) together, never one without the other.",
+    "reference_images": "A run attaches at most max_reference_images pictures (4 on the default). generate.sh refuses a refs.json with more. The voice clip is audio and is not counted."
   },
   "supagen_findings": {
-    "_comment": "Read-only check on 2026-10-02 through the Supagen MCP: the model record, the versions of the earlier reference template, the invocation list and one trace. No generation.",
-    "price": "price_per_s 0.06 is the 768p price set on 2026-10-02. Supagen's model record lists $0.13 per second.",
-    "billing": "PARTLY OPEN. Supagen records $0.65 for every run of this model (seven runs, 5 to 15 s, 9:16 and 16:9): the list price x the 5 s minimum, whatever the duration. MiniMax H3 Max shows the same pattern ($0.20 a run). So Supagen's cost record is per run. What the provider charges cannot be read from Supagen: compare the provider account after the first paid run. Until then, plan each run at $0.65 as the worst case.",
-    "template_settings": "SETTLED. The earlier reference template had three versions: aspect_ratio 9:16, n 1, extensions {duration: 15, 5 or 6, resolution: \"768P\"}, audio on at 15 s and off at 5 and 6 s. The ugc-character template does not exist in Supagen yet. It is created with these settings before the first paid run, after a yes; nothing before that needs it.",
-    "resolution": "SETTLED. Allowed: 480p, 768p, 2K, 4K (768p native; 2K and 4K are provider upscales). \"768P\" in extensions worked in every run. Send that; upscale to 1080p at assembly.",
-    "output_length": "SETTLED BY MEASUREMENT. Outputs run 0.1 to 0.6 s long: 5 s gave 5.184 s, 6 s gave 6.592 s, 15 s gave 15.104 s. Trim to the planned length at assembly."
+    "_comment": "Read-only checks through the Supagen MCP on 2026-10-02: the model records of both reference models, the versions of earlier templates, the invocation list and traces. No generation.",
+    "price": "minimax-h3-max-reference-to-video: price_per_s 0.08, the founder's figure; Supagen's model record lists the same, $0.08 per second. minimax-h3-reference-to-video: price_per_s 0.06, the founder's 768p figure; Supagen's record lists $0.13 per second.",
+    "billing": "PARTLY OPEN. minimax-h3-reference-to-video: Supagen records $0.65 for every run (seven runs, 5 to 15 s), the list price x the 5 s minimum. The H3 Max family (text-to-video and image-to-video): Supagen records $0.20 for every run, at 10 s and at 15 s alike, which is less than $0.08 x 5 s. No run of minimax-h3-max-reference-to-video exists yet. What the provider charges cannot be read from Supagen: compare the provider account after the first paid run. Until then, plan each H3 Max run at the computed figure, $0.08 x seconds, which is the higher of the two.",
+    "template_settings": "SETTLED. The earlier H3 Max templates (text-to-video, 16:9, six versions) used video_settings {aspect_ratio, n 1, generate_audio true, extensions {duration: 5 to 15, resolution: \"768P\"}}. The earlier H3 reference template used the same shape at 9:16. The ugc-character template does not exist in Supagen yet. It is created before the first paid run, after a yes, with one version on minimax-h3-max-reference-to-video: aspect_ratio 9:16, n 1, extensions {duration: 5, resolution: \"768P\"}, audio on. Nothing before that run needs it.",
+    "resolution": "SETTLED. minimax-h3-max-reference-to-video allows 480p, 768p, 1080p (768p native; 1080p is the provider's refinement, price at 1080p not listed). minimax-h3-reference-to-video allows 480p, 768p, 2K, 4K. Send \"768P\"; upscale once to 1080p at assembly.",
+    "audio": "OPEN. The H3 Max reference record says supports_audio_generation true and its description keeps the self-composed soundtrack, but its capabilities list audio_output false. The H3 Max text-to-video runs had audio on. Check the first paid run for a sound track before any talking segment counts on it.",
+    "references": "minimax-h3-max-reference-to-video takes at most 4 reference images (minimax-h3-reference-to-video takes 9), and also video and audio references. It has no video extension.",
+    "output_length": "SETTLED BY MEASUREMENT for minimax-h3-reference-to-video: outputs run 0.1 to 0.6 s long (5 s gave 5.184 s, 6 s gave 6.592 s, 15 s gave 15.104 s). Not measured yet for H3 Max reference. Trim to the planned length at assembly."
   }
 }
