@@ -1,0 +1,113 @@
+{
+  "_comment": "Copy to pipeline/character/<video>/segments/<nn>-<type>/insert.json, only for a segment that inserts the app. A superset of docs/insert.example.json: every existing key keeps its meaning, and the new keys are optional, so an old file still runs.",
+  "mode": "over-shoulder | in-hand | show-to-camera | push | finger",
+  "screen_id": "<row id in apps/<slug>/screens/SCREENS.md>",
+  "source": "apps/<slug>/screens/<id>.mp4",
+  "source_kind": "recording | still | finger-driven",
+  "plate_window": [
+    0.0,
+    4.0
+  ],
+  "key": {
+    "color": [
+      0,
+      177,
+      64
+    ],
+    "hue_tol": 26,
+    "sat_min": 55,
+    "val_min": 35,
+    "dark_max": 105
+  },
+  "beats": [
+    {
+      "app_t": 0.0,
+      "plate_t": 0.0,
+      "label": "start",
+      "region": null
+    },
+    {
+      "app_t": 1.2,
+      "plate_t": 1.5,
+      "label": "tap",
+      "region": "lower third, centre"
+    },
+    {
+      "app_t": 3.6,
+      "plate_t": 4.0,
+      "label": "end",
+      "region": null
+    }
+  ],
+  "gesture_rung": 2,
+  "hero": {
+    "text": "<the one string the viewer must read, exactly as the app shows it>",
+    "rect_source_px": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "needs": "recognition | large type | body text"
+  },
+  "legibility": {
+    "min_screen_width_px_at_1080": 280,
+    "ocr_must_read_hero": false
+  },
+  "track": {
+    "mode": "per-frame | locked | motion",
+    "locked_if_drift_pct_under": 2,
+    "motion": {
+      "median_frames": 3,
+      "smooth_frames": 5,
+      "area_filter": "against neighbours",
+      "join_green_regions": true
+    }
+  },
+  "occlusion": {
+    "matte": "green key: not green inside the quad is the finger",
+    "dark_exception": "notch zone and edge band only",
+    "edge_soften_px": 1,
+    "despill": "whole finger"
+  },
+  "finger": {
+    "contact_frame": null,
+    "release_frame": null,
+    "tip_track": "the point of the finger matte furthest into the screen",
+    "scroll_follow_tolerance_pct_screen_h": 5
+  },
+  "motion_blur": {
+    "on": false,
+    "from": "corner movement between frames",
+    "shutter_deg": 180
+  },
+  "composite_resolution": "1080x1920",
+  "patches": [],
+  "grade": {
+    "blur": 0.5,
+    "brightness": 0.0,
+    "contrast": 1.04,
+    "saturation": 1.0,
+    "reflection": 0.05,
+    "noise": 5,
+    "black_lift": 0.03
+  },
+  "smooth": 7,
+  "gates": {
+    "green_g_std_max": 10,
+    "drift_pct_max": 8,
+    "flat_on": {
+      "opposite_edge_diff_pct_max": 3,
+      "corner_deg_from_90_max": 3,
+      "long_edge_deg_from_vertical_max": 3
+    },
+    "strict_green_pixels_in_final": 0,
+    "tap_alignment_frames_max": 2,
+    "motion": {
+      "push_max_deg_from_square": 8,
+      "corner_jump_pct_screen_w_max": 2,
+      "finger_sheet": "no app pixel on the finger, no green on it",
+      "scroll_follow_pct_screen_h_max": 5
+    }
+  }
+}

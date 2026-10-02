@@ -1,0 +1,149 @@
+{
+  "_comment": "Copy to pipeline/character/<video>/shots/<nn>-<type>.json. Written by character-shots (P1). The video block is compiled to segments/<nn>-<type>/prompt.txt.",
+  "shot_id": "<video>.01-t",
+  "character_ref": "<character>@v<n>",
+  "character_file": "apps/<slug>/handles/<handle>/characters/<character>/creator.json",
+  "segment_type": "T | O | G | S | H | F",
+  "script_lines": "<ids of the frozen script lines this segment speaks; 'demo-vo' for a demo performance>",
+  "set_ref": "<set-id>",
+  "outfit_ref": "<outfit-id>",
+  "framing": "medium chest-up, phone propped at eye level, face fills most of the frame",
+  "action": "<one action, written as movement; ends in a visible state>",
+  "hands": {
+    "left": "<job and place, or 'out of frame'>",
+    "right": "<job and place, or 'out of frame'>"
+  },
+  "props": [
+    "<each prop, and whose hand it is in>"
+  ],
+  "fixed_subjects_in_shot": [
+    "<fixed-subject-id>"
+  ],
+  "phone": {
+    "present": false,
+    "screen": "none | green",
+    "angle": "flat-on: screen plane square to the lens, upright, no tilt, no perspective (hard rule)",
+    "share_of_frame_width": null,
+    "gesture_rung": null
+  },
+  "phone_motion": {
+    "kind": "none | push | finger",
+    "push": {
+      "start_hold_s": [
+        0.0,
+        0.5
+      ],
+      "end_hold_s": [
+        1.3,
+        4.0
+      ],
+      "start_share_of_frame_width": 0.33,
+      "end_share_of_frame_width": 0.6,
+      "end_still": "keyframes/<nn>-h-end.png",
+      "max_deg_from_square_during_push": 8
+    },
+    "finger": {
+      "hand": "right",
+      "finger": "index",
+      "gesture": "tap | scroll-up | scroll-down | swipe-left | swipe-right",
+      "start_place": "raised beside the phone, off the screen edge",
+      "contact_s": 1.0,
+      "release_s": 1.6,
+      "travel": "about a third of the screen height"
+    },
+    "on_camera_line": "none"
+  },
+  "keyframe": "pipeline/character/<video>/keyframes/01-t.png",
+  "keyframe_approved": "<the user's words and the date>",
+  "priority_order": [
+    "identity from creator file and anchors",
+    "fixed subjects: count, look, true size",
+    "camera habits",
+    "phone and green screen, when present",
+    "requested outfit only",
+    "requested set only",
+    "the action"
+  ],
+  "negative_prompt": {
+    "identity": "<from creator.json identity_negative>",
+    "slop": [
+      "plastic skin",
+      "airbrushed skin",
+      "beauty filter",
+      "studio lighting",
+      "ring light",
+      "cinematic grade",
+      "perfectly tidy room",
+      "extra fingers",
+      "fused fingers",
+      "text",
+      "captions",
+      "watermark",
+      "ui overlays"
+    ],
+    "earned": [
+      "<at most five, each with its row in docs/character-model-failures.md>"
+    ]
+  },
+  "video": {
+    "segment_project": "<video>.01-t",
+    "flow": "referenced | complex | complex+refs",
+    "model": "<slug in scripts/templates.json; default minimax-h3-reference-to-video with references, minimax-h3-max-text-to-video without; the active version must match>",
+    "duration_seconds": 4,
+    "start_frame": "keyframes/01-t.png",
+    "references": [
+      {
+        "file": "keyframes/01-t.png",
+        "role": "the first frame: composition, pose, set, light",
+        "not": "nothing else"
+      },
+      {
+        "file": "characters/<character>/references/anchors/hero.png",
+        "role": "the character's face and hair",
+        "not": "its background"
+      },
+      {
+        "file": "characters/<character>/references/voice/voice-reference.mp3",
+        "role": "the voice only: tone, pitch, accent, pace",
+        "not": "its words"
+      }
+    ],
+    "camera": "phone propped at eye level, subtle micro-shake, no cuts",
+    "phone_angle": "<O, G, S only, pasted as it is:> The phone is held completely flat-on to the camera: the screen plane is square to the lens and upright, with no tilt, no turn and no perspective, from the first frame to the last.",
+    "beats": [
+      {
+        "t": "0.0-1.5",
+        "action": "<physical action first>",
+        "line": null,
+        "end_state": "<what is visible>"
+      },
+      {
+        "t": "1.5-4.0",
+        "action": "<small action under the line>",
+        "line": "<the frozen words>",
+        "delivery": "<which word lifts, where it slows, the breath>",
+        "end_state": "<what is visible>"
+      }
+    ],
+    "speech": "on camera, lips in sync, eyes on the lens",
+    "audio": {
+      "room_events": [
+        "<each sound as a physical event>"
+      ],
+      "music": "none",
+      "subtitles": "none"
+    },
+    "keep_fixed": [
+      "face",
+      "hair",
+      "signature details",
+      "outfit",
+      "set layout",
+      "light direction",
+      "camera position",
+      "exactly one person"
+    ],
+    "word_count": 12,
+    "words_per_second_max": 3.75
+  }
+}

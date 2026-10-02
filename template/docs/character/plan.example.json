@@ -1,0 +1,54 @@
+{
+  "_comment": "Copy to pipeline/character/<video>/plan.json. The locked plan, the only input of production. Written by hand until the planning system exists, then approved by the user. No production stage edits it.",
+  "video_id": "<video>",
+  "app": "<slug>",
+  "handle": "<handle>",
+  "characters": [
+    "<character>@v<n>"
+  ],
+  "format": {
+    "dimension": "9:16",
+    "length_s": "<target length in seconds>"
+  },
+  "app_insertion": "<true | false>",
+  "script": [
+    {
+      "id": "l1",
+      "speaker": "<character id, or vo>",
+      "line": "<the frozen words>",
+      "delivery": "<which word lifts, where it slows, the breath>"
+    }
+  ],
+  "beats": [
+    {
+      "lines": [
+        "l1"
+      ],
+      "app_on_screen": false,
+      "screen_id": null,
+      "viewer_must": null
+    },
+    {
+      "lines": [
+        "l2"
+      ],
+      "app_on_screen": "<true only with app_insertion true>",
+      "screen_id": "<row id in apps/<slug>/screens/SCREENS.md>",
+      "viewer_must": "read | recognise | believe"
+    }
+  ],
+  "set": {
+    "<character>": "<set-id>"
+  },
+  "outfit": {
+    "<character>": "<outfit-id>"
+  },
+  "hero_strings": {
+    "<screen id>": "<the one string the viewer must read>"
+  },
+  "source": "<a reference post, or a research brief>",
+  "approved": {
+    "words": "<the user's words, quoted>",
+    "date": "<YYYY-MM-DD>"
+  }
+}

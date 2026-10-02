@@ -1,0 +1,42 @@
+{
+  "_comment": "Copy to pipeline/character/<video>/approval.json. Written at gate A (P1), gate B (P3) and gate C (P6), with the user's words.",
+  "video_id": "<video>",
+  "gate_a_storyboard": {
+    "keyframes_match_anchors": null,
+    "reads_as_camera_roll_not_ad": null,
+    "hands_counted": null,
+    "phone_size": null,
+    "phone_flat_on_to_lens": null,
+    "prompt_lint": null,
+    "decision": "approve | redo keyframe <n>",
+    "words": "<the user's words>"
+  },
+  "gate_b_segments": [
+    {
+      "project": "<video>.01-t",
+      "file": "<the mp4>",
+      "identity": "face, hair and signature details match the creator file in every second",
+      "fixed_subjects": "count, look and true size",
+      "hands": "five fingers, nothing melting",
+      "mouth": "lip sync holds; transcript matches the script",
+      "voice": "matches the voice reference; natural-voice check passes: natural breaths, varied pauses, pitch spread passes, room sound, no flat TTS cadence",
+      "set": "same room, light and camera position; nothing hallucinated",
+      "text_in_picture": "none",
+      "cuts": "within tolerance",
+      "insert_gates": "see insert.json gates, the flat-on gate first; n/a without a phone",
+      "decision": "approve | reject | regenerate this segment only",
+      "failure_class": "<for a reject: the ledger row it adds>",
+      "set_id": "<set-id>"
+    }
+  ],
+  "gate_c_final": {
+    "face_holds_across_segments": null,
+    "outfit_and_set_hold_across_segments": null,
+    "voice_and_room_agree_across_joins": null,
+    "no_join_inside_a_sentence": null,
+    "ui_real_and_readable": "OCR of the hero element passes on the final file; n/a without app insertion",
+    "captions": "match the frozen script and the house style",
+    "decision": "approve | reject | regenerate segment <n>",
+    "words": "<the user's words, quoted, with the date>"
+  }
+}

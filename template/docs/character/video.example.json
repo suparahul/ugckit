@@ -1,0 +1,105 @@
+{
+  "_comment": "Copy to pipeline/character/<video>/video.json. Written by character-shots (P1) from the locked plan; nothing can be assembled without it. With app_insertion false, it has no O, G, S, H, F, R or P segment.",
+  "video_id": "<video>",
+  "characters": [
+    "<character>@v<n>"
+  ],
+  "plan_ref": "pipeline/character/<video>/plan.json",
+  "app": "<slug>",
+  "handle": "<handle>",
+  "dimension": "9:16",
+  "app_insertion": "<true | false, from the plan; false means no O, G, S, H, F, R or P segment>",
+  "script_ref": "<the frozen script; the user's words and the date>",
+  "outfit_ref": "<outfit-id>",
+  "segments": [
+    {
+      "n": 1,
+      "type": "T",
+      "project": "<video>.01-t",
+      "script_lines": "<ids>",
+      "shared": false
+    },
+    {
+      "n": 2,
+      "type": "T",
+      "project": "<character>-shared.02-t",
+      "script_lines": "<ids>",
+      "shared": true,
+      "punch_in": 1.1
+    },
+    {
+      "n": 3,
+      "type": "R",
+      "screen_id": "<id>",
+      "crop": "9:16 around hero",
+      "punch_in_to_hero": 1.25,
+      "audio_from": "<character>-shared.<screen-id>-vo",
+      "shared": true
+    },
+    {
+      "n": 4,
+      "type": "T",
+      "project": "<character>-shared.04-t",
+      "script_lines": "<ids>",
+      "shared": true
+    }
+  ],
+  "joins": {
+    "cut": "hard",
+    "audio_fade_ms": 30,
+    "on_sentence_end": true
+  },
+  "sound": {
+    "loudness": "one level for all segments",
+    "room_tone": "characters/<character>/references/voice/room-tone-<set-id>.wav",
+    "music": "none in file"
+  },
+  "captions": {
+    "style": "house: Helvetica Neue Bold, white, black outline",
+    "words_per_caption": "3-6",
+    "text_source": "the frozen script"
+  },
+  "title_overlay": {
+    "burn": "<true only when the plan asks for it>",
+    "text": "<the line, or null>"
+  },
+  "export": {
+    "upscale": "lanczos, once, to 1080x1920",
+    "resolution": "1080x1920",
+    "fps": 30,
+    "intermediate_encode": true,
+    "film_grain": false,
+    "grain_test_variant": "<the first real use case only: true, a second export with 2 to 3% grain>"
+  },
+  "voiceover": {
+    "character_ref": "<character>@v<n>",
+    "script_ref": "<the frozen script of the video, or of the recording>",
+    "source": "in-model | tts-fallback",
+    "in_model": {
+      "segment_project": "<character>-shared.<screen-id>-vo",
+      "note": "the demo performance: she says the demo lines on camera in the set; the audio goes under R, the picture into P"
+    },
+    "delivery": "conversational; pace differs by line, as the delivery notes say",
+    "imperfections": [
+      "one small breath before the line that must land",
+      "one restart",
+      "no studio compression"
+    ],
+    "room_tone": {
+      "set": "<set-id>",
+      "file": "characters/<character>/references/voice/room-tone-<set-id>.wav",
+      "level_db": -45
+    },
+    "fallback_rules": [
+      "only where no face is on screen",
+      "same room tone bed",
+      "small-room reverb",
+      "never a TTS clone of a real person's voice"
+    ],
+    "checks": {
+      "pitch_spread_semitones_min_per_2s": 5,
+      "transcript_matches_script": true,
+      "natural_voice": "natural breaths, varied pauses, moving pitch, room sound, no flat TTS cadence"
+    }
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "_comment": "Copy to apps/<slug>/handles/<handle>/characters/<character>/creator.json. Written by character-cast (part A, once per character). Paths inside it are relative to the character's folder. Values in angle brackets are filled at casting.",
+  "character_id": "<character>",
+  "handle": "<handle>",
+  "handle_kind": "persona (the handle's one character and its identity) | multi-character",
+  "app": "<slug>",
+  "version": "v<n>",
+  "version_note": "<what changed from the previous version, and the user's approval with the date>",
+  "status": "casting | voice-setup | live | retired",
+  "image_model": "codex-image (the Codex image tool, for every picture of this character; decision 4)",
+  "identity_lock": {
+    "age_appearance": "<age band, from the claim the videos make>",
+    "face": "<shape, jaw, cheekbones: written from references/anchors/hero.png, visible traits only>",
+    "eyes": "<colour, shape, from the picture>",
+    "brows": "<from the picture>",
+    "skin": "<tone and undertone>, visible pores on nose and cheeks, <make-up>",
+    "hair": "<length, texture, colour, how it is worn>"
+  },
+  "signature_details": [
+    "<chosen at casting, with the user; at most three; each at least 1% of frame height in a chest-up shot; only what the approved face shows or the user adds>"
+  ],
+  "fixed_subjects": [
+    {
+      "id": "<fixed-subject-id>",
+      "what": "<what always comes with her, in visible traits: a pet, a product she always holds>",
+      "reference": "references/<fixed-subject-id>.png",
+      "rules": [
+        "<its true size in proportion to her and the furniture>",
+        "<its count, e.g. exactly one>"
+      ]
+    }
+  ],
+  "voice_profile": {
+    "tone": "<pitch and warmth>",
+    "pace": "<words per second, and how sentences join>",
+    "accent": "<one accent>",
+    "verbal_habits": [
+      "<one opener she uses, once per video>"
+    ],
+    "never_says": [
+      "guys",
+      "game changer",
+      "obsessed",
+      "you need this"
+    ],
+    "not_wanted": [
+      "announcer tone",
+      "narrator delivery",
+      "rising question tone on statements",
+      "over-articulated consonants"
+    ],
+    "voice_reference": {
+      "file": "references/voice/voice-reference.mp3",
+      "origin": "research | own-generation (fallback only)",
+      "source": {
+        "post": "<URL of the post>",
+        "creator_handle": "<handle>",
+        "platform": "tiktok | instagram",
+        "found_in": "<the research file that lists the post>",
+        "cut_s": [
+          "<start>",
+          "<end>"
+        ]
+      },
+      "candidates_heard": [
+        "<the other clips the user heard>"
+      ],
+      "approved": "<the user's words and the date>",
+      "natural_voice_check": "<date; the first approved generation passed: natural breaths, varied pauses, moving pitch, room sound, no flat TTS cadence>"
+    }
+  },
+  "camera_habits": {
+    "device": "front-facing phone camera",
+    "lens": "24-28mm equivalent, mild wide-angle distortion",
+    "distance": "arm's length, or propped at eye level",
+    "height": "eye level",
+    "processing": "normal phone processing, true colours, no beauty filter",
+    "flaws": [
+      "subtle micro-shake",
+      "slight off-centre tilt",
+      "one autofocus hunt"
+    ]
+  },
+  "sets": [
+    {
+      "id": "<set-id>",
+      "plate": "references/anchors/sets/<set-id>.png",
+      "room": "<the room, its furniture and what is behind her>",
+      "light": "<source, direction, colour temperature>",
+      "camera_position": "<where the phone sits>",
+      "objects": [
+        "<three named objects that are always there>"
+      ],
+      "usable_rate": null
+    }
+  ],
+  "outfits": [
+    {
+      "id": "<outfit-id>",
+      "what": "<the clothes, colours and how the hair is worn>",
+      "reference": "references/anchors/outfits/<outfit-id>.png"
+    }
+  ],
+  "anchors": {
+    "hero": "references/anchors/hero.png",
+    "front": "references/anchors/front.png",
+    "three_quarter_left": "references/anchors/three-quarter-left.png",
+    "three_quarter_right": "references/anchors/three-quarter-right.png",
+    "profile": "references/anchors/profile.png",
+    "back_shoulder": "references/anchors/back-shoulder.png",
+    "expressions": "references/anchors/expressions.png",
+    "hands": "references/anchors/hands.png"
+  },
+  "casting": {
+    "locked_prompt": "references/casting/<character>_locked_v<n>.json",
+    "vibe_references": [
+      "<one or more: a Pinterest picture or a real creator's frame, each with its source; used only to write the locked JSON, never attached to the image tool>"
+    ],
+    "diverged_axes": [
+      "<at least three identity axes changed from the vibe references>"
+    ],
+    "twenty_generation_gate": "<date passed>"
+  },
+  "never_change": [
+    "face",
+    "hair",
+    "signature_details",
+    "skin texture",
+    "voice_profile",
+    "fixed_subjects",
+    "camera_habits"
+  ],
+  "identity_negative": [
+    "different face",
+    "<shorter, lighter or differently coloured hair, as the lock needs>",
+    "missing signature detail",
+    "age change",
+    "make-up change",
+    "second person",
+    "<a fixed subject's count broken, e.g. a second pet>"
+  ],
+  "disclosure": {
+    "fictional_person": true
+  }
+}
