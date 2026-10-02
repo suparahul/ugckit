@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to pipeline/character/<video>/approval.json. Written at gate A (P1), gate B (P3) and gate C (P6), with the user's words.",
+  "_comment": "pipeline/character/<video>/approval.json. Gate A is written by character-shots (P1); gate B by scripts/character/review.py segment (P3), one entry per decision, and its composite by review.py composite (P4); gate C by review.py final (P6). Always with the user's words.",
   "video_id": "<video>",
   "gate_a_storyboard": {
     "keyframes_match_anchors": null,
@@ -14,7 +14,8 @@
   "gate_b_segments": [
     {
       "project": "<video>.01-t",
-      "file": "<the mp4>",
+      "segment_type": "T",
+      "file": "generated/<the mp4>",
       "identity": "face, hair and signature details match the creator file in every second",
       "fixed_subjects": "count, look and true size",
       "hands": "five fingers, nothing melting",
@@ -26,7 +27,28 @@
       "insert_gates": "see insert.json gates, the flat-on gate first; n/a without a phone",
       "decision": "approve | reject | regenerate this segment only",
       "failure_class": "<for a reject: the ledger row it adds>",
-      "set_id": "<set-id>"
+      "set_id": "<set-id>",
+      "words": "<the user's words>",
+      "date": "<YYYY-MM-DD>",
+      "model": "<model slug>",
+      "fix": "<the prompt change, for a reject>",
+      "checks": {},
+      "composite": {
+        "file": "composite/<seg>-composite-<stamp>.mp4",
+        "gates": "pass",
+        "hero": {
+          "t": 0.0,
+          "rect": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "text": "<hero>"
+        },
+        "words": "<the user's words>",
+        "date": "<YYYY-MM-DD>"
+      }
     }
   ],
   "gate_c_final": {
@@ -37,6 +59,9 @@
     "ui_real_and_readable": "OCR of the hero element passes on the final file; n/a without app insertion",
     "captions": "match the frozen script and the house style",
     "decision": "approve | reject | regenerate segment <n>",
-    "words": "<the user's words, quoted, with the date>"
+    "words": "<the user's words, quoted, with the date>",
+    "file": "pipeline/character/<video>/assembly/<video>.mp4",
+    "export_choice": "default | grain",
+    "date": "<YYYY-MM-DD>"
   }
 }
