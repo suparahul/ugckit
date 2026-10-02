@@ -75,12 +75,35 @@ one**: a wrong coat or a wrong eye colour here is a wrong week.
 1. **The casting brief.** From `## Persona`: the claim the handle makes first (who would
    believably say this: age band, life stage, home), then the look. A face that does not
    fit the claim fails before a word is said.
-2. **The vibe references.** One or more pictures whose look fits the claim: age,
-   styling, the room, the camera. Pinterest pictures from the user, or frames of real
-   creators from the research (`research/<project>/<app>/<handle>/<post>/video.mp4`,
-   `apps/<slug>/niche/batches/<date>/<handle>/<post>/`; cut a frame with `ffmpeg -ss`).
-   Save each in `characters/<character>/references/casting/` with its source. **A vibe
+2. **The vibe references: optional, strongly recommended.** For every handle that has a
+   persona, a slideshow handle or a video one, and for each new character. One or more
+   pictures whose look fits the claim: age, styling, the room, the camera. They keep
+   the face away from the model's default "beautiful AI person". First ask: "Do you have
+   pictures whose look fits this persona? Pinterest pictures are fine." When the user
+   has none, **propose some from the research**:
+   - **Find the persona handles** the research found: the persona rows of
+     `apps/<slug>/niche/architecture.md` `## Account table` (both sources), and the
+     persona accounts in `research/<project>/<app>/NETWORK.md` and in heading 2 of each
+     teardown. Keep only a handle that shows a person, and whose look fits the claim
+     (`Persona fidelity` and the saved posts say so). A brand account, a theme page or
+     a faceless persona is not a candidate.
+   - **Take their saved pictures**, nothing new fetched: `slide-NN.jpg` and `cover.jpg`
+     under `apps/<slug>/niche/batches/<date>/<handle>/<post>/` and
+     `research/<project>/<app>/<handle>/<post>/`, or one frame of a saved `video.mp4`
+     (`ffmpeg -y -ss <t> -i video.mp4 -frames:v 1 <out>.jpg`). Look at each one.
+   - **Propose three to six**, each copied to
+     `characters/<character>/references/casting/proposed-<n>.jpg`, with the handle, the
+     post, the file and one line on why its look fits the claim. The user picks one or
+     more, or none. Save each pick as `vibe-<n>.jpg` with its source; a proposed picture
+     the user does not pick is never used.
+
+   Pictures from the user go in the same folder as `vibe-<n>.<ext>`, with their source.
+   **The user may skip this step.** Then the locked JSON is written from `## Persona`
+   alone, `vibe_references` is `["none: skipped by the user"]`, and you say once that
+   the face is then more likely to look like the model's default person. **A vibe
    reference is never attached to the image tool**; it is used only to write the JSON.
+   A frame from the research shows a real person: the divergence check of step 3 is
+   what makes ours a different one.
 3. **The locked JSON** (`characters/<character>/references/casting/<character>_locked_v1.json`),
    the portrait-clone schema in full: `critical_constraints` and `negative_prompt`
    first, then subject, face (skin, eyes, brows, nose, mouth, make-up, ears), hair, neck,
@@ -95,10 +118,10 @@ one**: a wrong coat or a wrong eye colour here is a wrong week.
      axes every time: big round eyes, V-line or doll face, tighter clothes, glossy
      voluminous hair, poreless skin, model pose, idol look, saturated background, added
      earrings or props or text.
-   - **Diverge on purpose.** Change at least three identity axes away from the vibe
-     references (face shape, eye shape and spacing, nose, hair colour or cut, a body
-     mark); keep every vibe axis (age band, styling, wardrobe class, room, light,
-     camera, expression energy). Record them in `diverged_axes`.
+   - **Diverge on purpose**, when there are vibe references. Change at least three
+     identity axes away from them (face shape, eye shape and spacing, nose, hair colour
+     or cut, a body mark); keep every vibe axis (age band, styling, wardrobe class,
+     room, light, camera, expression energy). Record them in `diverged_axes`.
    - **De-slop.** No quality boosters in a positive field (4K, 8K, ultra-detailed,
      photorealistic, masterpiece, sharp focus, flawless, stunning: they go in the
      negative). No glamour words (ethereal, porcelain, dewy, model, cinematic, "natural

@@ -366,6 +366,22 @@ locked JSON then states which reference each vibe axis comes from. Match the fac
 the claim: a 22-year-old on joint pain fails before a word is said [Vlad]. So the
 casting brief states the claim first and the look second. The vibe reference is used
 only to write the locked JSON and is never attached to the image tool (decision 5).
+
+**Optional, strongly recommended, for every handle with a persona** (the founder,
+2026-10-02). It applies to a slideshow handle and a video handle alike, to each persona
+of a handle with several, and to each new character; a brand handle with no face and a
+real persona (own camera) have no casting. The user may bring pictures (Pinterest is
+fine). **When the user has none, `persona-identity` proposes some from the research**
+[the founder: "it can actually use the competitor and niche research to propose
+identity based on the persona handles it finds"]: the persona handles in the niche
+`architecture.md` account table, in each app's `NETWORK.md` and in the teardowns,
+filtered to those that show a person whose look fits the claim; their saved slides,
+covers or a frame of a saved video, nothing new fetched; three to six proposed, each
+with its handle, post and the reason it fits. The user picks, and only a pick is used.
+A frame from the research shows a real person, so the divergence check of § 4.3 is
+mandatory for it. When the user skips the step, the locked JSON is written from
+`## Persona` alone and `vibe_references` says "none: skipped by the user"; the face is
+then closer to the model's default person, and the skill says so.
 After the user approves the hero, it is saved as the handle's `references/face.png`, and
 that picture is attached as the identity reference of every later slide, keyframe and
 video (§ 6). The JSON alone is never the identity: the pictures go to the image tool and
@@ -457,7 +473,7 @@ one identity process for both paths. Its effect on a slideshow handle:
 | | Before | After |
 |---|---|---|
 | `handles` step 2, persona | `## Persona` | unchanged |
-| `handles` step 3, references | `persona-identity` wrote prompts from `## Persona` and made `face.png`, `subject-<name>.png`, `style.png` | `persona-identity` runs the identity half: the casting brief from `## Persona`, one or more vibe references, the locked JSON with its de-slop and divergence checks, four face candidates, the user picks the hero; then the fixed subjects and the style photo, as before. A real subject (own camera) still skips it. |
+| `handles` step 3, references | `persona-identity` wrote prompts from `## Persona` and made `face.png`, `subject-<name>.png`, `style.png` | `persona-identity` runs the identity half: the casting brief from `## Persona`, the vibe references (optional, strongly recommended: the user's pictures, or frames of persona handles proposed from the competitor and niche research, § 4.1), the locked JSON with its de-slop and divergence checks, four face candidates, the user picks the hero; then the fixed subjects and the style photo, as before. A real subject (own camera) still skips it. |
 | `handles` step 4, profile picture | from the face and the subjects | unchanged |
 | The files the slideshow reads | `HANDLE.md` `## References` and `references/face.png`, `subject-<name>.png`, `style.png`, `profile.png` | the same files, the same names, the same table; the `images` skill and the Atlas handle page are not changed |
 | New files | none | `characters/<character>/creator.json` (status `identity`), `characters/<character>/references/casting/`, `world.json`, and a `## Characters` table in `HANDLE.md` |
@@ -1571,7 +1587,7 @@ Paths inside it are relative to the handle's folder, `apps/<slug>/handles/<handl
   },
   "casting": {
     "locked_prompt": "characters/<character>/references/casting/<character>_locked_v<n>.json",
-    "vibe_references": ["<one or more: a Pinterest picture or a real creator's frame, each with its source, saved in references/casting/; used only to write the locked JSON, never attached to the image tool; or 'none: written from the approved face' (§ 4.6)>"],
+    "vibe_references": ["<optional, strongly recommended (§ 4.1). One or more: a picture from the user (Pinterest is fine) or a frame of a persona handle proposed from the competitor and niche research and picked by the user, each with its source, saved in references/casting/; used only to write the locked JSON, never attached to the image tool. Or 'none: skipped by the user', or 'none: written from the approved face' (§ 4.6)>"],
     "hero_candidates": ["characters/<character>/references/casting/candidate-<n>.png"],
     "hero_approved": "<the user's words and the date>",
     "diverged_axes": ["<at least three identity axes changed from the vibe references>"],
@@ -1879,7 +1895,8 @@ recreation scripts do, and the recreation scripts are byte-for-byte unchanged.
   the same `qc.py` report, the same contact sheet and a byte-identical composite (same
   checksum, with the grade noise seeded the same); the same model selection, limits,
   cost line and `refs.json` gate. Not in Phase 0: a composite wrapper, `assemble.sh`
-  and `lint_prompt.py` (Phases 3 and 4), and the Supagen template `ugc-character`.
+  and `lint_prompt.py` (Phases 3 and 4), and the Supagen template `ugc-character`
+  (created later on 2026-10-02, § 17 question 13).
 
 **Phase 1 — part A, character definition, through the one identity process (Codex
 plan only).** Decided 2026-10-02: `persona-identity` is the process (§ 2, § 4.9).
@@ -2028,6 +2045,10 @@ Questions about the script are in `SCRIPT-LEARNINGS.md` § 16.
     changes at least three identity traits (§ 4.3); a reference is never attached to
     the image tool. After the user approves the hero, the hero picture is the
     identity reference of every later keyframe and video (decision 5, § 4.1).
+    **Extended 2026-10-02:** the step is optional but strongly recommended, for any
+    handle that has a persona or several, not only for slideshow handles. When the user
+    has no pictures, `persona-identity` proposes frames of the persona handles found by
+    the competitor and niche research, and the user picks (§ 4.1, § 4.9).
 12. **The kit and the pipelines. Decided 2026-10-01.** Character videos and
     recreation videos are separate pipelines; the recreation pipeline is not changed
     (§ 2). ugckit is the source system. This method, its
@@ -2065,11 +2086,14 @@ Questions about the script are in `SCRIPT-LEARNINGS.md` § 16.
        six versions at 5 to 15 s) and the earlier H3 reference template (9:16, three
        versions) both used `n` 1 and `extensions`
        `{ "duration": <seconds>, "resolution": "768P" }`; the H3 Max versions had audio
-       on. The `ugc-character` template does not exist in Supagen yet. **The proposed
-       first version:** model `minimax-h3-max-reference-to-video`, `aspect_ratio` 9:16,
-       `n` 1, `extensions` `{ "duration": 5, "resolution": "768P" }`, audio on. It is
-       created before the first paid run (§ 16 Phase 5), after a yes; Phase 0 does not
-       need it.
+       on. **The `ugc-character` template was created on 2026-10-02 (the founder's yes)**,
+       with no generation and no spend: template id
+       `4611b06f-5bfb-4766-97c6-93d383d2d1f6`, slug `ugc-character`, video output,
+       messages only (no system instructions, no variables). Version 1, `v1-5s-9x16`, id
+       `1b56fe91-398f-4c9b-bf37-7cb44d735820`, **active**: model
+       `minimax-h3-max-reference-to-video`, `aspect_ratio` 9:16, `n` 1, `duration` null,
+       `extensions` `{ "duration": 5, "resolution": "768P" }`, audio on. It had no
+       invocation when it was recorded.
     3. **Resolution. Settled.** H3 Max reference takes 480p, 768p or 1080p (768p is
        native; 1080p is the provider's refinement, with no separate price listed). H3
        reference takes 480p, 768p, 2K or 4K. We send `"768P"` (uppercase) inside

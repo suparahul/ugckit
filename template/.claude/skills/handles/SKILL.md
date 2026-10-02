@@ -76,7 +76,9 @@ table. The brand handle's persona is the app: no "I", the voice is second person
 neutral. The user approves on the handle page (`persona.approve`) or here.
 
 **3. References.** Rendered subject → run the `persona-identity` skill now, its identity
-half (mode 1): the casting brief from `## Persona`, the vibe references, the locked
+half (mode 1): the casting brief from `## Persona`, the vibe references (optional,
+strongly recommended: the user's own pictures, or frames of persona handles that the
+skill proposes from the competitor and niche research for the user to pick), the locked
 JSON, four face candidates, the user picks the hero (`references/face.png`); then each
 subject (`references/subject-<name>.png`) and the style photo (`references/style.png`).
 It also writes `characters/<character>/creator.json` and `world.json`, and the

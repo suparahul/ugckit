@@ -100,7 +100,7 @@
   "casting": {
     "locked_prompt": "characters/<character>/references/casting/<character>_locked_v<n>.json",
     "vibe_references": [
-      "<one or more: a Pinterest picture or a real creator's frame, each with its source, saved in references/casting/; used only to write the locked JSON, never attached to the image tool; or 'none: written from the approved face'>"
+      "<optional, strongly recommended. One or more: a picture from the user (Pinterest is fine) or a frame of a persona handle proposed from the competitor and niche research and picked by the user, each with its source, saved in references/casting/; used only to write the locked JSON, never attached to the image tool. Or 'none: skipped by the user', or 'none: written from the approved face'>"
     ],
     "hero_candidates": [
       "characters/<character>/references/casting/candidate-<n>.png"
