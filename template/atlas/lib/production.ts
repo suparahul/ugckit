@@ -339,7 +339,7 @@ export function appendEvent(slug: string, e: Omit<Event, "at">): Event {
   return full;
 }
 
-/** A post key `2026-09-15/catlover/am` as a safe directory name. */
+/** A post key `2026-09-15/petfacts/am` as a safe directory name. */
 export const fileKey = (key: string) => key.replace(/\//g, "-");
 
 /**
@@ -568,7 +568,7 @@ function cardStates(slug: string, deck: Deck, key: string): CardState[] {
   }));
 }
 
-/** The app's name as a whole-word pattern, for the checks: "Catwise" matches "Catwise" and "catwise", not "cat". */
+/** The app's name as a whole-word pattern, for the checks: "Pawly" matches "Pawly" and "pawly", not "paw". */
 export function appPattern(app: string | null): RegExp | null {
   if (!app) return null;
   const esc = app.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*");

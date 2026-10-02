@@ -18,7 +18,7 @@ const run = promisify(execFile);
 
 export const EXPORT_ROOT = join(homedir(), "Downloads");
 
-/** ~/Downloads/tiktok-2026-09-16-hannah-1, shown as ~/Downloads/… */
+/** ~/Downloads/tiktok-2026-09-16-maya-1, shown as ~/Downloads/… */
 export function exportDir(s: PostState): string {
   return join(EXPORT_ROOT, `tiktok-${fileKey(s.row.key)}`);
 }

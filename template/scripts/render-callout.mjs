@@ -33,7 +33,7 @@ const FILES = join(ROOT, "apps", slug, "production", "files");
 const posts = args.includes("--all")
   ? (existsSync(FILES) ? readdirSync(FILES).filter((d) => /^\d{4}-\d{2}-\d{2}-/.test(d)) : [])
   : args[1] && !args[1].startsWith("--") ? [args[1].replace(/\//g, "-")] : [];
-if (!posts.length) { console.error("name a post key (2026-09-16/hannah/2) or --all"); process.exit(2); }
+if (!posts.length) { console.error("name a post key (2026-09-16/maya/2) or --all"); process.exit(2); }
 
 if (!existsSync(join(ATLAS, "node_modules"))) { console.error("the Atlas's dependencies are not installed yet: run  scripts/atlas.sh --index  once"); process.exit(1); }
 process.env.ATLAS_ROOT = ROOT;

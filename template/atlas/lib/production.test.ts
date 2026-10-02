@@ -9,7 +9,7 @@ import { test } from "node:test";
 import { linePlatform, parsePlatforms, platformOf, primaryOf, slideLimit } from "./platform.ts";
 import { legState, legsOfSent, platformsOf, slideLimitCheck, type Event, type PlanRow } from "./production.ts";
 
-const P = "2026-09-23/hannah/1";
+const P = "2026-09-23/maya/1";
 const ev = (at: string, kind: Event["kind"], data?: Event["data"], extra: Partial<Event> = {}): Event => ({ at: `2026-09-23T${at}:00.000Z`, post: P, kind, actor: "agent", ...(data ? { data } : {}), ...extra });
 
 test("platform names: absent is TikTok, unknown is null, a cell lists both in order", () => {
@@ -34,7 +34,7 @@ test("the 10-slide rule: a check only when the post also goes to Instagram", () 
 });
 
 test("platformsOf: the row's cell; else the handle's declared accounts, kept to the plan's line; else TikTok", () => {
-  const row = { slug: "x", handle: "@hannah.catmom" } as PlanRow;
+  const row = { slug: "x", handle: "@maya.petmom" } as PlanRow;
   assert.deepEqual(platformsOf(row, {}, null), ["tiktok"]);
   assert.deepEqual(platformsOf(row, {}, ["tiktok", "instagram"]), ["tiktok", "instagram"], "the handle reposts on Instagram");
   assert.deepEqual(platformsOf(row, { platforms: ["tiktok"] }, ["tiktok", "instagram"]), ["tiktok"], "the plan holds Instagram back this week");
@@ -45,7 +45,7 @@ test("platformsOf: the row's cell; else the handle's declared accounts, kept to 
 test("a log with no platform gives one TikTok leg", () => {
   const log = [
     ev("08:00", "posting.sent", { provider: "postbridge", id: "pb1", account: 97911, media: "m1 m2", status: "processing", mode: "draft" }),
-    ev("09:00", "posted", { time: "09:00", url: "https://www.tiktok.com/@hannah.catmom/photo/1" }),
+    ev("09:00", "posted", { time: "09:00", url: "https://www.tiktok.com/@maya.petmom/photo/1" }),
     ev("10:00", "outcome.sync", { source: "postbridge", views: 100, likes: 5, comments: 1, shares: 2, url: "", syncedAt: "2026-09-23T10:00:00Z", pbPost: "pb1" }),
     ev("11:00", "outcome.sync", { source: "monid", views: 120, likes: 6, comments: 1, shares: 2, saves: 4, url: "", syncedAt: "2026-09-23T11:00:00Z", pbPost: "" }),
   ];
@@ -55,7 +55,7 @@ test("a log with no platform gives one TikTok leg", () => {
   assert.equal(tt.sent?.mode, "draft");
   assert.deepEqual(tt.sent?.media, ["m1", "m2"]);
   assert.equal(tt.posted?.time, "09:00");
-  assert.equal(tt.link, "https://www.tiktok.com/@hannah.catmom/photo/1");
+  assert.equal(tt.link, "https://www.tiktok.com/@maya.petmom/photo/1");
   assert.equal(tt.synced?.source, "monid", "Monid first");
   assert.equal(tt.synced?.saves, 4);
   const ig = legState(log, "instagram");

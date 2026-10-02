@@ -21,7 +21,7 @@ It writes `strategy/HASHTAG-POOL.md` with the volumes and an empty tier column: 
 tiers (G general, N niche, P post-specific, x out), then the Tags column below follows
 the rotation rule: five per post, two general, two niche, one post-specific, no handle
 repeating a set on consecutive posts; a persona-only tag stays on the persona handle
-(#catmom went on Hannah alone); the SEO handle is outside the rotation, its tags come
+(#catmom went on the persona handle alone); the SEO handle is outside the rotation, its tags come
 from its keyword. Measured 2026-09-16: the general tags are one to three orders of
 magnitude bigger than the niche ones (#cat 1.2T against #newcatowner 60M).
 
@@ -50,14 +50,14 @@ The Organic Factory UI reads this file by these exact conventions:
     slide 1; no download instruction; …>
 
     ## Handle blocks
-    ### `@hannah.catmom` — main persona
+    ### `@maya.petmom` — main persona
     | Parameter | Fixed value for the week | Source |
     (short: the format lock, the product slot, the dimension, the cadence; the rest lives
      in HANDLE.md and a row here overrides it for the week only)
 
     ## Posts
     | Day | Date | Handle | Slot | Topic | Format / variation | Arm | Source | Tags | Kind |
-    | 1 | 09-16 | hannah | AM | … | tip list, 7 slides | Catwise slide 3 | `@x`, 1,201,654, https://www.tiktok.com/@x/photo/… | #a #b #c #d #e | slideshow |
+    | 1 | 09-16 | maya | AM | … | tip list, 7 slides | Pawly slide 3 | `@x`, 1,201,654, https://www.tiktok.com/@x/photo/… | #a #b #c #d #e | slideshow |
     (an optional last column, `Platforms`, after `Kind`: see "Two platforms")
 
     ## Day-7 read

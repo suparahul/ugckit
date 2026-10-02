@@ -10,7 +10,7 @@ and at the same time as TikTok, through the same posting service (Post Bridge). 
 1. **The account.** Create it in the Instagram app and make it a **professional
    account** (Business or Creator: Settings → Account type and tools). Post Bridge
    publishes only to a professional account; a Facebook Page is not needed. The name may
-   differ from the TikTok one (`@hannah.catmom_` when `@hannah.catmom` is taken).
+   differ from the TikTok one (`@maya.petmom_` when `@maya.petmom` is taken).
 2. **The table.** The `handles` skill, step 1, writes it in the identity's `HANDLE.md`,
    right after the head lines. TikTok stays the primary account (`Handle:` and
    `Platform:` still name it):
@@ -19,8 +19,8 @@ and at the same time as TikTok, through the same posting service (Post Bridge). 
 
        | Platform | Account | Created | Role | Status |
        |---|---|---|---|---|
-       | tiktok | @hannah.catmom | 2026-09-14 | primary | connected |
-       | instagram | @hannah.catmom_ | 2026-09-22 | repost | not connected |
+       | tiktok | @maya.petmom | 2026-09-14 | primary | connected |
+       | instagram | @maya.petmom_ | 2026-09-22 | repost | not connected |
 
    No table means one TikTok account: every `HANDLE.md` written before 0.4.0. The Status
    cell is for the eye; the truth is `production/posting-accounts.json`.

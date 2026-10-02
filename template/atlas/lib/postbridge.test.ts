@@ -208,34 +208,34 @@ test("mapAccounts: a bare handle declares one TikTok account; a missing one is n
 
 test("mapAccounts: a declared Instagram account with another name is matched; the same name on Instagram is not, unless declared", () => {
   const listed = [
-    { id: 1, platform: "tiktok", username: "hannah.catmom" },
-    { id: 2, platform: "tiktok", username: "catlover.tiktok3" },
-    { id: 3, platform: "tiktok", username: "catwise.app" },
-    { id: 4, platform: "instagram", username: "hannah.catmom_" },
-    { id: 5, platform: "instagram", username: "catlover.tiktok3" },
+    { id: 1, platform: "tiktok", username: "maya.petmom" },
+    { id: 2, platform: "tiktok", username: "petfacts.daily" },
+    { id: 3, platform: "tiktok", username: "pawly.app" },
+    { id: 4, platform: "instagram", username: "maya.petmom_" },
+    { id: 5, platform: "instagram", username: "petfacts.daily" },
   ];
   const f = mapAccounts([
-    { handle: "@hannah.catmom", accounts: [{ platform: "tiktok", account: "@hannah.catmom", role: "primary" }, { platform: "instagram", account: "@hannah.catmom_", role: "repost" }] },
-    "@catlover.tiktok3",
-    { handle: "@catwise.app", accounts: [{ platform: "tiktok", account: "@catwise.app", role: "primary" }, { platform: "instagram", account: "@catwise.app", role: "repost" }] },
+    { handle: "@maya.petmom", accounts: [{ platform: "tiktok", account: "@maya.petmom", role: "primary" }, { platform: "instagram", account: "@maya.petmom_", role: "repost" }] },
+    "@petfacts.daily",
+    { handle: "@pawly.app", accounts: [{ platform: "tiktok", account: "@pawly.app", role: "primary" }, { platform: "instagram", account: "@pawly.app", role: "repost" }] },
   ], listed, "2026-09-23T00:00:00.000Z");
-  const hannah = accountsOf(f, "@hannah.catmom");
-  assert.equal(hannah.tiktok?.id, 1);
-  assert.equal(hannah.instagram?.id, 4, "the declared Instagram account, with its own name");
-  assert.deepEqual(Object.keys(accountsOf(f, "@catlover.tiktok3")), ["tiktok"], "the Instagram account with the same name is not matched: not declared");
-  const catwise = accountsOf(f, "@catwise.app");
-  assert.equal(catwise.tiktok?.id, 3);
-  assert.equal(catwise.instagram, undefined, "declared, not connected yet");
-  assert.equal((f.accounts["@catwise.app"] as { platforms: Record<string, unknown> }).platforms.instagram, null);
+  const maya = accountsOf(f, "@maya.petmom");
+  assert.equal(maya.tiktok?.id, 1);
+  assert.equal(maya.instagram?.id, 4, "the declared Instagram account, with its own name");
+  assert.deepEqual(Object.keys(accountsOf(f, "@petfacts.daily")), ["tiktok"], "the Instagram account with the same name is not matched: not declared");
+  const pawlyAcc = accountsOf(f, "@pawly.app");
+  assert.equal(pawlyAcc.tiktok?.id, 3);
+  assert.equal(pawlyAcc.instagram, undefined, "declared, not connected yet");
+  assert.equal((f.accounts["@pawly.app"] as { platforms: Record<string, unknown> }).platforms.instagram, null);
   assert.deepEqual(f.unmatched.map((a) => a.id), [5]);
 });
 
 test("accountsOf: a map written before 0.4.0 (one account per handle) still gives the TikTok account", () => {
-  const old = { accounts: { "@hannah.catmom": { id: 97911, platform: "tiktok", username: "hannah.catmom", needs_reconnect: false, provider: "postbridge" }, "@catlover.tiktok3": null } };
-  assert.equal(accountsOf(old, "@hannah.catmom").tiktok?.id, 97911);
-  assert.equal(accountsOf(old, "hannah.catmom").tiktok?.id, 97911, "found without the @ too");
-  assert.deepEqual(accountsOf(old, "@catlover.tiktok3"), {});
-  assert.deepEqual(accountsOf(null, "@hannah.catmom"), {});
+  const old = { accounts: { "@maya.petmom": { id: 97911, platform: "tiktok", username: "maya.petmom", needs_reconnect: false, provider: "postbridge" }, "@petfacts.daily": null } };
+  assert.equal(accountsOf(old, "@maya.petmom").tiktok?.id, 97911);
+  assert.equal(accountsOf(old, "maya.petmom").tiktok?.id, 97911, "found without the @ too");
+  assert.deepEqual(accountsOf(old, "@petfacts.daily"), {});
+  assert.deepEqual(accountsOf(null, "@maya.petmom"), {});
 });
 
 test("legsPost: one post for both accounts; TikTok draft, Instagram with its own slides, the same caption and no first comment", () => {

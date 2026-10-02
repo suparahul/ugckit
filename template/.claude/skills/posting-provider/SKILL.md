@@ -21,9 +21,9 @@ line names the service; the connection is made now.
    "done".
 2. **The accounts.** A recipe with a tick, naming each account with its platform, from
    each identity's `HANDLE.md` (the `## Accounts` table; no table is one TikTok account
-   with the handle's name): "In Post Bridge, connect @hannah.catmom and @catwise.app as
+   with the handle's name): "In Post Bridge, connect @maya.petmom and @pawly.app as
    TikTok accounts (Accounts → Connect → TikTok, log in as that handle), and
-   @hannah.catmom_ as an Instagram account (Accounts → Connect → Instagram, log in with
+   @maya.petmom_ as an Instagram account (Accounts → Connect → Instagram, log in with
    Instagram's own login; the account must be a professional account, a Facebook Page
    is not needed). Tick 'connected' on the handle page when they are there." Each
    connected account uses one account of the Post Bridge plan; at the plan's cap Post

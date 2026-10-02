@@ -5,7 +5,7 @@
 #   scripts/images.sh <slug> <post> --verify         check every slide's file, write images-result.json, append the log lines
 #   scripts/images.sh <slug> <post> --job            print the job file's path and nothing else
 #
-# <post> is the post key, 2026-09-16/hannah/2. Codex inline: the Codex agent reads the
+# <post> is the post key, 2026-09-16/maya/2. Codex inline: the Codex agent reads the
 # instruction this prints, makes the pictures itself, then runs --verify. Claude: the
 # bridge, scripts/codex-images.sh, calls this twice around one `codex exec`.
 #

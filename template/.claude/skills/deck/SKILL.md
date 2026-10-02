@@ -18,7 +18,7 @@ yourself before writing a line.
 `<short>` is the plan's handle short name. The Organic Factory UI parses the file by these
 conventions; keep them exactly.
 
-    # `@hannah.catmom` — day 2, 2026-09-17 — two slideshow posts
+    # `@maya.petmom` — day 2, 2026-09-17 — two slideshow posts
     <two or three sentences: the role, the rules of the day, the sources>
 
     ## Bio
@@ -40,7 +40,7 @@ conventions; keep them exactly.
     | Slot | AM |
     | Arm | <the plan row's arm, with the callout slide named> |
     | Source | `@mias.diary7` 7657658973415410977, 151,103 views, 9 slides, https://www.tiktok.com/@mias.diary7/photo/7657658973415410977 |
-    | Slides | 8: hook → step ×2 → Catwise slide → step ×3 → save ask |
+    | Slides | 8: hook → step ×2 → Pawly slide → step ×3 → save ask |
     | Dimension | 3:4 (1080×1440) |
     | Slide style | photo |
     | Density | headline + 2–3 lines per step |
@@ -62,7 +62,7 @@ conventions; keep them exactly.
     **Position and size:** <where, which size, no box>
     **Image prompt:** [style prefix] <the scene: which subject is in frame, the room, the light, the framing>
 
-    ### Slide 4 — the Catwise slide
+    ### Slide 4 — the Pawly slide
     **Why this slide.** <the feature, the card, why here>
     **On-image text, top (headline):**
     ```

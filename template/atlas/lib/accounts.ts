@@ -1,15 +1,15 @@
 /**
  * The accounts an identity posts from: the `## Accounts` table of its
  * HANDLE.md, one row per platform. The two accounts of one identity may have
- * different names (@hannah.catmom on TikTok, @hannah.catmom_ on Instagram),
+ * different names (@maya.petmom on TikTok, @maya.petmom_ on Instagram),
  * which is why the table exists: no rule derives one name from the other.
  *
  *     ## Accounts
  *
  *     | Platform | Account | Created | Role | Status |
  *     |---|---|---|---|---|
- *     | tiktok | @hannah.catmom | 2026-09-14 | primary | connected |
- *     | instagram | @hannah.catmom_ | 2026-09-22 | repost | connected |
+ *     | tiktok | @maya.petmom | 2026-09-14 | primary | connected |
+ *     | instagram | @maya.petmom_ | 2026-09-22 | repost | connected |
  *
  * No table: one account, from the `Handle:`, `Platform:` and `Created:` head
  * lines. The Status

@@ -49,7 +49,7 @@ export function readAccounts(slug: string): AccountsFile | null {
   try { return JSON.parse(readFileSync(f, "utf8")) as AccountsFile; } catch { return null; }
 }
 
-/** The handles the plan names: `@hannah.catmom`, … */
+/** The handles the plan names: `@maya.petmom`, … */
 export function planHandles(slug: string): string[] {
   return Object.values(getProduction(slug).plan.handles).map((h) => h.handle);
 }
@@ -328,7 +328,7 @@ export async function statusWord(pbPostId: string): Promise<string | null> {
 
 /**
  * Adds the live Post Bridge word to the sentence of every sent post in place
- * ("in TikTok drafts · @hannah.catmom 17:25 · draft created"; a direct post
+ * ("in TikTok drafts · @maya.petmom 17:25 · draft created"; a direct post
  * only once its time has come: "scheduled Wed 19:00 ET (Thu 04:30 IST) · direct · posted").
  * The board and the post head call it once per render.
  */

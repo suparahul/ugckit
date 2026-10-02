@@ -9,7 +9,7 @@ description: Phase 8, the pictures — every candidate picture of one post, from
     scripts/codex-images.sh <slug> <post> [--only 3,5]  the bridge: the check, the job, one codex exec, the verify (Claude)
     scripts/images.sh <slug> <post> --verify          the check of every slide's file; images-result.json; the log lines
 
-`<post>` is the post key, `2026-09-17/hannah/1`. One post per call, serial. The deck
+`<post>` is the post key, `2026-09-17/maya/1`. One post per call, serial. The deck
 must exist before the first picture; no plan approval is waited for. The Organic Factory UI counts
 the plan done once the deck exists, shows the post at the pictures stage, and reads
 "final: waiting for you" once every slide has a candidate — the user's look is at the

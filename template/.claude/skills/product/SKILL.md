@@ -15,8 +15,8 @@ callout needs its store facts, and many people do not know which niche they are 
 
 ## The slug
 
-`<slug>` is the app's name in lowercase, letters, digits and hyphens only: Catwise →
-`catwise`, "My Cat Pal" → `my-cat-pal`. It is also the project name in
+`<slug>` is the app's name in lowercase, letters, digits and hyphens only: Pawly →
+`pawly`, "My Cat Pal" → `my-cat-pal`. It is also the project name in
 `pipeline/state/pipeline.json`, so `state.py init <slug>` and `apps.sh <slug>` use the
 same word. Decide it once, here, and say it.
 
