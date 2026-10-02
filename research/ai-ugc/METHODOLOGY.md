@@ -112,11 +112,30 @@ The character pipeline has two parts:
 
 | Part | When it runs | What it does | Skills (new) |
 |---|---|---|---|
-| **A. Character definition** | once per character, then reused by every video; again only for a new version (§ 2.6) | casting, the anchors, the signature details, the voice reference setup | `character-cast`, `character-voice` |
+| **A. Character definition** | once per character, then reused by every video; again only for a new version (§ 2.6) | casting, the anchors, the signature details, the voice reference setup | `persona-identity` (the one identity process, shared with the slideshow path), `character-voice` |
 | **B. Production** | once per video | picks an existing, approved character from the handle's roster, then: shots and keyframes, generation, review, app insertion when the plan asks for it, assembly, the hand-over of the finished file | `character-shots`, `character-generate`, `character-review`, `character-composite`, `character-assemble`, `character-deliver`; and `screens`, once per app, only when a plan inserts the app |
 
 **Casting never runs per video.** A production run that names a character with no
 approved definition stops and asks for part A first.
+
+**One identity process for slideshows and videos** (decided 2026-10-02). The founder:
+"we should probably have a process to rewrite how the handle identities are created,
+like, the visual identity specifically. Because that can benefit from the process that
+we have come up with." and "Yes. We can unify the persona identity process." So the
+casting method of § 4 to § 6 **is** the `persona-identity` skill. There is no separate
+`character-cast` skill: stage D1 is `persona-identity`, and the `handles` skill calls the
+same skill at its steps 3 and 4. Identity is made once per handle, in two halves:
+
+- **The identity half**, at handle creation, for every handle with a rendered face:
+  vibe references, the locked JSON (text only), four candidates, the hero approved by
+  the user, the fixed subjects, the style photo, the profile picture. The slideshow
+  needs only this half.
+- **The video half**, just in time, when the handle's first character video is
+  planned: the anchors (§ 6), the set plates, the signature details, the
+  twenty-generation gate (§ 4.7), then `character-voice` (§ 7.2).
+
+A handle with an already approved face reuses it and goes straight to the video half
+(§ 4.6). What this changes for the slideshow path, and what it does not, is § 4.9.
 
 **The pipeline ends at a created video** (decided 2026-10-02). Its last output is the
 finished file. Posting, the posting provider, outcomes and any label set at posting are
@@ -131,7 +150,7 @@ segments alone.
 
 | Stage | Skill | Input | Output | Gate |
 |---|---|---|---|---|
-| D1 cast | `character-cast` | the brief and the vibe references (§ 4) | the hero, the anchors, the signature details, `creator.json` | the hero and each anchor approved by the user; the twenty-generation gate (§ 4.7) |
+| D1 identity | `persona-identity` | the persona, the brief and the vibe references (§ 4) | the identity half: the hero (`references/face.png`), the fixed subjects, `creator.json`; the video half: the anchors, the set plates, the signature details | the hero and each anchor approved by the user; the twenty-generation gate (§ 4.7) before the first video |
 | D2 voice | `character-voice` | clips from the niche and competitor research (§ 7.2) | `voice-reference.mp3` and its source | the user's approval; the natural-voice check |
 | P1 shots | `character-shots` | the locked plan (§ 2.5) and the character | segments, shot files, prompts, keyframes, `video.json` | **A**, the storyboard (§ 14.1); the prompt lint |
 | P2 generate | `character-generate` | one segment | one generation | the computed cost, then the user's yes |
@@ -145,7 +164,7 @@ segments alone.
 | Need | What already exists [repo] | How the character pipeline uses it |
 |---|---|---|
 | Real creator clips for the voice reference, frames for casting | `harvest`, `deepen`, `niche-fetch` save posts with their audio; `ingest` cuts frames; `transcribe.sh` gives word times | reads their output files |
-| The handle and its identity | `apps/<slug>/handles/<handle>/HANDLE.md` and `references/`; the `handles` and `persona-identity` skills | reads them; a persona handle's existing face is the hero of its one character (§ 2.6, § 4.6) |
+| The handle and its identity | `apps/<slug>/handles/<handle>/HANDLE.md` and `references/`; the `handles` and `persona-identity` skills | **shares them**: `persona-identity` is the one identity process (§ 2, § 4.9); the handle's approved face is the hero of its character (§ 2.6, § 4.6) |
 | Pictures without API spend | the Codex image tool through `scripts/codex-images.sh` and the `images` skill | calls it, unchanged (decision 4) |
 | Generation with references, the cost line, the duration cap | `scripts/generate.sh`, `scripts/state.py model`, `scripts/templates.json` `known_model_limits` | **its own copy**, `scripts/character/generate.sh`, with its own model file `scripts/character/models.json` (same shape as `known_model_limits`) and its own Supagen template `ugc-character`. The recreation files are not changed. |
 | QC of a generation | `scripts/qc.py` (cuts, green, transcript, pitch spread, drift) | **its own copy**, `scripts/character/qc.py`, which adds the new gates |
@@ -161,9 +180,11 @@ paths are in a user's workspace.
 | New piece | Where it lives | Owner |
 |---|---|---|
 | The character roster of a handle | `apps/<slug>/handles/<handle>/characters/<character>/` (§ 2.6) | part A |
-| `creator.json` (identity lock, signature details, voice profile, camera habits, sets, outfits, version) | `characters/<character>/creator.json` | `character-cast` |
-| Casting files: the locked portrait JSON and its versions, the hero candidates | `characters/<character>/references/casting/` | `character-cast` |
-| Anchors: hero, angle views, expression sheet, hands, set plates, outfits | `characters/<character>/references/anchors/` | `character-cast` |
+| `creator.json` (identity lock, signature details, voice profile, camera habits, the sets and fixed subjects it uses, outfits, version) | `characters/<character>/creator.json` | `persona-identity` |
+| Casting files: the vibe references, the locked portrait JSON and its versions, the hero candidates | `characters/<character>/references/casting/` | `persona-identity` |
+| The hero of the handle's identity character | `references/face.png`, the file the slideshow already uses | `persona-identity` |
+| Anchors: angle views, expression sheet, hands, outfits (and the hero of any other character) | `characters/<character>/references/anchors/` | `persona-identity`, video half |
+| The handle's world: the fixed subjects (a pet) and the sets (the rooms of the home) | `world.json`; pictures in `references/subject-<name>.png` and `references/sets/<set-id>.png` | `persona-identity` |
 | Voice reference clip, its source, the room tones | `characters/<character>/references/voice/` | `character-voice`, the **voice reference setup** (§ 7.2) |
 | Screen library: real recordings and screenshots of the app | `apps/<slug>/screens/` with `SCREENS.md` | `screens`, only for a plan with app insertion: the user provides the recordings; the agent checks and indexes them |
 | The locked plan | `pipeline/character/<video>/plan.json` | written by the planning system, approved by the user; read-only to production |
@@ -240,24 +261,45 @@ characters are a **roster**:
 
     apps/<slug>/handles/<handle>/
       HANDLE.md                      the human document; its ## Characters table lists the roster
+      references/                    the handle-level files the slideshow already reads:
+        face.png                     the hero of the handle's identity character
+        subject-<name>.png           each fixed subject (a pet): the world's subjects
+        style.png, profile.png       the style photo, the profile picture
+        sets/<set-id>.png            the world's sets: the rooms of the home, empty (video half)
+      world.json                     the world's locks: each fixed subject and each set (§ 15.8)
       characters/<character>/
         creator.json                 the definition, with its version (§ 15.1)
-        references/casting/          the locked JSON versions, the hero candidates
-        references/anchors/          hero, views, expressions, hands, sets/, outfits/
+        references/casting/          the vibe references, the locked JSON versions, the hero candidates
+        references/anchors/          views, expressions, hands, outfits/ (and hero.png for any other character)
         references/voice/            voice-reference.mp3, room tones
         versions/v<n>.json           a frozen copy of creator.json at each version
 
+**The world** (decided 2026-10-02 as a place; its rules are expanded later). The
+founder also wants consistency beyond the face: the house in interior shots and the
+secondary subjects, such as a cat. They belong to the handle, not to one character:
+two characters of one handle share the home and the pet. So the fixed subjects and the
+sets live at the handle level, in `world.json` and `references/`, and each
+`creator.json` names the ones its character uses by id. The subject pictures keep the
+names the slideshow already reads (`references/subject-<name>.png`); the set plates go
+in `references/sets/`, a sub-folder that neither the Atlas handle page nor the `images`
+skill reads, so a slide never gets a set plate it did not ask for.
+
 - **A persona handle has exactly one character**, and that character is the handle's
-  identity. Its id is the persona's name. Its hero is the face the handle already uses
-  (`persona-identity` made it), so it is written from that picture, not re-cast
-  (§ 4.6). `HANDLE.md` and `creator.json` say the same thing; where they differ, the
+  identity. Its id is the persona's name. Its hero is `references/face.png`, the face
+  the handle already uses: one file for the slides and the videos. A face made before
+  this decision is written from that picture, not re-cast (§ 4.6). `HANDLE.md` and `creator.json` say the same thing; where they differ, the
   character is not live until the user settles it.
 - **A multi-character handle has several characters**, each with her own folder,
-  anchors and voice reference. Nothing is shared between two characters (§ 4.8). The
+  anchors and voice reference. One of them is the handle's identity character, whose
+  hero is `references/face.png`; the hero of each other one is in her own
+  `references/anchors/hero.png`. Nothing of a character is shared with another
+  (§ 4.8); the world is shared.
+- **A brand handle has no character.** Its identity is the app. It may still have a
+  world (fixed subjects, sets). The
   handle's `HANDLE.md` says it is multi-character.
 - **The locked plan names which character or characters a video uses** (§ 2.5).
 
-**Adding a character later.** `character-cast` runs for the handle with a new id; the
+**Adding a character later.** `persona-identity` runs for the handle with a new id; the
 new character is not usable before she passes part A (hero, anchors, signature details,
 voice reference, the twenty-generation gate). It adds a row to the `## Characters`
 table of `HANDLE.md`. A persona handle cannot add a second character; to do so the user
@@ -265,7 +307,9 @@ first makes it a multi-character handle, and the persona character stays as one 
 roster.
 
 **Versions.** `creator.json` carries `version` (`v1`, `v2`, …) and `status`
-(`casting`, `voice-setup`, `live`, `retired`). A change to identity (face, hair,
+(`casting`: no approved hero yet; `identity`: the hero is approved, so slides may use
+it, videos may not; `video-setup`: the video half and the voice reference are in
+progress; `live`: videos may use it; `retired`). A change to identity (face, hair,
 signature details, voice reference) is a new version: it is approved again and passes
 the twenty-generation gate again. A new set or a new outfit is also a new version, with
 no re-cast and no new gate. On every new version, the previous `creator.json` is frozen
@@ -305,7 +349,10 @@ The founder reviewed this table on 2026-10-01. Each row states the result: **agr
 
 Part A of the pipeline (§ 2): done once per character, then reused by every video;
 never per video. Free: every picture is made with the Codex image tool on the
-user's Codex plan (§ 3, decision 4).
+user's Codex plan (§ 3, decision 4). **This is also how every handle's visual identity
+is made** (decided 2026-10-02): § 4.1 to § 4.5 are the identity half of the
+`persona-identity` skill, which the `handles` skill runs for a slideshow handle too
+(§ 2, § 4.9).
 
 **4.1 The method.** Describe the vibe reference so completely that the image model has
 no room to fall back on its defaults, then generate from the description alone
@@ -319,8 +366,10 @@ locked JSON then states which reference each vibe axis comes from. Match the fac
 the claim: a 22-year-old on joint pain fails before a word is said [Vlad]. So the
 casting brief states the claim first and the look second. The vibe reference is used
 only to write the locked JSON and is never attached to the image tool (decision 5).
-After the user approves the hero, the hero picture is attached as the identity
-reference of every later keyframe and video (§ 6).
+After the user approves the hero, it is saved as the handle's `references/face.png`, and
+that picture is attached as the identity reference of every later slide, keyframe and
+video (§ 6). The JSON alone is never the identity: the pictures go to the image tool and
+the video model as references.
 
 **4.2 The locked JSON.** Use the portrait-clone schema in full
 (`sources/04-portrait-clone-SKILL.md`): `critical_constraints` and `negative_prompt` at
@@ -381,21 +430,50 @@ the person the JSON describes; would it pass in a feed beside real posts. The us
 picks the hero. Then the iteration mode of [PC]: diff the hero
 against the JSON variable by variable; each difference is an under-locked variable.
 
-**4.6 A character who already exists.** When a handle already has an approved face in
-`references/` (a persona handle always has one, from `persona-identity`), its character
-is not re-cast: that face is the hero of the handle's one character (§ 2.6). Her creator file is written **from the
-picture**: describe only what is visible; invent no scar, mole or jewellery that is not
-there [Ultra]. Her new angles are derived from that face with the Codex image tool, like
-any character's (§ 6).
+**4.6 A face that already exists.** When a handle already has an approved face in
+`references/face.png` (any persona handle made before 2026-10-02, or a face the user
+brings), its character is **not re-cast**: that picture is the hero, and the process
+goes straight to the video half (§ 2). The creator file is written **from the picture**:
+describe only what is visible; invent no scar, mole or jewellery that is not there
+[Ultra]. The locked JSON is written the same way, from the picture, so the next version
+has a text lock too, and `casting.vibe_references` says "none: written from the
+approved face". The status starts at `identity`. Her new angles are derived from that
+face with the Codex image tool, like any character's (§ 6).
 
-**4.7 The twenty-generation gate.** A character goes live after the same face holds
-through twenty generated stills in different shots [Enzo]. The stills are the first
-keyframes, so the gate costs nothing extra.
+**4.7 The twenty-generation gate.** A character goes live for video after the same
+face holds through twenty generated stills in different shots [Enzo]. The stills are
+the first keyframes, and slide pictures that show the face count too, so the gate costs
+nothing extra. The gate blocks only video production; it never blocks a slideshow post.
 
 **4.8 One before four.** The first character of an app is held through the gate
-before a second one is cast, on any handle [Enzo]. A multi-character handle adds its
+before a second one starts her video half, on any handle [Enzo]. This never holds back
+the identity half: a second slideshow handle gets its face as before. A multi-character handle adds its
 characters one at a time (§ 2.6). Each later character gets her own folder, character
 file, anchors and voice reference setup; nothing is shared between two characters.
+
+**4.9 What the unified process changes for the slideshow path.** Decided 2026-10-02:
+one identity process for both paths. Its effect on a slideshow handle:
+
+| | Before | After |
+|---|---|---|
+| `handles` step 2, persona | `## Persona` | unchanged |
+| `handles` step 3, references | `persona-identity` wrote prompts from `## Persona` and made `face.png`, `subject-<name>.png`, `style.png` | `persona-identity` runs the identity half: the casting brief from `## Persona`, one or more vibe references, the locked JSON with its de-slop and divergence checks, four face candidates, the user picks the hero; then the fixed subjects and the style photo, as before. A real subject (own camera) still skips it. |
+| `handles` step 4, profile picture | from the face and the subjects | unchanged |
+| The files the slideshow reads | `HANDLE.md` `## References` and `references/face.png`, `subject-<name>.png`, `style.png`, `profile.png` | the same files, the same names, the same table; the `images` skill and the Atlas handle page are not changed |
+| New files | none | `characters/<character>/creator.json` (status `identity`), `characters/<character>/references/casting/`, `world.json`, and a `## Characters` table in `HANDLE.md` |
+| Video-only work | none | none at handle creation: anchors, set plates, signature details, the gate and the voice wait for the first video |
+
+**An existing handle migrates without re-casting.** Nothing is redone at upgrade. The
+first time a character video is planned for a handle that has `references/face.png`
+and no `characters/` folder, `persona-identity` writes the character from that face
+(§ 4.6): `creator.json` at `v1`, status `identity`, the locked JSON written from the
+picture, the `## Characters` table, and `world.json` from the existing
+`subject-<name>.png` files and the `## Persona` text. Then the video half. A slideshow
+handle that never makes a video never needs any of it.
+
+**Not decided, and not changed:** a multi-character handle in the slideshow path. The
+`## References` table keeps the identity character's face only, so the slides behave as
+today; slides with a second character need their own decision.
 
 ---
 
@@ -420,10 +498,11 @@ one character's identity only. Nothing about any one post. It carries its `versi
   the same identity [Enzo] (§ 7).
 - `camera_habits`: device, lens, distance, height, processing. The camera is part of who
   she is; a shifting angle breaks the selfie read at once [Vlad].
-- `fixed_subjects`: what always comes with her, chosen per character at casting: a pet, a
-  partner's hand, a product she always holds. Each with its count, its reference sheet
-  and its true-size rule, as the handle's `HANDLE.md` states them.
-- `sets` and `outfits`: the locked rooms and clothes she can be in (§ 8).
+- `fixed_subjects`: the ids, in the handle's `world.json`, of what always comes with her:
+  a pet, a partner's hand, a product she always holds. The world holds each one's count,
+  its reference picture and its true-size rule, as the handle's `HANDLE.md` states them.
+- `sets`: the ids, in `world.json`, of the rooms she can be in (§ 8). `outfits`: the
+  locked clothes she can wear.
 - `never_change`: the list that every shot must obey.
 
 `HANDLE.md` stays the human document of the handle. `creator.json` holds only what a
@@ -465,24 +544,29 @@ never paraphrased: a lock that is reworded per card drifts [Ultra].
 ## 6. The character sheet and the anchors
 
 All derived from the hero by image-to-image, with the Codex image tool (decision 4).
-They live in `characters/<character>/references/anchors/`, are made once in part A, and
-are reused by every video; an anchor is added, never overwritten (§ 2.6).
+They are the video half of `persona-identity`: made once, just in time for the first
+video, and reused by every video; an anchor is added, never overwritten (§ 2.6). The
+character's anchors live in `characters/<character>/references/anchors/`; the hero of
+the handle's identity character is `references/face.png`; the set plates belong to the
+world, in `references/sets/`.
 Never from text again. Secondary views that come from the same base image hold; views
 generated independently do not [Ultra].
 
 | Anchor | What | Why |
 |---|---|---|
-| `hero.png` | the approved casting image, chest-up, selfie camera | the identity |
-| `front.png`, `three-quarter-left.png`, `three-quarter-right.png`, `profile.png` | neutral face, same light, plain framing | the model sees the head from the angles the shots use. One image per view; separate view images are more stable than a collage [SD]. |
+| `references/face.png` (or `anchors/hero.png` for any other character) | the approved casting image, chest-up, selfie camera | the identity |
+| `front.png`, `three-quarter-left.png`, `three-quarter-right.png`, `side.png` | neutral face, same light, plain framing | the model sees the head from the angles the shots use. One image per view; separate view images are more stable than a collage [SD]. |
 | `back-shoulder.png` | from behind, over the shoulder | the over-the-shoulder demo (§ 11) shows hair and shoulder, not the face |
 | `expressions.png` or six files | neutral, mid-sentence, real laugh with eye creasing, listening, surprised, looking away [Ultra] | talking keyframes start mid-sentence, not posed [Fekri] |
 | `hands.png` | both hands, nails per the lock | hands are the most common failure in every model [Vlad]; the nails are a signature detail |
-| `sets/<set-id>.png` | each set, empty, from the camera position she uses | the room is checked like the face (§ 8) |
+| `references/sets/<set-id>.png` (the world) | each set, empty, from the camera position used there | the room is checked like the face (§ 8) |
 | `outfits/<outfit-id>.png` | each locked outfit, on her | wardrobe drift is a join giveaway |
 
 Rules:
 
-- Each anchor is approved in the handle page like every reference today.
+- Each anchor is approved by the user, by word, and the approval is written in
+  `creator.json`. The Atlas handle page shows only the files of `references/`; showing the
+  anchors there is the later Atlas UI (decision 7).
 - When several images show one person, the prompt says so and states the count: "all
   images define one woman; exactly one person on screen" [SD].
 - Each reference is bound by a sentence that says what it controls and what it does
@@ -594,11 +678,12 @@ segment is:
 
 At the same price, 80% usable costs half of 40% usable. So the set is a cost decision.
 
-**8.3 Sets are locked like faces.** Each character has two or three sets, each with an id,
-a plate (§ 6), a light state (source, direction, colour temperature), a camera position
-and three named objects. The character sheet holds the face; the reviewer checks the
-room [Vlad]. A character's sets come from the home her `HANDLE.md` describes, for example
-the sofa, a spot on the floor, the kitchen.
+**8.3 Sets are locked like faces.** The handle's world (`world.json`, § 2.6) has two or
+three sets, each with an id, a plate (§ 6), a light state (source, direction, colour
+temperature), a camera position and three named objects. The character sheet holds the
+face; the reviewer checks the room [Vlad]. The sets come from the home the handle's
+`HANDLE.md` describes, for example the sofa, a spot on the floor, the kitchen; each
+character's `creator.json` names the ones she uses.
 
 **8.4 Rank the sets by measured usable rate.** `approval.json` records keep or reject
 per segment with its set id. After ten generations in a set, its rate is known. A set
@@ -1391,7 +1476,7 @@ needs its own yes [repo rule 9].
 **14.7 What is measured and written back.** Per generated segment, `approval.json`
 keeps the decision, the failure class, the model and the set. From these: the keep rate
 per segment type (it replaces the planning values of § 14.5), the usable rate per set
-(written into `creator.json`, § 8.4), and the rows of the failure ledger (§ 9.3). A
+(written into the handle's `world.json`, § 8.4), and the rows of the failure ledger (§ 9.3). A
 production variable is tested alone: one model, one set, one grade or one grain
 setting changes, and the script stays the same [Ultra: one axis at a time].
 
@@ -1409,21 +1494,22 @@ and her approved pictures. Nothing in these templates belongs to a real handle.
 
 ### 15.1 The creator file — `apps/<slug>/handles/<handle>/characters/<character>/creator.json`
 
-Paths inside it are relative to the character's folder.
+Paths inside it are relative to the handle's folder, `apps/<slug>/handles/<handle>/`.
 
 ```json
 {
   "character_id": "<character>",
   "handle": "<handle>",
   "handle_kind": "persona (the handle's one character and its identity) | multi-character",
+  "identity_character": "<true when this character is the handle's identity: its hero is references/face.png>",
   "app": "<slug>",
   "version": "v<n>",
   "version_note": "<what changed from the previous version, and the user's approval with the date>",
-  "status": "casting | voice-setup | live | retired",
+  "status": "casting | identity | video-setup | live | retired",
   "image_model": "codex-image (the Codex image tool, for every picture of this character; decision 4)",
   "identity_lock": {
     "age_appearance": "<age band, from the claim the videos make>",
-    "face": "<shape, jaw, cheekbones: written from references/anchors/hero.png, visible traits only>",
+    "face": "<shape, jaw, cheekbones: written from the hero picture, visible traits only>",
     "eyes": "<colour, shape, from the picture>",
     "brows": "<from the picture>",
     "skin": "<tone and undertone>, visible pores on nose and cheeks, <make-up>",
@@ -1432,14 +1518,7 @@ Paths inside it are relative to the character's folder.
   "signature_details": [
     "<chosen at casting, with the user; at most three; each at least 1% of frame height in a chest-up shot; only what the approved face shows or the user adds>"
   ],
-  "fixed_subjects": [
-    {
-      "id": "<fixed-subject-id>",
-      "what": "<what always comes with her, in visible traits: a pet, a product she always holds>",
-      "reference": "references/<fixed-subject-id>.png",
-      "rules": ["<its true size in proportion to her and the furniture>", "<its count, e.g. exactly one>"]
-    }
-  ],
+  "fixed_subjects": ["<fixed-subject-id from world.json: what always comes with her>"],
   "voice_profile": {
     "tone": "<pitch and warmth>",
     "pace": "<words per second, and how sentences join>",
@@ -1448,7 +1527,7 @@ Paths inside it are relative to the character's folder.
     "never_says": ["guys", "game changer", "obsessed", "you need this"],
     "not_wanted": ["announcer tone", "narrator delivery", "rising question tone on statements", "over-articulated consonants"],
     "voice_reference": {
-      "file": "references/voice/voice-reference.mp3",
+      "file": "characters/<character>/references/voice/voice-reference.mp3",
       "origin": "research | own-generation (fallback only)",
       "source": { "post": "<URL of the post>", "creator_handle": "<handle>", "platform": "tiktok | instagram", "found_in": "<the research file that lists the post>", "cut_s": ["<start>", "<end>"] },
       "candidates_heard": ["<the other clips the user heard>"],
@@ -1464,33 +1543,26 @@ Paths inside it are relative to the character's folder.
     "processing": "normal phone processing, true colours, no beauty filter",
     "flaws": ["subtle micro-shake", "slight off-centre tilt", "one autofocus hunt"]
   },
-  "sets": [
-    {
-      "id": "<set-id>",
-      "plate": "references/anchors/sets/<set-id>.png",
-      "room": "<the room, its furniture and what is behind her>",
-      "light": "<source, direction, colour temperature>",
-      "camera_position": "<where the phone sits>",
-      "objects": ["<three named objects that are always there>"],
-      "usable_rate": null
-    }
-  ],
+  "sets": ["<set-id from world.json: a room she can be in>"],
   "outfits": [
-    { "id": "<outfit-id>", "what": "<the clothes, colours and how the hair is worn>", "reference": "references/anchors/outfits/<outfit-id>.png" }
+    { "id": "<outfit-id>", "what": "<the clothes, colours and how the hair is worn>", "reference": "characters/<character>/references/anchors/outfits/<outfit-id>.png" }
   ],
   "anchors": {
-    "hero": "references/anchors/hero.png",
-    "front": "references/anchors/front.png",
-    "three_quarter_left": "references/anchors/three-quarter-left.png",
-    "three_quarter_right": "references/anchors/three-quarter-right.png",
-    "profile": "references/anchors/profile.png",
-    "back_shoulder": "references/anchors/back-shoulder.png",
-    "expressions": "references/anchors/expressions.png",
-    "hands": "references/anchors/hands.png"
+    "hero": "references/face.png (the identity character) | characters/<character>/references/anchors/hero.png",
+    "front": "characters/<character>/references/anchors/front.png",
+    "three_quarter_left": "characters/<character>/references/anchors/three-quarter-left.png",
+    "three_quarter_right": "characters/<character>/references/anchors/three-quarter-right.png",
+    "side": "characters/<character>/references/anchors/side.png",
+    "back_shoulder": "characters/<character>/references/anchors/back-shoulder.png",
+    "expressions": "characters/<character>/references/anchors/expressions.png",
+    "hands": "characters/<character>/references/anchors/hands.png",
+    "approved": ["<anchor name, the user's words and the date>"]
   },
   "casting": {
-    "locked_prompt": "references/casting/<character>_locked_v<n>.json",
-    "vibe_references": ["<one or more: a Pinterest picture or a real creator's frame, each with its source; used only to write the locked JSON, never attached to the image tool>"],
+    "locked_prompt": "characters/<character>/references/casting/<character>_locked_v<n>.json",
+    "vibe_references": ["<one or more: a Pinterest picture or a real creator's frame, each with its source, saved in references/casting/; used only to write the locked JSON, never attached to the image tool; or 'none: written from the approved face' (§ 4.6)>"],
+    "hero_candidates": ["characters/<character>/references/casting/candidate-<n>.png"],
+    "hero_approved": "<the user's words and the date>",
     "diverged_axes": ["<at least three identity axes changed from the vibe references>"],
     "twenty_generation_gate": "<date passed>"
   },
@@ -1549,12 +1621,13 @@ Paths inside it are relative to the character's folder.
   "video": {
     "segment_project": "<video>.01-t",
     "flow": "referenced | complex | complex+refs",
-    "model": "<slug in scripts/templates.json; default minimax-h3-reference-to-video with references, minimax-h3-max-text-to-video without; the active version must match>",
-    "duration_seconds": 4,
+    "model": "<slug in scripts/character/models.json; default minimax-h3-reference-to-video; the active version must match>",
+    "duration_seconds": 5,
+    "trim_to_seconds": "<the planned length when it is under the model's 5 s minimum, else null>",
     "start_frame": "keyframes/01-t.png",
     "references": [
       { "file": "keyframes/01-t.png", "role": "the first frame: composition, pose, set, light", "not": "nothing else" },
-      { "file": "characters/<character>/references/anchors/hero.png", "role": "the character's face and hair", "not": "its background" },
+      { "file": "references/face.png", "role": "the character's face and hair (characters/<character>/references/anchors/hero.png for a character that is not the handle's identity)", "not": "its background" },
       { "file": "characters/<character>/references/voice/voice-reference.mp3", "role": "the voice only: tone, pitch, accent, pace", "not": "its words" }
     ],
     "camera": "phone propped at eye level, subtle micro-shake, no cuts",
@@ -1715,6 +1788,40 @@ script-side fields of a video come from the plan, never from production.
 }
 ```
 
+### 15.8 The world — `apps/<slug>/handles/<handle>/world.json`
+
+The handle-level things that must stay the same across slides and videos, shared by
+the handle's characters (§ 2.6). A place decided 2026-10-02; its rules are expanded
+later. Paths are relative to the handle's folder.
+
+```json
+{
+  "handle": "<handle>",
+  "fixed_subjects": [
+    {
+      "id": "<fixed-subject-id>",
+      "what": "<a pet, a product always held: visible traits only>",
+      "reference": "references/subject-<name>.png",
+      "count": "<exactly one>",
+      "true_size": "<its size in proportion to a person and the furniture>",
+      "approved": "<the user's words and the date>"
+    }
+  ],
+  "sets": [
+    {
+      "id": "<set-id>",
+      "plate": "references/sets/<set-id>.png",
+      "room": "<the room, its furniture and what is behind the person>",
+      "light": "<source, direction, colour temperature>",
+      "camera_position": "<where the phone sits>",
+      "objects": ["<three named objects that are always there>"],
+      "usable_rate": null,
+      "approved": "<the user's words and the date>"
+    }
+  ]
+}
+```
+
 ---
 
 ## 16. The phased plan
@@ -1760,15 +1867,28 @@ recreation scripts do, and the recreation scripts are byte-for-byte unchanged.
   cost line and `refs.json` gate. Not in Phase 0: a composite wrapper, `assemble.sh`
   and `lint_prompt.py` (Phases 3 and 4), and the Supagen template `ugc-character`.
 
-**Phase 1 — part A, character definition (Codex plan only).**
-`character-cast`: the roster folder (§ 2.6), the locked casting JSON, the de-slop check,
-the divergence check, the hero from the Codex image tool, the signature details
-proposed and approved, the anchors by image-to-image, the twenty-generation gate, the
-versions, and the `## Characters` table in `HANDLE.md`. For a persona handle it writes
-the one character from the face the handle already uses (§ 4.6). `character-voice`: the
-**voice reference setup** (§ 7.2), the clips from the research, cut clean, heard and
-approved by the user. Done when: one character is live, at `v1`, with an approved voice
-reference.
+**Phase 1 — part A, character definition, through the one identity process (Codex
+plan only).** Decided 2026-10-02: `persona-identity` is the process (§ 2, § 4.9).
+- `persona-identity`, rewritten from "listed, minimal" to the method of § 4 to § 6, in
+  four modes: **new identity** (the identity half: the brief from `## Persona`, the vibe
+  references, the locked JSON with the de-slop and divergence checks, four candidates,
+  the hero approved as `references/face.png`, the fixed subjects, the style photo, then
+  the profile picture at `handles` step 4); **from an existing face** (§ 4.6, the
+  migration of § 4.9); **video half** (the anchors by image-to-image, the set plates,
+  the signature details proposed and approved, `world.json`, the twenty-generation
+  gate); **add a character or a version** (§ 2.6). It writes `creator.json`, the
+  versions, `world.json` and the `## Characters` table in `HANDLE.md`. The Codex check
+  and the bridge are the ones the skill already uses.
+- `handles` steps 3 and 4 name the new identity half; the files and the table they
+  write do not change.
+- `character-voice`: the **voice reference setup** (§ 7.2), the clips from the
+  research, cut clean, heard and approved by the user, and the natural-voice check with
+  `scripts/character/qc.py` on the first approved talking generation.
+- Templates: `docs/character/creator.example.json` with handle-relative paths, and
+  `docs/character/world.example.json`.
+
+Done when: one character is live, at `v1`, with an approved voice reference; and a new
+slideshow handle gets the same `references/` files and table as before.
 
 **Phase 2 — P1, the shots and the storyboard gate (Codex plan only).**
 `character-shots`: reads the locked plan (§ 2.5) and the pinned character, cuts the
@@ -1827,8 +1947,8 @@ account. If the charge is per second at $0.06/s, the same $2 cap allows up to si
 model is not tested in this phase.
 
 **Phase 6 — measured numbers.**
-From the first real use case in a consumer workspace: set usable rates and keep rates are written back into each character's `creator.json`
-(as a new version, § 2.6), and § 14.5 is replaced by measured numbers. Future work: a
+From the first real use case in a consumer workspace: set usable rates are written back into the handle's `world.json`, keep rates into each
+character's `creator.json` (as a new version, § 2.6), and § 14.5 is replaced by measured numbers. Future work: a
 fallback on the Supagen image generation models, for when the Codex image tool refuses
 or fails a picture (decision 4). Every phase is written for the kit: no app, handle or
 character of a user's workspace is named in any skill, script or template.
@@ -1854,7 +1974,7 @@ Questions about the script are in `SCRIPT-LEARNINGS.md` § 16.
    face already approved in her handle (§ 4.6). Whether her fixed subjects are in every
    video is set in her creator file.
 3. **Signature details. Decided 2026-10-01: chosen per character at casting.** They are not
-   decided for any named character here. `character-cast` proposes two or three (a necklace, a hair
+   decided for any named character here. `persona-identity` proposes two or three (a necklace, a hair
    clip, a nail colour) and the user approves them; they are then permanent (§ 5.1).
 4. **The voice reference. Decided 2026-10-01.** The voice reference is a required
    setup step per character, done by the agent with the user before her first AI UGC
@@ -1927,3 +2047,13 @@ Questions about the script are in `SCRIPT-LEARNINGS.md` § 16.
     4. **Output length. Settled by measurement.** Outputs run 0.1 to 0.6 s long (5 s →
        5.184 s, 6 s → 6.592 s, 15 s → 15.104 s, measured on the files). Assembly trims
        to the planned length. Supagen does not record the output length.
+14. **One identity process. Decided 2026-10-02.** The casting method (§ 4 to § 6) is
+    the `persona-identity` skill, for slideshow handles and character videos alike;
+    there is no separate `character-cast`. Identity is made once per handle: the
+    identity half at handle creation, the video half just in time for the first video.
+    The hero of the handle's identity character is `references/face.png`, so the slides
+    and the videos use one picture. The slideshow keeps its files, names and
+    `## References` table; an existing handle migrates without re-casting (§ 4.9). The
+    handle's world (fixed subjects such as a cat, the sets of the home) has its place in
+    `world.json` and `references/`; its rules are expanded later. Still open: slides
+    with a second character on a multi-character handle.
