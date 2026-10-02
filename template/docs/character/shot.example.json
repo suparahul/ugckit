@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to pipeline/character/<video>/shots/<nn>-<type>.json. Written by character-shots (P1). The video block is compiled to segments/<nn>-<type>/prompt.txt.",
+  "_comment": "Copy to pipeline/character/<video>/shots/<nn>-<type>.json. Written by character-shots (P1). The video block is compiled to segments/<nn>-<type>/prompt.txt. Character and world paths are relative to the handle's folder; keyframes/ is relative to the video's folder.",
   "shot_id": "<video>.01-t",
   "character_ref": "<character>@v<n>",
   "character_file": "apps/<slug>/handles/<handle>/characters/<character>/creator.json",
@@ -88,8 +88,9 @@
   "video": {
     "segment_project": "<video>.01-t",
     "flow": "referenced | complex | complex+refs",
-    "model": "<slug in scripts/templates.json; default minimax-h3-reference-to-video with references, minimax-h3-max-text-to-video without; the active version must match>",
-    "duration_seconds": 4,
+    "model": "<slug in scripts/character/models.json; default minimax-h3-reference-to-video; the active version must match>",
+    "duration_seconds": 5,
+    "trim_to_seconds": "<the planned length when it is under the model's 5 s minimum, else null>",
     "start_frame": "keyframes/01-t.png",
     "references": [
       {
@@ -98,8 +99,8 @@
         "not": "nothing else"
       },
       {
-        "file": "characters/<character>/references/anchors/hero.png",
-        "role": "the character's face and hair",
+        "file": "references/face.png",
+        "role": "the character's face and hair (characters/<character>/references/anchors/hero.png for a character that is not the handle's identity)",
         "not": "its background"
       },
       {

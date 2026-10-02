@@ -31,7 +31,10 @@ is a pending slot on the canvas, never an error.
         HANDLE.md                the identity: head lines (…, Dimension:, Slide style:), Accounts (optional:
                                  one row per platform, see docs/instagram.md), Persona, Bio,
                                  References, Defaults, Style prefix, Identity rule, Post-process step
-        references/              face.png, subject-<name>.png, style.png, profile.png
+        references/              face.png, subject-<name>.png, style.png, profile.png (the slides read these);
+                                 sets/<set-id>.png for character videos
+        world.json               the fixed subjects and the sets, shared by the handle's characters
+        characters/<character>/  creator.json, references/{casting,anchors,voice}/, versions/ (persona-identity)
       production/
         PLAN.md                  the plan: App:, App Store id:, Posting zone:, Home zone:, Posting service:,
                                  Platforms: (optional), the posts table

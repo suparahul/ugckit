@@ -1,16 +1,17 @@
 {
-  "_comment": "Copy to apps/<slug>/handles/<handle>/characters/<character>/creator.json. Written by character-cast (part A, once per character). Paths inside it are relative to the character's folder. Values in angle brackets are filled at casting.",
+  "_comment": "Copy to apps/<slug>/handles/<handle>/characters/<character>/creator.json. Written by persona-identity: the identity half at handle creation, the video half before the first character video. Paths inside it are relative to the handle's folder. Values in angle brackets are filled at casting.",
   "character_id": "<character>",
   "handle": "<handle>",
   "handle_kind": "persona (the handle's one character and its identity) | multi-character",
+  "identity_character": "<true when this character is the handle's identity: its hero is references/face.png>",
   "app": "<slug>",
   "version": "v<n>",
   "version_note": "<what changed from the previous version, and the user's approval with the date>",
-  "status": "casting | voice-setup | live | retired",
-  "image_model": "codex-image (the Codex image tool, for every picture of this character; decision 4)",
+  "status": "casting | identity | video-setup | live | retired",
+  "image_model": "codex-image (the Codex image tool, for every picture of this character)",
   "identity_lock": {
     "age_appearance": "<age band, from the claim the videos make>",
-    "face": "<shape, jaw, cheekbones: written from references/anchors/hero.png, visible traits only>",
+    "face": "<shape, jaw, cheekbones: written from the hero picture, visible traits only>",
     "eyes": "<colour, shape, from the picture>",
     "brows": "<from the picture>",
     "skin": "<tone and undertone>, visible pores on nose and cheeks, <make-up>",
@@ -20,15 +21,7 @@
     "<chosen at casting, with the user; at most three; each at least 1% of frame height in a chest-up shot; only what the approved face shows or the user adds>"
   ],
   "fixed_subjects": [
-    {
-      "id": "<fixed-subject-id>",
-      "what": "<what always comes with her, in visible traits: a pet, a product she always holds>",
-      "reference": "references/<fixed-subject-id>.png",
-      "rules": [
-        "<its true size in proportion to her and the furniture>",
-        "<its count, e.g. exactly one>"
-      ]
-    }
+    "<fixed-subject-id from world.json: what always comes with her>"
   ],
   "voice_profile": {
     "tone": "<pitch and warmth>",
@@ -50,7 +43,7 @@
       "over-articulated consonants"
     ],
     "voice_reference": {
-      "file": "references/voice/voice-reference.mp3",
+      "file": "characters/<character>/references/voice/voice-reference.mp3",
       "origin": "research | own-generation (fallback only)",
       "source": {
         "post": "<URL of the post>",
@@ -82,40 +75,37 @@
     ]
   },
   "sets": [
-    {
-      "id": "<set-id>",
-      "plate": "references/anchors/sets/<set-id>.png",
-      "room": "<the room, its furniture and what is behind her>",
-      "light": "<source, direction, colour temperature>",
-      "camera_position": "<where the phone sits>",
-      "objects": [
-        "<three named objects that are always there>"
-      ],
-      "usable_rate": null
-    }
+    "<set-id from world.json: a room she can be in>"
   ],
   "outfits": [
     {
       "id": "<outfit-id>",
       "what": "<the clothes, colours and how the hair is worn>",
-      "reference": "references/anchors/outfits/<outfit-id>.png"
+      "reference": "characters/<character>/references/anchors/outfits/<outfit-id>.png"
     }
   ],
   "anchors": {
-    "hero": "references/anchors/hero.png",
-    "front": "references/anchors/front.png",
-    "three_quarter_left": "references/anchors/three-quarter-left.png",
-    "three_quarter_right": "references/anchors/three-quarter-right.png",
-    "profile": "references/anchors/profile.png",
-    "back_shoulder": "references/anchors/back-shoulder.png",
-    "expressions": "references/anchors/expressions.png",
-    "hands": "references/anchors/hands.png"
+    "hero": "references/face.png (the identity character) | characters/<character>/references/anchors/hero.png",
+    "front": "characters/<character>/references/anchors/front.png",
+    "three_quarter_left": "characters/<character>/references/anchors/three-quarter-left.png",
+    "three_quarter_right": "characters/<character>/references/anchors/three-quarter-right.png",
+    "side": "characters/<character>/references/anchors/side.png",
+    "back_shoulder": "characters/<character>/references/anchors/back-shoulder.png",
+    "expressions": "characters/<character>/references/anchors/expressions.png",
+    "hands": "characters/<character>/references/anchors/hands.png",
+    "approved": [
+      "<anchor name, the user's words and the date>"
+    ]
   },
   "casting": {
-    "locked_prompt": "references/casting/<character>_locked_v<n>.json",
+    "locked_prompt": "characters/<character>/references/casting/<character>_locked_v<n>.json",
     "vibe_references": [
-      "<one or more: a Pinterest picture or a real creator's frame, each with its source; used only to write the locked JSON, never attached to the image tool>"
+      "<one or more: a Pinterest picture or a real creator's frame, each with its source, saved in references/casting/; used only to write the locked JSON, never attached to the image tool; or 'none: written from the approved face'>"
     ],
+    "hero_candidates": [
+      "characters/<character>/references/casting/candidate-<n>.png"
+    ],
+    "hero_approved": "<the user's words and the date>",
     "diverged_axes": [
       "<at least three identity axes changed from the vibe references>"
     ],

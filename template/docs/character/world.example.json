@@ -1,0 +1,28 @@
+{
+  "_comment": "Copy to apps/<slug>/handles/<handle>/world.json. The handle's world: the fixed subjects (a pet) and the sets (the rooms of the home), shared by the handle's characters and kept the same across slides and videos. Written by persona-identity. Paths are relative to the handle's folder.",
+  "handle": "<handle>",
+  "fixed_subjects": [
+    {
+      "id": "<fixed-subject-id>",
+      "what": "<a pet, a product always held: visible traits only>",
+      "reference": "references/subject-<name>.png",
+      "count": "<exactly one>",
+      "true_size": "<its size in proportion to a person and the furniture>",
+      "approved": "<the user's words and the date>"
+    }
+  ],
+  "sets": [
+    {
+      "id": "<set-id>",
+      "plate": "references/sets/<set-id>.png",
+      "room": "<the room, its furniture and what is behind the person>",
+      "light": "<source, direction, colour temperature>",
+      "camera_position": "<where the phone sits>",
+      "objects": [
+        "<three named objects that are always there>"
+      ],
+      "usable_rate": null,
+      "approved": "<the user's words and the date>"
+    }
+  ]
+}
