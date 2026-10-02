@@ -195,7 +195,8 @@ paths are in a user's workspace.
 | `approval.json` | `pipeline/character/<video>/` | P1, P3, P6 |
 | The pipeline's state | `pipeline/character/state.json` | the character scripts; the recreation `pipeline.json` is not touched |
 | The scripts | `scripts/character/`: `generate.sh`, `character/qc.py`, `screen_comp.py`, `assemble.sh`, `lint_prompt.py`, `state.py`, `models.json` | the character skills |
-| The failure ledger, per model | `docs/character-model-failures.md` (shipped with one empty table per model; kept, the founder 2026-10-02) | P3 writes, P1 reads |
+| The failure ledger, per model | `pipeline/character/model-failures.md`, **the user's file**: written once by the installer (the § 9.4 table and one empty table per model), never overwritten by an upgrade | P3 writes, P1 reads |
+| What the kit knows about each model | `docs/character-model-known.md`, **the kit's file**: the § 9.4 table, updated by every upgrade, never written by the pipeline | P1 reads |
 | The orchestrator section for character videos (§ 2.4) | `template/AGENTS.md` | orchestrator update, shipped with the skills |
 
 ### 2.4 Segments, flows and references
@@ -751,10 +752,26 @@ a cut), never inside one [Fekri]. Background movement only where the set implies
   is the push of an H segment, which moves straight along the lens axis between two
   flat-on holds (§ 11.12).
 
-**9.3 The failure ledger.** `docs/character-model-failures.md`, one table per model: the failure,
-the date, the project, the prompt change that fixed it. P3 adds a row; P1
-reads the model's table before writing. A negative enters a prompt only from this
-ledger. Repair is by layer [Ultra]: face drift goes to the references and the keyframe;
+**9.3 The failure ledger.** `pipeline/character/model-failures.md`, one table per model:
+the failure, the date, the project, the prompt change that fixed it. P3 adds a row; P1
+reads the model's table, and the model's row in `docs/character-model-known.md`, before
+writing. A negative enters a prompt only from this ledger.
+
+**Who owns which file** (the founder, 2026-10-02: a kit upgrade must never clash with
+the user's rows). The kit splits its files into managed ones (`scripts/`, `.claude/`,
+`docs/`, `atlas/`, replaced or merged at each upgrade; `brain/`, replaced and
+read-only) and the user's (`apps/`, `pipeline/`, `research/`: the installer only makes
+the folders, and writes a few starter files once with `copy_once`). So:
+- **The ledger is the user's.** `pipeline/character/model-failures.md` ships in
+  `template/pipeline/character/` and the installer writes it with `copy_once`: a new
+  workspace gets the seed (§ 9.4 as a table "What was known before the first run", and
+  one empty table per model), and an upgrade says "kept your …" and changes nothing.
+  A model added to the kit later has no table in an existing ledger; P3 adds it, in the
+  same shape, at that model's first rejected segment.
+- **New kit knowledge reaches existing users through a managed file**, the pattern of
+  `brain/` beside `apps/<slug>/niche/`: `docs/character-model-known.md` holds the § 9.4
+  table as the kit knows it now, and every upgrade updates it. Nobody writes rows in it.
+  P1 reads both files; where they disagree, a row the user measured wins over a kit row. Repair is by layer [Ultra]: face drift goes to the references and the keyframe;
 plastic skin to the casting and the light; bad hands to a simpler shot; warped UI
 cannot happen (§ 11); bad lip sync to fewer words; room or outfit drift to the exact
 lock restated; a polished look to stripping cinema words.
@@ -1503,7 +1520,8 @@ needs its own yes [repo rule 9].
 **14.7 What is measured and written back.** Per generated segment, `approval.json`
 keeps the decision, the failure class, the model and the set. From these: the keep rate
 per segment type (it replaces the planning values of § 14.5), the usable rate per set
-(written into the handle's `world.json`, § 8.4), and the rows of the failure ledger (§ 9.3). A
+(written into the handle's `world.json`, § 8.4), and the rows of the failure ledger
+(`pipeline/character/model-failures.md`, the user's file, § 9.3). A
 production variable is tested alone: one model, one set, one grade or one grain
 setting changes, and the script stays the same [Ultra: one axis at a time].
 
@@ -1636,7 +1654,7 @@ Paths inside it are relative to the handle's folder, `apps/<slug>/handles/<handl
   "negative_prompt": {
     "identity": "<from creator.json identity_negative>",
     "slop": ["plastic skin", "airbrushed skin", "beauty filter", "studio lighting", "ring light", "cinematic grade", "perfectly tidy room", "extra fingers", "fused fingers", "text", "captions", "watermark", "ui overlays"],
-    "earned": ["<at most five, each with its row in docs/character-model-failures.md>"]
+    "earned": ["<at most five, each with its row in pipeline/character/model-failures.md>"]
   }
 }
 ```
@@ -1864,8 +1882,8 @@ Phase 5 is the first API spend: under $2 in total, and a yes per run.
 state logic of `state.py`, renamed and pointed at `pipeline/character/` and
 `scripts/character/models.json`; nothing in them changes behaviour yet.
 `models.json` is already built (decision 6; § 17, questions 10 and 13): the copies read it. The JSON
-templates of § 15 and `docs/character-model-failures.md` (seeded from § 9.4) in
-`template/docs/`. Done when: the copies run on an old segment exactly as the
+templates of § 15 in `template/docs/`, and the failure ledger (seeded from § 9.4; since
+2026-10-02 the user's file, § 9.3). Done when: the copies run on an old segment exactly as the
 recreation scripts do, and the recreation scripts are byte-for-byte unchanged.
 
 **Built 2026-10-02** (branch `ai-ugc-character-pipeline`):
@@ -1885,11 +1903,13 @@ recreation scripts do, and the recreation scripts are byte-for-byte unchanged.
   the first video), `creator.example.json` (§ 15.1), `shot.example.json` (§ 15.2 with
   the `video` block of § 15.3), `video.example.json` (§ 15.6 with the `voiceover`
   block of § 15.4), `insert.example.json` (§ 15.5), `approval.example.json` (§ 15.7).
-- `docs/character-model-failures.md`: § 9.4 as the seed, and an empty table for
-  `minimax-h3-reference-to-video`. Later on 2026-10-02 the default became
-  `minimax-h3-max-reference-to-video`: it has its own empty table, `models.json` has
-  both entries, and `generate.sh` refuses a `refs.json` with more pictures than the
-  model takes.
+- The failure ledger: § 9.4 as the seed, and an empty table for
+  `minimax-h3-reference-to-video`, first in `docs/`. Later on 2026-10-02 the default
+  became `minimax-h3-max-reference-to-video`: it has its own empty table, `models.json`
+  has both entries, and `generate.sh` refuses a `refs.json` with more pictures than the
+  model takes. Then the ledger moved to the user's `pipeline/character/model-failures.md`
+  (written once), and the kit's table to the managed `docs/character-model-known.md`
+  (§ 9.3, § 17 question 16).
 - `pipeline/character/`: the empty folder the installer makes.
 - Evidence: on an old app-insertion plate, the copies and the recreation scripts gave
   the same `qc.py` report, the same contact sheet and a byte-identical composite (same
@@ -2135,6 +2155,12 @@ Questions about the script are in `SCRIPT-LEARNINGS.md` § 16.
     multi-character handle the `## References` table keeps the identity character's
     face only, and the slides behave as today (§ 4.9). Nothing in the slideshow path
     changes for a second character.
-16. **The failure ledger. Kept** (the founder, 2026-10-02). It stays at
-    `docs/character-model-failures.md` for now; where it lives is still the founder's
-    question.
+16. **The failure ledger. Kept, and moved to a folder the user owns** (the founder,
+    2026-10-02: no kit upgrade may clash with the user's rows). The ledger is
+    `pipeline/character/model-failures.md`: the installer writes the seed once
+    (`copy_once`) and never again. The kit's own knowledge is
+    `docs/character-model-known.md`, a managed file that every upgrade updates, so a
+    new finding of the kit reaches an existing workspace without touching its rows
+    (§ 9.3). `generate.sh` and `qc.py` do not read the ledger; P1 (`character-shots`)
+    reads both files and P3 (`character-review`) writes the ledger only. Those two
+    skills are built in Phases 2 and 3.
