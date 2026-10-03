@@ -9,9 +9,11 @@ on any FAIL. The checks: the length, the section order, no booster
 or glamour word, every reference bound alone, an end state on every shot, a job for
 every hand, no conflicting camera words, the word budget, the flat-on sentence in every
 O, G and S prompt and no word that angles the phone, the push sentence in H and the
-finger sentence in F with their times, no spoken line in H or F, lip sync stated for a
+finger sentence in F with their times, no spoken line in H, F or B, lip sync stated for a
 talking segment, the shot times within the generated length, no generation
-parameter, and the reference-picture limit.
+parameter, and the reference-picture limit. For B (a silent generated action): no phone
+and no app, the people rule of its framing (hands only: no face; subject only: no person,
+and no "exactly one person"), and the exact count of each fixed subject.
 """
 import json, os, re, sys
 
@@ -38,6 +40,10 @@ PARAMS = [r"--ar\b", r"--[a-z]+ \d", r"\bseed\s*[:=]", r"\bduration\s*[:=]", r"\
 SECTIONS = ["REFERENCES", "STRUCTURE", "SUBJECT", "SETTING", "ANIMALS/PROPS", "SHOT",
             "THE PHONE SCREEN", "PERFORMANCE", "AUDIO", "DIALOGUE", "CONSISTENCY", "NO TEXT"]
 NEGATORS = ("no ", "not ", "never ", "without ", "avoid ", "zero ")
+SILENT = ("does not speak", "no one speaks", "nobody speaks", "do not speak")
+APP_WORDS = [r"green screen", r"phone screen", r"\bthe app\b", r"app screen", r"screen recording",
+             r"holds? (a|the|her|his) phone", r"\bsmartphone\b"]
+COUNT_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
 
 
 def sections(text):
@@ -173,11 +179,33 @@ def lint(video, seg):
                                                    r"flat solid green under and around the finger",
                                                    r"never passes through the phone"])
         check("the finger sentence with its times", ok, "" if ok else "the F sentence of the character-shots skill")
-    if t in ("H", "F"):
+    if t in ("H", "F", "B"):
         quoted = re.findall(r"[\"“][^\"”]{3,}[\"”]", "\n".join(shots_b))
-        silent = "does not speak" in text.lower()
+        silent = any(x in text.lower() for x in SILENT)
         check("no spoken line", not spoken and not quoted and silent,
-              "an H or F segment has no line on camera and says 'She does not speak'")
+              f"an {t} segment has no line on camera and says so ('She does not speak', 'No one speaks')")
+    if t == "B":
+        low = front.lower()
+        app = [p for p in APP_WORDS if any(not negated(low, m.start()) for m in re.finditer(p, low))]
+        check("no phone and no app", "THE PHONE SCREEN" not in heads and not app,
+              ", ".join(app) or ("THE PHONE SCREEN section in a B prompt" if "THE PHONE SCREEN" in heads else
+                                 "") or "the app is shown only by O, G, S, H, F, R or P")
+        fk = shot.get("framing_kind")
+        tl = text.lower()
+        if fk == "subject_only":
+            ok = "exactly one person" not in tl and re.search(r"\bno (person|people|human)\b", tl)
+            check("the people rule (subject only)", bool(ok),
+                  "" if ok else "say 'No person in frame'; never 'exactly one person'")
+        elif fk == "hands_only":
+            ok = re.search(r"\bno face\b", tl) is not None
+            check("the people rule (hands only)", ok, "" if ok else "say 'Only her hands and forearms; no face'")
+        subs = shot.get("fixed_subjects_in_shot") or []
+        if subs:
+            ap = allb("ANIMALS/PROPS").lower()
+            n = len(subs)
+            ok = re.search(rf"\bexactly ({n}|{COUNT_WORDS.get(n, n)})\b", ap) is not None
+            check("the exact count of the subjects", ok,
+                  f"{n} fixed subject(s): ANIMALS/PROPS says 'exactly {COUNT_WORDS.get(n, n)}' with their true size")
     if spoken:
         perf = allb("PERFORMANCE").lower()
         bans = allb("NO TEXT").lower()

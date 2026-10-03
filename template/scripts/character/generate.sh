@@ -15,7 +15,8 @@
 #
 # It also refuses, before any cost: a video whose storyboard (gate A) is not approved in
 # approval.json; a pinned character whose status is not 'live'; a refs.json reference of
-# a kind the character pipeline does not allow (an app screen is never a reference).
+# a kind the character pipeline does not allow (an app screen is never a reference); a
+# reference that is supplied media (the plan's assets); a segment that is not generated.
 set -euo pipefail
 
 [ $# -ge 2 ] || { echo "usage: $0 <video> <segment> [template_slug] [prompt_file]" >&2; exit 2; }
@@ -79,6 +80,9 @@ for pin in plan.get("characters") or []:
     if c.get("status") != "live":
         sys.exit(f"FATAL: {pin} is not live (status {c.get('status')!r}) -- the video half, the "
                  "voice reference and the twenty-generation gate come first (persona-identity)")
+# C and M are supplied or composed at assembly; R and P are the real recording.
+if seg.split("-")[-1].upper() in ("C", "M", "R", "P"):
+    sys.exit(f"FATAL: {seg} is not generated (C, M, R and P are built at assembly)")
 # The active Supagen version has one length; the segment must be planned at that length.
 shot = os.path.join(vd, "shots", f"{seg}.json")
 st = os.path.join(root, "pipeline", "character", "state.json")
@@ -95,10 +99,15 @@ if refs:
     if "references" not in spec:
         sys.exit("FATAL: refs.json has no 'references' list -- write it with "
                  "scripts/character/shots.py refs")
+    supplied = {os.path.realpath(os.path.join(root, a["path"])) for a in plan.get("assets") or []
+                if isinstance(a.get("path"), str)}
     for r in spec["references"]:
         if r.get("kind") not in allowed or "/screens/" in r.get("file", ""):
             sys.exit(f"FATAL: refs.json reference {r.get('file')} of kind {r.get('kind')!r} is not "
                      f"allowed; only {', '.join(sorted(allowed))}. The app is never a reference.")
+        if "/supplied/" in r.get("file", "") or os.path.realpath(os.path.join(root, r.get("file", ""))) in supplied:
+            sys.exit(f"FATAL: refs.json reference {r.get('file')} is supplied media (the plan's assets). "
+                     "Supplied footage goes into the video as it is; it never conditions a generation.")
 GATES
 
 # ---- cost, computed from list price x seconds. Reported costs are unreliable (rule 7).
