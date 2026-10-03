@@ -352,10 +352,11 @@ export type Leg = { platform: Platform; account: number };
  * Instagram's.
  *
  * A video (`kind: "video"`) is one media id, the same file on every leg (a TikTok
- * video, an Instagram Reel). Direct mode sets no `auto_add_music` (photo posts
- * only: a video plays its own sound) and leaves duet, stitch, the cover frame and
- * the AI-generated label at the platform's defaults. Draft mode is `draft: true`,
- * as for slides: TikTok puts the video in the account's inbox.
+ * video, an Instagram Reel). TikTok gets `is_aigc: true` in both modes (the
+ * founder, 2026-10-04: the AI-generated label is on for every video). Direct mode
+ * sets no `auto_add_music` (photo posts only: a video plays its own sound) and
+ * sets duet and stitch on; the cover frame is the platform's default. Draft mode
+ * is `draft: true`, as for slides: TikTok puts the video in the account's inbox.
  */
 export function legsPost(o: {
   legs: Leg[];
@@ -375,7 +376,9 @@ export function legsPost(o: {
   const direct = o.mode === "direct";
   if (direct && !o.scheduledAt) throw new Error("A direct post needs a time.");
   const platformConfig: PlatformConfig = {};
-  if (tt) platformConfig.tiktok = !direct ? { draft: true } : video ? { draft: false, privacy_status: "public", allow_comment: true } : { draft: false, privacy_status: "public", auto_add_music: true, allow_comment: true };
+  if (tt) platformConfig.tiktok = video
+    ? (direct ? { draft: false, privacy_status: "public", allow_comment: true, allow_duet: true, allow_stitch: true, is_aigc: true } : { draft: true, is_aigc: true })
+    : direct ? { draft: false, privacy_status: "public", auto_add_music: true, allow_comment: true } : { draft: true };
   if (ig) platformConfig.instagram = { caption: o.instagram!.caption, media: o.instagram!.media };
   const main = tt ? o.tiktok! : o.instagram!;
   return {

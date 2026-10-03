@@ -27,6 +27,7 @@ import { appDir } from "./root.ts";
 import { fmtBoth, setZones } from "./when.ts";
 import { declaredPlatforms } from "./accounts.ts";
 import { PLATFORMS, PLATFORM_NAME, linePlatform, platformOf, primaryOf, slideLimit, type Platform } from "./platform.ts";
+import { directBlock } from "./video-post.ts";
 import { readVideo, videoPlanPoint, type VideoState } from "./video.ts";
 import type { Kind, VideoIdea } from "./video-row.ts";
 
@@ -982,7 +983,7 @@ export function nextStep(s: PostState): { who: "you" | "agent" | "nobody"; text:
         ? (s.sent!.mode === "direct" && s.sent!.scheduledAt
           ? say("you", `Scheduled for ${fmtBoth(s.sent!.scheduledAt)} on ${s.row.handle} · direct. The posting service publishes it; nothing to do until then.`)
           : say("you", `In TikTok drafts on ${s.row.handle} since ${hhmm(s.sent!.at)}. Post it from the phone, then mark it posted.`))
-        : say("you", "Ready. Send it to TikTok drafts, or schedule a direct post.");
+        : say("you", s.video && directBlock(s.video.plan?.music) ? "Ready. Send it to TikTok drafts; it has a music note, so no direct post." : "Ready. Send it to TikTok drafts, or schedule a direct post.");
     case "posted": return say("you", `Posted ${s.posted!.time}. Outcomes open ${outcomesOpenAt(s)}.`);
     case "read": return say("nobody", "Done. Outcomes are recorded.");
     default: return say("nobody", "");

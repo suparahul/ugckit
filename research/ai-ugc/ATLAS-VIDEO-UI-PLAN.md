@@ -141,23 +141,44 @@ from here, so they are not checked against a live page.
 then the row's tags it does not carry (no caption, no send); the limits are checked
 (caption 2,200 characters, 30 hashtags with an Instagram leg, 3 s to 600 s, 300 MB). The send
 hashes the bytes again, uploads them once, and creates one post: the same media id on every
-leg, `{ tiktok: { draft: true } }` or, direct, `{ draft: false, privacy_status: "public",
-allow_comment: true }` with `scheduled_at`; Instagram gets `{ caption, media }`. The
+leg, `{ tiktok: { draft: true, is_aigc: true } }` or, direct, `{ draft: false,
+privacy_status: "public", allow_comment: true, allow_duet: true, allow_stitch: true,
+is_aigc: true }` with `scheduled_at`; Instagram gets `{ caption, media }`. The
 `posting.sent` line also carries `video` and `sha256`. `--request` (or `REQUEST_ONLY=1`)
 prints the exact bodies with a placeholder media id, needs no key and sends nothing.
+
+### The founder's decisions (2026-10-04, third request), built
+
+1. **The AI-generated label is on for every video post.** TikTok gets `is_aigc: true` in
+   draft and in direct mode. Post Bridge's document does not say whether a TikTok draft
+   carries it, so in draft mode the post page reminds: "In TikTok, turn on the
+   AI-generated label before you post". Post Bridge has no AI label field for Instagram;
+   the dry run says to turn it on in the Instagram app.
+2. **The cover frame is each platform's default** (the hook text is on frame 1). No cover
+   setting is sent.
+3. **A video whose plan has a music note goes as a TikTok draft only.** Direct mode is
+   refused before any call, with the reason; the page disables "Schedule direct post…"
+   and says "No direct post: this video has a music note (…), so it goes as a TikTok
+   draft only". In the drafts, the page reminds "Add the sound on the phone: “…”". A video
+   with no music note may go direct.
+4. **Duet and stitch stay on**, sent as `true` in direct mode.
+5. **Instagram gets the Reel at once**, as slides do; "Do not post on Instagram" keeps one
+   post off it. A music-note video in draft mode therefore still publishes a Reel on
+   Instagram at once, without the music.
 
 ### Draft against direct, for a video
 
 | | Draft (default) | Direct (scheduled) | What the Atlas does |
 |---|---|---|---|
 | Where it lands | the TikTok inbox; the user finishes and posts from the phone | Post Bridge publishes at the time | as for slides |
-| Caption | TikTok's inbox upload of a video takes no caption in TikTok's API, so it may arrive empty | carried | says "paste it from the caption block" in draft mode; to confirm on the first real draft |
-| Sound | the user may add a TikTok sound in the app | the file's own sound only; nothing is added | warns; the plan's `music_note` is never applied |
-| Cover frame | chosen in the app | TikTok's default | sends no `video_cover_timestamp_ms` (**decision**) |
-| Privacy, comments, duet, stitch | set in the app | public, comments on; duet and stitch at TikTok's default (on) | as for slides, plus duet and stitch left on (**decision**) |
-| AI-generated label | the user's toggle in the app | not set | sends no `is_aigc`; the dry run says so (**decision**) |
+| Allowed for | every video | a video with no music note | refuses direct for a music note |
+| Caption | TikTok's inbox upload of a video takes no caption in TikTok's API, so it may arrive empty | carried | the page says "paste it from the caption block" |
+| Sound | the user adds it on the phone (the music note) | the file's own sound only; nothing is added | the page names the music note to add |
+| Cover frame | TikTok's default (the user may change it in the app) | TikTok's default | sends no cover setting |
+| AI-generated label | `is_aigc: true` sent; may not arrive | `is_aigc: true` | a reminder on the page in draft mode |
+| Privacy, comments, duet, stitch | set in the app | public, comments on, duet and stitch on | as decided |
 | Time | arrives when sent | `scheduled_at`, required | as for slides |
-| Instagram leg | publishes when the send runs (no Instagram draft) | at the same time | the slideshow's warning: send at the slot time |
+| Instagram leg | publishes when the send runs (no Instagram draft), no AI label field | at the same time | the slideshow's slot-time warning; the AI label reminder |
 | The link and the outcomes | no link from Post Bridge; `sync` matches the caption through Monid (a pasted caption must be exact) | the link from Post Bridge | as for slides |
 
 ### A video against a slideshow
@@ -168,27 +189,18 @@ prints the exact bodies with a placeholder media id, needs no key and sends noth
 | What is checked | the deck hash in the approval | the file's sha256, against `delivery.json` and the approval |
 | Caption | `final/caption.txt` from the deck | `publishing_note.caption` and the row's tags |
 | Cover text | typed by hand (draft) or burned in (direct) | none: the overlays are in the file |
-| Direct mode's sound | TikTok picks one (`auto_add_music: true`) | none added (photo-only setting) |
-| Instagram | a 4:5 JPEG carousel, 10 at most; music added by hand afterwards | the same file as a Reel, its own sound, Instagram's default cover; the Atlas says nothing about adding music |
+| Direct mode's sound | TikTok picks one (`auto_add_music: true`) | none added; a music note blocks direct mode |
+| AI label | not set | `is_aigc: true` |
+| Instagram | a 4:5 JPEG carousel, 10 at most; music added by hand afterwards | the same file as a Reel, its own sound, Instagram's default cover |
 | TikTok draft caption | carried | may be dropped (above) |
 | Limits | 10 slides with an Instagram leg | caption 2,200, 30 hashtags (Instagram), 3–600 s, 300 MB |
 | Export | Export files | none: the file is `pipeline/character/<video>/final/<video>.mp4` |
 | Post Bridge processing | images | `processing_enabled` left at its default (true): Post Bridge may re-encode the file before it posts it |
 
-### Decisions for the founder
+### Still to check on the first real send
 
-1. **The AI-generated label** (`is_aigc`, TikTok direct posts). Not set now. TikTok asks for a
-   label on realistic AI-generated content; the character videos are generated people.
-2. **The cover frame.** Not set now (each platform's default). Options: a fixed time, or a
-   frame chosen per video in the plan.
-3. **Music on a direct post.** The file is music-free by the pipeline's rule, so a direct
-   video posts with the voice only. Options: post music videos in draft mode only, or let
-   the pipeline mix the music in.
-4. **Duet and stitch** stay on (TikTok's default).
-5. **Instagram for videos.** Each video goes to Instagram at once when the handle has an
-   account, as slides do; `leg.drop` or `--only tiktok` keeps one off.
-6. **The first real send** should be one draft, to check the caption question, the size
-   limits and Post Bridge's re-encoding, before a direct post.
+One TikTok draft first: whether the caption and the AI label arrive, whether the size
+limits hold, and how Post Bridge encodes the file.
 
 ### Changed files
 
@@ -202,7 +214,7 @@ prints the exact bodies with a placeholder media id, needs no key and sends noth
 | `template/atlas/scripts/postbridge-send.mjs` | The video's dry-run lines; `--request` / `REQUEST_ONLY=1`. |
 | `template/atlas/components/production/Bridge.tsx`, `Legs.tsx`, the post page | The slideshow's send buttons for a video, no Export; the video's words. |
 | `template/.claude/skills/post`, `character-deliver`, `atlas`; `template/AGENTS.md` | "A video post"; the hand-over from `final/`. The recreation `deliver` skill is unchanged: recreation rows stay out of the studio. |
-| `template/atlas/lib/video-post.test.ts` (new), `package.json` | 10 tests: the rules, the request shapes, the selection, the preview, the mocked send in both modes, the dry run, the export refusal. |
+| `template/atlas/lib/video-post.test.ts` (new), `package.json` | 12 tests: the rules and the founder's decisions, the request shapes, the selection, the preview, the mocked send in both modes, the music-note refusal, the Instagram drop, the dry run, the export refusal. |
 
 ## Still open
 

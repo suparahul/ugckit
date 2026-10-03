@@ -30,7 +30,7 @@ import { fmtBoth, fmtIn, shortOf, tomorrowIn, weekdayIn, zonedToUtc, type Zones 
 import { appFromPath } from "./scope";
 
 /** What the page computes server-side: the account and why the send is not offered. */
-export type BridgeInfo = { account: PBAccount | null; why: string | null; canSend: boolean };
+export type BridgeInfo = { account: PBAccount | null; why: string | null; canSend: boolean; /** A video with a music note: a TikTok draft only. */ directBlock?: string | null };
 
 type Status = { word: "queued" | "scheduled" | "draft created" | "posted" | "error"; status: string; error: string | null; url: string | null };
 type Decide = (e: Omit<Event, "at">) => Promise<void>;
@@ -225,7 +225,7 @@ export function PostingRail({
             <>
               {video ? null : <ExportFiles post={post} exported={exported} />}
               <button type="button" className="rail__kill" title={video ? "Marks it posted, when you posted the file yourself." : "Marks it posted. Use Export files to get the images first."} onClick={() => setByHand(true)}>Mark as manually posted</button>
-              <button type="button" className="rail__kill" disabled={sending || !bridge.canSend} title={video ? `Post Bridge publishes the video at a set time${alsoInstagram ? ", on TikTok and Instagram together" : ""}, with its own sound only` : `Post Bridge publishes it at a set time${alsoInstagram ? ", on TikTok and Instagram together" : ""}; nobody types the cover text, so it is burned into slide 1`} onClick={() => setScheduling(true)}>Schedule direct post…</button>
+              {bridge.directBlock ? null : <button type="button" className="rail__kill" disabled={sending || !bridge.canSend} title={video ? `Post Bridge publishes the video at a set time${alsoInstagram ? ", on TikTok and Instagram together" : ""}, with its own sound only` : `Post Bridge publishes it at a set time${alsoInstagram ? ", on TikTok and Instagram together" : ""}; nobody types the cover text, so it is burned into slide 1`} onClick={() => setScheduling(true)}>Schedule direct post…</button>}
               <button type="button" className="rail__go" disabled={sending || !bridge.canSend} onClick={() => setAsking(true)}>{sending ? "Sending…" : alsoInstagram ? "Send to TikTok drafts and Instagram" : "Send to TikTok drafts"}</button>
             </>
           )}
@@ -250,7 +250,7 @@ export function PostingRail({
             <OpenOnTikTok link={link} />
             {!withLink && !link ? <button type="button" className="rail__kill" title="The TikTok link, once the post is live; optional" onClick={() => setWithLink(true)}>add the link</button> : null}
             <button type="button" className="rail__kill" disabled={sending || !bridge.canSend} title="A second draft on the account; the first stays on the phone" onClick={() => setAsking(true)}>{sending ? "sending…" : "Send again"}</button>
-            <button type="button" className="rail__kill" disabled={sending || !bridge.canSend} title="A second send, direct at a set time; the first stays where it is" onClick={() => setScheduling(true)}>Schedule direct post…</button>
+            {bridge.directBlock ? null : <button type="button" className="rail__kill" disabled={sending || !bridge.canSend} title="A second send, direct at a set time; the first stays where it is" onClick={() => setScheduling(true)}>Schedule direct post…</button>}
             {video ? null : <ExportFiles post={post} exported={exported} />}
             <MarkPosted post={post} busy={busy} onDecide={onDecide} primary withLink={withLink} />
           </>

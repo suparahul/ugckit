@@ -14,6 +14,13 @@
  *   - direct mode adds no sound (TikTok's auto_add_music is for photo posts),
  *     and there is no cover text to burn: the overlays are in the file.
  *
+ * The founder's decisions of 2026-10-04: the AI-generated label is on for every
+ * video (TikTok's `is_aigc`, in both modes; Instagram has no such field in Post
+ * Bridge, so the page reminds); the cover frame is each platform's default (the
+ * hook text is on frame 1); a video whose plan has a music note goes as a TikTok
+ * draft only, so the sound is added on the phone, and direct mode is refused for
+ * it; duet and stitch stay on; Instagram gets the Reel at once, as slides do.
+ *
  * The limits below are the platforms' published ones for API posts (TikTok's
  * Content Posting API, Meta's Reels publishing); Post Bridge's API document
  * states none of its own. They are checked here so a send fails before an
@@ -34,7 +41,7 @@ export const VIDEO_LIMITS = {
 } as const;
 
 /** A placeholder left in a plan (`<optional>`): not a value. */
-const placeholder = (s: string | null | undefined) => !s || !s.trim() || /^<.*>$/.test(s.trim());
+export const placeholder = (s: string | null | undefined) => !s || !s.trim() || /^<.*>$/.test(s.trim());
 
 /** The caption of a video post: the plan's caption, then the row's tags unless it carries every one. Null when the plan has none. */
 export function videoCaption(caption: string | null | undefined, tags: string[] = []): string | null {
@@ -88,14 +95,27 @@ export function checkVideoSend(v: {
     : v.duration !== null && v.duration < L.minSeconds ? `the video is ${v.duration} s; TikTok and Instagram take ${L.minSeconds} s at least`
     : v.duration !== null && v.duration > L.maxSeconds ? `the video is ${v.duration} s; TikTok through the API takes ${L.maxSeconds} s at most`
     : v.bytes !== null && v.bytes > L.maxBytes ? `the file is ${mb(v.bytes)}; Instagram Reels through the API take ${mb(L.maxBytes)} at most`
+    : v.mode === "direct" ? directBlock(v.music)
     : null;
   const warnings: string[] = [];
   if (!skip) {
-    if (tt && v.mode === "draft") warnings.push("TikTok's video inbox may not carry the caption: paste it from the post page when you post from the phone.");
-    if (tt && v.mode === "direct") warnings.push("A direct TikTok video plays its own sound only: TikTok adds no music, and the file has none.");
-    if (!placeholder(v.music) && (v.mode === "direct" || ig)) warnings.push(`The plan's music note (“${v.music!.trim()}”) is not applied${tt && v.mode === "draft" ? " on Instagram" : ""}: the file is music-free.`);
-    if (ig) warnings.push("On Instagram the video is a Reel, published with the file's own sound and Instagram's default cover frame.");
-    if (tt && v.mode === "direct") warnings.push("TikTok's AI-generated label is not set (decision open); the cover frame is TikTok's default.");
+    if (tt && v.mode === "draft") warnings.push(...videoReminders(v.music));
+    if (tt && v.mode === "direct") warnings.push("A direct TikTok video plays its own sound only: TikTok adds no music. The AI-generated label is sent on.");
+    if (ig) warnings.push(`On Instagram the video is a Reel, published at once with the file's own sound${!placeholder(v.music) ? ` (the music note “${v.music!.trim()}” is not applied there)` : ""}. Post Bridge has no AI label field for Instagram: turn on the AI label in the Instagram app.`);
   }
   return { caption, skip, warnings };
+}
+
+/** Why direct mode is refused for this video, or null: a music note means the sound is added on the phone, so a TikTok draft only. */
+export function directBlock(music: string | null | undefined): string | null {
+  return placeholder(music) ? null : `this video has a music note (“${music!.trim()}”), so it goes as a TikTok draft only: send it to the drafts and add the sound on the phone`;
+}
+
+/** What the user does on the phone with a TikTok draft of a video. Shown before the send and on the post page. */
+export function videoReminders(music: string | null | undefined): string[] {
+  return [
+    "In TikTok, turn on the AI-generated label before you post: the draft may not carry it.",
+    "TikTok's video inbox may not carry the caption: paste it from the caption block.",
+    ...(placeholder(music) ? [] : [`Add the sound on the phone: “${music!.trim()}”.`]),
+  ];
 }

@@ -20,9 +20,9 @@ process.env.ATLAS_ROOT = WS;
 process.env.POST_BRIDGE_API_KEY = "pb_test_not_a_key";
 process.chdir(CWD);
 
-const { VIDEO_LIMITS, checkVideoSend, videoCaption } = await import("./video-post.ts");
+const { VIDEO_LIMITS, checkVideoSend, directBlock, videoCaption, videoReminders } = await import("./video-post.ts");
 const { legsPost, postBody, postBridge } = await import("./postbridge.ts");
-const { bridgeInfo, requestPreviews, selectSends, sendPosts } = await import("./postbridge-flow.ts");
+const { bridgeInfo, postingNotes, requestPreviews, selectSends, sendPosts, sendWarning } = await import("./postbridge-flow.ts");
 const { allStates, readLog } = await import("./production.ts");
 const { exportPost } = await import("./export-flow.ts");
 
@@ -113,17 +113,27 @@ test("checkVideoSend: the file must be the delivered and the approved one; capti
   assert.match(checkVideoSend({ ...ok, bytes: 301 * 1024 * 1024 }).skip!, /Reels through the API/);
 });
 
-test("checkVideoSend: what each mode says first", () => {
-  const base = { id: ID, caption: "c", music: "a soft piano", sha256: SHA, delivered: SHA, approved: SHA, bytes: 1, duration: 15, platforms: ["tiktok", "instagram"] as ("tiktok" | "instagram")[] };
-  const draft = checkVideoSend({ ...base, mode: "draft" }).warnings.join("\n");
-  assert.match(draft, /may not carry the caption/);
-  assert.match(draft, /music note .* not applied on Instagram/);
-  assert.match(draft, /a Reel/);
-  assert.doesNotMatch(draft, /AI-generated/);
-  const direct = checkVideoSend({ ...base, mode: "direct" }).warnings.join("\n");
-  assert.match(direct, /its own sound only/);
-  assert.match(direct, /AI-generated label is not set/);
-  assert.doesNotMatch(direct, /may not carry the caption/);
+test("checkVideoSend: the founder's rules — a music note means a TikTok draft only; the AI label and the reminders", () => {
+  const base = { id: ID, caption: "c", sha256: SHA, delivered: SHA, approved: SHA, bytes: 1, duration: 15, platforms: ["tiktok", "instagram"] as ("tiktok" | "instagram")[] };
+  /* A music note: direct is refused, draft goes, with the sound reminder. */
+  assert.match(checkVideoSend({ ...base, music: "a soft piano", mode: "direct" }).skip!, /music note .*TikTok draft only.*add the sound on the phone/);
+  assert.match(checkVideoSend({ ...base, music: "a soft piano", mode: "direct", platforms: ["instagram"] }).skip!, /TikTok draft only/);
+  const draft = checkVideoSend({ ...base, music: "a soft piano", mode: "draft" });
+  assert.equal(draft.skip, null);
+  const said = draft.warnings.join("\n");
+  assert.match(said, /turn on the AI-generated label/);
+  assert.match(said, /paste it from the caption block/);
+  assert.match(said, /Add the sound on the phone: “a soft piano”/);
+  assert.match(said, /Reel, published at once .*music note “a soft piano” is not applied there/);
+  assert.match(said, /no AI label field for Instagram/);
+  /* No music note: direct goes; the AI label is sent on. A placeholder note is no note. */
+  const direct = checkVideoSend({ ...base, music: null, mode: "direct" });
+  assert.equal(direct.skip, null);
+  assert.match(direct.warnings.join("\n"), /AI-generated label is sent on/);
+  assert.doesNotMatch(direct.warnings.join("\n"), /paste it|Add the sound/);
+  assert.equal(checkVideoSend({ ...base, music: "<a note only>", mode: "direct" }).skip, null);
+  assert.equal(directBlock(null), null);
+  assert.deepEqual(videoReminders(null).length, 2);
 });
 
 test("legsPost for a video: one media id on both legs; direct sets no auto_add_music", () => {
@@ -131,13 +141,15 @@ test("legsPost for a video: one media id on both legs; direct sets no auto_add_m
   const one = { caption: "c #a", media: ["mid"] };
   assert.deepEqual(postBody(legsPost({ legs, mode: "draft", kind: "video", tiktok: one, instagram: one })), {
     caption: "c #a", social_accounts: [7, 8], media: ["mid"],
-    platform_configurations: { tiktok: { draft: true }, instagram: { caption: "c #a", media: ["mid"] } },
+    platform_configurations: { tiktok: { draft: true, is_aigc: true }, instagram: { caption: "c #a", media: ["mid"] } },
   });
   const direct = postBody(legsPost({ legs, mode: "direct", scheduledAt: "2026-10-06T23:00:00.000Z", kind: "video", tiktok: one, instagram: one }));
-  assert.deepEqual((direct.platform_configurations as { tiktok: unknown }).tiktok, { draft: false, privacy_status: "public", allow_comment: true });
+  assert.deepEqual((direct.platform_configurations as { tiktok: unknown }).tiktok, { draft: false, privacy_status: "public", allow_comment: true, allow_duet: true, allow_stitch: true, is_aigc: true });
+  assert.equal("video_cover_timestamp_ms" in ((direct.platform_configurations as { tiktok: object }).tiktok), false, "the cover frame is the platform's default");
   assert.equal(direct.scheduled_at, "2026-10-06T23:00:00.000Z");
   assert.throws(() => legsPost({ legs, mode: "draft", kind: "video", tiktok: { caption: "c", media: ["a", "b"] }, instagram: one }), /exactly one video/);
-  /* The slideshow's direct post keeps its sound setting. */
+  /* A slideshow keeps its own settings: no AI label, TikTok's sound on a direct post. */
+  assert.deepEqual((postBody(legsPost({ legs: [legs[0]], mode: "draft", tiktok: one })).platform_configurations as { tiktok: unknown }).tiktok, { draft: true });
   assert.equal((postBody(legsPost({ legs: [legs[0]], mode: "direct", scheduledAt: "x", tiktok: one })).platform_configurations as { tiktok: { auto_add_music?: boolean } }).tiktok.auto_add_music, true);
 });
 
@@ -179,10 +191,10 @@ test("the request preview: the exact upload and post bodies, a placeholder media
     assert.deepEqual(r.preview!.uploads, [{ mime_type: "video/mp4", size_bytes: BYTES.length, name: `${ID}.mp4` }]);
     assert.deepEqual(r.preview!.post, {
       caption: "what the vet tech said #cattok #vettech", social_accounts: [7, 8], media: ["<media id of the video>"],
-      platform_configurations: { tiktok: { draft: true }, instagram: { caption: "what the vet tech said #cattok #vettech", media: ["<media id of the video>"] } },
+      platform_configurations: { tiktok: { draft: true, is_aigc: true }, instagram: { caption: "what the vet tech said #cattok #vettech", media: ["<media id of the video>"] } },
     });
     const [d] = requestPreviews(SLUG, { keys: [KEY], mode: "direct", at: "2099-01-01T00:00:00.000Z", only: "tiktok" });
-    assert.deepEqual(d.preview!.post, { caption: "what the vet tech said #cattok #vettech", social_accounts: [7], media: ["<media id of the video>"], platform_configurations: { tiktok: { draft: false, privacy_status: "public", allow_comment: true } }, scheduled_at: "2099-01-01T00:00:00.000Z" });
+    assert.deepEqual(d.preview!.post, { caption: "what the vet tech said #cattok #vettech", social_accounts: [7], media: ["<media id of the video>"], platform_configurations: { tiktok: { draft: false, privacy_status: "public", allow_comment: true, allow_duet: true, allow_stitch: true, is_aigc: true } }, scheduled_at: "2099-01-01T00:00:00.000Z" });
   } finally { process.env.POST_BRIDGE_API_KEY = key; }
   assert.equal(readLog(SLUG).filter((e) => e.kind === "posting.sent").length, 0);
 });
@@ -197,7 +209,7 @@ test("the send, mocked: one upload of the approved bytes, one post for both legs
   assert.deepEqual(calls[1].body, { blob: BYTES.length, type: "video/mp4" });
   assert.deepEqual(calls[2].body, {
     caption: "what the vet tech said #cattok #vettech", social_accounts: [7, 8], media: ["mid_video"],
-    platform_configurations: { tiktok: { draft: true }, instagram: { caption: "what the vet tech said #cattok #vettech", media: ["mid_video"] } },
+    platform_configurations: { tiktok: { draft: true, is_aigc: true }, instagram: { caption: "what the vet tech said #cattok #vettech", media: ["mid_video"] } },
   });
   const line = readLog(SLUG).find((e) => e.kind === "posting.sent")!;
   assert.equal(line.data!.video, ID);
@@ -216,7 +228,7 @@ test("the send, mocked, direct: scheduled_at and the TikTok video settings", asy
   const at = new Date(Date.now() + 86_400_000).toISOString();
   const { results } = await sendPosts(SLUG, { keys: [KEY], mode: "direct", at, only: "tiktok", pb });
   assert.equal(results[0].ok, true);
-  assert.deepEqual(calls[2].body, { caption: "what the vet tech said #cattok #vettech", social_accounts: [7], media: ["mid_video"], platform_configurations: { tiktok: { draft: false, privacy_status: "public", allow_comment: true } }, scheduled_at: at });
+  assert.deepEqual(calls[2].body, { caption: "what the vet tech said #cattok #vettech", social_accounts: [7], media: ["mid_video"], platform_configurations: { tiktok: { draft: false, privacy_status: "public", allow_comment: true, allow_duet: true, allow_stitch: true, is_aigc: true } }, scheduled_at: at });
   const line = readLog(SLUG).find((e) => e.kind === "posting.sent")!;
   assert.equal(line.data!.scheduledAt, at);
   assert.equal(line.data!.legs, undefined, "TikTok alone: the line as a slideshow's");
@@ -231,4 +243,45 @@ test("a dry run sends nothing; the export still refuses a video", async () => {
   assert.equal(calls.length, 0);
   await assert.rejects(exportPost(SLUG, KEY, { compose: false }), /has no export/);
   assert.ok(readFileSync(join(WS, VD, "final", `${ID}.mp4`)).equals(BYTES), "the delivered file is untouched");
+});
+
+test("a video with a music note: direct refused before any call, the draft goes, the page says why and what to do", async () => {
+  ready({ music: "lofi under the voice" });
+  const { pb, calls } = mockPB();
+  const at = new Date(Date.now() + 86_400_000).toISOString();
+  const refused = await sendPosts(SLUG, { keys: [KEY], mode: "direct", at, pb });
+  assert.match(refused.plans[0].skip!, /TikTok draft only/);
+  assert.deepEqual(refused.results, []);
+  assert.equal(calls.length, 0, "nothing reached Post Bridge");
+  const s = allStates(SLUG)[0];
+  const info = bridgeInfo(s);
+  assert.equal(info.canSend, true, "the draft is offered");
+  assert.match(info.directBlock!, /TikTok draft only/);
+  assert.match(sendWarning(s, info)!, /^No direct post: .*add the sound on the phone/);
+  const { nextStep } = await import("./production.ts");
+  assert.match(nextStep(s).text, /TikTok drafts; it has a music note, so no direct post/);
+  assert.deepEqual(postingNotes(s), [
+    "In TikTok, turn on the AI-generated label before you post: the draft may not carry it.",
+    "TikTok's video inbox may not carry the caption: paste it from the caption block.",
+    "Add the sound on the phone: “lofi under the voice”.",
+  ]);
+  const sent = await sendPosts(SLUG, { keys: [KEY], pb });
+  assert.equal(sent.results[0].ok, true);
+  assert.deepEqual((calls[2].body as { platform_configurations: { tiktok: unknown } }).platform_configurations.tiktok, { draft: true, is_aigc: true });
+  /* In the drafts: the reminders stay until it is marked posted. */
+  assert.equal(postingNotes(allStates(SLUG)[0]).length, 3);
+});
+
+test("a video with no music note may go direct; Instagram can be taken off per post", async () => {
+  ready();
+  const s = allStates(SLUG)[0];
+  assert.equal(bridgeInfo(s).directBlock, null);
+  assert.equal(sendWarning(s, bridgeInfo(s)), null);
+  w(`apps/${SLUG}/production/log.jsonl`, readFileSync(join(WS, `apps/${SLUG}/production/log.jsonl`), "utf8") + JSON.stringify({ at: "2026-10-05T12:00:00.000Z", post: KEY, kind: "leg.drop", data: { platform: "instagram" }, note: "not this one" }) + "\n");
+  const { pb, calls } = mockPB();
+  const at = new Date(Date.now() + 86_400_000).toISOString();
+  const { plans, results } = await sendPosts(SLUG, { keys: [KEY], mode: "direct", at, pb });
+  assert.deepEqual(plans[0].legs.map((l) => l.platform), ["tiktok"]);
+  assert.equal(results[0].ok, true);
+  assert.deepEqual((calls[2].body as { social_accounts: number[] }).social_accounts, [7]);
 });

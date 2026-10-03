@@ -34,7 +34,7 @@ import { MAX_SLIDES, PLATFORM_NAME, linePlatform, platformOf, primaryOf, type Pl
 import { slotKey, slotTimes } from "./slots.ts";
 import { accountsOf, hasKey, legsPost, postBody, postBridge, sendStatusOf, type CreatePostInput, type PostBridgeClient, type RequestPreview, type Leg, type SentPost, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type AccountsFile, type PBAccount, type SendStatus, type SyncReport } from "./postbridge.ts";
 import { allStates, appendEvent, filesRoot, fileKey, getProduction, isSent, legsOfSent, postingStep, readLog, storeOf, type Event, type PostState } from "./production.ts";
-import { checkVideoSend } from "./video-post.ts";
+import { checkVideoSend, directBlock, videoReminders } from "./video-post.ts";
 import { finalFileOf } from "./video.ts";
 import { findLinks, monidRuns, savedRunsFetch, type LinkReport } from "./tiktok-link.ts";
 import { fmtBoth, postingZone, zonedToUtc } from "./when.ts";
@@ -76,18 +76,21 @@ export function accountFor(slug: string, handle: string, platform: Platform = "t
 }
 
 /** What the post page needs to draw the panel: the button's availability and why not. */
-export function bridgeInfo(state: PostState): { keySet: boolean; account: PBAccount | null; why: string | null; canSend: boolean; /** A video that cannot go as it is: the reason (no caption, not the approved file, a limit). */ videoSkip?: string | null } {
+export function bridgeInfo(state: PostState): { keySet: boolean; account: PBAccount | null; why: string | null; canSend: boolean; /** A video that cannot go as it is: the reason (no caption, not the approved file, a limit). */ videoSkip?: string | null; /** Why a direct post is refused (a video with a music note), or null. */ directBlock?: string | null } {
   const { account, why } = accountFor(state.row.slug, state.row.handle);
   const keySet = hasKey();
   const finalOk = state.final.status === "approved" && ["ready", "posted", "read"].includes(state.stage);
   const videoSkip = state.video && finalOk && state.video.final ? videoCheck(state, "draft", state.platforms).check.skip : null;
-  return { keySet, account, why: !keySet ? "POST_BRIDGE_API_KEY is not set in .env" : why, canSend: keySet && !!account && !why && finalOk && !videoSkip, ...(state.video ? { videoSkip } : {}) };
+  return { keySet, account, why: !keySet ? "POST_BRIDGE_API_KEY is not set in .env" : why, canSend: keySet && !!account && !why && finalOk && !videoSkip, ...(state.video ? { videoSkip, directBlock: directBlock(state.video.plan?.music) } : {}) };
 }
 
 /** The one note line under the band's sentence. Never the cover text itself; the account warning sits under the button instead. */
 export function postingNotes(state: PostState): string[] {
-  if (postingStep(state) !== "send") return [];
-  return [state.video ? "A TikTok draft of a video may arrive without its caption: paste it from the caption block." : "Slide 1 text is typed in TikTok by hand; a direct post carries it burned in."];
+  const step = postingStep(state);
+  /* A video in the TikTok drafts: what to do on the phone, until it is marked posted. */
+  if (state.video && (step === "send" || (step === "sent" && state.sent?.mode !== "direct"))) return videoReminders(state.video.plan?.music);
+  if (step !== "send") return [];
+  return ["Slide 1 text is typed in TikTok by hand; a direct post carries it burned in."];
 }
 
 /** The warning under the primary button when the send is not offered, or null. */
@@ -96,6 +99,7 @@ export function sendWarning(state: PostState, info: ReturnType<typeof bridgeInfo
   if (!info.account) return `Connect ${state.row.handle} in Post Bridge to enable sending.`;
   if (info.why) return `Reconnect ${state.row.handle} in Post Bridge to enable sending.`;
   if (info.videoSkip) return `Not sendable: ${info.videoSkip}.`;
+  if (info.directBlock) return `No direct post: ${info.directBlock}.`;
   return null;
 }
 
