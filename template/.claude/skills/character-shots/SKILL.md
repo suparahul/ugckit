@@ -75,7 +75,25 @@ Mark the cut points on the frozen script first, then give each segment its lines
   (`reaction_refs`) gives the performance only: never name its post, its creator or its
   file in the prompt, and never attach the clip or a frame of it to a keyframe or a
   generation; the face stays the handle's own. A beat with `reaction: null` has no
-  reference yet: stop and send it back to planning.
+  reference yet: stop and send it back to planning. This is the written route, used
+  when the reference's `generation_input` is `none`.
+- **X in face-replace mode** (the reference's `generation_input` is `face_replace`;
+  founder, 2026-10-04): the reference clip itself drives the motion and timing, and the
+  model puts the character's face in. The beat lasts the clip's range and has no set.
+  Look at the range for burned-in text (the reference's `burned_in_text`, a handle, a
+  watermark, a caption) and write `face_replace` in the shot: `{ref_id, clip:
+  "segments/<nn>-x/source/reference.mp4", range_s, masks: [{rect, how, text}]}`; a mask
+  is `crop` at an edge, else `blur` or `box`. Then run
+  `scripts/character/shots.py reference <video> <nn>-x`: it checks the post against its
+  checksum, trims the range, masks it, and refuses while OCR still reads text. The
+  generation references are that clip (kind `face_replace_clip`) and the character's
+  approved face (kind `hero`); no keyframe. `trim_to_seconds` is the clip's length. The
+  prompt names the clip in REFERENCES ("reference.mp4 is the motion, timing, expression
+  and camera only"), says "Replace the face with the face of face.png" and "Nothing of the
+  original person's face, hair or identity remains", "No lip sync" and "She does not
+  speak", and never names the post, its creator or the research file. Never attach the
+  research file itself. Today no model in `models.json` has the face-replace mode, so
+  `generate.sh` stops before any cost; the written route is the fallback.
 - **A full-screen app beat** has framing `app_screen`: it is R or P, never generated.
 - **C, supplied media** (v2): the plan's clip (`source_range_s`, inside the asset's
   approved `trim_s`) or still (`still_s`). No casting, no keyframe, no prompt, no

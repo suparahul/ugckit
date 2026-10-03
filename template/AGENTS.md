@@ -402,8 +402,13 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
   approved generated face, no voice and no lip sync, performed from the written
   expression beats of a real reference reaction in `reaction_refs`, under the timed hook
   overlay; founder, 2026-10-03: a reaction hook is never spoken). A full-screen app beat
-  has framing `app_screen` (R or P). Production refuses a dry-run planning approval, a
-  number on an overlay without `fact_refs`, and a reference clip as a generation input.
+  has framing `app_screen` (R or P). In face-replace mode (founder, 2026-10-04) the
+  reference clip, trimmed to its range with its burned-in text masked (`shots.py
+  reference`), is the motion input of the X generation and the character's face goes in;
+  research footage is never an input anywhere else, and the run needs a model with the
+  `face_replace` mode in `models.json` (none yet: `generate.sh` stops before any cost; the
+  written expression beats are the fallback). Production refuses a dry-run planning approval, a
+  number on an overlay without `fact_refs`, and research footage attached to a generation.
   A narrator speaks where no generated face
   talks: the character's approved performance, a supplied voice, or an original synthetic
   narrator (`character-voice`, narrator mode: never a clone of a real person, never a

@@ -67,6 +67,12 @@ it.** The checklist (the user sees the same list):
   the reference creator's. `review.py` approves an X only with
   `--check identity=pass --check hands=pass --check silent=pass --check performance=pass`,
   and only when the file is as long as the shot plans (the duration gate).
+- **X segments in face-replace mode**: the motion is the clip's; look at the face. The
+  character's face in every frame; nothing of the original creator's face, hair or marks;
+  no handle, watermark or caption of the reference (OCR reads the file and refuses any
+  text); no voice. `review.py` approves it only with
+  `--check identity=pass --check no_source_identity=pass --check silent=pass`, and only
+  when the file is within 0.25 s of the clip's length.
 
 Pull a frame where you are unsure:
 

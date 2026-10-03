@@ -17,7 +17,11 @@ and no "exactly one person"), and the exact count of each fixed subject. For X (
 reaction): no line and the silence stated, no lip sync, exactly one person, no phone and
 no app, every expression beat of the written performance (its face, eyes and head) word for
 word with its time from the segment's start, and no copy of the reference (its post id,
-its creator's handle, its file, or words that ask the model to copy a clip).
+its creator's handle, its file, or words that ask the model to copy a clip). For X in
+face-replace mode (the reference's generation_input face_replace): the clip named in
+REFERENCES and bound to motion and timing, the face replaced by face.png, "nothing of the
+original person" stated, the reference post, creator and file never named; the written
+beats are then the gate B checklist, not prompt text.
 """
 import json, os, re, sys
 
@@ -217,11 +221,13 @@ def lint(video, seg):
     if t == "X":
         tl = text.lower()
         flat = " ".join(tl.split())
+        rx = shot.get("reaction") or {}
+        ref = next((r for r in plan.get("reaction_refs") or [] if r.get("id") == rx.get("ref_id")), {})
+        fr_mode = ref.get("generation_input") == "face_replace" and isinstance(shot.get("face_replace"), dict)
         check("no lip sync", re.search(r"\bno lip[- ]?sync\b", tl) is not None and "voice-over" not in
               allb("PERFORMANCE").lower(),
               "say 'No lip sync: her mouth does not form words'; a reaction hook is never spoken")
         check("the people rule (face)", "exactly one person" in tl, "say 'Exactly one person.'")
-        rx = shot.get("reaction") or {}
         steps = [x for x in rx.get("expression_beats") or [] if isinstance(x, dict)]
         perf_t = " ".join(allb("PERFORMANCE").lower().split())
         t0 = steps[0].get("start_s") if steps and isinstance(steps[0].get("start_s"), (int, float)) else 0
@@ -236,16 +242,32 @@ def lint(video, seg):
                 v = " ".join(str(x.get(k) or "").lower().split())
                 if not v or v not in perf_t:
                     miss.append(f"step {j} {k}")
-        check("the written performance, word for word", bool(steps) and not miss,
-              ("PERFORMANCE lacks: " + "; ".join(miss)) if miss else
-              "" if steps else "the shot has no reaction.expression_beats")
-        ref = next((r for r in plan.get("reaction_refs") or [] if r.get("id") == rx.get("ref_id")), {})
+        if not fr_mode:
+            check("the written performance, word for word", bool(steps) and not miss,
+                  ("PERFORMANCE lacks: " + "; ".join(miss)) if miss else
+                  "" if steps else "the shot has no reaction.expression_beats")
         names = [str(ref.get(k)) for k in ("post_id", "handle") if ref.get(k)]
         if ref.get("video_path"):
             names.append(os.path.basename(str(ref["video_path"])))
-        cp = [w for w in COPY_WORDS if re.search(w, flat)] + [n for n in names if n.lower() in flat]
+        if fr_mode:
+            # Face replace (founder, 2026-10-04): the prompt names its input clip, binds it
+            # to motion and timing only, and puts the character's face in.
+            clip = os.path.basename(str(shot["face_replace"].get("clip") or "reference.mp4"))
+            rb = " ".join(allb("REFERENCES").lower().split())
+            bound = clip.lower() in rb and re.search(r"\bmotion\b", rb) and re.search(r"\btiming\b", rb)
+            check("the clip bound to motion and timing", bool(bound),
+                  f"REFERENCES says '{clip} is the motion, timing, expression and camera only'")
+            swap = re.search(r"\breplace[sd]? (her|his|the|its) face\b", flat) is not None
+            check("the face replaced by the character's", swap and "face.png" in rb,
+                  "say 'Replace the face with the face of face.png' and bind face.png in REFERENCES")
+            trace = re.search(r"\b(nothing|no trace) of the (original|source) (person|creator|face)", flat)
+            check("no trace of the original person", trace is not None,
+                  "say 'Nothing of the original person's face, hair or identity remains'")
+            cp = [n for n in names if n.lower() in flat]
+        else:
+            cp = [w for w in COPY_WORDS if re.search(w, flat)] + [n for n in names if n.lower() in flat]
         check("no copy of the reference", not cp, ", ".join(cp) or
-              "the written performance is the brief; the face is the handle's own")
+              "the face is the handle's own; the prompt never names the reference post, creator or file")
     if spoken:
         perf = allb("PERFORMANCE").lower()
         bans = allb("NO TEXT").lower()
@@ -264,7 +286,7 @@ def lint(video, seg):
         lim = spec["known_model_limits"].get(slug or spec["default"], {})
     except Exception:
         lim = {}
-    imgs = sum(1 for r in refs if r.get("kind") != "voice")
+    imgs = sum(1 for r in refs if r.get("kind") not in ("voice", "face_replace_clip"))
     mx = lim.get("max_reference_images")
     check("reference pictures within the limit", not mx or imgs <= mx, f"{imgs} of at most {mx}")
     return results

@@ -305,6 +305,8 @@ def encode_segment(out, vin, vf, ain, af, dur, extra_inputs=(), fc=None):
     cmd = ["ffmpeg", "-y", "-v", "error"] + vin
     if ain is None:
         cmd += ["-f", "lavfi", "-t", f"{dur:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
+        # Digital silence needs no levelling: loudnorm on silence under 3 s returns NaN.
+        af = f"aresample=48000,apad=whole_dur={dur:.3f}" if af else af
     else:
         cmd += ain
     for x in extra_inputs:

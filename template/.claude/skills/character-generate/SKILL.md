@@ -50,7 +50,10 @@ notification. Do not poll with sleep.
 - The storyboard approval, the character's `live` status, the reference kinds (never an
   app screen: the app is inserted at P4), and never supplied media (a plan asset or a
   file under `supplied/`), research footage or a reference reaction's post. C, M, R and P
-  are never generated. An X segment (a silent reaction) carries no voice clip.
+  are never generated. An X segment (a silent reaction) carries no voice clip. An X segment
+  in face-replace mode carries only its masked clip (`shots.py reference`) and the
+  character's face, and runs only on a model with the `face_replace` mode in
+  `models.json`; none has it yet, so the script stops before any cost.
 - At most `max_reference_images` pictures (4 on the default model); the voice clip does
   not count.
 - The prompt under 5,000 characters, counted as characters; sent once, as message

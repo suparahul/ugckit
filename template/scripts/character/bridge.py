@@ -19,9 +19,10 @@ an approved mascot); C is supplied media (a clip or a still, never generated, ne
 reference of a generation); M lays panels side by side or one inside another. A narrator
 speaks over a beat where no generated face talks. X is a silent reaction: the handle's own
 generated face reacts, with no voice and no lip sync, while the hook runs as a timed text
-overlay; a written performance taken from a real reference reaction drives it, and the
-reference clip itself is never a generation input (founder, 2026-10-03: a reaction hook
-is never spoken).
+overlay (founder, 2026-10-03: a reaction hook is never spoken). In face-replace mode
+(founder, 2026-10-04) the reference clip, trimmed and masked by shots.py reference, is
+the motion input and the character's face goes in; otherwise the written performance
+taken from the reference drives it. The research file itself is never attached.
 """
 import hashlib, json, os, re, subprocess, sys
 
@@ -233,7 +234,7 @@ def check_plan(plan, out, verify_files=True, script_checked=False):
         if l.get("speaker") not in pins | {"vo"}:
             out.bad(f"script line {l.get('id')}: speaker {l.get('speaker')!r} is not a pinned character or 'vo'")
     beats = plan.get("beats") or []
-    check_reaction_refs(plan, out)
+    check_reaction_refs(plan, out, verify_files)
     check_beats(plan, beats, lines, length, pins, subjects, sets, assets, narrators, ed, out, script_checked)
     check_overlays(plan, beats, length, assets, ed, out)
     check_live(plan, beats, assets, ed, out)
@@ -611,10 +612,28 @@ def is_reaction(plan, b, first):
     return "reaction" in b or (first and ch == "reaction")
 
 
-def check_reaction_refs(plan, out):
-    """The real reference reactions, from the user's research. Each names a post and the
-    exact range; it gives the written performance only. Its clip is never a generation
-    input: the founder has not allowed that, so generation_input true is refused."""
+def ref_mode(r):
+    """How a reference reaction is used. face_replace: its trimmed clip is the input of an
+    X generation, which keeps the motion and timing and replaces the face with the
+    character's (founder, 2026-10-04). none: the written expression beats only (the
+    fallback). The first plans wrote null or false for none."""
+    g = (r or {}).get("generation_input")
+    return "none" if g in (None, False) else g
+
+
+def face_replace_ref(plan, b):
+    """The reaction_refs row of a face-replace beat, else None."""
+    rx = b.get("reaction") if isinstance(b.get("reaction"), dict) else {}
+    r = reaction_refs(plan).get(rx.get("ref_id"))
+    return r if r and ref_mode(r) == "face_replace" else None
+
+
+def check_reaction_refs(plan, out, verify_files=False):
+    """The real reference reactions, from the user's research, named by post and range.
+    In face_replace mode the trimmed clip is the motion input of the X generation, pinned
+    by its checksum; in none mode it gives the written performance only. Either way the
+    research file itself is never attached to a generation: production trims and masks a
+    copy (shots.py reference)."""
     seen = set()
     for r in plan.get("reaction_refs") or []:
         rid = r.get("id") if isinstance(r, dict) else None
@@ -627,13 +646,33 @@ def check_reaction_refs(plan, out):
                 out.bad(f"reaction ref {rid}: no '{k}'")
         if placeholder(r.get("post_id")) or placeholder(r.get("video_path")):
             out.bad(f"reaction ref {rid}: a real post (post_id and video_path)")
+        if any(os.path.isabs(str(r.get(k) or "")) for k in ("post_dir", "video_path")):
+            out.bad(f"reaction ref {rid}: paths are relative to the workspace")
         if not (num(r.get("start_s")) and num(r.get("end_s")) and 0 <= r["start_s"] < r["end_s"]):
             out.bad(f"reaction ref {rid}: start_s and end_s are the exact range of the reaction in the post")
-        if r.get("generation_input") is True:
-            out.bad(f"reaction ref {rid}: generation_input true -- the reference clip is never a generation "
-                    "input (the founder has not allowed it); the written performance carries the reaction")
-        elif r.get("generation_input") not in (None, False):
-            out.bad(f"reaction ref {rid}: generation_input is null or false")
+        g = r.get("generation_input")
+        if g in (None, False):
+            out.note(f"reaction ref {rid}: generation_input {g!r} is read as 'none' (the written performance only)")
+        elif g not in ("face_replace", "none"):
+            out.bad(f"reaction ref {rid}: generation_input is 'face_replace' or 'none', not {g!r}")
+        if not (r.get("burned_in_text") is None or isinstance(r.get("burned_in_text"), str)):
+            out.bad(f"reaction ref {rid}: burned_in_text is the visible text and where it is, or null")
+        if ref_mode(r) != "face_replace":
+            continue
+        sha = r.get("video_sha256")
+        if not (isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{64}", sha)):
+            out.bad(f"reaction ref {rid}: face_replace pins the clip: video_sha256 is its 64-hex checksum")
+        elif verify_files:
+            fp = os.path.join(ROOT, str(r.get("video_path")))
+            if not os.path.exists(fp):
+                out.bad(f"reaction ref {rid}: {r.get('video_path')} is not on disk")
+            elif sha256_file(fp) != sha:
+                out.bad(f"reaction ref {rid}: {r.get('video_path')} does not match its video_sha256 (it changed "
+                        "after the plan was locked)")
+            else:
+                d = probe(fp)[0]
+                if num(r.get("end_s")) and d and r["end_s"] > d + BEAT_TOL_S:
+                    out.bad(f"reaction ref {rid}: the range ends at {r['end_s']} s; the clip is {d:.2f} s")
 
 
 def check_reaction(plan, tag, b, first, perf, framing, layout, src, cast, ovs, ed, out):
@@ -664,6 +703,15 @@ def check_reaction(plan, tag, b, first, perf, framing, layout, src, cast, ovs, e
         r = reaction_refs(plan).get(rx.get("ref_id"))
         if not r and rx.get("ref_id"):
             out.bad(f"{tag}: reaction {rx.get('ref_id')!r} is not in reaction_refs")
+        if r and ref_mode(r) == "face_replace":
+            # The clip plays at 1x: no hold, no speed change. The room, clothes, hands and
+            # camera are the clip's; only the face changes.
+            if num(r.get("start_s")) and num(r.get("end_s")) and \
+                    abs((b["end_s"] - b["start_s"]) - (r["end_s"] - r["start_s"])) > BEAT_TOL_S:
+                out.bad(f"{tag}: a face-replace beat lasts its clip's range, {r['end_s'] - r['start_s']:g} s "
+                        f"(the beat is {b['end_s'] - b['start_s']:g} s)")
+            if not placeholder(b.get("set_id")):
+                out.bad(f"{tag}: a face-replace beat has no set_id: the room is the clip's")
         t = b["start_s"]
         for j, st in enumerate(rx.get("expression_beats") or [], 1):
             st = st if isinstance(st, dict) else {}
@@ -1039,6 +1087,13 @@ def check_segment_against_beats(plan, it, bmap, lines, assets, narrators, subjec
         if rx_beats and shot.get("reaction") != rx_beats[0]["reaction"]:
             out.bad(f"{name}: the shot's reaction is not beat {rx_beats[0].get('id')}'s reaction, copied exactly "
                     "(the written performance)")
+        fr = face_replace_ref(plan, rx_beats[0]) if rx_beats else None
+        fx = shot.get("face_replace")
+        if fr:
+            check_face_replace_shot(name, fr, fx, out)
+        elif fx:
+            out.bad(f"{name}: the reference's generation_input is none: the written performance route, no clip "
+                    "(no face_replace block)")
     elif rx_beats:
         out.bad(f"{name}: beat {rx_beats[0].get('id')} is a silent reaction; it is an X segment, not {ty}")
     if ty != "X" and it.get("first") and ((plan.get("editorial") or {}).get("hook") or {}).get("channel") == "reaction":
@@ -1151,6 +1206,43 @@ def check_segment_against_beats(plan, it, bmap, lines, assets, narrators, subjec
                 out.bad(f"{name}: panel {pid} is generated in the plan: it names its approved project (B)")
     elif layouts - {"sequence"}:
         out.bad(f"{name}: its beats are {sorted(layouts - {'sequence'})}; they are built as one M segment")
+
+
+MASK_HOW = {"crop", "blur", "box"}
+
+
+def check_face_replace_shot(name, r, fx, out):
+    """The X shot of a face-replace reaction: the trimmed, masked copy of the reference
+    clip that shots.py reference writes, and the masks over its burned-in text."""
+    if not isinstance(fx, dict):
+        out.bad(f"{name}: a face-replace reaction names its clip: face_replace {{ref_id, clip, range_s, masks}}")
+        return
+    if fx.get("ref_id") != r.get("id"):
+        out.bad(f"{name}: face_replace.ref_id {fx.get('ref_id')!r}; the beat's reference is {r.get('id')}")
+    if fx.get("range_s") != [r.get("start_s"), r.get("end_s")]:
+        out.bad(f"{name}: face_replace.range_s {fx.get('range_s')}; the reference range is "
+                f"[{r.get('start_s')}, {r.get('end_s')}]")
+    if fx.get("clip") != f"segments/{name}/source/reference.mp4":
+        out.bad(f"{name}: face_replace.clip is segments/{name}/source/reference.mp4 (shots.py reference), "
+                "never the research file")
+    masks = fx.get("masks")
+    if not isinstance(masks, list):
+        out.bad(f"{name}: face_replace.masks is a list (empty when the range has no burned-in text)")
+        masks = []
+    for m in masks:
+        rc = m.get("rect") if isinstance(m, dict) else None
+        if not (isinstance(rc, list) and len(rc) == 4 and all(num(x) for x in rc) and rc[2] > 0 and rc[3] > 0
+                and rc[0] >= 0 and rc[1] >= 0 and rc[0] + rc[2] <= 1.001 and rc[1] + rc[3] <= 1.001):
+            out.bad(f"{name}: a mask rect is [x, y, w, h] as shares of the frame")
+            continue
+        if m.get("how") not in MASK_HOW:
+            out.bad(f"{name}: a mask is crop, blur or box, not {m.get('how')!r}")
+        if m.get("how") == "crop" and not (rc[0] <= 0.001 or rc[1] <= 0.001 or rc[0] + rc[2] >= 0.999
+                                           or rc[1] + rc[3] >= 0.999):
+            out.bad(f"{name}: a crop mask lies at an edge of the frame; text in the middle is blurred or boxed")
+    if not placeholder(r.get("burned_in_text")) and not masks:
+        out.bad(f"{name}: the reference carries burned-in text ({r['burned_in_text']!r}); the shot masks it "
+                "before generation (face_replace.masks)")
 
 
 def check_video_overlays(plan, v, out):

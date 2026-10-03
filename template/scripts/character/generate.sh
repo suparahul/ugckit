@@ -16,7 +16,11 @@
 # It also refuses, before any cost: a video whose storyboard (gate A) is not approved in
 # approval.json; a pinned character whose status is not 'live'; a refs.json reference of
 # a kind the character pipeline does not allow (an app screen is never a reference); a
-# reference that is supplied media (the plan's assets); a segment that is not generated.
+# reference that is supplied media (the plan's assets); a segment that is not generated;
+# research footage. The one exception is an X segment in face-replace mode (founder,
+# 2026-10-04): its input is the trimmed, masked copy of the reference clip that
+# shots.py reference writes (kind face_replace_clip), with the character's face, and only
+# on a model that models.json marks with the face_replace mode.
 set -euo pipefail
 
 [ $# -ge 2 ] || { echo "usage: $0 <video> <segment> [template_slug] [prompt_file]" >&2; exit 2; }
@@ -93,8 +97,34 @@ if os.path.exists(shot) and os.path.exists(st):
         sys.exit(f"FATAL: {seg} is planned at {want}s but the selected length is {have}s -- activate "
                  f"the ugc-character version at {want}s and run: scripts/character/state.py "
                  f"model set <slug> {want}")
+# A face-replace reaction: the reference clip, trimmed and masked, is the motion input.
+tp = seg.split("-")[-1].upper()
+shotd = json.load(open(shot)) if os.path.exists(shot) else {}
+fx = shotd.get("face_replace") if tp == "X" else None
+fr = {x.get("id"): x for x in plan.get("reaction_refs") or []}.get((fx or {}).get("ref_id")) if fx else None
+fr_mode = bool(fr) and fr.get("generation_input") == "face_replace"
+clip_rel = f"pipeline/character/{video}/segments/{seg}/source/reference.mp4"
+if fx and not fr_mode:
+    sys.exit(f"FATAL: {seg} names a face-replace clip, but its reference's generation_input is not face_replace")
+if fr_mode:
+    import hashlib
+    rjp = os.path.join(vd, "segments", seg, "source", "reference.json")
+    cp = os.path.join(root, clip_rel)
+    if not refs:
+        sys.exit(f"FATAL: {seg} is a face-replace reaction: refs.json carries its clip and the character's face")
+    if not (os.path.exists(rjp) and os.path.exists(cp)):
+        sys.exit(f"FATAL: {seg}: no masked reference clip -- run scripts/character/shots.py reference {video} {seg}")
+    rj = json.load(open(rjp))
+    if hashlib.sha256(open(cp, "rb").read()).hexdigest() != rj.get("sha256") \
+            or rj.get("source_sha256") != fr.get("video_sha256") or rj.get("range_s") != [fr.get("start_s"), fr.get("end_s")]:
+        sys.exit(f"FATAL: {seg}: the reference clip is not the pinned range of the pinned file -- run shots.py reference again")
+    if rj.get("text_left"):
+        sys.exit(f"FATAL: {seg}: text is left on the reference clip ({rj['text_left']}): mask it before generation")
+    kinds = [r.get("kind") for r in json.load(open(refs)).get("references") or []]
+    if kinds.count("face_replace_clip") != 1 or "hero" not in kinds:
+        sys.exit(f"FATAL: {seg}: a face-replace run carries its clip once and the character's face (hero)")
 if refs:
-    allowed = {"keyframe", "hero", "anchor", "subject", "set", "neighbour-frame", "voice"}
+    allowed = {"keyframe", "hero", "anchor", "subject", "set", "neighbour-frame", "voice", "face_replace_clip"}
     spec = json.load(open(refs))
     if "references" not in spec:
         sys.exit("FATAL: refs.json has no 'references' list -- write it with "
@@ -108,14 +138,26 @@ if refs:
         if "/supplied/" in r.get("file", "") or os.path.realpath(os.path.join(root, r.get("file", ""))) in supplied:
             sys.exit(f"FATAL: refs.json reference {r.get('file')} is supplied media (the plan's assets). "
                      "Supplied footage goes into the video as it is; it never conditions a generation.")
+        if r.get("kind") == "face_replace_clip" and not (fr_mode and r.get("file") == clip_rel):
+            sys.exit(f"FATAL: refs.json reference {r.get('file')} is a face-replace clip; only an X segment in "
+                     f"face-replace mode carries one, as {clip_rel}. Research footage is never an input.")
         posts = {str(x.get(k)).strip().rstrip("/") for x in plan.get("reaction_refs") or []
                  for k in ("post_id", "post_dir", "video_path") if isinstance(x.get(k), str) and x[k].strip()}
         f = r.get("file", "")
         if f.startswith("research/") or "/research/" in f or any(p in f for p in posts):
-            sys.exit(f"FATAL: refs.json reference {f} is research footage or a reference reaction. The "
-                     "written performance carries a reaction; the clip never conditions a generation.")
+            sys.exit(f"FATAL: refs.json reference {f} is research footage or a reference reaction. It is "
+                     "never attached as it is; a face-replace reaction uses its trimmed, masked copy.")
         if seg.split("-")[-1].upper() == "X" and r.get("kind") == "voice":
             sys.exit(f"FATAL: {seg} is a silent reaction: no voice reference (a reaction hook is never spoken)")
+# Last: the face-replace run needs a model that does it.
+if fr_mode:
+    st_ = json.load(open(st)) if os.path.exists(st) else {}
+    slug = (st_.get("model") or {}).get("slug")
+    spec_ = json.load(open(os.path.join(root, "scripts", "character", "models.json")))
+    if "face_replace" not in (spec_["known_model_limits"].get(slug) or {}).get("modes", []):
+        sys.exit(f"FATAL: {seg} needs a video-to-video face-replace model; {slug!r} is not one. "
+                 "No model in scripts/character/models.json has the face_replace mode yet (see its "
+                 "face_replace note). Nothing was spent.")
 GATES
 
 # ---- cost, computed from list price x seconds. Reported costs are unreliable (rule 7).

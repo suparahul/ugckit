@@ -1040,7 +1040,7 @@
       }
     },
     "reaction_refs": {
-      "description": "The real reference reactions from the user's research, named by post and range. They drive the written performance only; the clip is never a generation input (generation_input true is refused).",
+      "description": "The real reference reactions from the user's research, named by post and range. generation_input face_replace (founder, 2026-10-04): production trims the range, masks its burned-in text, and gives that copy to the video model, which keeps the motion and timing and replaces the face with the character's (an X segment). none: the written expression beats only (the fallback). null and false are read as none. The research file itself is never attached to a generation.",
       "type": "array",
       "items": {
         "type": "object",
@@ -1080,10 +1080,16 @@
             "type": "string"
           },
           "video_sha256": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "required for face_replace"
           },
           "start_s": {
             "type": "number",
@@ -1101,9 +1107,25 @@
           },
           "generation_input": {
             "enum": [
+              "face_replace",
+              "none",
               null,
               false
             ]
+          },
+          "burned_in_text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "the visible text in the range and where it is, or null when clean; production masks it"
+          },
+          "permission_ref": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "optional; never required (founder, 2026-10-04)"
           }
         }
       }

@@ -25,8 +25,10 @@ adds a row to the model's table in pipeline/character/model-failures.md (the use
 the table is made at the model's first reject); --fixed-by on a later approve fills the
 "Prompt change that fixed it" column of that segment's open rows. Nothing is approved
 without the user's words. Gate C refuses an approval when the file is stale (the plan
-changed after assembly) or its overlays are not the plan's. An X segment (a silent
-reaction) is approved only with --check identity=pass, hands=pass, silent=pass and
+changed after assembly) or its overlays are not the plan's. An X segment in face-replace
+mode is approved only with --check identity=pass, no_source_identity=pass and silent=pass,
+a length within 0.25 s of its reference clip, and no text read by OCR. An X segment by the
+written route (a silent reaction) is approved only with --check identity=pass, hands=pass, silent=pass and
 performance=pass, and only when the file is as long as the shot plans.
 """
 import glob, json, os, re, subprocess, sys, time
@@ -41,6 +43,11 @@ GENERATED = ("T", "O", "G", "S", "H", "F", "B", "X")
 # X, a silent reaction: approved only with these checks passed by eye, and its length
 # measured against the shot's planned length.
 REACTION_CHECKS = ("identity", "hands", "silent", "performance")
+# X in face-replace mode (founder, 2026-10-04): the motion is the reference clip's, so the
+# checks are the face: the character's identity, and no trace of the original creator
+# (face, hair, identity marks, a handle or watermark); silent; the clip's length; and OCR
+# reads no text on the file.
+FACE_REPLACE_CHECKS = ("identity", "no_source_identity", "silent")
 AUDIO_EXT = (".wav", ".mp3", ".m4a", ".aac")
 PHONE = ("O", "G", "S", "H", "F")
 PLANNED = {"T": 60, "O": 50, "G": 37, "S": 37, "H": 30, "F": 25}
@@ -239,7 +246,26 @@ def cmd_segment(video, seg, a):
              "words": words or None, "date": today(), "model": o.get("--model") or model_slug(),
              "set_id": o.get("--set"), "failure_class": o.get("--class"), "fix": o.get("--fix"),
              "checks": dict(c.split("=", 1) for c in o.get("--check", []) if "=" in c)}
-    if t == "X" and dec == "approve":
+    fr = face_replace_of(video, seg) if t == "X" else None
+    if fr and dec == "approve":
+        miss = [k for k in FACE_REPLACE_CHECKS if entry["checks"].get(k) != "pass"]
+        if miss:
+            sys.exit(f"a face-replace reaction is approved with {' '.join(f'--check {k}=pass' for k in miss)}: "
+                     "the face is the character's in every frame (identity), nothing of the original creator's "
+                     "face, hair or identity remains (no_source_identity), and no voice is heard (silent)")
+        want = fr["end_s"] - fr["start_s"]
+        got = bridge.probe(os.path.join(sdir, f))[0]
+        if not got or abs(got - want) > 0.25:
+            sys.exit(f"the file is {got or 0:.2f} s; the reference clip is {want:g} s (length gate: the face "
+                     "replace keeps the clip's timing)")
+        entry["checks"]["length"] = "pass"
+        left = text_on(os.path.join(sdir, f), os.path.join(sdir, os.path.dirname(f), "qc"))
+        if left:
+            sys.exit(f"OCR reads text on the file: {left} -- a burned-in caption, handle or watermark of the "
+                     "reference is left (a trace of the original creator)")
+        entry["checks"]["text_left"] = "none" if left is not None else "not read (no OCR engine)"
+        entry["face_replace"] = {"ref_id": fr["id"], "post_id": fr.get("post_id")}
+    elif t == "X" and dec == "approve":
         miss = [k for k in REACTION_CHECKS if entry["checks"].get(k) != "pass"]
         if miss:
             sys.exit(f"a silent reaction is approved with {' '.join(f'--check {k}=pass' for k in miss)}: the face is the "
@@ -268,6 +294,40 @@ def cmd_segment(video, seg, a):
     if dec == "approve" and o.get("--fixed-by"):
         ledger_fixed(where, o["--fixed-by"])
     update_review_state(video)
+
+
+def face_replace_of(video, seg):
+    """The reaction_refs row of an X segment in face-replace mode, else None."""
+    vp = os.path.join(vdir(video), "video.json")
+    if not os.path.exists(vp):
+        return None
+    plan = plan_of(video)
+    bmap = {b.get("id"): b for b in plan.get("beats") or []}
+    for s in json.load(open(vp)).get("segments") or []:
+        if f"{int(s.get('n')):02d}-{str(s.get('type', '')).lower()}" == seg:
+            for b in s.get("beat_ids") or []:
+                if b in bmap and "reaction" in bmap[b]:
+                    return bridge.face_replace_ref(plan, bmap[b])
+    return None
+
+
+def text_on(video_file, work, n=6):
+    """The text OCR reads on n frames ({t: text} of the frames with text), {} when none,
+    None when no OCR engine exists."""
+    import ocr
+    os.makedirs(work, exist_ok=True)
+    d = bridge.probe(video_file)[0] or 0
+    frames = []
+    for i in range(n):
+        t = d * (i + 0.5) / n
+        fp = os.path.join(work, f"text-{i}.png")
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{t:.3f}", "-i", video_file, "-frames:v", "1", fp],
+                       capture_output=True)
+        frames.append((round(t, 2), fp))
+    got = ocr.read([fp for _, fp in frames])
+    if got is None:
+        return None
+    return {t: got[fp] for t, fp in frames if re.search(r"[A-Za-z0-9]{2,}", got.get(fp, ""))}
 
 
 def plan_of(video):
