@@ -364,7 +364,9 @@ what is missing (`ready`) and writes the lock. Free.
   idea (`Video type`; optional `Hook`, `Hook job`, `Length`, each a user decision when filled;
   the `plan` skill, "A video row"). The Atlas shows the video post through the slideshow's
   gates: idea, plan (REVIEW.md; its **Approve plan** click is taken by `video-lock
-  --from-atlas`), final (the delivered file, **Approve for posting**), then Mark posted.
+  --from-atlas`), final (the delivered file, **Approve for posting**), then the slideshow's
+  send (the `post` skill, "A video post": the one file, its checksum, `publishing_note.caption`
+  and the row's tags) or Mark posted.
 - **Later steps hook in here, not built yet:** a scheduling step that writes the dated rows
   planning reads; the setup-time video evidence (competitor and niche observations merged
   into `apps/<slug>/niche/video/patterns.json`) that `video-fit` and `video-plan` read

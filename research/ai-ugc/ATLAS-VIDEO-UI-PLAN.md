@@ -24,7 +24,9 @@ storyboards, segments, gates A and B, spend, generation progress, the idea decis
 4. (a) An **Approve plan** button in the Atlas, as for slideshows; `video-lock` accepts the Atlas
    `plan.approve` line as the user's approval. (b) Keep both: production gate C stays in
    production; **Approve for posting** is the Atlas posting approval. (c) **Mark posted** by hand
-   is enough for videos; Send to drafts and Export are hidden for videos. (d) Recreation
+   is enough for videos; Send to drafts and Export are hidden for videos. *Superseded the same
+   day by the founder's second request: videos are sent through Post Bridge (§ Video posting
+   below); Export stays hidden.* (d) Recreation
    (`originate`) video rows are left out of the studio for now.
 
 ## The studio plan row
@@ -60,7 +62,7 @@ one brief for the row's handle and date.
 | (plan waiting) | `plan` | draft and `REVIEW.md`, not approved: "plan: waiting for you"; or locked and the draft has a newer revision: "plan changed after the lock" | **Approve plan** writes `plan.approve` with `data: {video, revision, digest}` from `REVIEW.md`; **Send back** writes `plan.sendback` with `data.revision` (a new revision clears it) |
 | **Plan approved** | `final`, no file | an Atlas approval of `REVIEW.md`'s digest ("plan approved: lock being written") or a real lock (`planning-approval.json`, not a dry run, with words, for `plan.json`'s revision: "in production") | the agent: `video-lock --from-atlas`, then production (gates A, B, C, `deliver.sh`) |
 | **Ready for posting** | `final`, file present | `final/<video>.mp4` and `final/delivery.json`: "final: waiting for you" | **Approve for posting** (`final.approve`, `hash` = the file's `sha256`); **Send back** |
-| **Approved for posting** | `ready` | `final.approve` whose hash is the delivered `sha256` (a redelivered file makes it stale) | **Mark posted** by hand |
+| **Approved for posting** | `ready` | `final.approve` whose hash is the delivered `sha256` (a redelivered file makes it stale) | **Send to TikTok drafts**, **Schedule direct post…**, or **Mark as manually posted** (§ Video posting) |
 
 `posted`, `read` and `killed` are the slideshow's.
 
@@ -118,9 +120,93 @@ one brief for the row's handle and date.
   decide route, the send and export refusals and the media route (200, 206 on a range, 403 on
   `plan.json` and on an escape) were called directly.
 
+## Video posting through Post Bridge (built 2026-10-04, second request)
+
+The slideshow's send, with the video's file. Nothing real was sent: every test uses a mocked
+client, and the dry runs make no call.
+
+**Sources.** Post Bridge's OpenAPI document (`https://api.post-bridge.com/openapi.json`, read
+2026-10-04) and the client in `lib/postbridge.ts`: the upload is the slideshow's (`POST
+/v1/media/create-upload-url` with `video/mp4`, its size and name, then a `PUT` of the bytes);
+TikTok takes "1 `video`, or one or more `image`s"; Instagram takes "1–10 `image`/`video`"
+(one video is a Reel); `tiktok.video_cover_timestamp_ms`, `allow_duet`, `allow_stitch` and
+`is_aigc` exist, and `auto_add_music` is "PHOTO POSTS ONLY — has no effect on video posts";
+`instagram.video_cover_timestamp_ms` and `cover_image` exist. The document states no size or
+length limit. The limits below are the platforms' own for API posts (TikTok's Content Posting
+API, Meta's Reels publishing), from their documents as known; TikTok's site did not answer
+from here, so they are not checked against a live page.
+
+**What a send does.** `selectSends` hashes `final/<video>.mp4` and refuses unless the hash is
+`delivery.json`'s and the `final.approve` line's; the caption is `publishing_note.caption`
+then the row's tags it does not carry (no caption, no send); the limits are checked
+(caption 2,200 characters, 30 hashtags with an Instagram leg, 3 s to 600 s, 300 MB). The send
+hashes the bytes again, uploads them once, and creates one post: the same media id on every
+leg, `{ tiktok: { draft: true } }` or, direct, `{ draft: false, privacy_status: "public",
+allow_comment: true }` with `scheduled_at`; Instagram gets `{ caption, media }`. The
+`posting.sent` line also carries `video` and `sha256`. `--request` (or `REQUEST_ONLY=1`)
+prints the exact bodies with a placeholder media id, needs no key and sends nothing.
+
+### Draft against direct, for a video
+
+| | Draft (default) | Direct (scheduled) | What the Atlas does |
+|---|---|---|---|
+| Where it lands | the TikTok inbox; the user finishes and posts from the phone | Post Bridge publishes at the time | as for slides |
+| Caption | TikTok's inbox upload of a video takes no caption in TikTok's API, so it may arrive empty | carried | says "paste it from the caption block" in draft mode; to confirm on the first real draft |
+| Sound | the user may add a TikTok sound in the app | the file's own sound only; nothing is added | warns; the plan's `music_note` is never applied |
+| Cover frame | chosen in the app | TikTok's default | sends no `video_cover_timestamp_ms` (**decision**) |
+| Privacy, comments, duet, stitch | set in the app | public, comments on; duet and stitch at TikTok's default (on) | as for slides, plus duet and stitch left on (**decision**) |
+| AI-generated label | the user's toggle in the app | not set | sends no `is_aigc`; the dry run says so (**decision**) |
+| Time | arrives when sent | `scheduled_at`, required | as for slides |
+| Instagram leg | publishes when the send runs (no Instagram draft) | at the same time | the slideshow's warning: send at the slot time |
+| The link and the outcomes | no link from Post Bridge; `sync` matches the caption through Monid (a pasted caption must be exact) | the link from Post Bridge | as for slides |
+
+### A video against a slideshow
+
+| | Slideshow | Video |
+|---|---|---|
+| Media | the slides, rendered by the compositor on each send | one file, unchanged; no compositor |
+| What is checked | the deck hash in the approval | the file's sha256, against `delivery.json` and the approval |
+| Caption | `final/caption.txt` from the deck | `publishing_note.caption` and the row's tags |
+| Cover text | typed by hand (draft) or burned in (direct) | none: the overlays are in the file |
+| Direct mode's sound | TikTok picks one (`auto_add_music: true`) | none added (photo-only setting) |
+| Instagram | a 4:5 JPEG carousel, 10 at most; music added by hand afterwards | the same file as a Reel, its own sound, Instagram's default cover; the Atlas says nothing about adding music |
+| TikTok draft caption | carried | may be dropped (above) |
+| Limits | 10 slides with an Instagram leg | caption 2,200, 30 hashtags (Instagram), 3–600 s, 300 MB |
+| Export | Export files | none: the file is `pipeline/character/<video>/final/<video>.mp4` |
+| Post Bridge processing | images | `processing_enabled` left at its default (true): Post Bridge may re-encode the file before it posts it |
+
+### Decisions for the founder
+
+1. **The AI-generated label** (`is_aigc`, TikTok direct posts). Not set now. TikTok asks for a
+   label on realistic AI-generated content; the character videos are generated people.
+2. **The cover frame.** Not set now (each platform's default). Options: a fixed time, or a
+   frame chosen per video in the plan.
+3. **Music on a direct post.** The file is music-free by the pipeline's rule, so a direct
+   video posts with the voice only. Options: post music videos in draft mode only, or let
+   the pipeline mix the music in.
+4. **Duet and stitch** stay on (TikTok's default).
+5. **Instagram for videos.** Each video goes to Instagram at once when the handle has an
+   account, as slides do; `leg.drop` or `--only tiktok` keeps one off.
+6. **The first real send** should be one draft, to check the caption question, the size
+   limits and Post Bridge's re-encoding, before a direct post.
+
+### Changed files
+
+| File | Change |
+|---|---|
+| `template/atlas/lib/video-post.ts` (new) | The caption, the limits, the checks and the warnings. |
+| `template/atlas/lib/postbridge.ts` | `legsPost` `kind: "video"`; `postBody`; the cover fields in the types. |
+| `template/atlas/lib/postbridge-flow.ts` | The video branch of `selectSends`, `sendPost` (`sendVideo`), `bridgeInfo` (`videoSkip`), `sendWarning`, `postingNotes`; `videoRequest`, `requestPreviews`; an injectable client for tests. |
+| `template/atlas/lib/video.ts` | `finalFileOf`. |
+| `template/atlas/lib/production.ts` | The ready sentence is the slideshow's. |
+| `template/atlas/scripts/postbridge-send.mjs` | The video's dry-run lines; `--request` / `REQUEST_ONLY=1`. |
+| `template/atlas/components/production/Bridge.tsx`, `Legs.tsx`, the post page | The slideshow's send buttons for a video, no Export; the video's words. |
+| `template/.claude/skills/post`, `character-deliver`, `atlas`; `template/AGENTS.md` | "A video post"; the hand-over from `final/`. The recreation `deliver` skill is unchanged: recreation rows stay out of the studio. |
+| `template/atlas/lib/video-post.test.ts` (new), `package.json` | 10 tests: the rules, the request shapes, the selection, the preview, the mocked send in both modes, the dry run, the export refusal. |
+
 ## Still open
 
-- **Sending a video through Post Bridge** (and an export) is not built: Mark posted by hand.
+- **Video export** is not built; the delivered file is the export.
 - **Recreation video rows** are left out of the studio.
 - At phone width the post page is wider than the screen; the slideshow page does the same, so
   this is older than this change.

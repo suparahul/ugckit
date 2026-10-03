@@ -113,7 +113,7 @@ export default async function ProductionPost({ params, searchParams }: { params:
             </p>
             {notes.length || step === "sent" ? (
               <ul className="next__notes">
-                {step === "sent" && state.sent ? <SendStatusLine post={row.key} sent={state.sent} /> : null}
+                {step === "sent" && state.sent ? <SendStatusLine post={row.key} sent={state.sent} video={!!state.video} /> : null}
                 {notes.map((n) => <li key={n}>{n}</li>)}
               </ul>
             ) : null}

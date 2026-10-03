@@ -19,6 +19,14 @@
  *   node scripts/postbridge-send.mjs --post <key> --post <key> …   several posts (--post repeats)
  *   node scripts/postbridge-send.mjs --post <key> --only instagram --send   one leg only: the retry of a failed Instagram
  *                                                          leg, or --only tiktok for a deck Instagram cannot take
+ *   node scripts/postbridge-send.mjs --post <key> --request   (or REQUEST_ONLY=1) the exact JSON a video send would
+ *                                                          POST, with a placeholder media id: no key needed, no network
+ *
+ * A video post (Kind video in the plan, delivered to pipeline/character/<video>/final/)
+ * goes the same way: no compositor, the one file uploaded once (checked against
+ * delivery.json and the final approval first), the caption from plan.json
+ * publishing_note.caption plus the row's tags, the same media id on every leg
+ * (a TikTok video, an Instagram Reel). lib/video-post.ts has its rules and limits.
  *
  * Two platforms: a post goes to every platform its plan row names (the `Platforms`
  * cell, else the plan's `Platforms:` line, else TikTok), each on the account the
@@ -44,7 +52,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 process.chdir(ROOT); /* lib/production.ts reads ../production and data/ from the working directory */
 
 const { ENV_KEY, hasKey, readKey } = await import("../lib/postbridge.ts");
-const { sendPosts } = await import("../lib/postbridge-flow.ts");
+const { requestPreviews, sendPosts } = await import("../lib/postbridge-flow.ts");
 const { fmtBoth, hoursAhead, parseAt, parseAtLocal } = await import("../lib/when.ts");
 
 const key = readKey(process.env);
@@ -63,6 +71,8 @@ const post = posts.length ? posts.join(", ") : undefined;
 const date = post ? undefined : value("--date") ?? new Date().toISOString().slice(0, 10);
 const direct = flag("--direct");
 const only = value("--only");
+const requestOnly = flag("--request") || process.env.REQUEST_ONLY === "1";
+if (requestOnly && send) { console.error("--request (REQUEST_ONLY=1) and --send together: pick one."); process.exit(2); }
 if (only !== undefined && only !== "tiktok" && only !== "instagram") { console.error("--only takes tiktok or instagram."); process.exit(2); }
 if (flag("--dry-run") && send) { console.error("--dry-run and --send together: pick one."); process.exit(2); }
 if ((value("--at") || value("--at-local")) && !direct) { console.error("--at / --at-local need --direct."); process.exit(2); }
@@ -76,6 +86,18 @@ if (direct) {
   } catch (e) { console.error(e.message); process.exit(2); }
 }
 
+if (requestOnly) {
+  /* The requests, no network: the key is not needed and is never read here. */
+  const sel = posts.length ? { keys: posts } : { date: date ?? new Date().toISOString().slice(0, 10) };
+  for (const r of requestPreviews(SLUG, { ...sel, force, mode: direct ? "direct" : "draft", at, ...(only ? { only } : {}) })) {
+    console.log(`${r.key}: ${r.error ? `no request: ${r.error}` : "the requests a send would make (nothing was sent)"}`);
+    if (!r.preview) continue;
+    for (const u of r.preview.uploads) console.log(`  POST /v1/media/create-upload-url ${JSON.stringify(u)}\n  PUT  <the signed upload url>  (${u.size_bytes} bytes, Content-Type ${u.mime_type})`);
+    console.log(`  POST /v1/posts ${JSON.stringify(r.preview.post, null, 2).replace(/\n/g, "\n  ")}`);
+  }
+  process.exit(0);
+}
+
 if (!hasKey()) { console.error(`${ENV_KEY} is not set. Put the key from the Post Bridge dashboard (API Keys) in the workspace .env.`); process.exit(2); }
 
 const sel = post ? { keys: posts } : { date };
@@ -84,13 +106,19 @@ const { plans, results } = await sendPosts(SLUG, { ...sel, force, dryRun: !send,
 const when = at ? `at ${fmtBoth(at)} = ${at} (in ${hoursAhead(at).toFixed(1)} h)` : "";
 console.log(`${send ? "Sending" : "Dry run"} ${post ? post : `for ${date}`}, mode ${direct ? "direct" : "draft"}${when ? ` ${when}` : ""}: ${plans.length} post${plans.length === 1 ? "" : "s"}, ${plans.filter((p) => !p.skip).length} to send`);
 for (const p of plans) {
-  const head = `  ${p.key.padEnd(26)} ${p.handle.padEnd(18)} account ${String(p.account ?? "—").padEnd(6)} ${String(p.slides).padStart(2)} slides  final ${p.finalStatus.padEnd(9)} “${p.caption}”`;
+  const what = p.video ? `video ${p.video.duration ?? "?"} s, ${p.video.bytes !== null ? `${(p.video.bytes / 1024 / 1024).toFixed(1)} MB` : "no file"}` : `${String(p.slides).padStart(2)} slides`;
+  const head = `  ${p.key.padEnd(26)} ${p.handle.padEnd(18)} account ${String(p.account ?? "—").padEnd(6)} ${what}  final ${p.finalStatus.padEnd(9)} “${p.caption}”`;
   console.log(p.skip ? `${head}\n      skipped: ${p.skip}` : head);
   /* The legs, when there is more than TikTok. */
   if (p.legs.length > 1 || p.legs.some((l) => l.platform !== "tiktok")) {
-    for (const l of p.legs) console.log(`      ${l.platform.padEnd(9)} account ${String(l.account ?? "—").padEnd(6)} ${l.skip ? `left out: ${l.skip}` : l.platform === "instagram" ? "published by Post Bridge · 4:5 JPEG slides, cover text burned, the same caption, no music (add it in the Instagram app: Edit, then Replace Audio)" : p.mode === "direct" ? "published by Post Bridge" : "to the TikTok drafts"}`);
+    for (const l of p.legs) console.log(`      ${l.platform.padEnd(9)} account ${String(l.account ?? "—").padEnd(6)} ${l.skip ? `left out: ${l.skip}` : l.platform === "instagram" ? (p.video ? "published by Post Bridge · a Reel, the same file and caption" : "published by Post Bridge · 4:5 JPEG slides, cover text burned, the same caption, no music (add it in the Instagram app: Edit, then Replace Audio)") : p.mode === "direct" ? "published by Post Bridge" : "to the TikTok drafts"}`);
   }
   for (const w of p.warnings) console.log(`      ! ${w}`);
+  if (p.video) {
+    if (p.video.sha256) console.log(`      file pipeline/character/${p.video.id}/final/${p.video.id}.mp4 · sha256 ${p.video.sha256.slice(0, 12)}`);
+    if (p.mode === "direct") console.log(`      ${p.scheduledAt ? fmtBoth(p.scheduledAt) : "no time"} · public · comments on · the file's own sound`);
+    continue;
+  }
   if (p.mode === "direct") {
     console.log(`      ${p.scheduledAt ? fmtBoth(p.scheduledAt) : "no time"} · public · comments on · sound by TikTok`);
     console.log(`      slide 1 text burned in: ${p.coverText.length ? p.coverText.map((t) => `“${t.replace(/\n/g, " / ")}”`).join(" + ") : "(slide 1 has no text)"}`);
@@ -106,7 +134,7 @@ for (const r of results) {
   if (r.ok) {
     console.log(`  ${r.key.padEnd(26)} sent · Post Bridge post ${r.id} · ${r.status}`);
     for (const w of r.warnings ?? []) console.log(`      Post Bridge: ${w}`);
-    if (plans.find((p) => p.key === r.key)?.legs.some((l) => l.platform === "instagram" && !l.skip)) console.log("      Instagram: the post has no music. Once it is live, add it in the Instagram app: Edit, then Replace Audio.");
+    if (!plans.find((p) => p.key === r.key)?.video && plans.find((p) => p.key === r.key)?.legs.some((l) => l.platform === "instagram" && !l.skip)) console.log("      Instagram: the post has no music. Once it is live, add it in the Instagram app: Edit, then Replace Audio.");
   }
   else { failed++; console.log(`  ${r.key.padEnd(26)} FAILED · ${r.error}`); }
 }

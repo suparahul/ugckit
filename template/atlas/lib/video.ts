@@ -133,7 +133,7 @@ export function readVideo(row: Pick<PlanRow, "slug" | "key" | "handle" | "date">
       ? { revision: Number(pa.revision), digest: pa.content_sha256, words: pa.words, date: pa.date ?? null }
       : null;
   const delivery = readJson(join(vd, "final", "delivery.json"));
-  const file = join(vd, "final", `${id}.mp4`);
+  const file = finalFileOf(id);
   const final =
     delivery && typeof delivery.sha256 === "string" && existsSync(file)
       ? { url: `/media/pipeline/character/${id}/final/${id}.mp4?v=${delivery.sha256.slice(0, 12)}`, sha256: delivery.sha256, duration: num(delivery.duration_s), delivered: delivery.delivered ?? null }
@@ -148,6 +148,9 @@ export function readVideo(row: Pick<PlanRow, "slug" | "key" | "handle" | "date">
     final,
   };
 }
+
+/** The delivered file of a video: pipeline/character/<id>/final/<id>.mp4. */
+export const finalFileOf = (id: string): string => join(CHARACTER_DIR, id, "final", `${id}.mp4`);
 
 type Line = { at: string; kind: string; note?: string; data?: Record<string, unknown> };
 

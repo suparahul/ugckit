@@ -982,7 +982,7 @@ export function nextStep(s: PostState): { who: "you" | "agent" | "nobody"; text:
         ? (s.sent!.mode === "direct" && s.sent!.scheduledAt
           ? say("you", `Scheduled for ${fmtBoth(s.sent!.scheduledAt)} on ${s.row.handle} · direct. The posting service publishes it; nothing to do until then.`)
           : say("you", `In TikTok drafts on ${s.row.handle} since ${hhmm(s.sent!.at)}. Post it from the phone, then mark it posted.`))
-        : say("you", s.video ? "Ready. Post the video from the phone, then mark it posted." : "Ready. Send it to TikTok drafts, or schedule a direct post.");
+        : say("you", "Ready. Send it to TikTok drafts, or schedule a direct post.");
     case "posted": return say("you", `Posted ${s.posted!.time}. Outcomes open ${outcomesOpenAt(s)}.`);
     case "read": return say("nobody", "Done. Outcomes are recorded.");
     default: return say("nobody", "");

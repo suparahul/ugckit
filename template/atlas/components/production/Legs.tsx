@@ -37,8 +37,8 @@ export function Legs({ s, href, view }: { s: PostState; href: string; view: View
   const note = ig?.failed
     ? <>Instagram refused it ({ig.failed.at.slice(0, 16).replace("T", " ")} UTC): <em>“{ig.failed.error}”</em> TikTok is not touched. To send it again: <code>node scripts/posting-send.mjs {s.row.slug} --post {s.row.key} --only instagram --send</code></>
     : over ? <>{slides} slides: Instagram takes 10. Cut the deck, or take Instagram off this post.</>
-    : ig?.posted && !ig.synced ? <>Live on Instagram. Add the music in the Instagram app: Edit, then Replace Audio.</>
-    : !ig?.sent && !ig?.dropped ? <>Instagram publishes directly, at the same time as TikTok, with no music: add it in the Instagram app afterwards.</>
+    : ig?.posted && !ig.synced ? (s.video ? <>Live on Instagram as a Reel.</> : <>Live on Instagram. Add the music in the Instagram app: Edit, then Replace Audio.</>)
+    : !ig?.sent && !ig?.dropped ? (s.video ? <>Instagram publishes the video directly as a Reel, at the same time as TikTok, with the file&rsquo;s own sound.</> : <>Instagram publishes directly, at the same time as TikTok, with no music: add it in the Instagram app afterwards.</>)
     : null;
   return (
     <div className="legs">

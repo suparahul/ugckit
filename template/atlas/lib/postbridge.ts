@@ -91,6 +91,8 @@ export type TiktokConfig = {
   allow_comment?: boolean;
   /** Video posts only; no effect on a photo post. */
   allow_duet?: boolean;
+  /** Video posts only: the frame TikTok shows as the cover, in ms from the start. Absent: TikTok's own choice. */
+  video_cover_timestamp_ms?: number;
   allow_stitch?: boolean;
   is_aigc?: boolean;
   disclose_branded_content?: boolean;
@@ -103,8 +105,9 @@ export type TiktokConfig = {
  * the post in Post Bridge). `media` and `caption` override the post's for the
  * Instagram account; the kit sends no `first_comment` (the
  * hashtags stay in the caption). Carousels take 1–10 images, JPEG, 4:5 to 1.91:1.
+ * One video is a Reel (no `placement`); it has no draft either.
  */
-export type InstagramConfig = { caption?: string; media?: string[]; first_comment?: string; placement?: "story" };
+export type InstagramConfig = { caption?: string; media?: string[]; first_comment?: string; placement?: "story"; /** A video (a Reel) only: the cover frame in ms, or an uploaded image's media id. */ video_cover_timestamp_ms?: number; cover_image?: string };
 
 export type PlatformConfig = { tiktok?: TiktokConfig; instagram?: InstagramConfig } & Record<string, unknown>;
 
@@ -247,14 +250,7 @@ export function postBridge(opts: ClientOptions = {}) {
     },
 
     async createPost(input: CreatePostInput): Promise<PBPost> {
-      const body: Record<string, unknown> = {
-        caption: input.caption,
-        social_accounts: input.accounts,
-        media: input.media,
-      };
-      if (input.platformConfig) body.platform_configurations = input.platformConfig;
-      if (input.schedule) body.scheduled_at = input.schedule;
-      return call<PBPost>("POST", "/v1/posts", body);
+      return call<PBPost>("POST", "/v1/posts", postBody(input));
     },
 
     /** PATCH /v1/posts/{id}. A scheduled post must always get `scheduled_at` again, else Post Bridge processes it at once. */
@@ -354,6 +350,12 @@ export type Leg = { platform: Platform; account: number };
  * slides (4:5 JPEG) and the same caption, hashtags included, with no first
  * comment. With no TikTok leg, the post's own media and caption are
  * Instagram's.
+ *
+ * A video (`kind: "video"`) is one media id, the same file on every leg (a TikTok
+ * video, an Instagram Reel). Direct mode sets no `auto_add_music` (photo posts
+ * only: a video plays its own sound) and leaves duet, stitch, the cover frame and
+ * the AI-generated label at the platform's defaults. Draft mode is `draft: true`,
+ * as for slides: TikTok puts the video in the account's inbox.
  */
 export function legsPost(o: {
   legs: Leg[];
@@ -362,15 +364,18 @@ export function legsPost(o: {
   scheduledAt?: string | null;
   tiktok?: { caption: string; media: string[] };
   instagram?: { caption: string; media: string[] };
+  kind?: "slides" | "video";
 }): CreatePostInput {
   const tt = o.legs.some((l) => l.platform === "tiktok");
   const ig = o.legs.some((l) => l.platform === "instagram");
-  if (tt && !o.tiktok) throw new Error("A TikTok leg needs the TikTok slides and caption.");
-  if (ig && !o.instagram) throw new Error("An Instagram leg needs the Instagram slides and caption.");
+  const video = o.kind === "video";
+  if (tt && !o.tiktok) throw new Error(`A TikTok leg needs the TikTok ${video ? "video" : "slides"} and caption.`);
+  if (ig && !o.instagram) throw new Error(`An Instagram leg needs the Instagram ${video ? "video" : "slides"} and caption.`);
+  if (video && [o.tiktok, o.instagram].some((x) => x && x.media.length !== 1)) throw new Error("A video post carries exactly one video.");
   const direct = o.mode === "direct";
   if (direct && !o.scheduledAt) throw new Error("A direct post needs a time.");
   const platformConfig: PlatformConfig = {};
-  if (tt) platformConfig.tiktok = direct ? { draft: false, privacy_status: "public", auto_add_music: true, allow_comment: true } : { draft: true };
+  if (tt) platformConfig.tiktok = !direct ? { draft: true } : video ? { draft: false, privacy_status: "public", allow_comment: true } : { draft: false, privacy_status: "public", auto_add_music: true, allow_comment: true };
   if (ig) platformConfig.instagram = { caption: o.instagram!.caption, media: o.instagram!.media };
   const main = tt ? o.tiktok! : o.instagram!;
   return {
@@ -380,6 +385,20 @@ export function legsPost(o: {
     platformConfig,
     ...(direct ? { schedule: o.scheduledAt! } : {}),
   };
+}
+
+/**
+ * The exact JSON bodies a send would POST, with placeholder media ids and no
+ * network: the upload-url requests in order, then the post. The dry run with
+ * --request prints it (REQUEST_ONLY=1 does the same); nothing is uploaded.
+ */
+export type RequestPreview = { uploads: { mime_type: MediaMime; size_bytes: number; name: string }[]; post: Record<string, unknown> };
+
+export function postBody(input: CreatePostInput): Record<string, unknown> {
+  const body: Record<string, unknown> = { caption: input.caption, social_accounts: input.accounts, media: input.media };
+  if (input.platformConfig) body.platform_configurations = input.platformConfig;
+  if (input.schedule) body.scheduled_at = input.schedule;
+  return body;
 }
 
 /** The status of one leg: its post result, by the account id. The same words as sendStatusOf. */

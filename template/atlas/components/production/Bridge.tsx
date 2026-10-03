@@ -41,7 +41,8 @@ const nowHHMM = () => { const d = new Date(); return `${String(d.getHours()).pad
  * The live status of the last send, one small line: "Post Bridge says: draft created · id 5f2c… · 7 images · sent 09:02".
  * A direct post before its time needs no call: "Scheduled for Wed 19:00 ET (Thu 04:30 IST) · direct · id … · 7 images".
  */
-export function SendStatusLine({ post, sent }: { post: string; sent: SentState }) {
+export function SendStatusLine({ post, sent, video = false }: { post: string; sent: SentState; video?: boolean }) {
+  const what = video ? "1 video" : `${sent.media.length} images`;
   const [status, setStatus] = useState<Status | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const pending = sent.mode === "direct" && !!sent.scheduledAt && new Date(sent.scheduledAt).getTime() > Date.now();
@@ -58,10 +59,10 @@ export function SendStatusLine({ post, sent }: { post: string; sent: SentState }
     }
   }, [post, pending]);
   useEffect(() => { void read(); }, [read]);
-  if (pending) return <li>Scheduled for {fmtBoth(sent.scheduledAt!)} · direct · id {sent.id} · {sent.media.length} images · sent {sent.at.slice(11, 16)}</li>;
+  if (pending) return <li>Scheduled for {fmtBoth(sent.scheduledAt!)} · direct · id {sent.id} · {what} · sent {sent.at.slice(11, 16)}</li>;
   return (
     <li className={status?.word === "error" || err ? "is-bad" : undefined}>
-      Post Bridge says: {status ? `${status.word}${status.error ? ` — ${status.error}` : ""}` : err ?? "reading…"}{sent.mode === "direct" && sent.scheduledAt ? ` · direct, ${fmtBoth(sent.scheduledAt)}` : ""} · id {sent.id} · {sent.media.length} images · sent {sent.at.slice(11, 16)}
+      Post Bridge says: {status ? `${status.word}${status.error ? ` — ${status.error}` : ""}` : err ?? "reading…"}{sent.mode === "direct" && sent.scheduledAt ? ` · direct, ${fmtBoth(sent.scheduledAt)}` : ""} · id {sent.id} · {what} · sent {sent.at.slice(11, 16)}
       {" "}<button type="button" className="next__link" onClick={() => void read()}>refresh</button>
     </li>
   );
@@ -125,7 +126,7 @@ function OpenOnTikTok({ link }: { link: string | null }) {
 }
 
 /** The direct-post row: a date and a time in the posting zone (default 19:00 tomorrow), the home-zone time beside, [Schedule]. */
-function ScheduleDirect({ who, busy, zones, onSchedule, onCancel }: { who: string; busy: boolean; zones: Zones; onSchedule: (atUtc: string) => void; onCancel: () => void }) {
+function ScheduleDirect({ who, busy, zones, onSchedule, onCancel, video = false }: { who: string; busy: boolean; zones: Zones; onSchedule: (atUtc: string) => void; onCancel: () => void; video?: boolean }) {
   const [date, setDate] = useState(() => tomorrowIn(zones.posting));
   const [time, setTime] = useState("19:00");
   let at: string | null = null;
@@ -138,7 +139,7 @@ function ScheduleDirect({ who, busy, zones, onSchedule, onCancel }: { who: strin
       <input className="posting__url is-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label={`Date, ${zones.posting}`} required />
       <input className="posting__url is-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label={`Time, ${zones.posting}`} required />
       <span className="posting__zone" title={zones.home !== zones.posting ? `${zones.posting}; the same instant in ${zones.home}` : zones.posting}>{at ? (zones.home !== zones.posting ? `${weekdayIn(at, zones.posting)} ${P} = ${fmtIn(at, zones.home, H, true)}` : `${weekdayIn(at, zones.posting)} ${P}`) : P}</span>
-      <button type="submit" className="pill" disabled={busy || !at || past} title="Post Bridge publishes it then: public, comments on, TikTok picks the sound; slide 1 text burned in">{busy ? "Scheduling…" : "Schedule"}</button>
+      <button type="submit" className="pill" disabled={busy || !at || past} title={video ? "Post Bridge publishes the video then: public, comments on, its own sound only" : "Post Bridge publishes it then: public, comments on, TikTok picks the sound; slide 1 text burned in"}>{busy ? "Scheduling…" : "Schedule"}</button>
       <button type="button" className="rail__kill" onClick={onCancel}>cancel</button>
       {past ? <span className="is-bad">That time is past.</span> : null}
     </form>
@@ -173,7 +174,7 @@ export function PostingRail({
   onDecide: Decide;
   /** The posting zone and the home zone, from the plan. */
   zones: Zones;
-  /** A video post: posted from the phone and marked by hand; no send, no export (the send carries slides only). */
+  /** A video post: the delivered file is sent as it is (no cover text, no export of slides). */
   video?: boolean;
 }) {
   const router = useRouter();
@@ -200,20 +201,8 @@ export function PostingRail({
     }
   };
   const who = bridge.account ? `@${bridge.account.username}` : handle;
-  const schedule = <ScheduleDirect who={who} busy={sending} zones={zones} onSchedule={(at) => void send(at)} onCancel={() => setScheduling(false)} />;
+  const schedule = <ScheduleDirect who={who} busy={sending} zones={zones} onSchedule={(at) => void send(at)} onCancel={() => setScheduling(false)} video={video} />;
   const cancelHand = () => { setByHand(false); setWithLink(false); };
-
-  if (video && !sent) {
-    return (
-      <div className="posting">
-        <div className="posting__row">
-          <MarkPosted post={post} busy={busy} onDecide={onDecide} primary withLink={withLink} />
-          {!withLink ? <button type="button" className="rail__kill" title="The TikTok link, once the post is live; optional" onClick={() => setWithLink(true)}>add the link</button> : null}
-        </div>
-        <p className="posting__under">Sending a video through the posting service is not built yet.</p>
-      </div>
-    );
-  }
 
   if (!sent) {
     return (
@@ -228,15 +217,15 @@ export function PostingRail({
             </span>
           ) : asking ? (
             <span className="posting__ask">
-              Send to the drafts of {who}{alsoInstagram ? " and publish on Instagram now (no music: add it in the Instagram app)" : ""}?
+              Send {video ? "the video " : ""}to the drafts of {who}{alsoInstagram ? (video ? " and publish it on Instagram now as a Reel" : " and publish on Instagram now (no music: add it in the Instagram app)") : ""}?
               <button type="button" className="pill" disabled={sending} onClick={() => void send()}>Yes, send</button>
               <button type="button" className="rail__kill" onClick={() => setAsking(false)}>cancel</button>
             </span>
           ) : scheduling ? schedule : (
             <>
-              <ExportFiles post={post} exported={exported} />
-              <button type="button" className="rail__kill" title="Marks it posted. Use Export files to get the images first." onClick={() => setByHand(true)}>Mark as manually posted</button>
-              <button type="button" className="rail__kill" disabled={sending || !bridge.canSend} title={`Post Bridge publishes it at a set time${alsoInstagram ? ", on TikTok and Instagram together" : ""}; nobody types the cover text, so it is burned into slide 1`} onClick={() => setScheduling(true)}>Schedule direct post…</button>
+              {video ? null : <ExportFiles post={post} exported={exported} />}
+              <button type="button" className="rail__kill" title={video ? "Marks it posted, when you posted the file yourself." : "Marks it posted. Use Export files to get the images first."} onClick={() => setByHand(true)}>Mark as manually posted</button>
+              <button type="button" className="rail__kill" disabled={sending || !bridge.canSend} title={video ? `Post Bridge publishes the video at a set time${alsoInstagram ? ", on TikTok and Instagram together" : ""}, with its own sound only` : `Post Bridge publishes it at a set time${alsoInstagram ? ", on TikTok and Instagram together" : ""}; nobody types the cover text, so it is burned into slide 1`} onClick={() => setScheduling(true)}>Schedule direct post…</button>
               <button type="button" className="rail__go" disabled={sending || !bridge.canSend} onClick={() => setAsking(true)}>{sending ? "Sending…" : alsoInstagram ? "Send to TikTok drafts and Instagram" : "Send to TikTok drafts"}</button>
             </>
           )}
@@ -262,7 +251,7 @@ export function PostingRail({
             {!withLink && !link ? <button type="button" className="rail__kill" title="The TikTok link, once the post is live; optional" onClick={() => setWithLink(true)}>add the link</button> : null}
             <button type="button" className="rail__kill" disabled={sending || !bridge.canSend} title="A second draft on the account; the first stays on the phone" onClick={() => setAsking(true)}>{sending ? "sending…" : "Send again"}</button>
             <button type="button" className="rail__kill" disabled={sending || !bridge.canSend} title="A second send, direct at a set time; the first stays where it is" onClick={() => setScheduling(true)}>Schedule direct post…</button>
-            <ExportFiles post={post} exported={exported} />
+            {video ? null : <ExportFiles post={post} exported={exported} />}
             <MarkPosted post={post} busy={busy} onDecide={onDecide} primary withLink={withLink} />
           </>
         )}

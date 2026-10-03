@@ -54,7 +54,8 @@ The slideshow path's pages, the rest of the Organic Factory UI, read `apps/<slug
     A `Kind: video` row of the plan is a video post on the same page: its idea fields, then
     `REVIEW.md` (Approve plan, or Send back), then the locked plan's beats and prompts beside
     the 9:16 frame, which plays `pipeline/character/<video>/final/<video>.mp4` once it is
-    delivered (Approve for posting, then Mark posted by hand). No slide navigator.
+    delivered (Approve for posting, then Send to TikTok drafts, Schedule direct post, or Mark
+    as manually posted, as for a slideshow; no Export). No slide navigator.
 
 Say which page to open after each phase: the home base after `product`, the niche page
 after `niche-search` and `niche-read`, the strategy page after `account-architecture`

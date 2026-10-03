@@ -12,6 +12,7 @@
  *   node scripts/posting-send.mjs <slug> --post <key> --send --force      a post that was sent before
  *   node scripts/posting-send.mjs <slug> --post <key> --only instagram --send
  *                                                                          one leg only (a retry, or --only tiktok)
+ *   node scripts/posting-send.mjs <slug> --post <key> --request           a video: the exact requests, nothing sent, no key
  *
  * A post goes to every platform its plan row names (TikTok, and Instagram when the
  * identity reposts there), in one send at one time. Instagram has no drafts: its leg

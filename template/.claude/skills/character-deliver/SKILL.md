@@ -42,4 +42,7 @@ after gate C. It copies the export the user chose to `final/<video>.mp4` and wri
 computed spend), and marks P6 done.
 
 **The pipeline ends here.** Posting, sound choice and the caption text of the post are
-outside it.
+outside it. The Atlas takes the file from `final/` as it is: the user approves it for
+posting there (the approval names this `sha256`), and the `post` skill sends it ("A video
+post"). Deliver again only with a changed file in mind: a new checksum makes that approval
+stale, and the file is not sent until the user approves it again.

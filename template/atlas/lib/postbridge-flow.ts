@@ -17,18 +17,25 @@
  *   3. creates one post: the caption from final/caption.txt, the one mapped account,
  *      platform_configurations { tiktok: { draft: true } } or, direct, { draft: false, privacy_status: "public", … } + scheduled_at;
  *   4. appends `postbridge.sent` to production/log.jsonl: data { id, media, account, status, mode, scheduledAt }.
+ * A video post (lib/video-post.ts) skips step 1: it uploads the one delivered file,
+ * final/<video>.mp4, after checking that its sha256 is the approved one, and the
+ * line carries `video` and `sha256`. `--request` (or REQUEST_ONLY=1) shows the
+ * exact requests a send would make, with placeholder media ids, and sends nothing.
  */
 
 import { execFile } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { identitiesOf } from "./accounts.ts";
 import { MAX_SLIDES, PLATFORM_NAME, linePlatform, platformOf, primaryOf, type Platform } from "./platform.ts";
 import { slotKey, slotTimes } from "./slots.ts";
-import { accountsOf, hasKey, legsPost, postBridge, sendStatusOf, type Leg, type SentPost, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type AccountsFile, type PBAccount, type SendStatus, type SyncReport } from "./postbridge.ts";
+import { accountsOf, hasKey, legsPost, postBody, postBridge, sendStatusOf, type CreatePostInput, type PostBridgeClient, type RequestPreview, type Leg, type SentPost, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type AccountsFile, type PBAccount, type SendStatus, type SyncReport } from "./postbridge.ts";
 import { allStates, appendEvent, filesRoot, fileKey, getProduction, isSent, legsOfSent, postingStep, readLog, storeOf, type Event, type PostState } from "./production.ts";
+import { checkVideoSend } from "./video-post.ts";
+import { finalFileOf } from "./video.ts";
 import { findLinks, monidRuns, savedRunsFetch, type LinkReport } from "./tiktok-link.ts";
 import { fmtBoth, postingZone, zonedToUtc } from "./when.ts";
 
@@ -69,16 +76,18 @@ export function accountFor(slug: string, handle: string, platform: Platform = "t
 }
 
 /** What the post page needs to draw the panel: the button's availability and why not. */
-export function bridgeInfo(state: PostState): { keySet: boolean; account: PBAccount | null; why: string | null; canSend: boolean } {
+export function bridgeInfo(state: PostState): { keySet: boolean; account: PBAccount | null; why: string | null; canSend: boolean; /** A video that cannot go as it is: the reason (no caption, not the approved file, a limit). */ videoSkip?: string | null } {
   const { account, why } = accountFor(state.row.slug, state.row.handle);
   const keySet = hasKey();
   const finalOk = state.final.status === "approved" && ["ready", "posted", "read"].includes(state.stage);
-  return { keySet, account, why: !keySet ? "POST_BRIDGE_API_KEY is not set in .env" : why, canSend: keySet && !!account && !why && finalOk };
+  const videoSkip = state.video && finalOk && state.video.final ? videoCheck(state, "draft", state.platforms).check.skip : null;
+  return { keySet, account, why: !keySet ? "POST_BRIDGE_API_KEY is not set in .env" : why, canSend: keySet && !!account && !why && finalOk && !videoSkip, ...(state.video ? { videoSkip } : {}) };
 }
 
 /** The one note line under the band's sentence. Never the cover text itself; the account warning sits under the button instead. */
 export function postingNotes(state: PostState): string[] {
-  return postingStep(state) === "send" && !state.video ? ["Slide 1 text is typed in TikTok by hand; a direct post carries it burned in."] : [];
+  if (postingStep(state) !== "send") return [];
+  return [state.video ? "A TikTok draft of a video may arrive without its caption: paste it from the caption block." : "Slide 1 text is typed in TikTok by hand; a direct post carries it burned in."];
 }
 
 /** The warning under the primary button when the send is not offered, or null. */
@@ -86,6 +95,7 @@ export function sendWarning(state: PostState, info: ReturnType<typeof bridgeInfo
   if (!info.keySet) return "POST_BRIDGE_API_KEY is missing in .env.";
   if (!info.account) return `Connect ${state.row.handle} in Post Bridge to enable sending.`;
   if (info.why) return `Reconnect ${state.row.handle} in Post Bridge to enable sending.`;
+  if (info.videoSkip) return `Not sendable: ${info.videoSkip}.`;
   return null;
 }
 
@@ -116,9 +126,37 @@ export type SendPlan = {
   legs: { platform: Platform; account: number | null; skip: string | null }[];
   /** Said before the send, not a reason to stop: "Instagram publishes at once", … */
   warnings: string[];
+  /** A video post: the one file sent, as checked now. */
+  video?: { id: string; file: string; bytes: number | null; duration: number | null; sha256: string | null; caption: string | null };
 };
 
-export type SendSelect = { date?: string; keys?: string[]; force?: boolean; mode?: SendMode; /** Direct mode: the instant, ISO UTC; required. */ at?: string; /** One platform only: a retry of one leg, or TikTok alone for a deck Instagram cannot take. */ only?: Platform };
+/** The sha256 of a file, or null when it is missing. */
+function sha256Of(file: string): string | null {
+  if (!existsSync(file)) return null;
+  return createHash("sha256").update(readFileSync(file)).digest("hex");
+}
+
+/** The approved hash of the final point: the last final.approve line's, when the point is approved. */
+function approvedHash(s: PostState): string | null {
+  if (s.final.status !== "approved") return null;
+  const e = [...s.log].reverse().find((x) => x.kind === "final.approve");
+  return typeof e?.hash === "string" ? e.hash : null;
+}
+
+/** A video post's file and its send check (lib/video-post.ts), for the legs it goes to. */
+function videoCheck(s: PostState, mode: SendMode, platforms: Platform[]) {
+  const v = s.video!;
+  const file = v.id ? finalFileOf(v.id) : "";
+  const sha256 = v.id ? sha256Of(file) : null;
+  const check = checkVideoSend({
+    id: v.id ?? "<video>", caption: v.plan?.caption, tags: s.row.tags ?? [], music: v.plan?.music,
+    sha256, delivered: v.final?.sha256 ?? null, approved: approvedHash(s),
+    bytes: sha256 ? statSync(file).size : null, duration: v.final?.duration ?? null, mode, platforms,
+  });
+  return { file, sha256, check, info: { id: v.id ?? "", file, bytes: sha256 ? statSync(file).size : null, duration: v.final?.duration ?? null, sha256, caption: check.caption } };
+}
+
+export type SendSelect = { date?: string; keys?: string[]; force?: boolean; mode?: SendMode; /** Direct mode: the instant, ISO UTC; required. */ at?: string; /** One platform only: a retry of one leg, or TikTok alone for a deck Instagram cannot take. */ only?: Platform; /** The request preview: nothing is sent, so the key is not needed. */ noKey?: boolean };
 
 /** The slot instant of a plan row (ISO UTC), from the handle's `Slots:` line in the posting zone, or null for a slot word with no time. */
 function slotInstant(slug: string, handle: string, date: string, slot: string): string | null {
@@ -163,13 +201,15 @@ export function selectSends(slug: string, sel: SendSelect): SendPlan[] {
     const tooLong = over.length ? `${slides} slides; ${over.map((p) => `${PLATFORM_NAME[p]} takes ${MAX_SLIDES[p]}`).join(", ")}: cut the deck to ${Math.min(...over.map((p) => MAX_SLIDES[p]!))} (the deck skill)${s.platforms.includes("tiktok") && !sel.only ? ", or send TikTok alone with --only tiktok" : ""}` : null;
     const primaryLeg = legs.find((l) => l.platform === primaryOf(wanted)) ?? legs[0];
     const open = legs.filter((l) => !l.skip);
+    /* A video: the one delivered file, checked against the approval, and its caption. */
+    const vc = s.video && s.video.final && finalOk ? videoCheck(s, mode, open.map((l) => l.platform)) : null;
     const skip =
       s.killed ? "killed"
-      /* Videos are posted from the phone and marked posted by hand for now: the send carries slides only. */
-      : s.video ? "a video post is not sent through the posting service yet: post it from the phone, then mark it posted"
       : !finalOk ? `the final is not approved (${s.final.status})`
+      : s.video && !vc ? "the video is not delivered yet"
+      : vc?.check.skip ? vc.check.skip
       : timeBad ? timeBad
-      : !info.keySet ? info.why
+      : !info.keySet && !sel.noKey ? info.why
       : !legs.length ? "no platform left: every leg was taken off"
       : tooLong ? tooLong
       /* Nothing left to send; or the primary leg cannot go (not connected, needs a reconnect): the post stops.
@@ -179,6 +219,7 @@ export function selectSends(slug: string, sel: SendSelect): SendPlan[] {
       : null;
     const warnings: string[] = [];
     for (const l of legs) if (l.skip && !skip) warnings.push(`${PLATFORM_NAME[l.platform]} is left out: ${l.skip}`);
+    if (!skip && vc) warnings.push(...vc.check.warnings);
     if (!skip && open.some((l) => l.platform === "instagram") && mode === "draft") {
       /* Instagram has no drafts: the leg publishes when the send runs. Q3: at the slot time, with TikTok's. */
       const slotAt = slotInstant(slug, s.row.handle, s.row.date, s.row.slot);
@@ -188,9 +229,10 @@ export function selectSends(slug: string, sel: SendSelect): SendPlan[] {
         : "Instagram has no drafts: the Instagram post publishes the moment this is sent.");
     }
     return {
-      key: s.row.key, handle: s.row.handle, account: info.account?.id ?? null, slides, caption: (s.deck?.caption ?? "").split("\n")[0],
+      key: s.row.key, handle: s.row.handle, account: info.account?.id ?? null, slides, caption: (vc ? vc.check.caption ?? "" : s.deck?.caption ?? "").split("\n")[0],
       mode, scheduledAt: at, finalStatus: s.final.status, coverText: s.deck?.slides[0]?.blocks.map((b) => b.text) ?? [], skip, sentBefore: !!s.sent,
       legs: legs.map(({ platform, account, skip }) => ({ platform, account, skip })), warnings,
+      ...(vc ? { video: vc.info } : {}),
     };
   });
 }
@@ -202,14 +244,14 @@ export type SendResult = { key: string; ok: boolean; id?: string; status?: strin
  * Sends the selected posts, one after the other, and never throws for one
  * post: each result says ok or the error text. `dryRun` selects and sends nothing.
  */
-export async function sendPosts(slug: string, sel: SendSelect & { dryRun?: boolean }): Promise<{ plans: SendPlan[]; results: SendResult[] }> {
+export async function sendPosts(slug: string, sel: SendSelect & { dryRun?: boolean; /** Tests: the client to use instead of the real one. */ pb?: PostBridgeClient }): Promise<{ plans: SendPlan[]; results: SendResult[] }> {
   const plans = selectSends(slug, sel);
   const results: SendResult[] = [];
   if (sel.dryRun) return { plans, results };
   for (const p of plans) {
     if (p.skip) continue;
     try {
-      const r = await sendPost(slug, p.key, { force: !!sel.force, mode: p.mode, at: p.scheduledAt ?? undefined, only: sel.only });
+      const r = await sendPost(slug, p.key, { force: !!sel.force, mode: p.mode, at: p.scheduledAt ?? undefined, only: sel.only, pb: sel.pb });
       results.push({ key: p.key, ok: true, id: r.id, status: r.status, warnings: r.warnings.filter((w) => !p.warnings.includes(w)) });
     } catch (e) {
       results.push({ key: p.key, ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -224,9 +266,10 @@ export async function sendPosts(slug: string, sel: SendSelect & { dryRun?: boole
  * The button and sendPosts both come here. A post with one TikTok leg writes
  * exactly the line it always wrote; with Instagram, the line carries `legs`.
  */
-export async function sendPost(slug: string, key: string, opts: { compose?: boolean; force?: boolean; mode?: SendMode; at?: string; only?: Platform } = {}): Promise<SendReport> {
+export async function sendPost(slug: string, key: string, opts: { compose?: boolean; force?: boolean; mode?: SendMode; at?: string; only?: Platform; pb?: PostBridgeClient } = {}): Promise<SendReport> {
   const state = allStates(slug).find((s) => s.row.key === key);
   if (!state) throw new Error(`No post ${key}.`);
+  if (state.video) return sendVideo(slug, key, opts);
   if (!state.deck) throw new Error("No deck.");
   const plan = selectSends(slug, { keys: [key], force: opts.force, mode: opts.mode, at: opts.at, only: opts.only })[0];
   if (plan.skip) throw new Error(plan.skip);
@@ -251,7 +294,7 @@ export async function sendPost(slug: string, key: string, opts: { compose?: bool
   const igFiles = ig ? state.deck.slides.map((s) => need(join(dir, "instagram", `slide-${nn(s.n)}.jpg`))) : [];
 
   /* 2. and 3. */
-  const pb = postBridge();
+  const pb = opts.pb ?? postBridge();
   const media: string[] = [];
   for (const f of ttFiles) media.push((await pb.uploadMedia({ path: f })).media_id);
   const igMedia: string[] = [];
@@ -273,6 +316,63 @@ export async function sendPost(slug: string, key: string, opts: { compose?: bool
     }),
   } });
   return { id: post.id, media: lineMedia, account: first.account, status: post.status, warnings: [...plan.warnings, ...(post.warnings ?? [])] };
+}
+
+/**
+ * A video post: no compositor. The one delivered file is hashed again just
+ * before the upload (selectSends checked it against delivery.json and the
+ * approval), uploaded once, and the same media id goes to every leg.
+ * With `requestOnly`, nothing is uploaded or created and no line is written:
+ * it returns the exact request bodies with placeholder media ids.
+ */
+const MEDIA_PLACEHOLDER = "<media id of the video>";
+
+export function videoRequest(slug: string, key: string, opts: { force?: boolean; mode?: SendMode; at?: string; only?: Platform; noKey?: boolean } = {}): { plan: SendPlan; legs: Leg[]; input: (mediaId: string) => CreatePostInput; preview: RequestPreview } {
+  const plan = selectSends(slug, { keys: [key], force: opts.force, mode: opts.mode, at: opts.at, only: opts.only, noKey: opts.noKey })[0];
+  if (!plan) throw new Error(`No post ${key}.`);
+  if (plan.skip) throw new Error(plan.skip);
+  if (!plan.video?.sha256 || !plan.video.caption || plan.video.bytes === null) throw new Error("The video is not ready to send.");
+  const legs = plan.legs.filter((l) => !l.skip && l.account !== null).map((l) => ({ platform: l.platform, account: l.account! }));
+  const caption = plan.video.caption;
+  const input = (mediaId: string) => {
+    const one = { caption, media: [mediaId] };
+    return legsPost({
+      legs, mode: plan.mode, scheduledAt: plan.scheduledAt, kind: "video",
+      ...(legs.some((l) => l.platform === "tiktok") ? { tiktok: one } : {}),
+      ...(legs.some((l) => l.platform === "instagram") ? { instagram: one } : {}),
+    });
+  };
+  return { plan, legs, input, preview: { uploads: [{ mime_type: "video/mp4", size_bytes: plan.video.bytes, name: `${plan.video.id}.mp4` }], post: postBody(input(MEDIA_PLACEHOLDER)) } };
+}
+
+/** The exact requests a send of these posts would make (videos only), with placeholder media ids. Nothing leaves. */
+export function requestPreviews(slug: string, sel: SendSelect): { key: string; preview: RequestPreview | null; error: string | null }[] {
+  return selectSends(slug, { ...sel, noKey: true }).map((p) => {
+    if (!p.video) return { key: p.key, preview: null, error: "the request preview is built for video posts; a slideshow's dry run lists its slides" };
+    try { return { key: p.key, preview: videoRequest(slug, p.key, { ...sel, noKey: true }).preview, error: null }; } catch (e) { return { key: p.key, preview: null, error: e instanceof Error ? e.message : String(e) }; }
+  });
+}
+
+async function sendVideo(slug: string, key: string, opts: { force?: boolean; mode?: SendMode; at?: string; only?: Platform; pb?: PostBridgeClient }): Promise<SendReport> {
+  const { plan, legs, input } = videoRequest(slug, key, opts);
+  const v = plan.video!;
+  /* The bytes uploaded are the bytes approved: hashed once more, now. */
+  const bytes = new Uint8Array(readFileSync(v.file));
+  const now = createHash("sha256").update(bytes).digest("hex");
+  if (now !== v.sha256) throw new Error(`final/${v.id}.mp4 changed during the send (sha256 ${now.slice(0, 12)}, checked ${v.sha256!.slice(0, 12)}): nothing was sent.`);
+  const pb = opts.pb ?? postBridge();
+  const { media_id } = await pb.uploadMedia({ name: `${v.id}.mp4`, bytes, mime: "video/mp4" });
+  const post = await pb.createPost(input(media_id));
+  const first = legs[0];
+  const direct = plan.mode === "direct";
+  appendEvent(slug, { post: key, kind: "posting.sent", actor: "agent", data: {
+    provider: "postbridge", id: post.id, media: media_id, account: first.account, status: post.status, mode: plan.mode, ...(direct ? { scheduledAt: plan.scheduledAt! } : {}),
+    video: v.id, sha256: v.sha256!,
+    ...(legs.length === 1 && first.platform === "tiktok" ? {} : {
+      legs: legs.map((l) => ({ platform: l.platform, account: l.account, mode: plan.mode, scheduledAt: direct ? plan.scheduledAt : null, status: post.status })),
+    }),
+  } });
+  return { id: post.id, media: [media_id], account: first.account, status: post.status, warnings: [...plan.warnings, ...(post.warnings ?? [])] };
 }
 
 /** The old name of sendPost, draft mode. */
