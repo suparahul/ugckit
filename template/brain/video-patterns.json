@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "taxonomy_version": "2026-10-03.1",
+  "taxonomy_version": "2026-10-03.2",
   "_comment": "The video taxonomy of the kit (layer A, inbuilt). Read-only in an install. VIDEO-ANATOMY.md explains every slot; learnings-video.md gives the reasons. A local overlay (apps/<slug>/niche/video/patterns.json, written by the video-evidence step when it exists) references these ids and adds scoped evidence; it never redefines an id. Twelve hook jobs and eight recipes: adding one needs a structural reason and a new taxonomy_version.",
   "slots": {
     "objective": ["reach", "save_share", "product_discovery", "product_action"],
     "distribution": ["organic", "paid"],
     "lane": ["pitch", "discovery", "everyday", "education"],
     "filming_format": ["talking_head", "hook_to_demo", "live_use", "before_after", "text_over_action", "voiceover_action"],
-    "hook_channel": ["spoken", "visual", "text", "spoken_visual", "text_visual"],
+    "hook_channel": ["spoken", "visual", "text", "spoken_visual", "text_visual", "reaction"],
     "hook_framing": ["count", "negative", "audience_callout", "lived_experience", "professional_basis"],
     "proof": ["none", "visible_action", "real_screen_result", "sourced_fact"],
     "product_role": ["absent", "incidental_tool", "story_solution", "main_subject"],
@@ -17,7 +17,7 @@
     "viewer_task": ["read", "recognise", "believe"],
     "close": ["none", "payoff", "save", "share", "follow", "question", "profile", "product_action"],
     "cast_kind": ["human", "mascot", "none"],
-    "framing": ["face", "hands_only", "subject_only"],
+    "framing": ["face", "hands_only", "subject_only", "app_screen"],
     "media_origin": ["generated", "supplied", "mixed"],
     "layout": ["sequence", "split_screen", "picture_in_picture"],
     "series": ["standalone", "progress_log"],
@@ -38,7 +38,8 @@
       {"phrase": "Day N of …", "maps_to": {"hook": "in_progress", "series": "progress_log"}, "note": "the counter is an overlay; the day is real"},
       {"phrase": "Never do this / stop doing this", "maps_to": {"hook": "specific_promise", "framing": "negative"}, "note": "a warning is a promise with negative framing"},
       {"phrase": "POV: …", "maps_to": {"framing": "audience_callout"}, "note": "POV is a framing, not a filming format"},
-      {"phrase": "I do this for a living", "maps_to": {"framing": "professional_basis"}, "note": "only a real, verified speaker or a sourced fact"}
+      {"phrase": "I do this for a living", "maps_to": {"framing": "professional_basis"}, "note": "only a real, verified speaker or a sourced fact"},
+      {"phrase": "Reaction / a reacting face / “I just found this??”", "maps_to": {"hook_channel": "reaction"}, "note": "never spoken: a silent reacting face with the hook as text, performed from a real reference reaction (user decision, 2026-10-03)"}
     ]
   },
   "capabilities": {
@@ -47,7 +48,8 @@
     "bridge.C": {"definition": "supplied media: clips and stills beside R and P, trimmed, checksummed, subject-bound, source-approved at gate B"},
     "bridge.narration": {"definition": "a narrator apart from the face: character audio over action, a supplied voice, an approved original synthetic narrator"},
     "bridge.composition": {"definition": "split screen, picture in picture of two sources, timed overlay tracks, source credits, series counters"},
-    "bridge.live": {"definition": "a real input clip paired with the app recording that read it, with measured input and output times"}
+    "bridge.live": {"definition": "a real input clip paired with the app recording that read it, with measured input and output times"},
+    "bridge.reaction": {"definition": "a silent generated face of an approved character, performed from a real reference reaction (expression beats, head, eyes, framing, distance), under a timed hook overlay; requested from production, not declared yet"}
   },
   "patterns": [
     {"id": "discovery_regret", "kind": "hook", "definition": "A familiar activity done for a long time, then a late discovery.", "slots": ["familiar_activity", "elapsed_time", "discovery"], "allowed_formats": ["hook_to_demo", "talking_head", "live_use"], "allowed_lanes": ["discovery", "pitch"], "constraints": ["elapsed_time is true for the persona or the user's plan; never invented"], "aliases": ["seven years shopping at X, now I found this", "and I'm JUST NOW finding this??"], "evidence_ids": ["potto-teardown", "roamy-teardown"], "scope": "cross-niche", "status": "supported", "capability": "runnable", "requires": []},
@@ -78,9 +80,11 @@
     {"id": "rule.no_invented_fill", "kind": "rule", "definition": "Hook slots are filled from the plan, product facts or a source; never an invented elapsed time, result, credential, request or quotation.", "slots": [], "allowed_formats": [], "allowed_lanes": [], "constraints": [], "aliases": [], "evidence_ids": [], "scope": "kit", "status": "supported", "capability": "runnable", "requires": []},
     {"id": "rule.real_animal_supplied", "kind": "rule", "definition": "A real animal is shown only in supplied footage; never generated, never replaced by generated footage.", "slots": [], "allowed_formats": [], "allowed_lanes": [], "constraints": [], "aliases": [], "evidence_ids": [], "scope": "kit", "status": "supported", "capability": "bridge", "requires": ["bridge.C"]},
     {"id": "rule.speech_rate", "kind": "rule", "definition": "At most 15 spoken words per 4 seconds of a beat; overlays stay up at least words ÷ 3 seconds, and 1 second minimum.", "slots": [], "allowed_formats": [], "allowed_lanes": [], "constraints": [], "aliases": [], "evidence_ids": ["script-learnings"], "scope": "kit", "status": "supported", "capability": "runnable", "requires": []},
-    {"id": "rule.no_synthetic_credential", "kind": "rule", "definition": "No credential for a fictional persona or a synthetic voice; a synthetic narrator never speaks over a visible face and is never a clone.", "slots": [], "allowed_formats": [], "allowed_lanes": [], "constraints": [], "aliases": [], "evidence_ids": [], "scope": "kit", "status": "supported", "capability": "runnable", "requires": []},
+    {"id": "rule.no_synthetic_credential", "kind": "rule", "definition": "No credential for a fictional persona or a synthetic voice; a synthetic narrator never speaks over a visible human face (a mascot can have a synthetic voice-over) and is never a clone.", "slots": [], "allowed_formats": [], "allowed_lanes": [], "constraints": [], "aliases": [], "evidence_ids": [], "scope": "kit", "status": "supported", "capability": "runnable", "requires": []},
     {"id": "rule.one_close", "kind": "rule", "definition": "One primary ask at most; a paid product_action close needs a real destination.", "slots": [], "allowed_formats": [], "allowed_lanes": [], "constraints": [], "aliases": [], "evidence_ids": ["script-learnings"], "scope": "kit", "status": "supported", "capability": "runnable", "requires": []},
-    {"id": "rule.scoped_product_timing", "kind": "rule", "definition": "Delayed product and a payoff close are starter defaults for organic pitch only, below the handle's strategy; early demonstration is valid for discovery; 'name once' does not apply to everyday.", "slots": [], "allowed_formats": [], "allowed_lanes": [], "constraints": [], "aliases": [], "evidence_ids": ["script-learnings", "potto-teardown", "stronger-teardown"], "scope": "kit", "status": "supported", "capability": "runnable", "requires": []}
+    {"id": "rule.scoped_product_timing", "kind": "rule", "definition": "Delayed product and a payoff close are starter defaults for organic pitch only, below the handle's strategy; early demonstration is valid for discovery; 'name once' does not apply to everyday.", "slots": [], "allowed_formats": [], "allowed_lanes": [], "constraints": [], "aliases": [], "evidence_ids": ["script-learnings", "potto-teardown", "stronger-teardown"], "scope": "kit", "status": "supported", "capability": "runnable", "requires": []},
+    {"id": "rule.reaction_silent", "kind": "rule", "definition": "A reaction hook is never spoken: a silent reacting face (silent_action, face, no line, no voice-over) with the hook as a text overlay that starts in the first beat.", "slots": [], "allowed_formats": [], "allowed_lanes": [], "constraints": [], "aliases": [], "evidence_ids": ["founder-decision-reaction"], "scope": "kit", "status": "supported", "capability": "bridge.reaction", "requires": ["bridge.reaction"]},
+    {"id": "rule.reaction_from_reference", "kind": "rule", "definition": "A reaction is never invented. video-plan picks a real reference reaction from the workspace's downloaded research (a post id and the exact time range); video-script writes the performance from it (expression beats, timing, head, eyes, framing, distance to the camera). No reference blocks the plan. The reference gives the performance only; the face is the handle's approved character, never the reference creator.", "slots": [], "allowed_formats": [], "allowed_lanes": [], "constraints": [], "aliases": [], "evidence_ids": ["founder-decision-reaction"], "scope": "kit", "status": "supported", "capability": "runnable", "requires": []}
   ],
   "sources": [
     {"id": "potto-teardown", "kind": "observed", "ref": "research corpus: Potto TEARDOWN.md §§ 5–6, 10–11", "note": "Discovery regret → face → real demo/result; value legible in the store/budget/output sequence. One post holds 83.4% of attributed reach: an example's views are not a promised result."},
@@ -90,6 +94,7 @@
     {"id": "ventnow-teardown", "kind": "observed", "ref": "research corpus: Vent Now TEARDOWN.md §§ 4–6", "note": "Specific personal situations; caption suffix as placement. Much of the text-led evidence is photo mode, not video. Weak skits do not show that all skits lose."},
     {"id": "script-learnings", "kind": "claimed", "ref": "research corpus: SCRIPT-LEARNINGS.md §§ 4–11, 14", "note": "X articles; authors sell tools or services; paid-ad bias. One idea, one mechanism, one doubt; facts match real screens; 15 words per 4 s. Early reveal, compulsory naming and the product-free close are scoped choices."},
     {"id": "slideshow-anatomy", "kind": "observed", "ref": "brain/SLIDESHOW-ANATOMY.md, Layer 2 hook shapes", "note": "Slideshow hooks; transfer to video is not proven."},
+    {"id": "founder-decision-reaction", "kind": "user_decision", "ref": "founder answers, 2026-10-03", "note": "Reaction hooks are never spoken; reactions are never invented, they come from a real reference reaction in the user's own research. A mascot may have a synthetic voice-over."},
     {"id": "founder-plan-catwise", "kind": "user_decision", "ref": "a founder's handle strategies and experiment universe, coverage audit 2026-10-03", "note": "Planned cells, never observed posts. Shows the jobs are needed; says nothing about whether they win."}
   ],
   "examples": [

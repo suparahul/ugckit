@@ -74,6 +74,9 @@ is never merged with the capability or the evidence strength.
   mapping; the user decides. Do not change the request silently.
 - Open founder questions in the plan (a face or only hands, which real cat, an identity not
   yet approved) are missing inputs, owner `founder`, with a recommendation.
+- A reaction video maps to hook channel `reaction`: a silent face, the hook as text, never
+  spoken (`rule.reaction_silent`). Its performance comes from a real reference reaction in
+  the workspace's research, chosen per video by `video-plan` (`rule.reaction_from_reference`).
 - Cross-handle facts (the app's screens, product facts) are written once per app, under
   `## Shared inputs`.
 

@@ -40,7 +40,7 @@ fields. Production's check is `scripts/character/bridge.py`; the schema, when sh
       "beats": [{"id": "b1", "role": "<recipe role>", "start_s": 0, "end_s": 4,
                  "lines": ["l1"], "action": "<what the viewer sees>",
                  "performance": "on_camera|voiceover|silent_action",
-                 "framing": "face|hands_only|subject_only", "layout": "sequence|split_screen|picture_in_picture",
+                 "framing": "face|hands_only|subject_only|app_screen", "layout": "sequence|split_screen|picture_in_picture",
                  "media_origin": "generated|supplied|mixed",
                  "app_on_screen": false, "screen_id": null, "viewer_must": null,
                  "fact_refs": [], "source_asset_ids": [], "subject_ids": [], "set_id": null}],
@@ -52,9 +52,13 @@ fields. Production's check is `scripts/character/bridge.py`; the schema, when sh
                     "product": {"role", "name_locations": [], "speech_count", "timing"},
                     "app_presence", "proof": {"kind", "fact_refs": []}, "close", "cast_kind",
                     "narrator_ref", "series", "comparison_mode",
-                    "experiment": {"axis", "base_video_id"}, "strategy_ref", "evidence_ids": [],
+                    "experiment": {"axis", "base_video_id"},
+                    "strategy_ref": {<the brief's strategy_ref object, copied>}, "evidence_ids": [],
                     "taxonomy_version", "catalogue_digest"},
-      "overlays": [{"id", "role", "text", "start_s", "end_s", "placement", "panel_id"}],
+      "overlays": [{"id", "role", "text", "start_s", "end_s", "placement", "panel_id", "fact_refs"}],
+      "reaction_refs": [{"id": "rx1", "post_id", "platform", "handle", "post_dir", "video_path",
+                         "video_sha256": null, "start_s", "end_s", "notes_ref",
+                         "generation_input": null}],
       "assets": [{"id", "kind", "origin", "path", "sha256", "source_url", "permission_ref",
                   "subject_ids", "set_ref", "trim_s", "screen_id", "paired_input_ref"}],
       "narrators": [{"id", "kind", "character_ref", "voice_ref", "source_ref", "credential_ref"}],
@@ -82,8 +86,24 @@ reports every one.
   the words. The first beat does not name the app unless product timing is `opening`.
 - **Numbers and claims** carry `fact_refs` to the brief's facts, or come from the real screen.
 - **Overlays**: exact text, start and end, placement never in the caption band, up long
-  enough to read (words ÷ 3 s). A spoken hook needs no hook overlay; a text hook needs one
+  enough to read (words ÷ 3 s). A spoken hook needs no hook overlay; a text or reaction hook needs one
   in the first beat.
+- **A reaction hook is never spoken.** Its first beat is `silent_action`, `face`, no line,
+  no voice-over; the hook is the overlay. The beat carries a `reaction` block written from
+  the brief's reference, never from imagination:
+
+      "reaction": {"ref_id": "rx1", "framing": "<shot size and angle, what is in frame>",
+                   "camera_distance": "<e.g. arm's length, about 40 cm>", "camera": "<handheld, sway, cuts>",
+                   "expression_beats": [{"start_s", "end_s", "ref_s": [a, b], "face", "eyes",
+                                         "head", "hands"}]}
+
+  Watch the reference range (a contact sheet at 4 frames a second). Each expression beat
+  copies one stretch of it (`ref_s`, in the post's time) into video time; together they
+  cover the beat. Describe movement and expression only, never the reference creator's
+  face, hair, clothes or room: the face is the handle's character. `reaction_refs` records
+  the post; `generation_input` stays null (the founder has not decided; production refuses
+  true). With no reference, `reaction` is null and `ready` blocks the lock.
+- **Full-screen app beats** are framing `app_screen`.
 - **Cast and world**: the exact fixed subjects of each beat, by id; one set and one outfit
   per generated character; a real animal only in supplied beats.
 - **Feasibility, not shots.** Generated stretches of 3 s or more; supplied clips inside their

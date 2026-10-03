@@ -17,11 +17,12 @@ cost: those are production gates.
 
 1. **Ready.** Run `ready`. *Blocking* inputs stop the lock: a screen not in the library, a
    hero string not copied from it, a supplied file not on disk, a missing permission, a live
-   time not measured, a fact not verified. *Dependencies* do not stop the lock; production
+   time not measured, a fact not verified, a reaction with no real reference post (or its
+   video not downloaded, or changed since the pin). *Dependencies* do not stop the lock; production
    stops on them: a character not `live` (part A), a set or subject not in `world.json`, a
    narrator voice not approved, a bridge capability production has not declared. Say each
    one in one line with its owner. Never drop a requested format to pass.
-2. **Pin.** When supplied files exist, run `pin`, then `video_plan.py review` again: the
+2. **Pin.** When supplied files or a reaction reference exist, run `pin`, then `video_plan.py review` again: the
    checksums are part of what is approved.
 3. **Show.** Show `REVIEW.md` in full, with its revision and content digest. Ask for
    approval of that revision in the user's own words. A change request goes back to

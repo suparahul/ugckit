@@ -7,6 +7,8 @@ description: Video planning, step 2 — one finalised video idea (a handle, a da
 
     python3 scripts/planning/video_plan.py catalogue <slug>     the taxonomy version and digest to pin
     python3 scripts/planning/video_plan.py brief <brief.json>    the check; must pass
+    python3 scripts/planning/video_plan.py reactions <slug> [--grep <word>]
+                                                                 real reaction posts in research
 
 Input: one finalised idea — the handle, the date (or the row number of an undated week) and
 the row of the user's plan. The idea is already chosen; this step does not choose it.
@@ -57,6 +59,11 @@ Lowercase, digits and hyphens. It is the folder name here and under `pipeline/ch
       "hook_alternatives": [{"id": "h1", "job_id": "<the chosen job>", "text": "...", "channel": "...",
                              "fill": {...}, "note": "why, and what it changes"}],
       "selected_hook": "h1",
+      "reaction_reference": {"post_id": "...", "platform": "tiktok", "handle": "@...",
+                             "post_dir": "research/<project>/<app>/<handle>/<post>",
+                             "video": "<post_dir>/video.mp4", "notes": "<post_dir>/notes.md",
+                             "start_s": 0.0, "end_s": 2.9, "why": "...", "candidates_seen": []},
+                            (only with hook channel "reaction"; null when none is found)
       "facts": [{"id": "f1", "claim": "...", "source": "<title, url or section>", "verified": false}],
       "screens_needed": [{"screen_id": "...", "job": "...", "hero_proposed": "...", "status": "indexed|missing"}],
       "assets_needed": [{"id": "...", "kind": "clip|still|screen|audio", "origin": "...", "what": "...",
@@ -85,6 +92,25 @@ Lowercase, digits and hyphens. It is the folder name here and under `pipeline/ch
   missing inputs with owner `founder`.
 - **Facts are cited.** A health, risk, product or numeric claim is a fact with a source;
   `verified` stays false until someone checks it against the source.
+- **A reaction hook is never spoken** (user decision, 2026-10-03). A row that says reaction,
+  a reacting face or "I just found this??" takes hook channel `reaction`: a silent face, the
+  hook as text. Every hook alternative is a `reaction` text.
+- **A reaction comes from a real reference, never from the writer** (user decision,
+  2026-10-03). Run `video_plan.py reactions <slug>` (add `--grep` with the hook's words). It
+  lists downloaded posts in `research/<project>/…/<post>/` and
+  `apps/<slug>/niche/batches/<date>/<handle>/<post>/` whose notes describe a reaction. Read
+  the notes of the best matches. Look at the frames: `ffmpeg -t 5 -i <video> -vf
+  "fps=4,scale=270:-1,tile=6x3" -frames:v 1 <scratch>/sheet.jpg` writes one contact sheet to
+  a scratch folder, free and local. Pick the post whose reaction does the same hook job, with
+  no speech, and fits the handle's set. Write its post id and the exact range of the
+  reaction (the first and last face frame) in `reaction_reference`, and the others you saw
+  in `candidates_seen`. Never write to a research folder.
+- **No reference, no plan.** When no downloaded post fits, `reaction_reference` is null and
+  the missing input `{"id": "reaction_reference", "owner": "founder", "blocks": "lock"}`
+  says what to download. Never describe a made-up reaction.
+- **The reference gives the performance, never the identity.** The face is the handle's
+  approved character. Whether production may give the clip itself to the model is not
+  decided; list it as a founder question, never decide it.
 - Pin `taxonomy_version` and `catalogue_digest` from `video_plan.py catalogue <slug>`.
 
 ## Finish

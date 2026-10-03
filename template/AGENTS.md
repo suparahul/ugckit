@@ -351,6 +351,11 @@ what is missing (`ready`) and writes the lock. Free.
 - **Real or missing.** Real screens, real footage of a real pet, measured live timings and
   verified facts are inputs; until they exist, `ready` lists them and the lock refuses.
   A character not `live` is a part-A dependency; planning never starts casting.
+- **A reaction is silent and real** (user decision, 2026-10-03). A reaction hook is never
+  spoken: a silent face, the hook as text. Its performance is copied from a real reference
+  reaction in the workspace's downloaded research (post id and time range, in
+  `reaction_refs`); with no reference the plan is blocked. The face stays the handle's
+  approved character.
 - **No planning state store.** The files say where a video is: a brief, a draft in review, a
   locked plan. Locking never runs `shots.py check` (it starts production state).
 - **Later steps hook in here, not built yet:** a scheduling step that writes the dated rows

@@ -18,6 +18,8 @@ The compact guide behind `VIDEO-ANATOMY.md` and `video-patterns.json`. It says w
 ## The hook
 
 - The hook job is what the first beat does; the channel is how (said, shown, written). A visual-only first beat is valid for `in_progress`.
+- **A reaction hook is never spoken** (user decision, 2026-10-03). It is a silent reacting face with the hook as text on screen.
+- **A reaction is never invented** (user decision, 2026-10-03). An invented reaction looks fake. Each one copies the timing and the expression of a real reaction in the user's own research, chosen by post id and time range. The handle's approved face stays the face. No reference means no plan.
 - "A hook is a spoken line, not a title. Usually 6 to 14 words" (claimed, SCRIPT-LEARNINGS § 5). At the speech ceiling of 15 words per 4 s, a 15-word hook needs a full 4 s beat.
 - "The picture is part of the hook… The first frame must stop the scroll alone: something in motion, not a held pose" (claimed, SCRIPT-LEARNINGS § 5).
 - The on-screen hook and the spoken lines are not the same words (claimed, SCRIPT-LEARNINGS § 10). When the hook is spoken, the captions already show it; do not add a hook overlay with the same words.
@@ -36,7 +38,7 @@ The compact guide behind `VIDEO-ANATOMY.md` and `video-patterns.json`. It says w
 - A generated character is pinned by version and must be `live` before production; planning never launches casting.
 - A real pet is a fixed subject shown only in supplied footage. Planning states the exact subjects, count and size per beat; two cats are two pins.
 - Supplied footage is output media, never a generation reference. It carries its source, permission and checksum.
-- A synthetic narrator never speaks over a visible face, is never a clone, and claims no credential. A real expert is supplied and verified.
+- A synthetic narrator never speaks over a visible human face, is never a clone, and claims no credential. A mascot can have a synthetic voice-over (user decision, 2026-10-03, as the production bridge). A real expert is supplied and verified.
 
 ## Length and timing
 

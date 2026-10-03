@@ -146,6 +146,15 @@ Phrasings that are not new jobs: "Everyone asks how I…" is `specific_promise` 
 | `text` | a hook overlay starts in the first beat |
 | `spoken_visual` | said, over a picture that also works alone |
 | `text_visual` | a hook overlay over a picture that works alone |
+| `reaction` | a silent reacting face with the hook as a text overlay from the first beat; never spoken (user decision, 2026-10-03) |
+
+### Reaction hooks
+
+A reaction hook is never spoken. The first beat is a `silent_action` on the `face`: no line, no voice-over. The hook is a text overlay that starts in that beat and stays up for words ÷ 3 s.
+
+A reaction is never invented, so it does not look fake. `video-plan` picks a real reference reaction from the workspace's downloaded research (`research/<project>/<app>/<handle>/<post>/` or `apps/<slug>/niche/batches/<date>/<handle>/<post>/`, with its video): the post id and the exact time range. `video_plan.py reactions <slug>` lists the candidates. `video-script` writes the performance from it in the beat's `reaction` block: expression beats with their times, the face, the eyes, the head and the hands, the framing and the distance to the camera. The plan records the post in `reaction_refs`. No reference blocks the plan; nothing is written in its place.
+
+The reference drives the performance only. The face is the handle's approved character; nothing of the reference creator's face, hair, clothes, voice or room is copied. Whether production may give the reference clip itself to the model is not decided (`generation_input` null); until the founder decides, the clip is a description source only.
 
 ### Hook framing
 
@@ -205,12 +214,12 @@ One primary ask at most: `none`, `payoff`, `save`, `share`, `follow`, `question`
 | Slot | Values | Rule |
 |---|---|---|
 | Cast kind | `human`, `mascot`, `none` | a generated cast is pinned `<character>@v<n>` and must be `live` |
-| Framing per beat | `face`, `hands_only`, `subject_only` | speech on camera shows the face |
+| Framing per beat | `face`, `hands_only`, `subject_only`, `app_screen` | speech on camera shows the face; `app_screen` is a full-screen app beat (the real recording, layout `sequence`) |
 | Real animal | a fixed subject (`origin: real`) or a supplied clip subject | shown only in supplied footage; never generated; never replaced by an invented human narrator |
 
 ### Narrator
 
-`character`, `supplied_speaker`, `original_synthetic`, `none`, with the voice id and the source. An original synthetic voice never speaks over a visible face and is never a clone of a real person. No synthetic expert.
+`character`, `supplied_speaker`, `original_synthetic`, `none`, with the voice id and the source. An original synthetic voice never speaks over a visible human face and is never a clone of a real person. A mascot is not lip-synced; its narration can be a synthetic voice-over. No synthetic expert.
 
 ### World
 
@@ -243,7 +252,7 @@ Per beat: origin `generated`, `supplied`, `mixed`; layout `sequence`, `split_scr
 
 ## Production capability
 
-Separate from the anatomy. Today P1 makes T talking segments without the app, and T, O, G, S, H, F, R and P with app insertion. The shared production bridge adds five capabilities:
+Separate from the anatomy. Today P1 makes T talking segments without the app, and T, O, G, S, H, F, R and P with app insertion. The shared production bridge adds these capabilities:
 
 | Id | Capability | Needed by |
 |---|---|---|
@@ -252,6 +261,7 @@ Separate from the anatomy. Today P1 makes T talking segments without the app, an
 | `bridge.narration` | a narrator apart from the face: character audio over action, a supplied voice, an original synthetic narrator | `voiceover_action`, any `voiceover` beat |
 | `bridge.composition` | split screen, timed overlay tracks, source credits, series counters | overlays other than captions, `split_screen`, `picture_in_picture` of two sources |
 | `bridge.live` | a real input clip paired with the app recording that read it, with measured times | `live_use` |
+| `bridge.reaction` | a silent generated face of an approved character, performed from a real reference reaction | hook channel `reaction`, any beat with a `reaction` block |
 
 Never call a value runnable before its capability exists. Never replace a requested real cat with generated footage. Never relabel a silent action as talking to pass a check.
 

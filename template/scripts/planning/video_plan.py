@@ -3,6 +3,8 @@
 video. Free, local: no generation, no network, no production state.
 
     video_plan.py catalogue [<slug>]                 taxonomy version and catalogue digest
+    video_plan.py reactions <slug> [--grep <word>]   real reaction posts in the workspace's
+                                                     research, for a reaction hook's reference
     video_plan.py brief  <brief.json>                the brief against the taxonomy
     video_plan.py check  <plan.draft.json|plan.json> the planning contract (must pass to lock)
     video_plan.py review <plan.draft.json>           write REVIEW.md beside the draft, from the
@@ -10,8 +12,9 @@ video. Free, local: no generation, no network, no production state.
     video_plan.py ready  <plan.draft.json|plan.json> what production still needs: blocking
                                                      inputs, part-A dependencies, bridge
                                                      capabilities; then the bridge's own check
-    video_plan.py pin    <plan.draft.json>           fill each supplied asset's sha256 from its
-                                                     file (before the review; it changes the digest)
+    video_plan.py pin    <plan.draft.json>           fill each supplied asset's and reaction
+                                                     reference's sha256 from its file (before
+                                                     the review; it changes the digest)
     video_plan.py digest <plan json>                 the content digest the approval pins
     video_plan.py lock   <plan.draft.json> --digest <hex> --words "<the user's words>" --date YYYY-MM-DD
     video_plan.py lock   <plan.draft.json> --digest <hex> --dry-run
@@ -206,6 +209,28 @@ def check_brief(b, out):
     for h in alts:
         if h.get("job_id") != hook.get("job_id"):
             out.no(f"hook alternative {h.get('id')}: job {h.get('job_id')!r}; alternatives stay within {hook.get('job_id')!r}")
+    if hook.get("channel") == "reaction":
+        for h in alts:
+            if h.get("channel") != "reaction":
+                out.no(f"hook alternative {h.get('id')}: channel {h.get('channel')!r}; a reaction hook is never "
+                       "spoken, every alternative is a text hook over the silent reaction")
+        if "reaction_reference" not in b:
+            out.no("a reaction hook names its reaction_reference (a real post and range), or null with a "
+                   "missing input that blocks the lock")
+        rr = b.get("reaction_reference")
+        if rr is None and not any(m.get("id") == "reaction_reference" and m.get("blocks") == "lock"
+                                  for m in b.get("missing_inputs") or []):
+            out.no("no reaction_reference: the missing input 'reaction_reference' blocks the lock; "
+                   "never write a made-up reaction")
+        if rr is not None:
+            for k in ("post_id", "platform", "handle", "post_dir", "video", "start_s", "end_s", "why"):
+                if rr.get(k) in (None, ""):
+                    out.no(f"reaction_reference has no '{k}'")
+            if not (num(rr.get("start_s")) and num(rr.get("end_s")) and 0 <= rr["start_s"] < rr["end_s"]):
+                out.no("reaction_reference: start_s and end_s, the exact range of the reaction")
+            for k in ("post_dir", "video"):
+                if rr.get(k) and not os.path.exists(os.path.join(ROOT, rr[k])):
+                    out.no(f"reaction_reference.{k} {rr[k]} is not in the workspace")
     if b.get("selected_hook") not in {h.get("id") for h in alts}:
         out.no(f"selected_hook {b.get('selected_hook')!r} is not one of the alternatives")
     for c in b.get("choices") or []:
@@ -374,6 +399,10 @@ def check_contract(plan, out, brief=None):
             out.no(f"beat {bid}: performance {perf!r}")
         if fr not in S["framing"]:
             out.no(f"beat {bid}: framing {fr!r}")
+        if fr == "app_screen" and not (b.get("app_on_screen") and lay == "sequence"):
+            out.no(f"beat {bid}: framing app_screen is a full-screen app beat (app_on_screen, layout sequence)")
+        if b.get("app_on_screen") and lay == "sequence" and not (b.get("source_asset_ids") or []) and fr != "app_screen":
+            out.note(f"beat {bid}: a full-screen app beat has framing app_screen")
         if lay not in S["layout"]:
             out.no(f"beat {bid}: layout {lay!r}")
         if b.get("media_origin") not in S["media_origin"] + [None]:
@@ -401,8 +430,10 @@ def check_contract(plan, out, brief=None):
         if perf == "voiceover" and not (b.get("narrator_ref") or ed.get("narrator_ref")):
             out.no(f"beat {bid}: a voiceover binds a narrator")
         nar = narrators.get(b.get("narrator_ref") or ed.get("narrator_ref"))
-        if perf == "voiceover" and nar and nar.get("kind") == "original_synthetic" and fr == "face":
-            out.no(f"beat {bid}: a synthetic narrator never speaks over a visible face")
+        # A mascot is not lip-synced; its narration can be a synthetic voice-over (as the bridge).
+        if perf == "voiceover" and nar and nar.get("kind") == "original_synthetic" and fr == "face" \
+                and ck != "mascot":
+            out.no(f"beat {bid}: a synthetic narrator never speaks over a visible human face")
         src = b.get("source_asset_ids") or []
         for aid in src:
             if aid not in assets:
@@ -511,12 +542,14 @@ def check_contract(plan, out, brief=None):
             out.no(f"overlay {oid}: a number on screen needs fact_refs")
         if o.get("role") == "day_counter" and not series:
             out.no(f"overlay {oid}: a day counter belongs to a progress_log series")
-    if str(hook.get("channel", "")).startswith("text") and beats and not any(
+    if (str(hook.get("channel", "")).startswith("text") or hook.get("channel") == "reaction") and beats and not any(
             o.get("role") == "hook" and num(o.get("start_s")) and o["start_s"] < (beats[0].get("end_s") or 0)
             for o in ovs):
         out.no(f"hook channel {hook.get('channel')}: a hook overlay starts in the first beat")
     if hook.get("channel") in ("spoken", "spoken_visual") and beats and not beats[0].get("lines"):
         out.no(f"hook channel {hook.get('channel')}: the first beat speaks")
+
+    check_reaction(plan, beats, hook, ck, out)
 
     # Facts named against the brief.
     if brief is not None:
@@ -531,6 +564,100 @@ def check_contract(plan, out, brief=None):
     if not out.bad:
         out.ok(f"contract: {len(beats)} beats over {t_end:g} s, {len(lines)} line(s), {len(ovs)} overlay(s), "
                f"{len(assets)} asset(s); {rp['id'] if rp else '?'} in order")
+
+
+# A reaction hook (user decision, 2026-10-03): never spoken, never invented. The face is
+# the handle's approved character; a real reference reaction from the workspace's research
+# gives only the performance.
+RX_REF_KEYS = ["id", "post_id", "platform", "handle", "post_dir", "video_path", "video_sha256",
+               "start_s", "end_s", "notes_ref", "generation_input"]
+RX_KEYS = ["ref_id", "framing", "camera_distance", "expression_beats"]
+RX_STEP_KEYS = ["start_s", "end_s", "ref_s", "face", "eyes", "head"]
+
+
+def reaction_beats(plan):
+    """The beats that perform a reaction: each beat with a `reaction` key, and the first
+    beat of a reaction hook."""
+    beats = plan.get("beats") or []
+    ch = ((plan.get("editorial") or {}).get("hook") or {}).get("channel")
+    return [b for i, b in enumerate(beats) if "reaction" in b or (i == 0 and ch == "reaction")]
+
+
+def check_reaction(plan, beats, hook, ck, out):
+    refs = {}
+    for r in plan.get("reaction_refs") or []:
+        rid = r.get("id")
+        if not rid or rid in refs:
+            out.no(f"reaction ref {rid!r} is missing or used twice")
+            continue
+        refs[rid] = r
+        for k in RX_REF_KEYS:
+            if k not in r:
+                out.no(f"reaction ref {rid}: no '{k}'")
+        if not (r.get("post_id") and r.get("post_dir") and r.get("video_path")):
+            out.no(f"reaction ref {rid}: a real post: post_id, post_dir and video_path")
+        if any(os.path.isabs(str(r.get(k) or "")) for k in ("post_dir", "video_path", "notes_ref")):
+            out.no(f"reaction ref {rid}: paths are relative to the workspace")
+        if not (num(r.get("start_s")) and num(r.get("end_s")) and 0 <= r["start_s"] < r["end_s"]):
+            out.no(f"reaction ref {rid}: start_s and end_s are the exact range of the reaction in the post")
+        if r.get("generation_input") not in (None, False):
+            out.no(f"reaction ref {rid}: generation_input is null (not decided) or false; the founder has not "
+                   "allowed the reference clip as a generation input, and production refuses true")
+    if hook.get("channel") == "reaction" and beats:
+        b0 = beats[0]
+        if b0.get("lines") or b0.get("performance") != "silent_action":
+            out.no(f"beat {b0.get('id')}: a reaction hook is never spoken; the first beat is a silent_action "
+                   "with no line and no voice-over, the hook is a text overlay")
+        if b0.get("framing") != "face":
+            out.no(f"beat {b0.get('id')}: a reaction hook shows the reacting face")
+        if ck not in ("human", "mascot"):
+            out.no("a reaction hook needs a pinned cast; the face is the handle's approved character")
+        if "reaction" not in b0:
+            out.no(f"beat {b0.get('id')}: a reaction beat records its reference performance in 'reaction' "
+                   "(null only while no reference is found; `ready` then blocks)")
+    used = set()
+    for b in reaction_beats(plan):
+        bid, rx = b.get("id"), b.get("reaction")
+        if b.get("lines") or b.get("performance") != "silent_action":
+            out.no(f"beat {bid}: a reaction is silent: no line, no voice-over")
+        if rx is None:
+            continue
+        if not isinstance(rx, dict):
+            out.no(f"beat {bid}: reaction is an object or null")
+            continue
+        for k in RX_KEYS:
+            if not rx.get(k):
+                out.no(f"beat {bid}: reaction has no '{k}'")
+        r = refs.get(rx.get("ref_id"))
+        if not r:
+            out.no(f"beat {bid}: reaction {rx.get('ref_id')!r} is not in reaction_refs; a reaction without a "
+                   "real reference post is made up, and is never written")
+            continue
+        used.add(r["id"])
+        steps = rx.get("expression_beats") or []
+        t = b.get("start_s")
+        for j, st in enumerate(steps, 1):
+            for k in RX_STEP_KEYS:
+                if st.get(k) in (None, "", []):
+                    out.no(f"beat {bid}: expression beat {j} has no '{k}'")
+            s, e = st.get("start_s"), st.get("end_s")
+            if not (num(s) and num(e) and e > s):
+                out.no(f"beat {bid}: expression beat {j}: start_s and end_s, end after start")
+                continue
+            if num(t) and abs(s - t) > TOL:
+                out.no(f"beat {bid}: expression beat {j} starts at {s:g} s; the one before ends at {t:g} s")
+            t = e
+            rs = st.get("ref_s")
+            if not (isinstance(rs, list) and len(rs) == 2 and all(num(x) for x in rs) and rs[0] < rs[1]
+                    and num(r.get("start_s")) and num(r.get("end_s"))
+                    and r["start_s"] - TOL <= rs[0] and rs[1] <= r["end_s"] + TOL):
+                out.no(f"beat {bid}: expression beat {j}: ref_s is the [start, end] it copies, inside the "
+                       f"reference range of {r['id']}")
+        if steps and num(t) and num(b.get("end_s")) and abs(t - b["end_s"]) > TOL:
+            out.no(f"beat {bid}: the expression beats end at {t:g} s; the beat ends at {b['end_s']:g} s")
+    for rid in refs:
+        if rid not in used:
+            out.note(f"reaction ref {rid} is performed by no beat")
 
 
 # ------------------------------------------------------------------------------- ready
@@ -553,6 +680,8 @@ def capabilities_needed(plan):
             add("bridge.narration", f"beat {b.get('id')}: voiceover")
         if b.get("layout") != "sequence":
             add("bridge.composition", f"beat {b.get('id')}: {b.get('layout')}")
+    for b in reaction_beats(plan):
+        add("bridge.reaction", f"beat {b.get('id')}: a silent face performed from a reference reaction")
     if plan.get("overlays"):
         add("bridge.composition", f"{len(plan['overlays'])} timed overlay(s)")
     if ed.get("filming_format") == "live_use" or any(a.get("paired_input_ref") for a in assets.values()):
@@ -593,6 +722,26 @@ def readiness(plan, plan_path):
         pr = a.get("paired_input_ref")
         if pr and not (num(pr.get("input_t_s")) and num(pr.get("output_t_s"))):
             block.append(f"asset {aid}: the input and output times are measured on the real capture")
+    # The reference reaction: a real post on disk, never a made-up performance.
+    refs = {r.get("id"): r for r in plan.get("reaction_refs") or []}
+    for b in reaction_beats(plan):
+        if not (b.get("reaction") or {}).get("ref_id"):
+            block.append(f"beat {b.get('id')}: no reference reaction. video-plan picks a real one from the "
+                         f"workspace's research (`video_plan.py reactions {plan.get('app')}`); the performance "
+                         "is never made up")
+    for rid, r in refs.items():
+        vp = r.get("video_path")
+        if not r.get("post_dir") or not os.path.isdir(os.path.join(ROOT, r["post_dir"])):
+            block.append(f"reaction ref {rid}: post {r.get('post_id')} is not in the workspace ({r.get('post_dir')})")
+        elif not vp or not os.path.exists(os.path.join(ROOT, vp)):
+            block.append(f"reaction ref {rid}: the video of post {r.get('post_id')} is not downloaded ({vp})")
+        elif not r.get("video_sha256"):
+            block.append(f"reaction ref {rid}: no video_sha256 (video_plan.py pin, then review again)")
+        elif r["video_sha256"] != sha256_file(os.path.join(ROOT, vp)):
+            block.append(f"reaction ref {rid}: {vp} changed since it was pinned")
+        if r.get("generation_input") is None:
+            dep.append(f"reaction ref {rid}: may production give the reference clip itself to the model? "
+                       "Not decided (a question for the founder); until then it is a description source only")
     # Facts, against the brief.
     brief, _ = brief_of(plan_path)
     if brief:
@@ -803,6 +952,40 @@ def write_review(draft_path):
     if not lines:
         w("| — | — | — | no spoken words | — |")
     w("")
+    rx_beats = [b for b in reaction_beats(plan) if b.get("reaction")]
+    refs = {r.get("id"): r for r in plan.get("reaction_refs") or []}
+    if reaction_beats(plan):
+        w("## The reaction")
+        w("")
+        if not rx_beats:
+            w("**No reference reaction yet.** The plan is blocked until video-plan picks a real one. "
+              "No performance is written without it.")
+            w("")
+        for b in rx_beats:
+            rx = b["reaction"]
+            r = refs.get(rx.get("ref_id")) or {}
+            w(f"Beat {b.get('id')} ({fmt_t(b['start_s'], b['end_s'])}) performs reference `{r.get('id')}`: post "
+              f"`{r.get('post_id')}` by {r.get('handle')} ({r.get('platform')}), {fmt_t(r.get('start_s', 0), r.get('end_s', 0))} "
+              f"of `{r.get('video_path')}`" + (f"; notes `{r.get('notes_ref')}`" if r.get("notes_ref") else "") + ".")
+            w("")
+            w(f"- Framing: {rx.get('framing')}. Distance to the camera: {rx.get('camera_distance')}."
+              + (f" Camera: {rx['camera']}." if rx.get("camera") else ""))
+            w("")
+            w("| Time | From the reference | Face | Eyes | Head | Hands |")
+            w("|---|---|---|---|---|---|")
+            for st in rx.get("expression_beats") or []:
+                rs = st.get("ref_s") or [0, 0]
+                w(f"| {fmt_t(st['start_s'], st['end_s'])} | {fmt_t(rs[0], rs[1])} | {st.get('face')} | {st.get('eyes')} | "
+                  f"{st.get('head')} | {st.get('hands') or '—'} |")
+            w("")
+        w("The face is the handle's approved character. The reference gives only the performance: timing, "
+          "expression, head, eyes, framing and distance. Nothing of the reference creator's face, hair, clothes, "
+          "voice or room is copied, and nothing is said.")
+        for r in refs.values():
+            if r.get("generation_input") is None:
+                w(f"- **Open question for the founder:** may production give the clip of `{r.get('post_id')}` itself "
+                  "to the model as a generation input? Not decided. Until then it is a description source only.")
+        w("")
     w("## Beat timeline")
     w("")
     w("| Beat | Role | Time | Performance | Framing / layout | What the viewer sees | App | Subjects, set, sources | Facts |")
@@ -900,18 +1083,24 @@ def write_review(draft_path):
 
 
 # -------------------------------------------------------------------------------- lock
+def sha256_file(p):
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def pin(draft_path):
     plan = load(draft_path)
     n = 0
-    for a in plan.get("assets") or []:
-        p = os.path.join(ROOT, a["path"]) if a.get("path") else None
+    for obj, key, sha in [(a, "path", "sha256") for a in plan.get("assets") or []] + \
+                         [(r, "video_path", "video_sha256") for r in plan.get("reaction_refs") or []]:
+        p = os.path.join(ROOT, obj[key]) if obj.get(key) else None
         if p and os.path.exists(p):
-            h = hashlib.sha256()
-            with open(p, "rb") as f:
-                for chunk in iter(lambda: f.read(1 << 20), b""):
-                    h.update(chunk)
-            if a.get("sha256") != h.hexdigest():
-                a["sha256"] = h.hexdigest()
+            h = sha256_file(p)
+            if obj.get(sha) != h:
+                obj[sha] = h
                 n += 1
     if n:
         tmp = atomic_write(os.path.abspath(draft_path), plan)
@@ -988,16 +1177,53 @@ def lock(draft_path, want_digest, words_, date, dry_run):
     print("  stop: planning ends here. Production starts with character-shots when its inputs exist.")
 
 
+# --------------------------------------------------------------------------- reactions
+RX_WORDS = re.compile(r"react|shock|surpris|disbelief|gasp|amaz|stunned|jaw|hand to (?:her |his )?(?:mouth|face)", re.I)
+VIDEO_EXT = (".mp4", ".mov", ".webm")
+
+
+def reactions(slug, grep=None, limit=30):
+    """Downloaded posts in the workspace's research whose notes describe a reaction. The
+    reference of a reaction hook is chosen from these; never from memory."""
+    roots = [os.path.join(ROOT, "research", slug), os.path.join(ROOT, "apps", slug, "niche", "batches")]
+    rows = []
+    for top in roots:
+        for d, _, files in os.walk(top):
+            if "notes.md" not in files:
+                continue
+            vids = [f for f in files if f.lower().endswith(VIDEO_EXT)]
+            if not vids:
+                continue
+            text = open(os.path.join(d, "notes.md"), errors="replace").read()
+            hits = [ln.strip() for ln in text.splitlines() if RX_WORDS.search(ln)]
+            if not hits or (grep and not re.search(grep, text, re.I)):
+                continue
+            m = re.search(r"(\d[\d,]*)\s+views|views\D{0,3}(\d[\d,]*)", text, re.I)
+            views = int((m.group(1) or m.group(2)).replace(",", "")) if m else -1
+            rows.append((views, os.path.relpath(d, ROOT), vids[0], hits[0][:180]))
+    rows.sort(reverse=True)
+    print(f"{len(rows)} downloaded post(s) with a reaction in their notes"
+          + (f", matching {grep!r}" if grep else "") + "; read the notes and the frames before you pick one")
+    for views, d, v, hit in rows[:limit]:
+        print(f"- {d}/{v} · views {views if views >= 0 else '?'}\n    {hit}")
+
+
 # -------------------------------------------------------------------------------- main
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["catalogue", "brief", "check", "review", "ready", "pin", "digest", "lock"])
+    ap.add_argument("cmd", choices=["catalogue", "reactions", "brief", "check", "review", "ready", "pin", "digest", "lock"])
     ap.add_argument("path", nargs="?")
     ap.add_argument("--digest")
     ap.add_argument("--words")
     ap.add_argument("--date")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--grep")
     a = ap.parse_args()
+    if a.cmd == "reactions":
+        if not a.path:
+            sys.exit("reactions <slug>")
+        reactions(a.path, a.grep)
+        return
     if a.cmd == "catalogue":
         tv, cd = catalogue(a.path)
         print(json.dumps({"taxonomy_version": tv, "catalogue_digest": cd}))
