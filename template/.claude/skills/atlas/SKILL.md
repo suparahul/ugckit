@@ -51,6 +51,10 @@ The slideshow path's pages, the rest of the Organic Factory UI, read `apps/<slug
     steps (phase 6); the ticks and approvals are made here.
 11. `/production/<slug>` — the studio, the board of the plan; `/app/<slug>/post/<date>-<short>-<n>`
     — one post: the deck, the candidates, the approvals, the send, the read (phase 8).
+    A `Kind: video` row of the plan is a video post on the same page: its idea fields, then
+    `REVIEW.md` (Approve plan, or Send back), then the locked plan's beats and prompts beside
+    the 9:16 frame, which plays `pipeline/character/<video>/final/<video>.mp4` once it is
+    delivered (Approve for posting, then Mark posted by hand). No slide navigator.
 
 Say which page to open after each phase: the home base after `product`, the niche page
 after `niche-search` and `niche-read`, the strategy page after `account-architecture`

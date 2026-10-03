@@ -157,6 +157,7 @@ export function PostingRail({
   busy,
   onDecide,
   zones,
+  video = false,
 }: {
   post: string;
   handle: string;
@@ -172,6 +173,8 @@ export function PostingRail({
   onDecide: Decide;
   /** The posting zone and the home zone, from the plan. */
   zones: Zones;
+  /** A video post: posted from the phone and marked by hand; no send, no export (the send carries slides only). */
+  video?: boolean;
 }) {
   const router = useRouter();
   const [sending, setSending] = useState(false);
@@ -199,6 +202,18 @@ export function PostingRail({
   const who = bridge.account ? `@${bridge.account.username}` : handle;
   const schedule = <ScheduleDirect who={who} busy={sending} zones={zones} onSchedule={(at) => void send(at)} onCancel={() => setScheduling(false)} />;
   const cancelHand = () => { setByHand(false); setWithLink(false); };
+
+  if (video && !sent) {
+    return (
+      <div className="posting">
+        <div className="posting__row">
+          <MarkPosted post={post} busy={busy} onDecide={onDecide} primary withLink={withLink} />
+          {!withLink ? <button type="button" className="rail__kill" title="The TikTok link, once the post is live; optional" onClick={() => setWithLink(true)}>add the link</button> : null}
+        </div>
+        <p className="posting__under">Sending a video through the posting service is not built yet.</p>
+      </div>
+    );
+  }
 
   if (!sent) {
     return (
@@ -258,7 +273,7 @@ export function PostingRail({
 }
 
 /** After posting: "open on TikTok", "Export files again" and, when the post went through Post Bridge, "Sync outcomes" as the primary. The day-7 form, when open, sits above. */
-export function PostedRail({ post, sent, link, exported, synced, children }: { post: string; sent: SentState | null; link: string | null; exported: { at: string; dir: string } | null; synced: SyncedState | null; children?: React.ReactNode }) {
+export function PostedRail({ post, sent, link, exported, synced, children, video = false }: { post: string; sent: SentState | null; link: string | null; exported: { at: string; dir: string } | null; synced: SyncedState | null; children?: React.ReactNode; video?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -288,7 +303,7 @@ export function PostedRail({ post, sent, link, exported, synced, children }: { p
       {children ? <div className="posting__row">{children}</div> : null}
       <div className="posting__row">
         <OpenOnTikTok link={link} />
-        <ExportFiles post={post} exported={exported} />
+        {video ? null : <ExportFiles post={post} exported={exported} />}
         {sent ? <button type="button" className="rail__go" disabled={busy} title="Finds the TikTok link and pulls views, likes, comments, saves and shares through Monid into the log; Post Bridge analytics second" onClick={() => void sync()}>{busy ? "Syncing…" : "Sync outcomes"}</button> : null}
       </div>
       {synced ? <p className="posting__under">{synced.source === "monid" ? "Monid" : "Post Bridge"} {synced.at.slice(0, 10)}: {synced.views.toLocaleString("en-US")} views · {synced.likes.toLocaleString("en-US")} likes · {synced.comments.toLocaleString("en-US")} comments{synced.saves != null ? ` · ${synced.saves.toLocaleString("en-US")} saves` : ""} · {synced.shares.toLocaleString("en-US")} shares</p> : null}

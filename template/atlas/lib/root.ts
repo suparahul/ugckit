@@ -14,6 +14,8 @@ export const ROOT = process.env.ATLAS_ROOT ? resolve(process.env.ATLAS_ROOT) : r
 export const APPS_DIR = join(ROOT, "apps");
 export const RESEARCH_DIR = join(ROOT, "research");
 export const STATE_FILE = join(ROOT, "pipeline", "state", "pipeline.json");
+/* The character pipeline's folders: pipeline/character/<video>/ (the locked plan, the segments, the final file). */
+export const CHARACTER_DIR = join(ROOT, "pipeline", "character");
 
 /** The app's folder and the folders inside it, by name. */
 export const appDir = (slug: string) => join(APPS_DIR, slug);

@@ -95,7 +95,7 @@ export default async function ProductionPost({ params, searchParams }: { params:
         </Link>
         <h1 className={`post-head__topic${state.killed ? " is-killed" : ""}`}>{curl(row.topic)}</h1>
         <p className="post-head__meta">
-          <span>{row.slot}</span><span>·</span><span>{row.format}{state.deck ? ` · ${state.deck.slides.length} slides · ${state.dimension}` : ""}</span>
+          <span>{row.slot}</span><span>·</span><span>{row.video ? ["video", row.video.type, row.video.length ? `${row.video.length} s` : null, "9:16"].filter(Boolean).join(" · ") : `${row.format}${state.deck ? ` · ${state.deck.slides.length} slides · ${state.dimension}` : ""}`}</span>
           <Marks state={state} size="lg" />
           <StateWord s={state} />
           {mode === "planning" ? (

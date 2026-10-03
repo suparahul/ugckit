@@ -127,9 +127,9 @@ export function DecisionRail({
             <button type="button" className="rail__kill" disabled={busy} onClick={() => run({ post, kind: "unkill" })}>Un-kill this post</button>
           </div>
         ) : primary.kind === "posted" ? (
-          <PostingRail post={post} handle={state.row.handle} alsoInstagram={(state.platforms ?? []).includes("instagram") && !state.legs?.instagram?.dropped && !state.legs?.instagram?.sent} sent={state.sent} link={state.link} exported={state.exported} bridge={bridge ?? { account: null, why: "POST_BRIDGE_API_KEY is not set in .env", canSend: false }} warning={warning ?? null} busy={busy} onDecide={run} zones={zones} />
+          <PostingRail post={post} handle={state.row.handle} alsoInstagram={(state.platforms ?? []).includes("instagram") && !state.legs?.instagram?.dropped && !state.legs?.instagram?.sent} sent={state.sent} link={state.link} exported={state.exported} bridge={bridge ?? { account: null, why: "POST_BRIDGE_API_KEY is not set in .env", canSend: false }} warning={warning ?? null} busy={busy} onDecide={run} zones={zones} video={!!state.video} />
         ) : primary.kind === "outcomes" ? (
-          <PostedRail post={post} sent={state.sent} link={state.link} exported={state.exported} synced={state.synced}>
+          <PostedRail post={post} sent={state.sent} link={state.link} exported={state.exported} synced={state.synced} video={!!state.video}>
             {outcomesReady ? <OutcomesForm post={post} busy={busy} onDecide={run} synced={state.synced} /> : null}
           </PostedRail>
         ) : (

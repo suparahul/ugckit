@@ -27,6 +27,8 @@ import { appDir } from "./root.ts";
 import { fmtBoth, setZones } from "./when.ts";
 import { declaredPlatforms } from "./accounts.ts";
 import { PLATFORMS, PLATFORM_NAME, linePlatform, platformOf, primaryOf, slideLimit, type Platform } from "./platform.ts";
+import { readVideo, videoPlanPoint, type VideoState } from "./video.ts";
+import type { Kind, VideoIdea } from "./video-row.ts";
 
 /* ------------------------------------------------------------------- authored */
 
@@ -54,7 +56,17 @@ export type PlanRow = {
   idea: Idea;
   /** The row's own `Platforms` cell, when it has one; else the plan's `Platforms:` line, else TikTok (platformsOf). */
   platforms?: Platform[];
+  /** `video` from the plan's Kind column; absent means slideshow (every row of an old plan). */
+  kind?: Kind;
+  /** A video row's idea fields (lib/video-row.ts). */
+  video?: VideoIdea;
+  /** A video row's tags, from the Tags column. */
+  tags?: string[];
+  /** The video id an old plan wrote in Format / variation; else lib/video.ts finds it from the brief. */
+  videoId?: string | null;
 };
+
+export const isVideo = (row: Pick<PlanRow, "kind">) => row.kind === "video";
 
 /** A source post the plan points at, with what the corpus holds about it. */
 export type SourceRef = {
@@ -470,6 +482,8 @@ export type PostState = {
   dimension: Dimension;
   /** Where the post goes: the row's cell, else the plan's line, else TikTok. */
   platforms: Platform[];
+  /** A video row's files (lib/video.ts); null for a slideshow. */
+  video: VideoState | null;
   /** The leg whose state is `sent`, `posted`, `link` and `synced`: TikTok when the post goes there. */
   primary: Platform;
   legs: Partial<Record<Platform, LegState>>;
@@ -691,12 +705,15 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
   const platforms = platformsOf(row, prod.plan);
   const primary = primaryOf(platforms);
 
+  const video = isVideo(row) ? readVideo(row) : null;
+
   const killEv = last(log.filter((e) => e.kind === "kill" || e.kind === "unkill"));
   const killed = killEv && killEv.kind === "kill" ? { at: killEv.at, note: killEv.note ?? "" } : null;
 
   /* A deck on disk means the idea was approved, on paper or before this rule. */
   const ideaRaw = pointState(log, "idea.approve", "idea.sendback", null);
-  const idea: PointState = ideaRaw.status === "open" && deck ? { status: "approved", at: null, note: null } : ideaRaw;
+  /* A video's brief on disk means the same. */
+  const idea: PointState = ideaRaw.status === "open" && (deck || video?.brief) ? { status: "approved", at: null, note: null } : ideaRaw;
 
   /* A deck on disk is the plan, and the plan is read through its pictures:
    * the agent writes the deck and makes the pictures in one run, and Rahul's
@@ -709,8 +726,11 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
   const planRaw = pointState(log, "plan.approve", "plan.sendback", null);
   const planBack = last(log.filter((e) => e.kind === "plan.approve" || e.kind === "plan.sendback"));
   const rewritten = planRaw.status === "sentback" && !!deck && !!planBack?.hash && planBack.hash !== deck.hash;
-  const plan: PointState = deck && (planRaw.status === "open" || rewritten) ? { status: "approved", at: null, note: null } : planRaw;
-  const changed = deckChange(deck, log, plan, log.some((e) => e.kind === "posted" && onLeg(e, primary)));
+  /* A video's plan is the user's approval of one revision (lib/video.ts videoPlanPoint). */
+  const plan: PointState = video ? videoPlanPoint(video, log) : deck && (planRaw.status === "open" || rewritten) ? { status: "approved", at: null, note: null } : planRaw;
+  /* The plan on disk: the deck, or a video's draft or lock. */
+  const hasPlan = video ? !!(video.draft || video.lock) : !!deck;
+  const changed = video ? null : deckChange(deck, log, plan, log.some((e) => e.kind === "posted" && onLeg(e, primary)));
   const changedSlides = new Set(changed?.slides ?? []);
 
   const slides = deck ? slideStates(slug, deck, row.key, log, changedSlides) : [];
@@ -722,7 +742,10 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
    * picture or asks for a new one after it, or the deck text changes. A new
    * candidate from the agent, or a look at an earlier one, changes nothing. */
   const lastSlideDecision = last(log.filter((e) => e.kind === "slide.approve" || e.kind === "slide.reject"))?.at ?? null;
-  const final = pointState(log, "final.approve", "final.sendback", deck?.hash ?? null, (at) => !!lastSlideDecision && lastSlideDecision > at);
+  /* A video's final approval covers the delivered file: its sha256 (final/delivery.json). */
+  const final = video
+    ? pointState(log, "final.approve", "final.sendback", video.final?.sha256 ?? null)
+    : pointState(log, "final.approve", "final.sendback", deck?.hash ?? null, (at) => !!lastSlideDecision && lastSlideDecision > at);
 
   const outEv = last(log.filter((e) => e.kind === "outcomes"));
   const outcomes = outEv ? (outEv.data as Record<string, string | number> | undefined) ?? null : null;
@@ -740,7 +763,7 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
   let stage: Stage;
   if (killed) stage = "killed";
   else if (idea.status !== "approved") stage = "idea";
-  else if (!deck) stage = "planned";
+  else if (!hasPlan) stage = "planned";
   else if (plan.status !== "approved") stage = "plan";
   /* A posted post is posted: a deck edit after the fact changes nothing on the phone, so the final gate is not reopened. */
   else if (final.status !== "approved" && !(posted && final.status === "stale")) stage = "final";
@@ -749,7 +772,7 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
   else if (!outcomes && !(synced && synced.at.slice(0, 10) >= addDays(posted.at.slice(0, 10), 7))) stage = "posted";
   else stage = "read";
 
-  const mode: Mode = deck && plan.status === "approved" ? "produced" : "planning";
+  const mode: Mode = hasPlan && plan.status === "approved" ? "produced" : "planning";
 
   let sentence: string;
   let waiting = false;
@@ -759,10 +782,21 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
       if (idea.status === "sentback") sentence = `idea: sent back${q(idea.note)}`;
       else { sentence = "idea: waiting for you"; waiting = true; }
       break;
-    case "planned": sentence = "deck being written"; break;
-    /* Only a sent-back plan stops here: a deck on disk is otherwise the plan, approved. */
-    case "plan": sentence = `plan: sent back${q(plan.note)}`; break;
+    case "planned": sentence = video ? "script being written" : "deck being written"; break;
+    /* Only a sent-back plan stops here: a deck on disk is otherwise the plan, approved. A video's plan waits for the user's approval. */
+    case "plan":
+      if (plan.status === "sentback") sentence = `plan: sent back${q(plan.note)}`;
+      else { sentence = plan.status === "stale" ? "plan changed after the lock: waiting for you" : "plan: waiting for you"; waiting = true; }
+      break;
     case "final": {
+      if (video) {
+        if (final.status === "sentback") sentence = `final: sent back${q(final.note)}`;
+        else if (final.status === "stale") { sentence = "changed after approval: waiting for you"; waiting = true; }
+        else if (!video.lock) sentence = "plan approved: lock being written";
+        else if (!video.final) sentence = "in production";
+        else { sentence = "final: waiting for you"; waiting = true; }
+        break;
+      }
       const missing = slides.filter((s) => s.status === "empty" || s.status === "needsnew").length;
       const cardsMissing = cards.filter((c) => !c.file).length;
       if (final.status === "sentback") sentence = `final: sent back${q(final.note)}`;
@@ -782,8 +816,8 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
     row, deck, deckFile, stage, mode, idea, plan, final, changed, slides, cards, approvedSlides,
     posted, sent, exported, synced, link, outcomes, killed, log, sentence, waiting, demo: log.some((e) => e.actor === "demo"),
     checks: deck && deckFile ? checksFor(row, deck, deckFile, appPattern(prod.plan.app), platforms) : [],
-    dimension: deck?.dimension ?? "3:4",
-    platforms, primary, legs,
+    dimension: video ? "9:16" : deck?.dimension ?? "3:4",
+    platforms, primary, legs, video,
   };
 }
 
@@ -877,6 +911,7 @@ export const STAGE_WORD: Record<Stage, string> = {
 
 /** Why the final click cannot happen yet, or null when it can. The same rule on the server and in the rail. */
 export function finalBlock(s: PostState): string | null {
+  if (s.video) return !s.video.lock ? "the plan is not locked yet" : !s.video.final ? "the video is not delivered yet" : null;
   const empty = s.slides.filter((x) => x.status === "empty").length;
   const needs = s.slides.filter((x) => x.status === "needsnew").length;
   const cards = s.cards.filter((c) => !c.file).length;
@@ -893,7 +928,7 @@ export function primaryAction(s: PostState): { kind: EventKind | "posted" | "out
     case "idea": return { kind: "idea.approve", label: "Approve idea", disabled: null };
     case "planned": return { kind: null, label: "", disabled: null };
     /* Reached only after a send-back: the button clears it by hand; a rewritten deck clears it alone. */
-    case "plan": return { kind: "plan.approve", label: "Approve plan", disabled: null };
+    case "plan": return { kind: "plan.approve", label: "Approve plan", disabled: s.video && !s.video.review?.digest ? "REVIEW.md has no content digest yet" : null };
     case "final": return { kind: "final.approve", label: "Approve for posting", disabled: finalBlock(s) };
     case "ready": return { kind: "posted", label: "Mark posted", disabled: null };
     case "posted": return { kind: "outcomes", label: "Record outcomes", disabled: null };
@@ -915,9 +950,20 @@ export function nextStep(s: PostState): { who: "you" | "agent" | "nobody"; text:
       return s.idea.status === "sentback"
         ? say("agent", "Sent back with your note. The idea comes back here when it is reworked.")
         : say("you", "Read the idea. Approve it, or send it back with a note. The deck is written after that.");
-    case "planned": return say("agent", "The idea is approved. The deck is not written yet; it appears here when it is.");
-    case "plan": return say("agent", "Sent back with your note. The plan comes back here when the deck is rewritten.");
+    case "planned": return s.video
+      ? say("agent", "The idea is approved. The brief and the script are not written yet (video-plan, video-script); the plan appears here when they are.")
+      : say("agent", "The idea is approved. The deck is not written yet; it appears here when it is.");
+    case "plan":
+      if (s.video && s.plan.status !== "sentback") return say("you", `${s.plan.status === "stale" ? "The script changed after the lock. " : ""}Read revision ${s.video.review?.revision ?? s.video.draft?.revision ?? "?"} of the plan. Approve it, or send it back with a note. The agent then locks it (video-lock).`);
+      return say("agent", s.video ? "Sent back with your note. The plan comes back here as a new revision." : "Sent back with your note. The plan comes back here when the deck is rewritten.");
     case "final": {
+      if (s.video) {
+        if (s.final.status === "sentback") return say("agent", "Sent back with your note. It comes back here when the video is delivered again.");
+        if (!s.video.lock) return say("agent", "The plan is approved. The agent locks it with video-lock; production starts from the lock.");
+        if (!s.video.final) return say("agent", "The plan is locked. The video is in production; it shows here when it is delivered.");
+        if (s.final.status === "stale") return say("you", "A new file was delivered after you approved the post. Watch it again, then approve for posting.");
+        return say("you", "Watch the video. Approve it for posting, or send it back with a note.");
+      }
       if (s.final.status === "sentback") return say("agent", "Sent back with your note. It comes back here when the deck or the pictures are reworked.");
       const empty = s.slides.filter((x) => x.status === "empty").length;
       const needs = s.slides.filter((x) => x.status === "needsnew").length;
@@ -936,7 +982,7 @@ export function nextStep(s: PostState): { who: "you" | "agent" | "nobody"; text:
         ? (s.sent!.mode === "direct" && s.sent!.scheduledAt
           ? say("you", `Scheduled for ${fmtBoth(s.sent!.scheduledAt)} on ${s.row.handle} · direct. The posting service publishes it; nothing to do until then.`)
           : say("you", `In TikTok drafts on ${s.row.handle} since ${hhmm(s.sent!.at)}. Post it from the phone, then mark it posted.`))
-        : say("you", "Ready. Send it to TikTok drafts, or schedule a direct post.");
+        : say("you", s.video ? "Ready. Post the video from the phone, then mark it posted." : "Ready. Send it to TikTok drafts, or schedule a direct post.");
     case "posted": return say("you", `Posted ${s.posted!.time}. Outcomes open ${outcomesOpenAt(s)}.`);
     case "read": return say("nobody", "Done. Outcomes are recorded.");
     default: return say("nobody", "");

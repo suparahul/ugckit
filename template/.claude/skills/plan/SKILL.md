@@ -58,7 +58,9 @@ The Organic Factory UI reads this file by these exact conventions:
     ## Posts
     | Day | Date | Handle | Slot | Topic | Format / variation | Arm | Source | Tags | Kind |
     | 1 | 09-16 | maya | AM | … | tip list, 7 slides | Pawly slide 3 | `@x`, 1,201,654, https://www.tiktok.com/@x/photo/… | #a #b #c #d #e | slideshow |
-    (an optional last column, `Platforms`, after `Kind`: see "Two platforms")
+    | 2 | 09-17 | maya | PM | the vet-tech tip nobody gives you | video-plan | Pawly payoff | `@y`, 88,410, https://www.tiktok.com/@y/video/… | #a #b #c #d #e | video | talking_head | | gratitude_discovery | 15 |
+    (optional columns after `Kind`, found by their headers: `Platforms` (see "Two platforms"), and
+     for a video row `Video type`, `Hook`, `Hook job`, `Length` (see "A video row"))
 
     ## Day-7 read
     | Handle | Format verdict | Experiments to read | What settles each |
@@ -66,12 +68,30 @@ The Organic Factory UI reads this file by these exact conventions:
 The posts table: `Handle` is the short name (the part of the handle before the first
 dot); `Date` is `MM-DD` in the plan's year; `Source` carries the source post's handle,
 its view count and its exact url ("no URL held" when none); `Kind` is `slideshow` or
-`video` and sits last so the UI's column order holds. A row with `kind: video` names its
-maker in `Format / variation`: a character video names `video-plan` and its `video_id`
-(`video-plan reaction, hannah-2026-10-05-reaction-h5`), planned to a locked plan by the
-video planning skills (AGENTS.md § Video planning); a recreation names `originate`
-(stage 5) and joins production at `post`.
+`video`; a missing column or cell means `slideshow`. A row with `kind: video` names its
+maker in `Format / variation`: a character video names `video-plan`, planned to a locked plan by
+the video planning skills (AGENTS.md § Video planning); a recreation names `originate`
+(stage 5) and joins production at `post` (the studio leaves recreation rows out for now).
 Two handles at two a day for seven days is 28 rows; write every row with a source.
+
+## A video row
+
+The idea of a video is the row, as a slideshow's is. Required: the handle, the date and slot,
+`Kind` = `video`, `Video type` and the idea in one line (`Topic`). Useful: `Source` and the
+five `Tags`, as for a slideshow. Optional, after `Kind`, each in its own column:
+
+| Column | Value | From |
+|---|---|---|
+| `Video type` (required) | a `filming_format` of `brain/video-patterns.json` (`talking_head`, `hook_to_demo`, `live_use`, …), or `reaction` (its hook channel) | the brain; never a new word |
+| `Hook` | the hook text, exactly as the user wants it | the user |
+| `Hook job` | one of the twelve hook jobs of the brain | the brain |
+| `Length` | a length band of the brain (`10`, `15`, `20`, `30`, `35-60`) or seconds | the brain |
+
+A filled optional cell is the user's decision: `video-plan` keeps it verbatim, with status
+`user`. An empty cell (blank or `—`) is chosen by `video-plan`. Ask nothing else at the idea
+step: every other anatomy slot is `video-plan`'s. Columns a plan does not use can be left out;
+an old plan without them still reads (its video id, if it wrote one in `Format / variation`,
+still counts).
 
 ## Two platforms
 

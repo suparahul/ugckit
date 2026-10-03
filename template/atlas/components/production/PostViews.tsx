@@ -16,6 +16,7 @@ import Link from "next/link";
 import { getPost } from "@/lib/data";
 import { dateParts, getProduction, outcomesOpenAt, postPath, type Deck, type DeckFile, type PostState, type SourceRef } from "@/lib/production";
 import { Deck as DeckView } from "./Deck";
+import { VideoView } from "./VideoView";
 
 export function sourceLink(src: { handle: string | null; id: string | null } | null): { href: string; label: string; inAtlas: boolean; cover: string | null } | null {
   if (!src || !src.handle) return null;
@@ -31,6 +32,7 @@ export function sourceLink(src: { handle: string | null; id: string | null } | n
 
 export function PlanningMode({ state, readOnly, src, slideNo }: { state: PostState; readOnly?: boolean; src: ReturnType<typeof sourceLink>; slideNo: number }) {
   const { deck, deckFile } = state;
+  if (state.video) return state.video.review ? <VideoView state={state} mode="plan" /> : <IdeaBrief state={state} />;
 
   if (!deck || !deckFile) return <IdeaBrief state={state} />;
 
@@ -133,7 +135,17 @@ export function IdeaBrief({ state }: { state: PostState }) {
           </div>
         ) : null}
         <dl className="idea__rows" aria-label="This post">
-          <div className="idea__row"><dt>Format</dt><dd>{row.format}</dd></div>
+          {row.video ? (
+            <>
+              <div className="idea__row"><dt>Kind</dt><dd>video{state.video?.id ? <> · <code>{state.video.id}</code></> : null}</dd></div>
+              {([["Video type", row.video.type], ["Hook", row.video.hook ? curl(`"${row.video.hook}"`) : null], ["Hook job", row.video.hookJob], ["Length", row.video.length ? `${row.video.length} s` : null]] as const).map(([k, v]) => (
+                <div key={k} className="idea__row"><dt>{k}</dt><dd>{v ?? <span className="is-blank">{k === "Video type" ? "not set: the plan row needs it" : "chosen by video-plan"}</span>}</dd></div>
+              ))}
+              {row.tags?.length ? <div className="idea__row"><dt>Tags</dt><dd>{row.tags.join(" ")}</dd></div> : null}
+            </>
+          ) : (
+            <div className="idea__row"><dt>Format</dt><dd>{row.format}</dd></div>
+          )}
           <div className="idea__row"><dt>Feature card</dt><dd>{idea.feature ?? <span className="is-blank">none named</span>}</dd></div>
           <div className="idea__row">
             <dt>Arm</dt>
@@ -244,6 +256,7 @@ export function IdeaBrief({ state }: { state: PostState }) {
 /* ---------------------------------------------------------------- produced */
 
 export function ProducedMode({ state, slideNo, src, overlayOff, readOnly }: { state: PostState; slideNo: number; src: ReturnType<typeof sourceLink>; overlayOff?: boolean; readOnly?: boolean }) {
+  if (state.video) return <VideoView state={state} mode="produced" />;
   const { deck, deckFile } = state;
   if (!deck || !deckFile) return null;
   return <DeckView state={state} deck={deck} deckFile={deckFile} initial={slideNo} src={src ? { href: src.href, label: src.label, inAtlas: src.inAtlas } : null} overlayOff={!!overlayOff} readOnly={!!readOnly} />;

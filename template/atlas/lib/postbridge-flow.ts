@@ -78,7 +78,7 @@ export function bridgeInfo(state: PostState): { keySet: boolean; account: PBAcco
 
 /** The one note line under the band's sentence. Never the cover text itself; the account warning sits under the button instead. */
 export function postingNotes(state: PostState): string[] {
-  return postingStep(state) === "send" ? ["Slide 1 text is typed in TikTok by hand; a direct post carries it burned in."] : [];
+  return postingStep(state) === "send" && !state.video ? ["Slide 1 text is typed in TikTok by hand; a direct post carries it burned in."] : [];
 }
 
 /** The warning under the primary button when the send is not offered, or null. */
@@ -165,6 +165,8 @@ export function selectSends(slug: string, sel: SendSelect): SendPlan[] {
     const open = legs.filter((l) => !l.skip);
     const skip =
       s.killed ? "killed"
+      /* Videos are posted from the phone and marked posted by hand for now: the send carries slides only. */
+      : s.video ? "a video post is not sent through the posting service yet: post it from the phone, then mark it posted"
       : !finalOk ? `the final is not approved (${s.final.status})`
       : timeBad ? timeBad
       : !info.keySet ? info.why

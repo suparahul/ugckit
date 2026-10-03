@@ -1,5 +1,6 @@
 /**
- * Streams files straight out of ../research, and the served parts of ../apps.
+ * Streams files straight out of ../research, the served parts of ../apps, and
+ * a video post's delivered file (../pipeline/character/<video>/final/<video>.mp4).
  *
  * research/ is the source of truth and is read IN PLACE — nothing is ever copied
  * into public/. Scrapes are writing into that tree while the app is running, so
@@ -14,7 +15,7 @@ import { createReadStream, statSync } from "node:fs";
 import { join, normalize, resolve, sep } from "node:path";
 import type { NextRequest } from "next/server";
 
-import { APPS_DIR, RESEARCH_DIR } from "@/lib/root";
+import { APPS_DIR, CHARACTER_DIR, RESEARCH_DIR } from "@/lib/root";
 
 const MEDIA_ROOT = resolve(RESEARCH_DIR);
 /* apps/<slug>/… is served too, read-only: the app's icon, a handle's
@@ -22,6 +23,10 @@ const MEDIA_ROOT = resolve(RESEARCH_DIR);
  * batches. Only those folders. */
 const APPS_ROOT = resolve(APPS_DIR);
 const APP_SERVED = /^[^/]+\/(icon\.(jpg|jpeg|png|webp)$|handles\/[^/]+\/references\/|niche\/(covers|batches|instagram\/covers)\/)/;
+/* pipeline/character/<video>/final/<video>.mp4 is served too: a video post's delivered file, and nothing
+ * else of the pipeline (no plan, no approval, no segment). */
+const CHARACTER_ROOT = resolve(CHARACTER_DIR);
+const FINAL_SERVED = /^([a-z0-9][a-z0-9-]*)\/final\/\1\.mp4$/;
 
 const TYPES: Record<string, string> = {
   jpg: "image/jpeg",
@@ -73,10 +78,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pat
   // Contain every request inside media/. A decoded `..` must not escape it.
   const raw = normalize(path.map(decodeURIComponent).join("/"));
   const inApps = raw.startsWith("apps/");
-  const rel = inApps ? raw.slice(5) : raw;
-  const root = inApps ? APPS_ROOT : MEDIA_ROOT;
+  const inFinal = raw.startsWith("pipeline/character/");
+  const rel = inApps ? raw.slice(5) : inFinal ? raw.slice("pipeline/character/".length) : raw;
+  const root = inApps ? APPS_ROOT : inFinal ? CHARACTER_ROOT : MEDIA_ROOT;
   const abs = join(root, rel);
-  if (!abs.startsWith(root + sep) || (inApps && !APP_SERVED.test(rel))) {
+  if (!abs.startsWith(root + sep) || (inApps && !APP_SERVED.test(rel)) || (inFinal && !FINAL_SERVED.test(rel))) {
     return new Response("Forbidden", { status: 403 });
   }
 

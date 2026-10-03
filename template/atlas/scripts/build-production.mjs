@@ -31,6 +31,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { parsePlatforms } from "../lib/platform.ts";
+import { brainValues, columnsOf, isRecreation, kindOf, tagsOf, videoIdIn, videoIdeaOf } from "../lib/video-row.ts";
 
 const REPO = process.env.ATLAS_ROOT ? resolve(process.env.ATLAS_ROOT) : resolve(process.cwd(), "..");
 const APPS = join(REPO, "apps");
@@ -304,13 +305,21 @@ function readPlan() {
   let inTable = false;
   /* The optional `Platforms` column, found by its header (the last column, after Kind). */
   let platIdx = -1;
+  /* Kind, Tags and the optional video columns, found by their headers (lib/video-row.ts); absent in an old plan. */
+  let cols = {};
+  const brainFile = join(REPO, "brain", "video-patterns.json");
+  const brain = existsSync(brainFile) ? brainValues(JSON.parse(readFileSync(brainFile, "utf8"))) : null;
+  let recreation = 0;
   for (const l of lines) {
-    if (/^\|\s*Day\s*\|\s*Date\s*\|/.test(l)) { inTable = true; platIdx = cells(l).findIndex((x) => /^platforms?$/i.test(strip(x))); continue; }
+    if (/^\|\s*Day\s*\|\s*Date\s*\|/.test(l)) { inTable = true; platIdx = cells(l).findIndex((x) => /^platforms?$/i.test(strip(x))); cols = columnsOf(cells(l)); continue; }
     if (inTable) {
       if (!isRow(l)) { if (rows.length) break; continue; }
       const c = cells(l);
       if (c.length < 8) continue;
       const [day, md, short, slot, topic, format, arm, source] = c;
+      const kind = kindOf(c, cols);
+      /* A recreation video (originate) is left out of the studio for now. */
+      if (kind === "video" && isRecreation(format)) { recreation++; continue; }
       const h = handles[short];
       if (!h) warn(`plan: row for unknown handle "${short}" (${md} ${slot})`);
       const date = `${year}-${md}`;
@@ -338,8 +347,16 @@ function readPlan() {
       /* Written only when the row names its platforms; blank means the head line's. */
       const rowPlatforms = platIdx >= 0 ? parsePlatforms(c[platIdx]) : null;
       if (rowPlatforms) rows[rows.length - 1].platforms = rowPlatforms;
+      /* A video row: its idea fields, its tags, and the id an old plan wrote in Format / variation. Slideshow rows stay as they were. */
+      if (kind === "video") {
+        const { idea, warnings } = videoIdeaOf(c, cols, brain);
+        Object.assign(rows[rows.length - 1], { kind, video: idea, tags: tagsOf(c, cols), videoId: videoIdIn(format) });
+        for (const w of warnings) warn(`plan: ${md} ${short} ${slot}: ${w}`);
+      }
     }
   }
+
+  if (recreation) warn(`plan: ${recreation} recreation video row(s) (originate) left out of the studio for now`);
 
   /* Day tasks: in "## Today — <date>", the paragraph "Before the first post: a; b." */
   const tasks = {};

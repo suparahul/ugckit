@@ -58,6 +58,7 @@ export type ExportReport = { dir: string; files: string[] };
 export async function exportPost(slug: string, key: string, opts: { compose?: boolean } = {}): Promise<ExportReport> {
   const state = allStates(slug).find((s) => s.row.key === key);
   if (!state) throw new Error(`No post ${key}.`);
+  if (state.video) throw new Error(`A video post has no export: the file is pipeline/character/${state.video.id ?? "<video>"}/final/${state.video.id ?? "<video>"}.mp4.`);
   if (!state.deck) throw new Error("No deck.");
   if (opts.compose !== false) {
     const { stdout } = await run("node", ["scripts/render-slides.mjs", slug, key], { cwd: process.cwd(), maxBuffer: 8 * 1024 * 1024 });

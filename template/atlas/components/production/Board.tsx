@@ -201,7 +201,9 @@ export function Cell({ s, time }: { s: PostState; time?: string }) {
   if (s.waiting) cls.push("is-waiting");
   if (s.stage === "killed") cls.push("is-killed");
   const pic = firstPicture(s);
-  const word = s.stage === "idea" ? "idea" : s.stage === "planned" ? "deck" : s.stage === "plan" ? "plan" : s.stage === "final" ? "pictures" : "deck";
+  const word = s.video
+    ? (s.stage === "idea" ? "idea" : s.stage === "planned" ? "script" : s.stage === "plan" ? "plan" : s.video.final ? "video ✓" : "video")
+    : s.stage === "idea" ? "idea" : s.stage === "planned" ? "deck" : s.stage === "plan" ? "plan" : s.stage === "final" ? "pictures" : "deck";
   const nb = s.posted ? numbersOf(s) : null;
   const z = (v: number) => (v === 0 ? "is-zero" : undefined);
   return (
@@ -209,7 +211,7 @@ export function Cell({ s, time }: { s: PostState; time?: string }) {
       <span className={`cell__thumb${pic ? "" : " is-empty"}`} aria-hidden="true">{pic ? <img src={pic} alt="" /> : <span className="cell__nopic">{word}</span>}</span>
       <span className="cell__handle">{s.row.slot}{time ? ` · ${time}` : ""}</span>
       <span className="cell__topic">{s.row.topic}</span>
-      <span className="cell__format"><span className="state">{s.row.format}{s.deck ? ` · ${s.deck.slides.length} slides` : ""} · {s.dimension}</span></span>
+      <span className="cell__format"><span className="state">{s.row.video ? `video${s.row.video.type ? ` · ${s.row.video.type}` : ""}` : `${s.row.format}${s.deck ? ` · ${s.deck.slides.length} slides` : ""}`} · {s.dimension}</span></span>
       <span className="cell__state"><Marks state={s} /><StateWord s={s} /></span>
       {nb ? <span className="cell__read" aria-label={`${n(nb.views)} views, ${nb.saves} saves, ${nb.shares} shares`}><b>{n(nb.views)}</b><span className={z(nb.saves)}>{nb.saves} {nb.saves === 1 ? "save" : "saves"}</span><span className={z(nb.shares)}>{nb.shares} {nb.shares === 1 ? "share" : "shares"}</span></span> : null}
       <LegSplit s={s} className="cell__split" />

@@ -18,7 +18,11 @@ the row of the user's plan. The idea is already chosen; this step does not choos
 ## Read, in this order
 
 1. The fit: the handle's section of `strategy/VIDEO-FIT.md` for this video type.
-2. The row: the exact row of the user's plan, verbatim, and the handle's hook table.
+2. The row: the exact row of the user's plan, verbatim, and the handle's hook table. In
+   `production/PLAN.md` a video row carries its idea fields in their own columns (the `plan`
+   skill, "A video row"): `Video type`, and optionally `Hook`, `Hook job`, `Length`. Copy them
+   into `strategy_ref.row_fields`. A filled one is the user's decision: keep it verbatim, as a
+   choice with status `user`; an empty one is yours to choose.
 3. The brain: the hook job and the recipe in `brain/video-patterns.json`, the slots in
    `brain/VIDEO-ANATOMY.md`; the local overlay when it exists.
 4. The handle's world, characters, narrators; the app's screen library and `APP.md`.
@@ -36,7 +40,10 @@ Lowercase, digits and hyphens. It is the folder name here and under `pipeline/ch
       "video_id": "...", "app": "<slug>", "product_name": "<as APP.md>", "handle": "@...",
       "date": "YYYY-MM-DD or null",
       "strategy_ref": {"file": "...", "section": "...", "row": "<the row, verbatim>",
-                       "disposition": "scheduled|candidate|stopped|avoid"},
+                       "disposition": "scheduled|candidate|stopped|avoid",
+                       "post": "<YYYY-MM-DD>/<short>/<n>: the studio's post key, for a PLAN.md row",
+                       "row_fields": {"video_type": "...|null", "hook": "...|null",
+                                      "hook_job": "...|null", "length": "...|null"}},
       "taxonomy_version": "...", "catalogue_digest": "sha256:...", "local_overlay": null,
       "idea": "<one line>", "viewer_moment": "<one concrete situation>", "topic": "...",
       "metric": "<how the objective is read>",
@@ -77,6 +84,12 @@ Lowercase, digits and hyphens. It is the folder name here and under `pipeline/ch
 
 ## Rules
 
+- **The row's fields are the user's.** For each filled field of `row_fields`, a choice with
+  status `user`: `video_type` as `filming_format` (or `hook_channel` for `reaction`), `hook` as
+  `hook_text` (h1, verbatim, selected), `hook_job` as `hook_job`, `length` as `length_band` (or
+  `length_s` for seconds). `video_plan.py brief` checks each one. `post` is the row's key in the
+  studio (`<date>/<short>/<n>`, n the row's order that day for the handle): the Atlas finds the
+  video by it. A row from another file has no `post` and `row_fields` null.
 - **The plan's words first.** A hook the plan writes is hook alternative h1, verbatim. Up to
   two more alternatives, inside the same hook job and the same body, each a different idea
   (not a changed noun), each with its reason. Never more than three; never a bank.

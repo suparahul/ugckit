@@ -10,6 +10,10 @@
  * hash per slide, so a later edit can name the slide it touched. The final
  * line approves every picture still open (one `slide.approve` per file, so
  * the record names what was approved), then records the same hashes.
+ *
+ * A video post: `plan.approve` records the video id, the revision and the
+ * content digest of REVIEW.md (video-lock reads it as the user's approval);
+ * `final.approve` records the delivered file's sha256 as its hash.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -71,11 +75,25 @@ export async function POST(request: NextRequest) {
     data = { ...(data ?? {}), slides: slideHashes(state.deck) };
   }
   if (body.kind === "plan.sendback" && state?.deck) hash = state.deck.hash;
+  /* A video's plan gate is one exact revision, by digest: the line records what REVIEW.md showed, and
+   * video-lock --from-atlas takes it as the user's approval. A send-back records the revision it refused. */
+  if (state?.video && body.kind === "plan.approve") {
+    const r = state.video.review;
+    if (!state.video.id || !r?.digest) return NextResponse.json({ error: "No REVIEW.md with a content digest to approve yet." }, { status: 400 });
+    data = { ...(data ?? {}), video: state.video.id, revision: r.revision ?? state.video.draft?.revision ?? null, digest: r.digest };
+  }
+  if (state?.video && body.kind === "plan.sendback") data = { ...(data ?? {}), video: state.video.id, revision: state.video.draft?.revision ?? null };
   if (body.kind === "slide.layout") {
     if (typeof body.slide !== "number" || !parseLayout(data?.layout)) return NextResponse.json({ error: "slide and data.layout (JSON) are required." }, { status: 400 });
     if (!state?.slides.some((s) => s.n === body.slide)) return NextResponse.json({ error: "No such slide." }, { status: 400 });
   }
-  if (body.kind === "final.approve") {
+  /* A video's final approval covers the delivered file, by its checksum. */
+  if (body.kind === "final.approve" && state?.video) {
+    const why = finalBlock(state);
+    if (why) return NextResponse.json({ error: `Not yet: ${why}.` }, { status: 400 });
+    hash = state.video.final!.sha256;
+    data = { ...(data ?? {}), video: state.video.id };
+  } else if (body.kind === "final.approve") {
     if (!state?.deck) return NextResponse.json({ error: "No deck to approve." }, { status: 400 });
     const why = finalBlock(state);
     if (why) return NextResponse.json({ error: `Not yet: ${why}.` }, { status: 400 });

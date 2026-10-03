@@ -18,6 +18,9 @@ video. Free, local: no generation, no network, no production state.
     video_plan.py digest <plan json>                 the content digest the approval pins
     video_plan.py lock   <plan.draft.json> --digest <hex> --words "<the user's words>" --date YYYY-MM-DD
     video_plan.py lock   <plan.draft.json> --digest <hex> --dry-run
+    video_plan.py lock   <plan.draft.json> --from-atlas      the user's "Approve plan" click in the Atlas
+                                                     (a plan.approve line in apps/<slug>/production/log.jsonl
+                                                     with this revision's digest) is the approval
 
 The draft lives in apps/<slug>/production/video-plans/<video>/ with its brief.json. The
 lock writes pipeline/character/<video>/plan.json and planning-approval.json and stops: it
@@ -233,6 +236,7 @@ def check_brief(b, out):
                     out.no(f"reaction_reference.{k} {rr[k]} is not in the workspace")
     if b.get("selected_hook") not in {h.get("id") for h in alts}:
         out.no(f"selected_hook {b.get('selected_hook')!r} is not one of the alternatives")
+    check_row_fields(b, t, out)
     for c in b.get("choices") or []:
         if c.get("status") not in S["choice_status"]:
             out.no(f"choice {c.get('slot')}: status {c.get('status')!r}; one of {S['choice_status']}")
@@ -251,6 +255,47 @@ def check_brief(b, out):
     if not out.bad:
         out.ok(f"brief {b.get('video_id')}: {hook.get('job_id')} hook, {a.get('recipe_id')} recipe, "
                f"{ff}, {len(alts)} hook alternative(s), {len(b.get('missing_inputs') or [])} missing input(s)")
+
+
+# The optional idea fields of a video row in the studio plan (production/PLAN.md: Video type, Hook,
+# Hook job, Length). A filled cell is the user's decision: kept verbatim, status user. An empty one is
+# null and video-plan chooses it. A brief written before these columns has no row_fields: nothing to check.
+ROW_SLOTS = {"video_type": ("filming_format", "hook_channel"), "hook": ("hook_text",),
+             "hook_job": ("hook_job",), "length": ("length_band", "length_s")}
+
+
+def check_row_fields(b, t, out):
+    rf = (b.get("strategy_ref") or {}).get("row_fields")
+    if rf is None:
+        return
+    a = b.get("anatomy") or {}
+    hook = a.get("hook") or {}
+    alts = {h.get("id"): h for h in b.get("hook_alternatives") or []}
+    user = {c.get("slot") for c in b.get("choices") or [] if c.get("status") == "user"}
+    for k in ROW_SLOTS:
+        v = rf.get(k)
+        if v in (None, ""):
+            continue
+        if not user & set(ROW_SLOTS[k]):
+            out.no(f"the row's {k} {v!r} is the user's decision: a choice for {' or '.join(ROW_SLOTS[k])} with status user")
+        if k == "video_type":
+            ff = t["aliases"]["filming_format"].get(a.get("filming_format"), a.get("filming_format"))
+            if v == "reaction" and hook.get("channel") != "reaction":
+                out.no("the row's video type is reaction: anatomy.hook.channel must be reaction")
+            elif v != "reaction" and t["aliases"]["filming_format"].get(v, v) != ff:
+                out.no(f"the row's video type is {v!r}; anatomy.filming_format is {a.get('filming_format')!r}")
+        elif k == "hook":
+            if (alts.get("h1") or {}).get("text") != v or b.get("selected_hook") != "h1":
+                out.no("the row's hook is h1, verbatim, and the selected hook")
+        elif k == "hook_job" and hook.get("job_id") != v:
+            out.no(f"the row's hook job is {v!r}; anatomy.hook.job_id is {hook.get('job_id')!r}")
+        elif k == "length":
+            band = str(v).replace("–", "-")
+            if band in t["slots"]["length_band"]:
+                if str(a.get("length_band")) != band:
+                    out.no(f"the row's length is the band {band}; anatomy.length_band is {a.get('length_band')!r}")
+            elif num(a.get("length_s")) is None or abs(float(band) - a["length_s"]) > TOL:
+                out.no(f"the row's length is {band} s; anatomy.length_s is {a.get('length_s')!r}")
 
 
 # -------------------------------------------------------------------------- the contract
@@ -1135,13 +1180,53 @@ def atomic_write(path, data):
     return tmp
 
 
-def lock(draft_path, want_digest, words_, date, dry_run):
+def atlas_approval(lines, video_id, revision, want):
+    """The user's "Approve plan" click in the Atlas, from the app's decision log: the last plan line
+    for this video must be a plan.approve by the user (no actor) for this revision and this digest.
+    Returns (words, date, at). The words say what the user did; nobody writes words for them."""
+    mine = [e for e in lines if e.get("kind") in ("plan.approve", "plan.sendback")
+            and (e.get("data") or {}).get("video") == video_id]
+    if not mine:
+        sys.exit(f"no Atlas plan decision for {video_id}: the user approves the plan in the Atlas, "
+                 "or gives their words here (--digest --words --date)")
+    e = mine[-1]
+    d = e.get("data") or {}
+    if e["kind"] == "plan.sendback":
+        sys.exit(f"the last Atlas decision for {video_id} is a send-back ({e.get('at', '')[:16]}): "
+                 f"“{e.get('note', '')}”. Rework the draft as a new revision")
+    if e.get("actor"):
+        sys.exit(f"the Atlas line was written by {e['actor']!r}, not by the user: it is not an approval")
+    if d.get("digest") != want or d.get("revision") != revision:
+        sys.exit(f"the Atlas approval is for revision {d.get('revision')}, digest {str(d.get('digest'))[:12]}…; "
+                 f"the draft is revision {revision}, digest {want[:12]}…. Write REVIEW.md again and ask again")
+    words = (e.get("note") or "").strip() or f"Approve plan (clicked in the Atlas on revision {revision})"
+    return words, e["at"][:10], e["at"]
+
+
+def read_log(slug):
+    p = os.path.join(ROOT, "apps", slug or "", "production", "log.jsonl")
+    out = []
+    if os.path.exists(p):
+        for ln in open(p, encoding="utf-8"):
+            try:
+                out.append(json.loads(ln))
+            except ValueError:
+                pass
+    return out
+
+
+def lock(draft_path, want_digest, words_, date, dry_run, from_atlas=False):
     plan = load(draft_path)
     brief, _ = brief_of(draft_path)
     print(f"lock {os.path.relpath(os.path.abspath(draft_path), ROOT)}")
     if "approved" in plan:
         sys.exit("the draft carries 'approved'; the lock writes it")
     got = digest(plan)
+    atlas_at = None
+    if from_atlas:
+        words_, date, atlas_at = atlas_approval(read_log(plan.get("app")), plan.get("video_id"), plan.get("revision"), got)
+        want_digest = got
+        print(f"  ✓ the user's Atlas approval of {atlas_at[:16]} is for this revision and digest")
     if want_digest != got:
         sys.exit(f"the draft's digest is {got}; the approval is for {want_digest}. The user approves the "
                  "draft they were shown: write REVIEW.md again and show it.")
@@ -1183,6 +1268,8 @@ def lock(draft_path, want_digest, words_, date, dry_run):
           "words": approved["words"], "date": approved["date"], "evidence_snapshot_digest": cd}
     if dry_run:
         pa["dry_run"] = True
+    if atlas_at:
+        pa["approved_in"] = {"atlas_line_at": atlas_at}
     t1 = atomic_write(os.path.join(vd, "planning-approval.json"), pa)
     t2 = atomic_write(cur, final)
     os.replace(t1, os.path.join(vd, "planning-approval.json"))
@@ -1235,6 +1322,7 @@ def main():
     ap.add_argument("--date")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--grep")
+    ap.add_argument("--from-atlas", action="store_true")
     a = ap.parse_args()
     if a.cmd == "reactions":
         if not a.path:
@@ -1257,9 +1345,11 @@ def main():
         pin(a.path)
         return
     if a.cmd == "lock":
-        if not a.digest:
-            sys.exit("--digest: the digest printed in the REVIEW.md the user approved")
-        lock(a.path, a.digest, a.words, a.date, a.dry_run)
+        if not a.digest and not a.from_atlas:
+            sys.exit("--digest: the digest printed in the REVIEW.md the user approved (or --from-atlas)")
+        if a.from_atlas and (a.dry_run or a.words):
+            sys.exit("--from-atlas takes the approval from the Atlas line; no --words, no --dry-run")
+        lock(a.path, a.digest, a.words, a.date, a.dry_run, a.from_atlas)
         return
     out = Out()
     if a.cmd == "brief":

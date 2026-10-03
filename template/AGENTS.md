@@ -360,6 +360,11 @@ what is missing (`ready`) and writes the lock. Free.
   expression beats are the fallback and the review checklist.
 - **No planning state store.** The files say where a video is: a brief, a draft in review, a
   locked plan. Locking never runs `shots.py check` (it starts production state).
+- **The studio carries video ideas.** A `Kind: video` row of `production/PLAN.md` holds the
+  idea (`Video type`; optional `Hook`, `Hook job`, `Length`, each a user decision when filled;
+  the `plan` skill, "A video row"). The Atlas shows the video post through the slideshow's
+  gates: idea, plan (REVIEW.md; its **Approve plan** click is taken by `video-lock
+  --from-atlas`), final (the delivered file, **Approve for posting**), then Mark posted.
 - **Later steps hook in here, not built yet:** a scheduling step that writes the dated rows
   planning reads; the setup-time video evidence (competitor and niche observations merged
   into `apps/<slug>/niche/video/patterns.json`) that `video-fit` and `video-plan` read

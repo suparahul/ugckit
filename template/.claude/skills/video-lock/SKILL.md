@@ -8,6 +8,7 @@ description: Video planning, step 4 — show the exact draft for the user's appr
     python3 scripts/planning/video_plan.py ready <plan.draft.json>
     python3 scripts/planning/video_plan.py pin   <plan.draft.json>      fills supplied files' sha256
     python3 scripts/planning/video_plan.py lock  <plan.draft.json> --digest <hex> --words "<the user's words>" --date YYYY-MM-DD
+    python3 scripts/planning/video_plan.py lock  <plan.draft.json> --from-atlas   the Atlas "Approve plan" click is the approval
 
 The one human gate of planning. Plan approval approves the words, the actions, the timing,
 the cast and the sources of one revision. It does not approve a storyboard, a keyframe or a
@@ -26,9 +27,15 @@ cost: those are production gates.
    checksums are part of what is approved.
 3. **Show.** Show `REVIEW.md` in full, with its revision and content digest. Ask for
    approval of that revision in the user's own words. A change request goes back to
-   `video-script`; it is a new revision.
+   `video-script`; it is a new revision. The user can also read `REVIEW.md` on the post's page
+   in the Atlas and click **Approve plan** (or **Send back** with a note): the click writes a
+   `plan.approve` line to `apps/<slug>/production/log.jsonl` with the video id, the revision
+   and the digest REVIEW.md showed.
 4. **Lock.** With the user's words and the date, run `lock` with the digest from the
-   `REVIEW.md` they approved. The script refuses when the draft changed after the review,
+   `REVIEW.md` they approved. After an Atlas approval, run `lock --from-atlas`: it takes the
+   last Atlas plan line for this video, refuses a send-back, a line another actor wrote, or a
+   line for another revision or digest, and records the click (its note, or "Approve plan
+   (clicked in the Atlas on revision N)") and its date as the approval. The script refuses when the draft changed after the review,
    when the contract fails, when a blocking input is missing, or when an older plan for the
    same video has the same revision with other content. It writes
    `pipeline/character/<video>/planning-approval.json`
