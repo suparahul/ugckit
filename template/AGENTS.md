@@ -374,9 +374,9 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
 | | D2 voice | `character-voice` | the approved voice reference |
 | B, per video | P1 shots | `character-shots` | segments, shot files, `video.json`, keyframes, prompts, `refs.json`; **gate A**, the storyboard the user approves |
 | | P2 generate | `character-generate` | one segment per run, after the user's yes to its computed cost |
-| | P3 review | `character-review` | keep, reject or regenerate one segment; **gate B**; a reject adds a ledger row |
+| | P3 review | `character-review` | keep, reject or regenerate one segment; **gate B**; a reject adds a ledger row; each supplied file and narrator take approved |
 | | P4 composite | `character-composite` (with `screens`, the screen library) | the real app on the green phone, at 1080x1920, and its insertion gates; **skipped when `app_insertion` is false** |
-| | P5 assemble | `character-assemble` | one 1080x1920 file from `video.json`: trims, R and P, sound, captions, the export pass |
+| | P5 assemble | `character-assemble` | one 1080x1920 file from `video.json`: trims, R and P, supplied C and panels M, narration, sound, captions, the plan's overlays, the export pass |
 | | P6 deliver | `character-deliver` | **gate C**, then the finished file in `final/`; the pipeline ends here |
 
 - **Production starts only from `pipeline/character/<video>/plan.json`**, locked and
@@ -384,6 +384,23 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
   plan whose character is not ready stops and asks for part A.
 - **`app_insertion` false** means no app segment (no O, G, S, H, F, R or P) and no screen
   stage; `scripts/character/state.py` shows P4 as `n/a`.
+- **The production bridge, for a v2 plan** (`schema_version` 2). `scripts/character/bridge.py`
+  checks the plan at `shots.py check` (its fields, and its approval against the digest of
+  this exact revision) and `video.json` at `shots.py validate` (each beat's seconds, words,
+  performance, action, subjects and set; the panels, overlays, narration and live
+  pairing). Three more segment types: **B**, a silent generated action (hands only, pet
+  only, or an approved mascot; never the app); **C**, supplied media (a clip or a still of
+  the plan's assets: never generated, approved at gate B with `review.py source`); **M**,
+  panels (split screen, picture in picture). A narrator speaks where no generated face
+  talks: the character's approved performance, a supplied voice, or an original synthetic
+  narrator (`character-voice`, narrator mode: never a clone of a real person, never a
+  credential, never over a human face). Overlays are the plan's, timed, checked at gate C.
+  `scripts/character/capabilities.json` tells planning what production can make. A plan
+  without `schema_version` runs exactly as before.
+- **Supplied footage is output, never conditioning.** No plan asset and nothing under
+  `supplied/` is a reference of a keyframe or a generation; `generate.sh` refuses it. A
+  real animal (`origin: real` in `world.json`) is never generated. A filmed phone in a
+  supplied clip passes the same flat-on and tracking gates as a generated plate.
 - **References are the standard mode here.** Rule 1 and the three flows are the
   recreation pipeline's. In the character pipeline, a segment may carry `refs.json` with
   only these kinds: the character's anchors (and her hero), the segment's approved

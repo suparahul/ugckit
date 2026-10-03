@@ -14,13 +14,19 @@ and the checks of `assembly/assembly.json`. On the first real use case, both exp
 default and `<video>-grain.mp4`; the user picks one (the grain test). Walk the final
 checklist with them: the face, the outfit and the set hold across every segment; the
 voice and the room agree across every join; no join inside a sentence; the app's strings
-are real and readable; the captions match the frozen script and the house style.
+are real and readable; the captions match the frozen script and the house style; the
+overlays are the plan's words at the plan's times, readable and clear of the app and the
+captions; each supplied clip is the approved one.
 
 ## 2. Record their decision
 
     scripts/character/review.py final <video> --decision approve --words "<the user's words>" [--export grain]
     scripts/character/review.py final <video> --decision regenerate --segment <n> --words "<the user's words>"
     scripts/character/review.py final <video> --decision reject --words "<the user's words>"
+
+For a v2 plan an approval is refused when the file was assembled from another revision
+of the plan, or when an overlay or supplied-file check failed in `assembly.json`:
+assemble again, or take the problem back to P1 or to planning.
 
 A regenerate goes back to that segment alone: `character-generate` (a paid run, with its
 own yes), `character-review`, then P4 and P5 again. A reject stops the video; say why in

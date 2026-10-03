@@ -8,7 +8,11 @@ description: P4 of the character pipeline — put the real app on the green phon
     scripts/character/composite.sh <video> <nn>-<type> [plate.mp4]
 
 **Only for a plan with `app_insertion` true**, for each phone segment (O, G, S, H, F)
-whose plate is approved at gate B (`character-review`). A plan without app insertion has
+whose plate is approved at gate B (`character-review`), and for a C segment whose
+supplied clip films a phone (`insert` in `video.json`): its plate is
+`segments/<nn>-c/source/plate.mp4` (`shots.py supplied`), and it passes the gates of its
+insert mode (in-hand as G, show-to-camera as S, finger as F...), the flat-on gate first,
+unchanged. A real recording that fails them is filmed again. A plan without app insertion has
 no P4 (`state.py` shows it as n/a). R and P are not composited; `character-assemble`
 builds them. Local OpenCV and ffmpeg, so iterate freely.
 

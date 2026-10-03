@@ -1,6 +1,6 @@
 ---
 name: character-shots
-description: P1 of the character pipeline — from a locked, approved plan and a pinned character, cut the video into segments, write the shot files, video.json and each segment's prompt and refs.json, render the keyframes with the Codex image tool, run the prompt lint, and get the storyboard approved by the user (gate A). Free; no video is generated.
+description: P1 of the character pipeline — from a locked, approved plan (v1, or v2 with its editorial contract, supplied media, narrators and overlays), cut the video into segments (talking, phone, silent action B, supplied C, panels M), write the shot files, video.json and each segment's prompt and refs.json, render the keyframes with the Codex image tool, run the prompt lint and the bridge check, and get the storyboard approved by the user (gate A). Free; no video is generated.
 ---
 
 # P1 — the shots and the storyboard
@@ -29,8 +29,20 @@ plates is part A: say what is missing and run `persona-identity` (mode 3) first.
 check passes it records the video in `pipeline/character/state.json`, with or without
 app insertion as the plan says.
 
+**A v2 plan** (`schema_version` 2) is also checked by the production bridge
+(`scripts/character/bridge.py plan <video>`, run by `check`): its approval matches the
+digest of this exact revision (`planning-approval.json`), the editorial values, beats in
+order that cover the length, at most 15 words per 4 s per beat, every voiceover beat
+bound to a narrator, every supplied asset on disk with its checksum, permission and
+range, overlays long enough to read, a source credit over a third party's clip, the live
+pairing of an input clip and its app recording. A v2 plan may pin no character
+(`characters: []`) when no generated person or mascot appears; a real animal of the
+world (`origin: real`) is only ever shown in supplied footage.
+
 A plan is changed only by the planning system and the user. If the plan cannot be made as
-written, say why and stop; do not adjust it.
+written, say why and stop; do not adjust it. Report the infeasibility back to planning
+(`video-lock`) with the beat and the reason: never relabel a silent beat as talk, never
+generate what the plan supplies, never change the format to pass a check.
 
 ## 2. Cut the segments
 
@@ -46,8 +58,25 @@ Mark the cut points on the frozen script first, then give each segment its lines
   beat that shows the app becomes O, G, S, H or F (a plate with a green phone, inserted
   at P4) or R, P (the real recording, no generation): choose by what the viewer must do
   (read → R or a large S hold; recognise → G or O; believe → F or H). H and F speak no
-  line on camera; their audio is laid at assembly. **With `app_insertion` false, every
-  segment is T**, and there is no screen stage.
+  line on camera; their audio is laid at assembly. **With `app_insertion` false, no
+  segment shows the app** (no O, G, S, H, F, R or P), and there is no screen stage.
+- **B, a silent generated action** (v2): hands only (a pinned human's hands, no face),
+  pet only (the world's generated subjects, no person) or an approved mascot. Exact
+  subject ids and count, the beat's set. No line on camera and no voice reference; a
+  narration is laid at assembly (`audio_from`). **Never the app**: a beat that shows the
+  app is O, G, S, H, F, R or P.
+- **C, supplied media** (v2): the plan's clip (`source_range_s`, inside the asset's
+  approved `trim_s`) or still (`still_s`). No casting, no keyframe, no prompt, no
+  generation. Its own sound plays unless `audio` is `mute` or `audio_from` lays another.
+  A clip that films a phone whose screen is replaced has `insert: {mode, screen_id}` and
+  goes through the same insertion gates as a generated plate (step 3).
+- **M, panels** (v2): a split-screen or picture-in-picture beat, its panels copied from
+  the plan (`asset_id`, the `project` of an approved B, or a `screen_id`; the range, the
+  `rect`, `crop` and `sync_offset_s`). A live demonstration keeps the measured offset of
+  its input clip and its app recording.
+- **Supplied media is never a reference.** No plan asset and nothing under `supplied/`
+  is attached to a keyframe or a generation; `shots.py validate` and `generate.sh`
+  refuse it.
 - **The references, at most four pictures on the default model**, in this order: the
   keyframe, the hero, the sheet of each fixed subject in the shot, then one more (the
   angle anchor nearest the shot, or the last frame of the neighbour segment). The voice
@@ -69,13 +98,25 @@ Under `pipeline/character/<video>/`:
   earned ones only from the ledger, at most five), and the `video` block with its
   references and their `kind`.
 - `video.json` from `video.example.json`: the plan's pins, `app_insertion`, the outfit,
-  and the segments in order with their lines (R and P carry a `screen_id`).
+  and the segments in order with their lines (R and P carry a `screen_id`). For a v2
+  plan also: `plan_revision` and `plan_sha256` (`bridge.py digest`), `beat_ids` on every
+  segment, the plan's `overlays` copied exactly, `audio_from` for every narrated segment
+  (`narration:<take>` for an original synthetic narrator, `asset:<id>` for a supplied
+  voice, `<video>.<seg>` for the character's own approved performance). A shot file
+  copies its beat's `action` word for word, its exact `fixed_subjects_in_shot`, its
+  `set_ref` and `framing_kind`.
 
 Then check them, and write each segment's `refs.json` (and, for a phone segment, a first
-`insert.json` that P4 completes):
+`insert.json` that P4 completes; for a C segment with a filmed phone, its plate):
 
     scripts/character/shots.py validate <video>
     scripts/character/shots.py refs <video>
+    scripts/character/shots.py supplied <video>        # only for a C segment with insert
+
+For a v2 plan, `validate` ends with the bridge: each beat in its segments at the plan's
+seconds (half a second, or a tenth of the beat, either way), the words, the performance
+(a T segment only on on_camera beats), the actions, the subjects, the sets, the panels,
+the narration sources, the overlays and the live pairing.
 
 ## 4. The keyframes
 
@@ -96,7 +137,10 @@ not compute that cost."**
 
 Every still is 1080x1920 at `keyframes/<nn>-<type>.png` (and `<nn>-h-end.png` for H).
 **Look at each one before the user does**, against the anchors: is it her (face, hair,
-signature details); exactly one person; does it read as a camera-roll photo, not an ad;
+signature details); who is in the picture, by the shot's `framing_kind` (face: exactly
+one person; hands only: one person's hands and forearms, no face; subject only: no
+person at all, the subjects in their exact count); does it read as a camera-roll photo,
+not an ad;
 is the room right and not too tidy; is she holding what she should; hands counted; for
 O, G, S, H, F the phone at its size and **flat-on to the lens** (an angled phone is
 redone, never fixed later); for H the end still too; for F the other hand already raised
@@ -149,6 +193,11 @@ and the flat-on sentence, word for word:
 > lens and upright, with no tilt, no turn and no perspective, from the first frame to the
 > last.
 
+For B there is no phone section: PERFORMANCE says "No one speaks" (or "She does not
+speak"), ANIMALS/PROPS gives each subject's exact count ("exactly two cats") and true
+size, a hands-only shot says "no face", and a subject-only shot says "No person in
+frame" and never "exactly one person".
+
 For H the push sentence replaces the stability paragraph; for F the finger sentence is
 added. Fill the times and sizes from the shot's `phone_motion`:
 
@@ -183,7 +232,8 @@ runs again.
 Show the user `keyframes/storyboard.jpg` and, per segment, one line: the type, the
 planned and generated length, the lines it speaks, the references it will carry, and the
 computed cost of its generation (`price_per_s` × generated seconds, from `models.json`),
-with the total. Ask for approval **by word**. A "redo <n>" goes back to step 4 for that
+with the total. C and M segments cost nothing and have no keyframe: give their source
+asset, range and panels, and the narration or sound laid under them. Ask for approval **by word**. A "redo <n>" goes back to step 4 for that
 still only.
 
 On approval, write `approval.json` from `approval.example.json`: `gate_a_storyboard` with

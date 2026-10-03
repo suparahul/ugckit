@@ -8,7 +8,8 @@ description: P2 of the character pipeline — generate one segment of a characte
     ALLOW_REFS=1 CONFIRM=1 scripts/character/generate.sh <video> <nn>-<type>
 
 One segment per run, from its folder `pipeline/character/<video>/segments/<nn>-<type>/`
-(`prompt.txt`, `refs.json`). Only `character-assemble` knows the whole video.
+(`prompt.txt`, `refs.json`): T, O, G, S, H, F or B. Only `character-assemble` knows the
+whole video.
 
 ## Before the first run of a video
 
@@ -47,7 +48,8 @@ notification. Do not poll with sleep.
 ## Guards in the script — do not work around them
 
 - The storyboard approval, the character's `live` status, the reference kinds (never an
-  app screen: the app is inserted at P4).
+  app screen: the app is inserted at P4), and never supplied media (a plan asset or a
+  file under `supplied/`). C, M, R and P are never generated.
 - At most `max_reference_images` pictures (4 on the default model); the voice clip does
   not count.
 - The prompt under 5,000 characters, counted as characters; sent once, as message

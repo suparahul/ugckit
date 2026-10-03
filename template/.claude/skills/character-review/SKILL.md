@@ -1,6 +1,6 @@
 ---
 name: character-review
-description: P3 of the character pipeline, gate B — measure one generated segment with qc.py (and its phone screen's insertion gates), look at it against the character's anchors and the frozen script, and record keep, reject or regenerate in approval.json with the user's words. A reject adds a row to the user's failure ledger. Free.
+description: P3 of the character pipeline, gate B — measure one generated segment with qc.py (and its phone screen's insertion gates), look at it against the character's anchors and the frozen script, and record keep, reject or regenerate in approval.json with the user's words; approve each supplied file (its checksum, permission and range) and each narrator take (after the natural-voice check). A reject adds a row to the user's failure ledger. Free.
 ---
 
 # P3 — review one segment (gate B)
@@ -55,6 +55,12 @@ it.** The checklist (the user sees the same list):
 - **Text:** none in the picture.
 - **Phone segments:** the gates above, then by eye: the green flat and edge to edge, the
   holding hand below the screen, for F the finger never through the phone.
+- **B segments** (a silent generated action): who is in the picture, by the shot's
+  `framing_kind`: hands only, one person's hands and forearms and no face; subject only,
+  no person, no hand, no body part. Each subject in its exact count and true size, two
+  cats as two. The set as planned. No phone and no screen. No mouth moving as if
+  speaking. A mascot: its style lock in every second. The face, voice and mouth checks do
+  not apply; the hands, the set and the motion do.
 
 Pull a frame where you are unsure:
 
@@ -84,7 +90,29 @@ the file and ask for their word. Record it:
 - Each regeneration is a new paid run: it goes back to `character-generate`, with its own
   computed cost and its own yes.
 
-When every generated segment of the video is approved, `review.py` marks P3 done. For a
+## Supplied media and narrator takes
+
+Supplied media (a C segment, a panel, a supplied voice) has **source checks, not the
+checks of a generated picture**: the file is the plan's (its sha256), its permission is
+recorded, its range is inside the file. Look at the range and listen to it, then:
+
+    scripts/character/review.py source <video> <asset-id> --decision approve --words "<the user's words>"
+
+It refuses an approval when the file changed after the plan was locked, a third party's
+or a supplied file has no permission, or the range runs past the file. A changed file is
+a new plan revision, not a new approval. A C segment whose clip films a phone also gets a
+plate (`shots.py supplied`), measured with `qc.py <video> <nn>-c segments/<nn>-c/source/plate.mp4`
+and approved like a generated plate (`review.py segment <video> <nn>-c --file
+source/plate.mp4`): the flat-on and tracking gates of its mode hold, unchanged. A filmed
+phone that fails them needs a new recording, not relaxed QC.
+
+A narrator's take (`character-voice`, narrator mode):
+
+    scripts/character/review.py narration <video> <take> --narrator <id> --lines l2,l3 \
+        --decision approve --words "<the user's words>" --check natural_voice=pass
+
+When every generated segment, supplied source and narrator take that `video.json` uses is
+approved, `review.py` marks P3 done. For a
 plan with app insertion, the next stage is `character-composite` for each phone segment;
 without it, `character-assemble`.
 
