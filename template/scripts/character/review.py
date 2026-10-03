@@ -10,6 +10,13 @@
     review.py final <video> --decision approve|reject|regenerate --words "<the user's words>"
               [--export default|grain] [--segment <n>] [--check name=value ...]
                                     gate C (P6): the assembled file
+    review.py source <video> <asset-id> --decision approve|reject --words "<the user's words>"
+              [--check name=value ...]
+                                    gate B for supplied media (C, a panel, a supplied voice):
+                                    the file matches its checksum, its permission and range
+    review.py narration <video> <take> --narrator <id> --lines l2,l3 --decision approve|reject
+              --words "<the user's words>" [--check natural_voice=pass ...]
+                                    gate B for a narrator's take, narration/<take>.wav|mp3
     review.py show <video>          every segment: generated, approved, composited
     review.py rates                 the keep rate per segment type and per set, from every video
 
@@ -17,14 +24,19 @@ Writes pipeline/character/<video>/approval.json. A reject or a regenerate with -
 adds a row to the model's table in pipeline/character/model-failures.md (the user's file;
 the table is made at the model's first reject); --fixed-by on a later approve fills the
 "Prompt change that fixed it" column of that segment's open rows. Nothing is approved
-without the user's words.
+without the user's words. Gate C refuses an approval when the file is stale (the plan
+changed after assembly) or its overlays are not the plan's.
 """
 import glob, json, os, re, subprocess, sys, time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bridge
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CH = os.path.join(ROOT, "pipeline", "character")
 LEDGER = os.path.join(CH, "model-failures.md")
-GENERATED = ("T", "O", "G", "S", "H", "F")
+GENERATED = ("T", "O", "G", "S", "H", "F", "B")
+AUDIO_EXT = (".wav", ".mp3", ".m4a", ".aac")
 PHONE = ("O", "G", "S", "H", "F")
 PLANNED = {"T": 60, "O": 50, "G": 37, "S": 37, "H": 30, "F": 25}
 
@@ -142,21 +154,58 @@ def state_set(video, stage, status, note=""):
                     stage, status] + ([note] if note else []), capture_output=True)
 
 
+def latest_source(d, asset_id):
+    rows = [e for e in d.get("gate_b_sources") or [] if e.get("asset_id") == asset_id]
+    return rows[-1] if rows else None
+
+
+def latest_take(d, take):
+    rows = [e for e in d.get("gate_b_narration") or [] if e.get("take") == take]
+    return rows[-1] if rows else None
+
+
+def needs(video):
+    """What gate B must approve before assembly: the generated segments (projects), the
+    supplied assets and the narration takes that video.json uses."""
+    projects, assets, takes = [], set(), set()
+    for s, t, name, proj in video_segments(video):
+        if t in GENERATED or (t == "C" and s.get("insert")):
+            projects.append(proj)
+        if t == "C" and s.get("asset_id"):
+            assets.add(s["asset_id"])
+        for p in s.get("panels") or []:
+            if p.get("asset_id"):
+                assets.add(p["asset_id"])
+            if p.get("project"):
+                projects.append(p["project"])
+        af = s.get("audio_from") or ""
+        if af.startswith("asset:"):
+            assets.add(af[6:])
+        elif af.startswith("narration:"):
+            takes.add(af[10:])
+    p = os.path.join(vdir(video), "plan.json")
+    screens = {a.get("id") for a in (json.load(open(p)).get("assets") or [])
+               if a.get("kind") == "screen"} if os.path.exists(p) else set()
+    return projects, sorted(assets - screens), sorted(takes)
+
+
 def update_review_state(video):
     d = load_approval(video)
-    segs = [x for x in video_segments(video) if x[1] in GENERATED]
-    if not segs:
+    projects, assets, takes = needs(video)
+    if not projects and not assets and not takes:
         return
     approved = []
-    for s, t, name, proj in segs:
+    for proj in projects:
         v, _, _ = project_dir(proj)
         e = latest(load_approval(v) if v != video else d, proj)
         approved.append(bool(e and e.get("decision") == "approve"))
+    approved += [bool((latest_source(d, a) or {}).get("decision") == "approve") for a in assets]
+    approved += [bool((latest_take(d, k) or {}).get("decision") == "approve") for k in takes]
     if all(approved):
-        state_set(video, "review", "done", f"{len(segs)} segment(s) approved at gate B")
-        print(f"every generated segment of {video} is approved: P3 done")
+        state_set(video, "review", "done", f"{len(approved)} item(s) approved at gate B")
+        print(f"every segment, source and take of {video} is approved: P3 done")
     else:
-        state_set(video, "review", "running", f"{sum(approved)} of {len(segs)} approved")
+        state_set(video, "review", "running", f"{sum(approved)} of {len(approved)} approved")
 
 
 # ---------------------------------------------------------------- commands
@@ -185,8 +234,8 @@ def cmd_segment(video, seg, a):
              "words": words or None, "date": today(), "model": o.get("--model") or model_slug(),
              "set_id": o.get("--set"), "failure_class": o.get("--class"), "fix": o.get("--fix"),
              "checks": dict(c.split("=", 1) for c in o.get("--check", []) if "=" in c)}
-    gp = os.path.join(sdir, "generated", "qc", "gates.json")
-    if t in PHONE and os.path.exists(gp):
+    gp = os.path.join(sdir, os.path.dirname(f), "qc", "gates.json")        # beside the plate
+    if (t in PHONE or t == "C") and os.path.exists(gp):
         g = json.load(open(gp))
         entry["insert_gates"] = "pass" if g.get("pass") else "fail: " + ", ".join(
             r["gate"] for r in g["results"] if r["result"] != "PASS")
@@ -200,6 +249,106 @@ def cmd_segment(video, seg, a):
         ledger_add(entry["model"] or "unknown model", o["--class"], where, o.get("--fix"))
     if dec == "approve" and o.get("--fixed-by"):
         ledger_fixed(where, o["--fixed-by"])
+    update_review_state(video)
+
+
+def plan_of(video):
+    p = os.path.join(vdir(video), "plan.json")
+    if not os.path.exists(p):
+        sys.exit(f"no pipeline/character/{video}/plan.json")
+    return json.load(open(p))
+
+
+def cmd_source(video, asset_id, a):
+    """Gate B for supplied media: the user approves this exact file (its checksum), its
+    permission and its range. Supplied media has source checks, not the checks of a
+    generated picture."""
+    o = opts(a)
+    dec = o.get("--decision")
+    if dec not in ("approve", "reject"):
+        sys.exit("--decision approve | reject")
+    words = o.get("--words", "").strip()
+    if not words:
+        sys.exit("a source decision needs the user's words (--words)")
+    plan = plan_of(video)
+    asset = next((x for x in plan.get("assets") or [] if x.get("id") == asset_id), None)
+    if not asset:
+        sys.exit(f"{asset_id} is not in the plan's assets[]")
+    fp = os.path.join(ROOT, asset.get("path") or "-")
+    checks, problems = {}, []
+    if not os.path.exists(fp):
+        sys.exit(f"no {asset.get('path')}")
+    sha = bridge.sha256_file(fp)
+    checks["checksum"] = "pass" if sha == asset.get("sha256") else "fail"
+    if checks["checksum"] == "fail":
+        problems.append("the file does not match the plan's sha256: it changed after the plan was locked")
+    if asset.get("origin") in bridge.NEEDS_PERMISSION:
+        checks["permission"] = "pass" if not bridge.placeholder(asset.get("permission_ref")) else "fail"
+        if checks["permission"] == "fail":
+            problems.append(f"origin {asset.get('origin')} has no permission_ref")
+    dur, hv, ha = bridge.probe(fp)
+    trim = asset.get("trim_s")
+    if trim and dur:
+        checks["range"] = "pass" if trim[1] <= dur + 0.05 else "fail"
+        if checks["range"] == "fail":
+            problems.append(f"trim_s ends at {trim[1]} s; the file is {dur:.2f} s")
+    checks["streams"] = ("picture" if hv else "") + (" sound" if ha else "")
+    for c in o.get("--check", []):
+        if "=" in c:
+            k, v = c.split("=", 1)
+            checks[k] = v
+    if dec == "approve" and problems:
+        sys.exit("cannot approve:\n  " + "\n  ".join(problems))
+    d = load_approval(video)
+    d.setdefault("gate_b_sources", []).append({
+        "asset_id": asset_id, "kind": asset.get("kind"), "origin": asset.get("origin"),
+        "file": asset.get("path"), "sha256": sha, "trim_s": trim, "decision": dec,
+        "words": words, "date": today(), "checks": checks})
+    save_approval(video, d)
+    print(f"gate B source: {asset_id} {dec} ({asset.get('path')}, sha256 {sha[:12]})")
+    update_review_state(video)
+
+
+def cmd_narration(video, take, a):
+    """Gate B for one take of a narrator: the voice of an original synthetic narrator (or
+    the user's own recorded take), made outside the kit from the approved narrator voice.
+    The kit has no voice generator and computes no cost for it."""
+    o = opts(a)
+    dec = o.get("--decision")
+    if dec not in ("approve", "reject"):
+        sys.exit("--decision approve | reject")
+    words = o.get("--words", "").strip()
+    if not words:
+        sys.exit("a narration decision needs the user's words (--words)")
+    plan = plan_of(video)
+    nid = o.get("--narrator")
+    nar = next((n for n in plan.get("narrators") or [] if n.get("id") == nid), None)
+    if not nar:
+        sys.exit(f"--narrator {nid!r} is not in the plan's narrators[]")
+    if nar.get("kind") != "original_synthetic":
+        sys.exit(f"{nid} is a {nar.get('kind')} narrator: a character's voice is her approved performance "
+                 "(audio_from <video>.<seg>); a supplied speaker's is a supplied asset (review.py source)")
+    files = [f for f in glob.glob(os.path.join(vdir(video), "narration", f"{take}.*")) if f.endswith(AUDIO_EXT)]
+    if not files:
+        sys.exit(f"no narration/{take}.wav (or .mp3) in pipeline/character/{video}/")
+    lines = [x.strip() for x in o.get("--lines", "").split(",") if x.strip()]
+    beats = plan.get("beats") or []
+    allowed = {l for b in beats if b.get("performance") == "voiceover" and bridge.beat_narrator(plan, b) == nid
+               for l in b.get("lines") or []}
+    if not lines or set(lines) - allowed:
+        sys.exit(f"--lines names the voiceover lines of {nid}: {', '.join(sorted(allowed)) or 'none in the plan'}")
+    checks = dict(c.split("=", 1) for c in o.get("--check", []) if "=" in c)
+    if dec == "approve" and checks.get("natural_voice") != "pass":
+        sys.exit("a synthetic narrator's take is approved only after the natural-voice check: natural breaths, "
+                 "varied pauses, no 2 s window under 5 semitones (qc.py - - <take>), room sound, no flat TTS "
+                 "cadence; record it with --check natural_voice=pass")
+    d = load_approval(video)
+    d.setdefault("gate_b_narration", []).append({
+        "take": take, "file": os.path.relpath(files[0], vdir(video)), "sha256": bridge.sha256_file(files[0]),
+        "narrator": nid, "voice_ref": nar.get("voice_ref"), "lines": lines, "decision": dec,
+        "words": words, "date": today(), "checks": checks})
+    save_approval(video, d)
+    print(f"gate B narration: {take} ({nid}, {', '.join(lines)}) {dec}")
     update_review_state(video)
 
 
@@ -228,8 +377,8 @@ def cmd_composite(video, seg, a):
     if failed:
         print(f"warning: gates not passed ({', '.join(failed)}); recorded on the user's word")
     print(f"composite of {video}.{seg}: {f}")
-    if all(latest(d, p) and latest(d, p).get("composite") for _, t, _, p in video_segments(video)
-           if t in PHONE and p.startswith(video + ".")):
+    if all(latest(d, p) and latest(d, p).get("composite") for s, t, _, p in video_segments(video)
+           if (t in PHONE or (t == "C" and s.get("insert"))) and p.startswith(video + ".")):
         state_set(video, "composite", "done")
 
 
@@ -245,6 +394,14 @@ def cmd_final(video, a):
     if not os.path.exists(man):
         sys.exit("no assembly/assembly.json -- run scripts/character/assemble.sh first")
     m = json.load(open(man))
+    plan = plan_of(video)
+    if dec == "approve" and bridge.is_v2(plan):
+        if m.get("plan_sha256") != bridge.digest(plan):
+            sys.exit("the file was assembled from another revision of the plan: assemble again before gate C")
+        failed = [k for k, c in (m.get("checks") or {}).items()
+                  if k.startswith(("overlays", "supplied")) and c.get("result") == "FAIL"]
+        if failed:
+            sys.exit(f"cannot approve: {', '.join(failed)} failed on the final file (assembly.json)")
     d = load_approval(video)
     g = d.get("gate_c_final") or {}
     g.update({"decision": dec if dec != "regenerate" else f"regenerate segment {o.get('--segment', '?')}",
@@ -265,7 +422,16 @@ def cmd_show(video):
     ga = d.get("gate_a_storyboard") or {}
     print(f"{video}: gate A {ga.get('decision') or 'not yet'}")
     for s, t, name, proj in video_segments(video):
-        if t not in GENERATED:
+        if t == "C":
+            e = latest_source(d, s.get("asset_id"))
+            print(f"  {name:<8} C  supplied {s.get('asset_id')}: "
+                  + (f"{e['decision']} {e['date']}" if e else "source not reviewed"))
+            if not s.get("insert"):
+                continue
+        elif t == "M":
+            print(f"  {name:<8} M  panels {', '.join(str(p.get('id')) for p in s.get('panels') or [])}")
+            continue
+        elif t not in GENERATED:
             print(f"  {name:<8} {t}  not generated (built at assembly)")
             continue
         v, seg, sd = project_dir(proj)
@@ -277,6 +443,8 @@ def cmd_show(video):
             comp = "   composite: " + (e["composite"]["file"] if e and e.get("composite") else "not yet")
         shared = f"  (shared, {proj})" if v != video else ""
         print(f"  {name:<8} {t}  {files} generated   {state}{comp}{shared}")
+    for e in d.get("gate_b_narration") or []:
+        print(f"  narration {e['take']}  {e['narrator']}  {', '.join(e.get('lines') or [])}  {e['decision']}")
     gc = d.get("gate_c_final") or {}
     print(f"gate C: {gc.get('decision') or 'not yet'}")
 
@@ -315,6 +483,10 @@ def main():
         cmd_composite(a[1], a[2], a[3:])
     elif c == "final" and len(a) >= 2:
         cmd_final(a[1], a[2:])
+    elif c == "source" and len(a) >= 3:
+        cmd_source(a[1], a[2], a[3:])
+    elif c == "narration" and len(a) >= 3:
+        cmd_narration(a[1], a[2], a[3:])
     elif c == "show" and len(a) == 2:
         cmd_show(a[1])
     elif c == "rates":

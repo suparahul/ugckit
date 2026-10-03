@@ -1,5 +1,5 @@
 {
-  "_comment": "pipeline/character/<video>/approval.json. Gate A is written by character-shots (P1); gate B by scripts/character/review.py segment (P3), one entry per decision, and its composite by review.py composite (P4); gate C by review.py final (P6). Always with the user's words.",
+  "_comment": "pipeline/character/<video>/approval.json. Gate A is written by character-shots (P1); gate B by scripts/character/review.py segment (P3), one entry per decision, and its composite by review.py composite (P4); gate C by review.py final (P6). Always with the user's words. gate_b_sources (review.py source): the user's approval of each supplied file, its checksum, permission and range. gate_b_narration (review.py narration): each narrator take, after the natural-voice check. Gate C refuses an approval when the file is from another plan revision or an overlay check failed.",
   "video_id": "<video>",
   "gate_a_storyboard": {
     "keyframes_match_anchors": null,
@@ -9,7 +9,8 @@
     "phone_flat_on_to_lens": null,
     "prompt_lint": null,
     "decision": "approve | redo keyframe <n>",
-    "words": "<the user's words>"
+    "words": "<the user's words>",
+    "people_rule": "exactly one person (face); one person's hands (hands_only); no person (subject_only)"
   },
   "gate_b_segments": [
     {
@@ -51,6 +52,45 @@
       }
     }
   ],
+  "gate_b_sources": [
+    {
+      "asset_id": "<asset id>",
+      "kind": "clip",
+      "origin": "own_camera",
+      "file": "<path>",
+      "sha256": "<64 hex>",
+      "trim_s": [
+        0,
+        6
+      ],
+      "decision": "approve | reject",
+      "words": "<the user's words>",
+      "date": "<YYYY-MM-DD>",
+      "checks": {
+        "checksum": "pass",
+        "permission": "pass",
+        "range": "pass"
+      }
+    }
+  ],
+  "gate_b_narration": [
+    {
+      "take": "<take>",
+      "file": "narration/<take>.wav",
+      "sha256": "<64 hex>",
+      "narrator": "<narrator>",
+      "voice_ref": "<narrator>@v<n>",
+      "lines": [
+        "<ids>"
+      ],
+      "decision": "approve | reject",
+      "words": "<the user's words>",
+      "date": "<YYYY-MM-DD>",
+      "checks": {
+        "natural_voice": "pass"
+      }
+    }
+  ],
   "gate_c_final": {
     "face_holds_across_segments": null,
     "outfit_and_set_hold_across_segments": null,
@@ -62,6 +102,7 @@
     "words": "<the user's words, quoted, with the date>",
     "file": "pipeline/character/<video>/assembly/<video>.mp4",
     "export_choice": "default | grain",
-    "date": "<YYYY-MM-DD>"
+    "date": "<YYYY-MM-DD>",
+    "overlays": "as planned, readable, clear of heroes and captions, read back by OCR; n/a without overlays"
   }
 }

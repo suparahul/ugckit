@@ -1,0 +1,34 @@
+{
+  "_comment": "Copy to apps/<slug>/handles/<handle>/narrators/<narrator>/narrator.json. An original synthetic narrator: a voice for faceless and mascot videos, with no face and no casting. Written by character-voice in narrator mode. A new voice is a new version (versions/v<n>.json keeps the old one). Never a clone of a real person, never a credential, never a lived experience it does not have. Used only where no human face is on screen.",
+  "narrator_id": "<narrator>",
+  "handle": "<handle>",
+  "kind": "original_synthetic",
+  "version": "v1",
+  "version_note": "<what changed, and the user's approval with the date>",
+  "status": "candidate | live | retired",
+  "voice_profile": {
+    "tone": "<pitch and warmth>",
+    "pace": "<words per second>",
+    "accent": "<one accent>",
+    "not_wanted": [
+      "announcer tone",
+      "flat TTS cadence",
+      "rising question tone on statements"
+    ]
+  },
+  "voice_design": "<how the voice was made: the tool and the text description of the voice; never a clip of a real person>",
+  "cloned_from": "none",
+  "voice_sample": "narrators/<narrator>/voice-sample.wav",
+  "candidates_heard": [
+    "<the other samples the user heard>"
+  ],
+  "approved": {
+    "words": "<the user's words>",
+    "date": "<YYYY-MM-DD>"
+  },
+  "natural_voice_check": "<date and result on the sample: natural breaths, varied pauses, no 2 s window under 5 semitones, room sound, no flat TTS cadence>",
+  "claims": {
+    "credential": null,
+    "lived_experience": null
+  }
+}
