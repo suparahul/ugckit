@@ -1,0 +1,237 @@
+{
+  "schema_version": 2,
+  "revision": 1,
+  "video_id": "v2-split",
+  "app": "catapp",
+  "handle": "nora",
+  "characters": [],
+  "format": {
+    "dimension": "9:16",
+    "length_s": 9
+  },
+  "app_insertion": false,
+  "editorial": {
+    "objective": "save_share",
+    "distribution": "organic",
+    "lane": "education",
+    "filming_format": "before_after",
+    "hook": {
+      "job_id": "explanation",
+      "channel": "text_visual",
+      "framing": []
+    },
+    "recipe_id": "state_change",
+    "product": {
+      "role": "absent",
+      "name_locations": [],
+      "speech_count": 0,
+      "timing": "absent"
+    },
+    "app_presence": "none",
+    "proof": {
+      "kind": "none",
+      "fact_refs": []
+    },
+    "close": "save",
+    "cast_kind": "none",
+    "narrator_ref": "calm",
+    "series": "standalone",
+    "comparison_mode": "wrong_right",
+    "experiment": {
+      "axis": "none",
+      "base_video_id": null
+    },
+    "strategy_ref": "fixture",
+    "evidence_ids": [],
+    "taxonomy_version": "1",
+    "catalogue_digest": "fixture"
+  },
+  "script": [
+    {
+      "id": "l1",
+      "speaker": "vo",
+      "line": "Left, the pill goes in fast. Right, it waits in a treat.",
+      "delivery": "even"
+    }
+  ],
+  "beats": [
+    {
+      "id": "b1",
+      "role": "state_a_b",
+      "start_s": 0,
+      "end_s": 6,
+      "lines": [
+        "l1"
+      ],
+      "action": "Two clips side by side: a pill pushed in fast, and a pill hidden in a treat",
+      "fact_refs": [],
+      "performance": "voiceover",
+      "source_asset_ids": [
+        "wrong-clip",
+        "right-clip"
+      ],
+      "subject_ids": [],
+      "set_id": null,
+      "framing": "hands_only",
+      "layout": "split_screen",
+      "panels": [
+        {
+          "id": "left",
+          "asset_id": "wrong-clip",
+          "source_range_s": [
+            0,
+            6
+          ],
+          "rect": [
+            0,
+            0,
+            0.5,
+            1
+          ],
+          "crop": "cover",
+          "sync_offset_s": 0
+        },
+        {
+          "id": "right",
+          "asset_id": "right-clip",
+          "source_range_s": [
+            0,
+            6
+          ],
+          "rect": [
+            0.5,
+            0,
+            0.5,
+            1
+          ],
+          "crop": "cover",
+          "sync_offset_s": 0
+        }
+      ],
+      "app_on_screen": false,
+      "screen_id": null,
+      "viewer_must": null
+    },
+    {
+      "id": "b2",
+      "role": "takeaway",
+      "start_s": 6,
+      "end_s": 9,
+      "lines": [],
+      "action": "The treat pouch on the counter",
+      "fact_refs": [],
+      "performance": "silent_action",
+      "source_asset_ids": [
+        "pouch-still"
+      ],
+      "subject_ids": [],
+      "set_id": null,
+      "framing": "subject_only",
+      "layout": "sequence",
+      "panels": [],
+      "app_on_screen": false,
+      "screen_id": null,
+      "viewer_must": null
+    }
+  ],
+  "overlays": [
+    {
+      "id": "o1",
+      "role": "hook",
+      "text": "Pill time: wrong vs right",
+      "start_s": 0,
+      "end_s": 3,
+      "placement": "middle",
+      "panel_id": null
+    },
+    {
+      "id": "o2",
+      "role": "comparison_label",
+      "text": "Wrong",
+      "start_s": 0,
+      "end_s": 6,
+      "placement": "panel",
+      "panel_id": "left"
+    },
+    {
+      "id": "o3",
+      "role": "comparison_label",
+      "text": "Right",
+      "start_s": 0,
+      "end_s": 6,
+      "placement": "panel",
+      "panel_id": "right"
+    },
+    {
+      "id": "o4",
+      "role": "paragraph",
+      "text": "Hide it in a treat, then wait",
+      "start_s": 6,
+      "end_s": 9,
+      "placement": "middle",
+      "panel_id": null
+    }
+  ],
+  "assets": [
+    {
+      "id": "wrong-clip",
+      "kind": "clip",
+      "origin": "own_camera",
+      "path": "apps/catapp/media/pill-wrong.mp4",
+      "sha256": "@sha",
+      "source_url": null,
+      "permission_ref": null,
+      "subject_ids": [],
+      "set_ref": null,
+      "trim_s": null,
+      "screen_id": null,
+      "paired_input_ref": null
+    },
+    {
+      "id": "right-clip",
+      "kind": "clip",
+      "origin": "own_camera",
+      "path": "apps/catapp/media/pill-right.mp4",
+      "sha256": "@sha",
+      "source_url": null,
+      "permission_ref": null,
+      "subject_ids": [],
+      "set_ref": null,
+      "trim_s": null,
+      "screen_id": null,
+      "paired_input_ref": null
+    },
+    {
+      "id": "pouch-still",
+      "kind": "still",
+      "origin": "own_camera",
+      "path": "apps/catapp/media/pouch.jpg",
+      "sha256": "@sha",
+      "source_url": null,
+      "permission_ref": null,
+      "subject_ids": [],
+      "set_ref": null,
+      "trim_s": null,
+      "screen_id": null,
+      "paired_input_ref": null
+    }
+  ],
+  "narrators": [
+    {
+      "id": "calm",
+      "kind": "original_synthetic",
+      "character_ref": null,
+      "voice_ref": "calm@v1",
+      "source_ref": null,
+      "credential_ref": null
+    }
+  ],
+  "set": {},
+  "outfit": {},
+  "hero_strings": {},
+  "source": "tests/character-bridge fixture",
+  "approved": {
+    "words": "Yes, lock this plan.",
+    "date": "2026-10-03"
+  }
+}

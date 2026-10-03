@@ -1,0 +1,111 @@
+{
+  "schema_version": 2,
+  "revision": 1,
+  "video_id": "v2-filmed-phone",
+  "app": "catapp",
+  "handle": "nora",
+  "characters": [],
+  "format": {
+    "dimension": "9:16",
+    "length_s": 5
+  },
+  "app_insertion": true,
+  "editorial": {
+    "objective": "product_discovery",
+    "distribution": "organic",
+    "lane": "discovery",
+    "filming_format": "hook_to_demo",
+    "hook": {
+      "job_id": "in_progress",
+      "channel": "visual",
+      "framing": []
+    },
+    "recipe_id": "discovery_demo",
+    "product": {
+      "role": "main_subject",
+      "name_locations": [
+        "caption"
+      ],
+      "speech_count": 0,
+      "timing": "closing"
+    },
+    "app_presence": "demonstration",
+    "proof": {
+      "kind": "real_screen_result",
+      "fact_refs": []
+    },
+    "close": "payoff",
+    "cast_kind": "none",
+    "narrator_ref": null,
+    "series": "standalone",
+    "comparison_mode": null,
+    "experiment": {
+      "axis": "none",
+      "base_video_id": null
+    },
+    "strategy_ref": "fixture",
+    "evidence_ids": [],
+    "taxonomy_version": "1",
+    "catalogue_digest": "fixture"
+  },
+  "script": [],
+  "beats": [
+    {
+      "id": "b1",
+      "role": "use_reveal",
+      "start_s": 0,
+      "end_s": 5,
+      "lines": [],
+      "action": "Her hand holds the phone flat to the camera while the app reads the tail",
+      "fact_refs": [],
+      "performance": "silent_action",
+      "source_asset_ids": [
+        "phone-clip"
+      ],
+      "subject_ids": [],
+      "set_id": null,
+      "framing": "hands_only",
+      "layout": "sequence",
+      "panels": [],
+      "app_on_screen": true,
+      "screen_id": "scan-result",
+      "viewer_must": "read"
+    }
+  ],
+  "overlays": [],
+  "assets": [
+    {
+      "id": "phone-clip",
+      "kind": "clip",
+      "origin": "own_camera",
+      "path": "apps/catapp/media/phone-flat.mp4",
+      "sha256": "@sha",
+      "source_url": null,
+      "permission_ref": null,
+      "subject_ids": [],
+      "set_ref": "the user's desk, from the clip",
+      "trim_s": [
+        0,
+        5
+      ],
+      "screen_id": null,
+      "paired_input_ref": null
+    }
+  ],
+  "hero_strings": {
+    "scan-result": "Relaxed tail"
+  },
+  "publishing_note": {
+    "caption": "his tail, read by the app",
+    "bio_ref": null,
+    "music_note": "soft acoustic, at posting"
+  },
+  "narrators": [],
+  "set": {},
+  "outfit": {},
+  "source": "tests/character-bridge fixture",
+  "approved": {
+    "words": "Yes, lock this plan.",
+    "date": "2026-10-03"
+  }
+}

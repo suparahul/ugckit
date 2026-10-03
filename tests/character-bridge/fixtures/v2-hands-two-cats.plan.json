@@ -1,0 +1,162 @@
+{
+  "schema_version": 2,
+  "revision": 1,
+  "video_id": "v2-hands-two-cats",
+  "app": "catapp",
+  "handle": "nora",
+  "characters": [
+    "nora@v1"
+  ],
+  "format": {
+    "dimension": "9:16",
+    "length_s": 10
+  },
+  "app_insertion": false,
+  "editorial": {
+    "objective": "save_share",
+    "distribution": "organic",
+    "lane": "education",
+    "filming_format": "voiceover_action",
+    "hook": {
+      "job_id": "specific_promise",
+      "channel": "spoken_visual",
+      "framing": []
+    },
+    "recipe_id": "list_steps",
+    "product": {
+      "role": "absent",
+      "name_locations": [],
+      "speech_count": 0,
+      "timing": "absent"
+    },
+    "app_presence": "none",
+    "proof": {
+      "kind": "none",
+      "fact_refs": []
+    },
+    "close": "save",
+    "cast_kind": "human",
+    "narrator_ref": "calm",
+    "series": "standalone",
+    "comparison_mode": null,
+    "experiment": {
+      "axis": "none",
+      "base_video_id": null
+    },
+    "strategy_ref": "fixture",
+    "evidence_ids": [],
+    "taxonomy_version": "1",
+    "catalogue_digest": "fixture"
+  },
+  "script": [
+    {
+      "id": "l1",
+      "speaker": "vo",
+      "line": "Two cats, two bowls, a body length apart.",
+      "delivery": "even"
+    },
+    {
+      "id": "l2",
+      "speaker": "vo",
+      "line": "Then wait until both eat before you walk away.",
+      "delivery": "slow on wait"
+    }
+  ],
+  "beats": [
+    {
+      "id": "b1",
+      "role": "item",
+      "start_s": 0,
+      "end_s": 5,
+      "lines": [
+        "l1"
+      ],
+      "action": "Her hands set two bowls a body length apart for Pip and Biscuit",
+      "fact_refs": [],
+      "performance": "voiceover",
+      "source_asset_ids": [],
+      "subject_ids": [
+        "pip",
+        "biscuit"
+      ],
+      "set_id": "kitchen",
+      "framing": "hands_only",
+      "layout": "sequence",
+      "panels": [],
+      "app_on_screen": false,
+      "screen_id": null,
+      "viewer_must": null,
+      "repeat_group": "steps",
+      "item_index": 1
+    },
+    {
+      "id": "b2",
+      "role": "item",
+      "start_s": 5,
+      "end_s": 10,
+      "lines": [
+        "l2"
+      ],
+      "action": "Her hands rest on the counter while both cats eat",
+      "fact_refs": [],
+      "performance": "voiceover",
+      "source_asset_ids": [],
+      "subject_ids": [
+        "pip",
+        "biscuit"
+      ],
+      "set_id": "kitchen",
+      "framing": "hands_only",
+      "layout": "sequence",
+      "panels": [],
+      "app_on_screen": false,
+      "screen_id": null,
+      "viewer_must": null,
+      "repeat_group": "steps",
+      "item_index": 2
+    }
+  ],
+  "overlays": [
+    {
+      "id": "o1",
+      "role": "step_label",
+      "text": "Step 1: two bowls",
+      "start_s": 0,
+      "end_s": 4.5,
+      "placement": "top",
+      "panel_id": null
+    },
+    {
+      "id": "o2",
+      "role": "step_label",
+      "text": "Step 2: wait",
+      "start_s": 5,
+      "end_s": 9.5,
+      "placement": "top",
+      "panel_id": null
+    }
+  ],
+  "narrators": [
+    {
+      "id": "calm",
+      "kind": "original_synthetic",
+      "character_ref": null,
+      "voice_ref": "calm@v1",
+      "source_ref": null,
+      "credential_ref": null
+    }
+  ],
+  "set": {
+    "nora": "kitchen"
+  },
+  "outfit": {
+    "nora": "apron"
+  },
+  "assets": [],
+  "hero_strings": {},
+  "source": "tests/character-bridge fixture",
+  "approved": {
+    "words": "Yes, lock this plan.",
+    "date": "2026-10-03"
+  }
+}

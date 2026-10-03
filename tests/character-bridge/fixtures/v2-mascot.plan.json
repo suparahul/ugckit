@@ -1,0 +1,106 @@
+{
+  "schema_version": 2,
+  "revision": 1,
+  "video_id": "v2-mascot",
+  "app": "catapp",
+  "handle": "nora",
+  "characters": [
+    "whisker@v1"
+  ],
+  "format": {
+    "dimension": "9:16",
+    "length_s": 5
+  },
+  "app_insertion": false,
+  "editorial": {
+    "objective": "save_share",
+    "distribution": "organic",
+    "lane": "education",
+    "filming_format": "voiceover_action",
+    "hook": {
+      "job_id": "specific_promise",
+      "channel": "spoken",
+      "framing": [
+        "count"
+      ]
+    },
+    "recipe_id": "list_steps",
+    "product": {
+      "role": "absent",
+      "name_locations": [],
+      "speech_count": 0,
+      "timing": "absent"
+    },
+    "app_presence": "none",
+    "proof": {
+      "kind": "none",
+      "fact_refs": []
+    },
+    "close": "save",
+    "cast_kind": "mascot",
+    "narrator_ref": "calm",
+    "series": "standalone",
+    "comparison_mode": null,
+    "experiment": {
+      "axis": "none",
+      "base_video_id": null
+    },
+    "strategy_ref": "fixture",
+    "evidence_ids": [],
+    "taxonomy_version": "1",
+    "catalogue_digest": "fixture"
+  },
+  "script": [
+    {
+      "id": "l1",
+      "speaker": "vo",
+      "line": "Three toys a cat never gets bored of.",
+      "delivery": "bright"
+    }
+  ],
+  "beats": [
+    {
+      "id": "b1",
+      "role": "promise",
+      "start_s": 0,
+      "end_s": 5,
+      "lines": [
+        "l1"
+      ],
+      "action": "Whisker the mascot points at three toys on the rug",
+      "fact_refs": [],
+      "performance": "voiceover",
+      "source_asset_ids": [],
+      "subject_ids": [],
+      "set_id": "kitchen",
+      "framing": "face",
+      "layout": "sequence",
+      "panels": [],
+      "app_on_screen": false,
+      "screen_id": null,
+      "viewer_must": null
+    }
+  ],
+  "narrators": [
+    {
+      "id": "calm",
+      "kind": "original_synthetic",
+      "character_ref": null,
+      "voice_ref": "calm@v1",
+      "source_ref": null,
+      "credential_ref": null
+    }
+  ],
+  "set": {
+    "whisker": "kitchen"
+  },
+  "overlays": [],
+  "assets": [],
+  "outfit": {},
+  "hero_strings": {},
+  "source": "tests/character-bridge fixture",
+  "approved": {
+    "words": "Yes, lock this plan.",
+    "date": "2026-10-03"
+  }
+}

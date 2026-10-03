@@ -1,0 +1,167 @@
+{
+  "schema_version": 2,
+  "revision": 1,
+  "video_id": "v2-live-cat",
+  "app": "catapp",
+  "handle": "nora",
+  "characters": [],
+  "format": {
+    "dimension": "9:16",
+    "length_s": 9
+  },
+  "app_insertion": true,
+  "editorial": {
+    "objective": "product_discovery",
+    "distribution": "organic",
+    "lane": "discovery",
+    "filming_format": "live_use",
+    "hook": {
+      "job_id": "visible_result",
+      "channel": "text_visual",
+      "framing": []
+    },
+    "recipe_id": "discovery_demo",
+    "product": {
+      "role": "main_subject",
+      "name_locations": [
+        "caption"
+      ],
+      "speech_count": 0,
+      "timing": "closing"
+    },
+    "app_presence": "result",
+    "proof": {
+      "kind": "real_screen_result",
+      "fact_refs": []
+    },
+    "close": "payoff",
+    "cast_kind": "none",
+    "narrator_ref": null,
+    "series": "standalone",
+    "comparison_mode": null,
+    "experiment": {
+      "axis": "none",
+      "base_video_id": null
+    },
+    "strategy_ref": "fixture",
+    "evidence_ids": [],
+    "taxonomy_version": "1",
+    "catalogue_digest": "fixture"
+  },
+  "script": [],
+  "beats": [
+    {
+      "id": "b1",
+      "role": "attention",
+      "start_s": 0,
+      "end_s": 4,
+      "lines": [],
+      "action": "Milo flicks his tail on the sofa while the phone films him",
+      "fact_refs": [],
+      "performance": "silent_action",
+      "source_asset_ids": [
+        "milo-clip"
+      ],
+      "subject_ids": [
+        "milo"
+      ],
+      "set_id": null,
+      "framing": "subject_only",
+      "layout": "sequence",
+      "panels": [],
+      "app_on_screen": false,
+      "screen_id": null,
+      "viewer_must": null
+    },
+    {
+      "id": "b2",
+      "role": "result",
+      "start_s": 4,
+      "end_s": 9,
+      "lines": [],
+      "action": "The app shows its reading of the same tail flick",
+      "fact_refs": [],
+      "performance": "silent_action",
+      "source_asset_ids": [
+        "scan-rec"
+      ],
+      "subject_ids": [],
+      "set_id": null,
+      "framing": "subject_only",
+      "layout": "sequence",
+      "panels": [],
+      "app_on_screen": true,
+      "screen_id": "scan-result",
+      "viewer_must": "read"
+    }
+  ],
+  "overlays": [
+    {
+      "id": "o1",
+      "role": "hook",
+      "text": "I filmed his tail and asked the app",
+      "start_s": 0,
+      "end_s": 3.5,
+      "placement": "top",
+      "panel_id": null
+    }
+  ],
+  "assets": [
+    {
+      "id": "milo-clip",
+      "kind": "clip",
+      "origin": "own_camera",
+      "path": "apps/catapp/media/milo-tail.mp4",
+      "sha256": "@sha",
+      "source_url": null,
+      "permission_ref": null,
+      "subject_ids": [
+        "milo"
+      ],
+      "set_ref": "the sofa, from the clip",
+      "trim_s": [
+        1,
+        6
+      ],
+      "screen_id": null,
+      "paired_input_ref": null
+    },
+    {
+      "id": "scan-rec",
+      "kind": "screen",
+      "origin": "app_recording",
+      "path": "apps/catapp/screens/scan-result.mp4",
+      "sha256": "@sha",
+      "source_url": null,
+      "permission_ref": null,
+      "subject_ids": [],
+      "set_ref": null,
+      "trim_s": [
+        0,
+        6
+      ],
+      "screen_id": "scan-result",
+      "paired_input_ref": {
+        "asset_id": "milo-clip",
+        "input_t_s": 3.0,
+        "output_t_s": 3.5
+      }
+    }
+  ],
+  "hero_strings": {
+    "scan-result": "Relaxed tail"
+  },
+  "publishing_note": {
+    "caption": "his tail, read by the app",
+    "bio_ref": null,
+    "music_note": "soft acoustic, at posting"
+  },
+  "narrators": [],
+  "set": {},
+  "outfit": {},
+  "source": "tests/character-bridge fixture",
+  "approved": {
+    "words": "Yes, lock this plan.",
+    "date": "2026-10-03"
+  }
+}

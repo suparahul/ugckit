@@ -1,0 +1,59 @@
+{
+  "video_id": "v1-insert",
+  "app": "catapp",
+  "handle": "nora",
+  "characters": [
+    "nora@v1"
+  ],
+  "format": {
+    "dimension": "9:16",
+    "length_s": 12
+  },
+  "app_insertion": true,
+  "script": [
+    {
+      "id": "l1",
+      "speaker": "nora",
+      "line": "I filmed her tail and asked the app.",
+      "delivery": "quick"
+    },
+    {
+      "id": "l2",
+      "speaker": "nora",
+      "line": "It said she was relaxed, not angry.",
+      "delivery": "slow on relaxed"
+    }
+  ],
+  "beats": [
+    {
+      "lines": [
+        "l1"
+      ],
+      "app_on_screen": false,
+      "screen_id": null,
+      "viewer_must": null
+    },
+    {
+      "lines": [
+        "l2"
+      ],
+      "app_on_screen": true,
+      "screen_id": "scan-result",
+      "viewer_must": "read"
+    }
+  ],
+  "set": {
+    "nora": "kitchen"
+  },
+  "outfit": {
+    "nora": "apron"
+  },
+  "hero_strings": {
+    "scan-result": "Relaxed tail"
+  },
+  "source": "fixture",
+  "approved": {
+    "words": "Yes, lock this plan.",
+    "date": "2026-10-03"
+  }
+}

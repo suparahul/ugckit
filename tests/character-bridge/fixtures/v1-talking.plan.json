@@ -1,0 +1,57 @@
+{
+  "video_id": "v1-talking",
+  "app": "catapp",
+  "handle": "nora",
+  "characters": [
+    "nora@v1"
+  ],
+  "format": {
+    "dimension": "9:16",
+    "length_s": 10
+  },
+  "app_insertion": false,
+  "script": [
+    {
+      "id": "l1",
+      "speaker": "nora",
+      "line": "My cat ignored her bowl for a week.",
+      "delivery": "flat, tired"
+    },
+    {
+      "id": "l2",
+      "speaker": "nora",
+      "line": "Then I moved it away from the litter box.",
+      "delivery": "lift on moved"
+    }
+  ],
+  "beats": [
+    {
+      "lines": [
+        "l1"
+      ],
+      "app_on_screen": false,
+      "screen_id": null,
+      "viewer_must": null
+    },
+    {
+      "lines": [
+        "l2"
+      ],
+      "app_on_screen": false,
+      "screen_id": null,
+      "viewer_must": null
+    }
+  ],
+  "set": {
+    "nora": "kitchen"
+  },
+  "outfit": {
+    "nora": "apron"
+  },
+  "hero_strings": {},
+  "source": "fixture",
+  "approved": {
+    "words": "Yes, lock this plan.",
+    "date": "2026-10-03"
+  }
+}

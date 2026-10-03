@@ -1,0 +1,122 @@
+{
+  "schema_version": 2,
+  "revision": 1,
+  "video_id": "v2-vet",
+  "app": "catapp",
+  "handle": "nora",
+  "characters": [],
+  "format": {
+    "dimension": "9:16",
+    "length_s": 6
+  },
+  "app_insertion": false,
+  "editorial": {
+    "objective": "save_share",
+    "distribution": "organic",
+    "lane": "education",
+    "filming_format": "talking_head",
+    "hook": {
+      "job_id": "explanation",
+      "channel": "spoken",
+      "framing": [
+        "professional_basis"
+      ]
+    },
+    "recipe_id": "explain_action",
+    "product": {
+      "role": "absent",
+      "name_locations": [],
+      "speech_count": 0,
+      "timing": "absent"
+    },
+    "app_presence": "none",
+    "proof": {
+      "kind": "none",
+      "fact_refs": []
+    },
+    "close": "save",
+    "cast_kind": "none",
+    "narrator_ref": "vet",
+    "series": "standalone",
+    "comparison_mode": null,
+    "experiment": {
+      "axis": "none",
+      "base_video_id": null
+    },
+    "strategy_ref": "fixture",
+    "evidence_ids": [],
+    "taxonomy_version": "1",
+    "catalogue_digest": "fixture"
+  },
+  "script": [
+    {
+      "id": "l1",
+      "speaker": "vo",
+      "line": "A cat that hides for two days needs a vet.",
+      "delivery": "calm"
+    }
+  ],
+  "beats": [
+    {
+      "id": "b1",
+      "role": "explanation",
+      "start_s": 0,
+      "end_s": 6,
+      "lines": [
+        "l1"
+      ],
+      "action": "Dr Lee speaks to the camera in her clinic",
+      "fact_refs": [],
+      "performance": "on_camera",
+      "source_asset_ids": [
+        "vet-clip"
+      ],
+      "subject_ids": [],
+      "set_id": null,
+      "framing": "face",
+      "layout": "sequence",
+      "panels": [],
+      "app_on_screen": false,
+      "screen_id": null,
+      "viewer_must": null
+    }
+  ],
+  "assets": [
+    {
+      "id": "vet-clip",
+      "kind": "clip",
+      "origin": "verified_expert",
+      "path": "apps/catapp/media/vet-clip.mp4",
+      "sha256": "@sha",
+      "source_url": "https://example.org/dr-lee",
+      "permission_ref": "signed release, 2026-09-30",
+      "subject_ids": [],
+      "set_ref": null,
+      "trim_s": [
+        0,
+        6
+      ],
+      "screen_id": null,
+      "paired_input_ref": null
+    }
+  ],
+  "narrators": [
+    {
+      "id": "vet",
+      "kind": "supplied_speaker",
+      "character_ref": null,
+      "voice_ref": null,
+      "source_ref": "vet-clip",
+      "credential_ref": "state licence #12345, checked 2026-09-30"
+    }
+  ],
+  "overlays": [],
+  "set": {},
+  "outfit": {},
+  "hero_strings": {},
+  "source": "tests/character-bridge fixture",
+  "approved": {
+    "words": "Yes, lock this plan.",
+    "date": "2026-10-03"
+  }
+}
