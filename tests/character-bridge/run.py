@@ -557,7 +557,7 @@ def face_replace(assemble_on):
                        references=[{"file": clip_rel, "kind": "face_replace_clip", "role": "the motion and timing"},
                                    {"file": "references/face.png", "kind": "hero", "role": "her face"}])
     sh["reaction"] = copy.deepcopy(pl["beats"][0]["reaction"])
-    sh["face_replace"] = {"ref_id": "r1", "clip": clip_rel, "range_s": [0.0, 2.9], "masks": masks}
+    sh["face_replace"] = {"ref_id": "r1", "route": "edit", "clip": clip_rel, "range_s": [0.0, 2.9], "masks": masks}
     shp = p("pipeline", "character", v_, "shots", "01-x.json")
     wj(shp, sh)
     video_json(pl, [{"n": 1, "type": "X", "project": f"{v_}.01-x", "beat_ids": ["b1"], "script_lines": []},
@@ -601,9 +601,10 @@ def face_replace(assemble_on):
     ap = os.path.join(vd, "approval.json")
     wj(ap, {**(rj(ap) if os.path.exists(ap) else {}),
             "gate_a_storyboard": {"decision": "approve", "words": "Storyboard is good."}})
-    expect(f"{v_}: generate.sh stops before any cost: no face-replace model",
-           ["bash", f"{SC}/generate.sh", v_, "01-x"], ok=False, contains="video-to-video face-replace model",
-           env={"ALLOW_REFS": "1"})
+    expect(f"{v_}: generate.sh stops before any cost: face replace is not approved for a live run",
+           ["bash", f"{SC}/generate.sh", v_, "01-x"], ok=False, contains="bridge.face_replace is false",
+           env={"ALLOW_REFS": "1", "CONFIRM": "1"})
+    request_shape(v_, sd, sh, shp, clip_rel)
     refs = os.path.join(sd, "refs.json")
     keep_refs = open(refs).read()
     wj(refs, {"references": [{"kind": "face_replace_clip", "file": ref["video_path"]},
@@ -642,6 +643,7 @@ def face_replace(assemble_on):
     os.remove(long_)
     expect(f"{v_}: gate B approves the face replace with its checks", rv + ok_checks)
     assemble(v_, assemble_on)
+    guided_gate_b(v_, sd, sh, shp)
     # The plan and the shot.
     mutate(v_, "a face-replace beat that is not the clip's length",
            plan_fn=lambda q: q["reaction_refs"][0].update(end_s=3.5), cmd="plan", contains="lasts its clip's range")
@@ -674,6 +676,89 @@ def face_replace(assemble_on):
     mutate(v_, "a clip on a segment that is not face replace",
            plan_fn=lambda q: q["reaction_refs"][0].update(generation_input="none"),
            contains="only an X segment in face-replace mode")
+
+
+def request_shape(v_, sd, sh, shp, clip_rel):
+    """The two face-replace routes, offline: the request generate.sh would send
+    (REQUEST_ONLY=1, placeholder file ids, no upload, no run), the cost it quotes, and the
+    stop before spend as the only block."""
+    gen = ["bash", f"{SC}/generate.sh", v_, "01-x"]
+    face = "apps/catapp/handles/nora/references/face.png"
+    clip_file = f"pipeline/character/{v_}/{clip_rel}"
+    for route, model, tpl, cost, extra in (
+            ("edit", "wan-2-7-edit-video", "ugc-character-face-replace", "$0.30", {"duration_seconds": None}),
+            ("guided", "minimax-h3-reference-to-video", "ugc-character-face-guided", "$0.30",
+             {"duration_seconds": 5})):
+        wj(shp, {**sh, "face_replace": {**sh["face_replace"], "route": route},
+                 "video": {**sh["video"], **extra}})
+        validate(v_) if route == "guided" else None
+        out = expect(f"{v_}: generate.sh REQUEST_ONLY, the {route} route", gen, env={"ALLOW_REFS": "1", "REQUEST_ONLY": "1"})
+        rq = os.path.join(sd, "generated", "request-draft.json")
+        req = rj(rq) if os.path.exists(rq) else {}
+        parts = ((req.get("messages") or [{}])[0]).get("content") or []
+        shape = [(x.get("type"), (x.get("source") or {}).get("file_id")) for x in parts[1:]]
+        ok = (req.get("template_slug") == tpl and parts[:1] and parts[0].get("type") == "text"
+              and parts[0].get("text") == FR_PROMPT.strip()
+              and shape == [("video", f"offline:{clip_file}"), ("image", f"offline:{face}")]
+              and f"model       {model}" in out and f"est. cost   {cost}" in out
+              and ("trim to 2.9s" in out) == (route == "guided"))
+        RESULTS.append((f"{v_}: the {route} request: {tpl}, the clip as the one video part first, then her face", ok))
+        print(f"{'PASS' if ok else 'FAIL'}  {v_}: the {route} request: {tpl}, the clip first, then her face")
+        if not ok:
+            print("      " + json.dumps({"template": req.get("template_slug"), "parts": shape}) + "\n      "
+                  + "\n      ".join(out.strip().splitlines()[-8:]))
+        os.remove(rq)
+    # The stop is the only block: with bridge.face_replace true (this scratch copy only) the
+    # run reaches the cost prompt and stops there without CONFIRM. Nothing is sent.
+    cp = os.path.join(WS, "scripts", "character", "capabilities.json")
+    keep_c = open(cp).read()
+    wj(cp, {**json.loads(keep_c), "bridge.face_replace": True})
+    expect(f"{v_}: with the paid test approved, the guided route stops at the cost prompt", gen, ok=False,
+           contains="This would spend $0.30", env={"ALLOW_REFS": "1"})
+    open(cp, "w").write(keep_c)
+    # The route's rules.
+    for label, change, why in (
+            ("a guided shot at 3 s", {"duration_seconds": 3}, "the guided route generates 5 s"),
+            ("an edit shot with a length of its own", None, "has no length of its own")):
+        if change:
+            wj(shp, {**sh, "face_replace": {**sh["face_replace"], "route": "guided"}, "video": {**sh["video"], **change}})
+        else:
+            wj(shp, {**sh, "video": {**sh["video"], "duration_seconds": 5}})
+        expect(f"{v_}: shots.py validate refuses {label}", [PY, f"{SC}/shots.py", "validate", v_], ok=False, contains=why)
+        expect(f"{v_}: generate.sh refuses {label}", gen + [], ok=False, contains=why.replace("the guided route generates 5 s", "generates 5 s"),
+               env={"ALLOW_REFS": "1", "REQUEST_ONLY": "1"})
+    wj(shp, {**sh, "face_replace": {k: x for k, x in sh["face_replace"].items() if k != "route"}})
+    expect(f"{v_}: bridge refuses a face replace with no route", [PY, f"{SC}/bridge.py", "video", v_], ok=False,
+           contains="face_replace.route")
+    two = {**sh, "video": {**sh["video"], "references": sh["video"]["references"] + [
+        {"file": "references/face.png", "kind": "anchor", "role": "a second angle"}]}}
+    wj(shp, two)
+    expect(f"{v_}: shots.py validate refuses two pictures on the edit route (Wan takes one)",
+           [PY, f"{SC}/shots.py", "validate", v_], ok=False, contains="at most 1")
+    wj(shp, sh)
+    expect(f"{v_}: state.py refuses the edit model as the segment model",
+           [PY, f"{SC}/state.py", "model", "set", "wan-2-7-edit-video", "5"], ok=False, contains="never as the segment model")
+
+
+def guided_gate_b(v_, sd, sh, shp):
+    """Gate B on the guided route: a new clip of 5 s, at least the clip's length, trimmed at
+    assembly, with the check that the reaction follows the clip."""
+    wj(shp, {**sh, "face_replace": {**sh["face_replace"], "route": "guided"}, "video": {**sh["video"], "duration_seconds": 5}})
+    rv = [PY, f"{SC}/review.py", "segment", v_, "01-x", "--decision", "approve", "--words", "Keep it.",
+          "--check", "identity=pass", "--check", "no_source_identity=pass", "--check", "silent=pass"]
+    g5 = os.path.join(sd, "generated", "01-x-guided.mp4")
+    clip(g5, 5, "smptebars", 120, size="720x1280")
+    expect(f"{v_}: gate B refuses a guided take without follows_reference", rv + ["--file", "generated/01-x-guided.mp4"],
+           ok=False, contains="follows_reference")
+    g2 = os.path.join(sd, "generated", "01-x-short.mp4")
+    clip(g2, 2, "smptebars", 120, size="720x1280")
+    expect(f"{v_}: gate B refuses a guided take shorter than the clip",
+           rv + ["--file", "generated/01-x-short.mp4", "--check", "follows_reference=pass"], ok=False, contains="length gate")
+    expect(f"{v_}: gate B approves a 5 s guided take (trimmed at assembly)",
+           rv + ["--file", "generated/01-x-guided.mp4", "--check", "follows_reference=pass"])
+    for f in (g5, g2):
+        os.remove(f)
+    wj(shp, sh)
 
 
 # ---------------------------------------------------------------- per fixture
