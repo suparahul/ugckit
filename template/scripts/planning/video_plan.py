@@ -572,6 +572,7 @@ def check_contract(plan, out, brief=None):
 # written expression beats are the fallback and the review checklist.
 RX_REF_KEYS = ["id", "post_id", "platform", "handle", "post_dir", "video_path", "video_sha256",
                "start_s", "end_s", "notes_ref", "generation_input", "burned_in_text"]
+# permission_ref is optional and never required (founder, 2026-10-04).
 RX_INPUT = ("face_replace", "none")
 RX_KEYS = ["ref_id", "framing", "camera_distance", "expression_beats"]
 RX_STEP_KEYS = ["start_s", "end_s", "ref_s", "face", "eyes", "head"]
@@ -754,9 +755,6 @@ def readiness(plan, plan_path):
         if r.get("generation_input") == "face_replace" and r.get("burned_in_text"):
             dep.append(f"reaction ref {rid}: burned-in text in the clip ({r['burned_in_text']}). Production crops "
                        "text at an edge; text mid-frame is blurred and a soft patch stays. Or choose a clean clip")
-        if r.get("generation_input") == "face_replace" and not r.get("permission_ref"):
-            dep.append(f"reaction ref {rid}: no permission_ref from {r.get('handle')} for the use of the clip "
-                       "(a rights risk; production reports it)")
     # Facts, against the brief.
     brief, _ = brief_of(plan_path)
     if brief:

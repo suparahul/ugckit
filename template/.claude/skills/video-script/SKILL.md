@@ -59,7 +59,7 @@ fields. Production's check is `scripts/character/bridge.py`; the schema, when sh
       "reaction_refs": [{"id": "rx1", "post_id", "platform", "handle", "post_dir", "video_path",
                          "video_sha256": null, "start_s", "end_s", "notes_ref",
                          "generation_input": "face_replace", "burned_in_text": null,
-                         "permission_ref": null}],
+                         "permission_ref": null}],   (optional; never required)
       "assets": [{"id", "kind", "origin", "path", "sha256", "source_url", "permission_ref",
                   "subject_ids", "set_ref", "trim_s", "screen_id", "paired_input_ref"}],
       "narrators": [{"id", "kind", "character_ref", "voice_ref", "source_ref", "credential_ref"}],
