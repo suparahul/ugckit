@@ -52,8 +52,13 @@ notification. Do not poll with sleep.
   file under `supplied/`), research footage or a reference reaction's post. C, M, R and P
   are never generated. An X segment (a silent reaction) carries no voice clip. An X segment
   in face-replace mode carries only its masked clip (`shots.py reference`) and the
-  character's face, and runs only on a model with the `face_replace` mode in
-  `models.json`; none has it yet, so the script stops before any cost.
+  character's face, on its route's model and template (the shot's
+  `face_replace.route`: `edit`, Wan 2.7 Edit Video, the clip as the source video; or
+  `guided`, MiniMax H3 reference-to-video, the clip as a video reference). The clip is
+  the one video part of the request, before the face. A live face-replace run is refused
+  until the founder approves a paid test (`capabilities.json` `bridge.face_replace`);
+  `REQUEST_ONLY=1` writes the request it would send, with placeholder file ids, and
+  spends nothing.
 - At most `max_reference_images` pictures (4 on the default model); the voice clip does
   not count.
 - The prompt under 5,000 characters, counted as characters; sent once, as message

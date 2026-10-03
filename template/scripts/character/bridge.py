@@ -1209,14 +1209,19 @@ def check_segment_against_beats(plan, it, bmap, lines, assets, narrators, subjec
 
 
 MASK_HOW = {"crop", "blur", "box"}
+FR_ROUTES = ("edit", "guided")      # models.json face_replace.routes
 
 
 def check_face_replace_shot(name, r, fx, out):
-    """The X shot of a face-replace reaction: the trimmed, masked copy of the reference
-    clip that shots.py reference writes, and the masks over its burned-in text."""
+    """The X shot of a face-replace reaction: its route, the trimmed, masked copy of the
+    reference clip that shots.py reference writes, and the masks over its burned-in text."""
     if not isinstance(fx, dict):
-        out.bad(f"{name}: a face-replace reaction names its clip: face_replace {{ref_id, clip, range_s, masks}}")
+        out.bad(f"{name}: a face-replace reaction names its clip: face_replace {{ref_id, route, clip, range_s, masks}}")
         return
+    if fx.get("route") not in FR_ROUTES:
+        out.bad(f"{name}: face_replace.route {fx.get('route')!r}; it is edit (Wan 2.7 Edit Video: the clip is the "
+                "source video, its frames and timing stay) or guided (MiniMax H3: a new clip guided by the clip, "
+                "trimmed to its length)")
     if fx.get("ref_id") != r.get("id"):
         out.bad(f"{name}: face_replace.ref_id {fx.get('ref_id')!r}; the beat's reference is {r.get('id')}")
     if fx.get("range_s") != [r.get("start_s"), r.get("end_s")]:

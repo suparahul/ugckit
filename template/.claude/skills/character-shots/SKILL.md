@@ -81,9 +81,15 @@ Mark the cut points on the frozen script first, then give each segment its lines
   founder, 2026-10-04): the reference clip itself drives the motion and timing, and the
   model puts the character's face in. The beat lasts the clip's range and has no set.
   Look at the range for burned-in text (the reference's `burned_in_text`, a handle, a
-  watermark, a caption) and write `face_replace` in the shot: `{ref_id, clip:
+  watermark, a caption) and write `face_replace` in the shot: `{ref_id, route, clip:
   "segments/<nn>-x/source/reference.mp4", range_s, masks: [{rect, how, text}]}`; a mask
-  is `crop` at an edge, else `blur` or `box`. Then run
+  is `crop` at an edge, else `blur` or `box`. The route (`models.json`
+  `face_replace.routes`) is `edit` by default: Wan 2.7 Edit Video edits the clip, so its
+  frames, timing and length stay; `duration_seconds` is null, the clip is 2 to 10 s, and
+  the only picture is the character's face. `guided` is the fallback: MiniMax H3
+  reference-to-video makes a new clip guided by the clip, so the frames and timing are
+  not kept exactly; `duration_seconds` is 5 (its template version, at least the clip's
+  length) and the take is trimmed to the clip at assembly. Then run
   `scripts/character/shots.py reference <video> <nn>-x`: it checks the post against its
   checksum, trims the range, masks it, and refuses while OCR still reads text. The
   generation references are that clip (kind `face_replace_clip`) and the character's
@@ -92,8 +98,9 @@ Mark the cut points on the frozen script first, then give each segment its lines
   and camera only"), says "Replace the face with the face of face.png" and "Nothing of the
   original person's face, hair or identity remains", "No lip sync" and "She does not
   speak", and never names the post, its creator or the research file. Never attach the
-  research file itself. Today no model in `models.json` has the face-replace mode, so
-  `generate.sh` stops before any cost; the written route is the fallback.
+  research file itself. Until the founder approves a paid test (`capabilities.json`
+  `bridge.face_replace`), `generate.sh` stops before any cost; the written route is the
+  fallback.
 - **A full-screen app beat** has framing `app_screen`: it is R or P, never generated.
 - **C, supplied media** (v2): the plan's clip (`source_range_s`, inside the asset's
   approved `trim_s`) or still (`still_s`). No casting, no keyframe, no prompt, no

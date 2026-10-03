@@ -123,6 +123,9 @@ def main():
             if lim is None:
                 sys.exit(f"'{slug}' is not in scripts/character/models.json known_model_limits "
                          f"-- add it with its measured cap and price before selecting it")
+            if not lim.get("max_duration_s"):
+                sys.exit(f"{slug} is a face-replace model with no length of its own; an X shot picks it "
+                         "with face_replace.route (models.json face_replace.routes), never as the segment model")
             if lim["max_duration_s"] and dur > lim["max_duration_s"]:
                 sys.exit(f"{slug} caps at {lim['max_duration_s']}s -- {dur}s would be rejected")
             # The model refuses anything shorter than its minimum. A shorter planned

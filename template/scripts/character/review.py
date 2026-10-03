@@ -45,9 +45,11 @@ GENERATED = ("T", "O", "G", "S", "H", "F", "B", "X")
 REACTION_CHECKS = ("identity", "hands", "silent", "performance")
 # X in face-replace mode (founder, 2026-10-04): the motion is the reference clip's, so the
 # checks are the face: the character's identity, and no trace of the original creator
-# (face, hair, identity marks, a handle or watermark); silent; the clip's length; and OCR
-# reads no text on the file.
+# (face, hair, identity marks, a handle or watermark); silent; the clip's length on the edit
+# route, at least it on the guided route (trimmed at assembly, plus follows_reference); and
+# OCR reads no text on the file.
 FACE_REPLACE_CHECKS = ("identity", "no_source_identity", "silent")
+GUIDED_CHECKS = ("follows_reference",)    # the guided route makes a new clip, not the clip's frames
 AUDIO_EXT = (".wav", ".mp3", ".m4a", ".aac")
 PHONE = ("O", "G", "S", "H", "F")
 PLANNED = {"T": 60, "O": 50, "G": 37, "S": 37, "H": 30, "F": 25}
@@ -248,23 +250,35 @@ def cmd_segment(video, seg, a):
              "checks": dict(c.split("=", 1) for c in o.get("--check", []) if "=" in c)}
     fr = face_replace_of(video, seg) if t == "X" else None
     if fr and dec == "approve":
-        miss = [k for k in FACE_REPLACE_CHECKS if entry["checks"].get(k) != "pass"]
+        sp = os.path.join(vdir(video), "shots", f"{seg}.json")
+        shot = json.load(open(sp)) if os.path.exists(sp) else {}
+        route = (shot.get("face_replace") or {}).get("route")
+        need = FACE_REPLACE_CHECKS + (GUIDED_CHECKS if route == "guided" else ())
+        miss = [k for k in need if entry["checks"].get(k) != "pass"]
         if miss:
             sys.exit(f"a face-replace reaction is approved with {' '.join(f'--check {k}=pass' for k in miss)}: "
                      "the face is the character's in every frame (identity), nothing of the original creator's "
-                     "face, hair or identity remains (no_source_identity), and no voice is heard (silent)")
+                     "face, hair or identity remains (no_source_identity), and no voice is heard (silent)"
+                     + ("; on the guided route the reaction follows the clip's expression beats in order and "
+                        "time within the trimmed length (follows_reference)" if route == "guided" else ""))
         want = fr["end_s"] - fr["start_s"]
         got = bridge.probe(os.path.join(sdir, f))[0]
-        if not got or abs(got - want) > 0.25:
-            sys.exit(f"the file is {got or 0:.2f} s; the reference clip is {want:g} s (length gate: the face "
-                     "replace keeps the clip's timing)")
+        if route == "guided":
+            # A new clip of the template's length, trimmed to the clip's at assembly.
+            gen = (shot.get("video") or {}).get("duration_seconds")
+            if not got or got < want - 0.05 or (bridge.num(gen) and got > gen + 0.7):
+                sys.exit(f"the file is {got or 0:.2f} s; the guided route generates {gen} s, at least the "
+                         f"reference clip's {want:g} s, and is trimmed to it at assembly (length gate)")
+        elif not got or abs(got - want) > 0.25:
+            sys.exit(f"the file is {got or 0:.2f} s; the reference clip is {want:g} s (length gate: the edit "
+                     "route keeps the clip's timing)")
         entry["checks"]["length"] = "pass"
         left = text_on(os.path.join(sdir, f), os.path.join(sdir, os.path.dirname(f), "qc"))
         if left:
             sys.exit(f"OCR reads text on the file: {left} -- a burned-in caption, handle or watermark of the "
                      "reference is left (a trace of the original creator)")
         entry["checks"]["text_left"] = "none" if left is not None else "not read (no OCR engine)"
-        entry["face_replace"] = {"ref_id": fr["id"], "post_id": fr.get("post_id")}
+        entry["face_replace"] = {"ref_id": fr["id"], "post_id": fr.get("post_id"), "route": route}
     elif t == "X" and dec == "approve":
         miss = [k for k in REACTION_CHECKS if entry["checks"].get(k) != "pass"]
         if miss:

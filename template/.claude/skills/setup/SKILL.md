@@ -239,7 +239,9 @@ templates in their workspace; running setup again must create nothing that exist
    `ugc-character` template keeps it: create only the versions that are missing by
    name, and never a second template. There is no model question here: activate the
    version marked `"activate": true` only when the template has no active version; an
-   active version is the user's choice and stays.
+   active version is the user's choice and stays. The two face-replace templates in the
+   same file (`"required": false`) are not created here: they are created when the
+   founder approves the paid face-replace test.
 
 ## 6. Record the choice in BOTH places
 

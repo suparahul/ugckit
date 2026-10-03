@@ -128,6 +128,15 @@ def model_limits():
     return slug, spec["known_model_limits"].get(slug, {})
 
 
+def face_route(shot):
+    """The face-replace route a shot names (models.json face_replace.routes) and its
+    model's limits, or (None, None, {}) when the route is unknown."""
+    spec = load(MODELS)
+    route = (shot.get("face_replace") or {}).get("route")
+    rt = ((spec.get("face_replace") or {}).get("routes") or {}).get(route)
+    return (route, rt, spec["known_model_limits"].get(rt["model"], {})) if rt else (None, None, {})
+
+
 def pins(plan):
     out = []
     for c in plan.get("characters") or []:
@@ -497,12 +506,24 @@ def cmd_validate(video):
             rb = [bmap[b] for b in seg.get("beat_ids") or [] if b in bmap and "reaction" in bmap[b]]
             fr = bridge.face_replace_ref(plan, rb[0]) if rb else None
         fr_clip = (shot.get("face_replace") or {}).get("clip") if fr else None
+        fr_lim = None
         if fr:
-            # The output is as long as the clip: the face-replace model keeps its timing.
+            # The segment is as long as the clip. The edit route keeps the clip's timing and
+            # length; the guided route generates its template's length and is trimmed to it.
             want = fr["end_s"] - fr["start_s"]
             if not isinstance(trim, (int, float)) or abs(trim - want) > 0.05:
                 bad(f"{name}: trim_to_seconds {trim!r}; a face-replace reaction is its clip's {want:g} s")
             total += want
+            route, rt, fr_lim = face_route(shot)
+            if rt and rt["length"] == "exact" and dur is not None:
+                bad(f"{name}: duration_seconds {dur!r}; the {route} route has no length of its own (null)")
+            elif rt and rt["length"] != "exact" and (dur != rt.get("duration_s") or dur < want):
+                bad(f"{name}: duration_seconds {dur!r}; the {route} route generates {rt.get('duration_s')} s "
+                    f"(its template version), at least the clip's {want:g} s, and is trimmed to it")
+            sv_ = fr_lim.get("source_video") or {}
+            if rt and not sv_.get("min_s", 0) <= want <= sv_.get("max_s", 1e9):
+                bad(f"{name}: the clip is {want:g} s; {rt['model']} takes a video of {sv_.get('min_s')} to "
+                    f"{sv_.get('max_s')} s -- a shorter range, or the other route")
             check_reference(video, plan, name, shot, fr)
         elif not isinstance(dur, int) or not lo <= dur <= hi:
             bad(f"{name}: duration_seconds {dur!r}; the model takes whole seconds from {lo} to {hi}")
@@ -557,8 +578,8 @@ def cmd_validate(video):
         if placeholder(shot.get("keyframe_prompt")):
             bad(f"{name}: no keyframe_prompt")
         check_refs(video, plan, name, shot.get("keyframe_references") or [], KEYFRAME_KINDS, None, "keyframe")
-        check_refs(video, plan, name, gen_refs(shot), GEN_KINDS, lim.get("max_reference_images"), "generation",
-                   fr_clip)
+        check_refs(video, plan, name, gen_refs(shot), GEN_KINDS,
+                   (fr_lim if fr_lim else lim).get("max_reference_images"), "generation", fr_clip)
         if t == "T" and not any(r.get("kind") == "voice" for r in gen_refs(shot)) and sl:
             bad(f"{name}: a talking segment carries the voice reference")
         if fr:
@@ -594,8 +615,9 @@ def cmd_refs(video, only):
         if only and name not in only:
             continue
         refs = gen_refs(shot)
-        n = check_refs(video, plan, name, refs, GEN_KINDS, lim.get("max_reference_images"), "generation",
-                       (shot.get("face_replace") or {}).get("clip") if name.endswith("-x") else None)
+        fr_lim = face_route(shot)[2] if name.endswith("-x") and shot.get("face_replace") else None
+        n = check_refs(video, plan, name, refs, GEN_KINDS, (fr_lim or lim).get("max_reference_images"),
+                       "generation", (shot.get("face_replace") or {}).get("clip") if name.endswith("-x") else None)
         sdir = os.path.join(vdir(video), "segments", name)
         os.makedirs(sdir, exist_ok=True)
         out = {"_comment": "Written by scripts/character/shots.py refs from the shot file. "
@@ -604,7 +626,8 @@ def cmd_refs(video, only):
                                "file": os.path.relpath(resolve(video, plan, r["file"]), ROOT),
                                "binding": r.get("role", "")} for r in refs]}
         json.dump(out, open(os.path.join(sdir, "refs.json"), "w"), indent=2)
-        msg = f"{name}: refs.json, {n} picture(s), {len(refs) - n} audio"
+        nv = sum(1 for r in refs if r.get("kind") == "face_replace_clip")
+        msg = f"{name}: refs.json, {n} picture(s), {len(refs) - n - nv} audio" + (f", {nv} video" if nv else "")
         t = str(shot.get("segment_type", "")).upper()
         if t in PHONE:
             ip = os.path.join(sdir, "insert.json")

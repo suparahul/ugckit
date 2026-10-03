@@ -19,8 +19,12 @@
 # reference that is supplied media (the plan's assets); a segment that is not generated;
 # research footage. The one exception is an X segment in face-replace mode (founder,
 # 2026-10-04): its input is the trimmed, masked copy of the reference clip that
-# shots.py reference writes (kind face_replace_clip), with the character's face, and only
-# on a model that models.json marks with the face_replace mode.
+# shots.py reference writes (kind face_replace_clip), with the character's face. The shot's
+# face_replace.route picks the model and the template (models.json face_replace.routes):
+# edit (Wan 2.7 Edit Video, the clip is the source video) or guided (MiniMax H3
+# reference-to-video, the clip is a video reference). A live face-replace run is refused
+# while capabilities.json bridge.face_replace is false; REQUEST_ONLY=1 writes the request
+# it would send, with placeholder file ids, and spends nothing.
 set -euo pipefail
 
 [ $# -ge 2 ] || { echo "usage: $0 <video> <segment> [template_slug] [prompt_file]" >&2; exit 2; }
@@ -62,7 +66,7 @@ WARN
 fi
 
 # ---- the gates before any cost: the storyboard, the character, the kinds of reference.
-python3 - "$PROJ" "$VIDEO" "$SEG" "$([ "$USE_REFS" = 1 ] && echo "$REFS")" <<'GATES' || exit 1
+python3 - "$PROJ" "$VIDEO" "$SEG" "$([ "$USE_REFS" = 1 ] && echo "$REFS")" <<'GATES' > "$OUT/.route" || exit 1
 import json, os, re, sys
 root, video, seg, refs = sys.argv[1:5]
 vd = os.path.join(root, "pipeline", "character", video)
@@ -88,9 +92,13 @@ for pin in plan.get("characters") or []:
 if seg.split("-")[-1].upper() in ("C", "M", "R", "P"):
     sys.exit(f"FATAL: {seg} is not generated (C, M, R and P are built at assembly)")
 # The active Supagen version has one length; the segment must be planned at that length.
+# A face-replace shot runs on its route's own template and model, not on state.json's.
 shot = os.path.join(vd, "shots", f"{seg}.json")
 st = os.path.join(root, "pipeline", "character", "state.json")
-if os.path.exists(shot) and os.path.exists(st):
+tp = seg.split("-")[-1].upper()
+shotd = json.load(open(shot)) if os.path.exists(shot) else {}
+fx = shotd.get("face_replace") if tp == "X" else None
+if os.path.exists(shot) and os.path.exists(st) and not fx:
     want = (json.load(open(shot)).get("video") or {}).get("duration_seconds")
     have = (json.load(open(st)).get("model") or {}).get("duration_s")
     if want and have and int(want) != int(have):
@@ -98,10 +106,7 @@ if os.path.exists(shot) and os.path.exists(st):
                  f"the ugc-character version at {want}s and run: scripts/character/state.py "
                  f"model set <slug> {want}")
 # A face-replace reaction: the reference clip, trimmed and masked, is the motion input.
-tp = seg.split("-")[-1].upper()
-shotd = json.load(open(shot)) if os.path.exists(shot) else {}
-fx = shotd.get("face_replace") if tp == "X" else None
-fr = {x.get("id"): x for x in plan.get("reaction_refs") or []}.get((fx or {}).get("ref_id")) if fx else None
+fr ={x.get("id"): x for x in plan.get("reaction_refs") or []}.get((fx or {}).get("ref_id")) if fx else None
 fr_mode = bool(fr) and fr.get("generation_input") == "face_replace"
 clip_rel = f"pipeline/character/{video}/segments/{seg}/source/reference.mp4"
 if fx and not fr_mode:
@@ -149,16 +154,39 @@ if refs:
                      "never attached as it is; a face-replace reaction uses its trimmed, masked copy.")
         if seg.split("-")[-1].upper() == "X" and r.get("kind") == "voice":
             sys.exit(f"FATAL: {seg} is a silent reaction: no voice reference (a reaction hook is never spoken)")
-# Last: the face-replace run needs a model that does it.
+# Last: the face-replace route (shot face_replace.route) names the model and the template.
+# Printed for the cost step: route model template clip_s duration_s.
 if fr_mode:
-    st_ = json.load(open(st)) if os.path.exists(st) else {}
-    slug = (st_.get("model") or {}).get("slug")
     spec_ = json.load(open(os.path.join(root, "scripts", "character", "models.json")))
-    if "face_replace" not in (spec_["known_model_limits"].get(slug) or {}).get("modes", []):
-        sys.exit(f"FATAL: {seg} needs a video-to-video face-replace model; {slug!r} is not one. "
-                 "No model in scripts/character/models.json has the face_replace mode yet (see its "
-                 "face_replace note). Nothing was spent.")
+    routes = (spec_.get("face_replace") or {}).get("routes") or {}
+    route = fx.get("route")
+    if route not in routes:
+        sys.exit(f"FATAL: {seg}: face_replace.route {route!r}; it is one of {', '.join(sorted(routes))} "
+                 "(models.json face_replace.routes). Nothing was spent.")
+    rt = routes[route]
+    lim = spec_["known_model_limits"].get(rt["model"]) or {}
+    if rt["mode"] not in lim.get("modes", []):
+        sys.exit(f"FATAL: {seg}: {rt['model']!r} has no {rt['mode']} mode in models.json. Nothing was spent.")
+    clip_s = round(fr["end_s"] - fr["start_s"], 3)
+    sv_ = lim.get("source_video") or {}
+    if not sv_.get("min_s", 0) <= clip_s <= sv_.get("max_s", 1e9):
+        sys.exit(f"FATAL: {seg}: the clip is {clip_s:g} s; {rt['model']} takes a video of {sv_.get('min_s')} "
+                 f"to {sv_.get('max_s')} s")
+    imgs = [k for k in kinds if k not in ("face_replace_clip", "voice")]
+    if lim.get("max_reference_images") and len(imgs) > lim["max_reference_images"]:
+        sys.exit(f"FATAL: {seg}: {rt['model']} takes {lim['max_reference_images']} reference image(s) beside "
+                 f"the clip; refs.json lists {len(imgs)}: keep the character's face (hero)")
+    dur = (shotd.get("video") or {}).get("duration_seconds")
+    if rt["length"] == "exact":
+        if dur not in (None, "null"):
+            sys.exit(f"FATAL: {seg}: the {route} route has no length of its own (the clip's); duration_seconds is null")
+        dur = clip_s
+    elif dur != rt.get("duration_s") or dur < clip_s:
+        sys.exit(f"FATAL: {seg}: the {route} route generates {rt.get('duration_s')} s (its template version) and "
+                 f"trims to the clip's {clip_s:g} s; the shot plans duration_seconds {dur!r}")
+    print(route, rt["model"], rt["template"], clip_s, dur)
 GATES
+FRINFO=$(cat "$OUT/.route"); rm -f "$OUT/.route"
 
 # ---- cost, computed from list price x seconds. Reported costs are unreliable (rule 7).
 # The model comes from pipeline/character/state.json, not from the template: the REST invoke endpoint
@@ -167,7 +195,22 @@ GATES
 # two in step -- `state.py model set` and `activate_version` are one operation in
 # two places, and the setup skill does both.
 REFS_ARG=""; [ "$USE_REFS" = 1 ] && REFS_ARG="$REFS"
-read -r MODEL DUR PRICE TRIM < <(python3 - "$PROJ" "$REFS_ARG" <<'COST'
+if [ -n "$FRINFO" ]; then
+  # Face replace: the route's model and template (models.json face_replace.routes).
+  read -r FR_ROUTE MODEL FR_TPL FR_CLIP DUR <<< "$FRINFO"
+  SLUG=$FR_TPL
+  read -r PRICE TRIM BILLED < <(python3 - "$PROJ" "$FR_ROUTE" "$MODEL" "$FR_CLIP" "$DUR" <<'FRCOST'
+import json, math, os, sys
+root, route, model = sys.argv[1:4]
+clip, dur = float(sys.argv[4]), float(sys.argv[5])
+spec = json.load(open(os.path.join(root, "scripts", "character", "models.json")))
+exact = spec["face_replace"]["routes"][route]["length"] == "exact"
+# Quoted on whole output seconds, rounded up: the higher figure until a bill shows otherwise.
+print(spec["known_model_limits"][model].get("price_per_s") or 0, 0 if exact else clip, math.ceil(dur - 1e-6))
+FRCOST
+)
+else
+  read -r MODEL DUR PRICE TRIM < <(python3 - "$PROJ" "$REFS_ARG" <<'COST'
 import json, os, sys
 root, refs = sys.argv[1], sys.argv[2]
 state = os.path.join(root, "pipeline", "character", "state.json")
@@ -196,29 +239,32 @@ if refs and lim.get("max_reference_images"):
 print(m["slug"], dur, lim.get("price_per_s") or 0, m.get("trim_to_s") or 0)
 COST
 )
+  BILLED=$DUR
+fi
 
 if [ "$PRICE" = "0" ]; then
   EST="unknown"
 else
-  EST=$(python3 -c "print(f'{$DUR * $PRICE:.2f}')")
+  EST=$(python3 -c "print(f'{$BILLED * $PRICE:.2f}')")
 fi
 
+if [ -n "$FRINFO" ]; then
+  if [ "$FR_ROUTE" = edit ]; then MODE="FACE REPLACE, edit route (the clip is the source video: its frames and timing stay)"
+  else MODE="FACE REPLACE, guided route (the clip guides a new clip; trimmed to the clip at assembly)"; fi
+else
+  MODE=$([ "$USE_REFS" = 1 ] && echo 'REFERENCE-TO-VIDEO (opted in)' || echo 'text-to-video')
+fi
 echo "project     $NAME"
 echo "template    $SLUG"
 echo "model       $MODEL   (whichever version is ACTIVE in Supagen is what runs)"
 echo "prompt      $LEN chars"
-echo "mode        $([ "$USE_REFS" = 1 ] && echo 'REFERENCE-TO-VIDEO (opted in)' || echo 'text-to-video')"
+echo "mode        $MODE"
 echo "duration    ${DUR}s$([ "$TRIM" != 0 ] && echo "   (trim to ${TRIM}s at assembly)")"
-echo "est. cost   \$$EST   (computed as list price x seconds, not the reported figure)"
+echo "est. cost   \$$EST   (computed as list price x ${BILLED} s, not the reported figure)"
 echo
 
-if [ "${CONFIRM:-0}" != "1" ]; then
-  echo "Not generating. This would spend \$$EST." >&2
-  echo "Re-run with CONFIRM=1 to proceed." >&2
-  exit 3
-fi
-
 STAMP=$(date +%Y%m%d-%H%M%S)
+[ "${REQUEST_ONLY:-0}" = 1 ] && STAMP=draft
 REQ="$OUT/request-$STAMP.json"
 RESP="$OUT/response-$STAMP.json"
 MP4="$OUT/$NAME-$STAMP.mp4"
@@ -226,18 +272,74 @@ IDS="$OUT/refs-$STAMP.txt"
 : > "$IDS"
 
 if [ "$USE_REFS" = 1 ]; then
-  echo "== uploading references =="
   python3 - "$REFS" <<'REFLIST' > "$OUT/reflist-$STAMP.txt"
 import json, sys
-# Pictures first, in the order of refs.json (the keyframe leads), then the voice clip.
+# A face-replace clip first (the source video, or the video reference), then the pictures
+# in the order of refs.json (the keyframe leads), then the voice clip.
 refs = json.load(open(sys.argv[1]))["references"]
 for r in refs:
-    if r["kind"] != "voice":
+    if r["kind"] == "face_replace_clip":
+        print("video", r["file"])
+for r in refs:
+    if r["kind"] not in ("voice", "face_replace_clip"):
         print("image", r["file"])
 for r in refs:
     if r["kind"] == "voice":
         print("audio", r["file"])
 REFLIST
+fi
+
+build_request() {
+python3 - "$REQ" "$SLUG" "$PROMPT" "$IDS" <<'BUILD'
+import json, sys
+req, slug, pf, idf = sys.argv[1:5]
+prompt = open(pf).read().strip()
+parts = [{"type": k, "source": {"file_id": v}}
+         for k, v in (l.split() for l in open(idf).read().splitlines() if l.strip())]
+# At most one video part, and it leads: on an edit model it is the source video.
+if sum(x["type"] == "video" for x in parts) > 1 or any(x["type"] == "video" for x in parts[1:]):
+    sys.exit("FATAL: a request carries one video part, before the pictures")
+# The prompt goes here and ONLY here. Supagen CONCATENATES rendered system_instructions
+# with message text parts rather than choosing one, so a template that also renders
+# {{prompt}} would send it twice and blow the char cap -- and the rendered copy arrives
+# with its quotes HTML-escaped. Templates from templates.json are messages-only.
+# AGENTS.md rule 4.
+json.dump({
+    "template_slug": slug,
+    "messages": [{"role": "user", "content": [{"type": "text", "text": prompt}] + parts}],
+    "end_user": {"project_id": "ugckit", "feature": "character", "user_id": "local"},
+}, open(req, "w"), indent=2)
+BUILD
+}
+
+# REQUEST_ONLY=1: the request this run would send, with placeholder file ids. No upload,
+# no run, nothing spent; it works while the face-replace stop below is on.
+if [ "${REQUEST_ONLY:-0}" = 1 ]; then
+  [ "$USE_REFS" = 1 ] && while read -r KIND FILE; do
+    [ -n "$KIND" ] && echo "$KIND offline:$FILE" >> "$IDS"
+  done < "$OUT/reflist-$STAMP.txt"
+  build_request || exit 1
+  echo "request written: $REQ (REQUEST_ONLY: no upload, no run, nothing spent)"
+  exit 0
+fi
+
+# The stop before spend (founder, 2026-10-04): no live face-replace run until the founder
+# approves a paid test and capabilities.json bridge.face_replace is true.
+if [ -n "$FRINFO" ] && ! python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("bridge.face_replace") is True else 1)' \
+    "$PROJ/scripts/character/capabilities.json"; then
+  echo "FATAL: face replace is not approved for a live run (capabilities.json bridge.face_replace is false)." >&2
+  echo "The founder approves the paid test first. Nothing was spent. REQUEST_ONLY=1 shows the request." >&2
+  exit 1
+fi
+
+if [ "${CONFIRM:-0}" != "1" ]; then
+  echo "Not generating. This would spend \$$EST." >&2
+  echo "Re-run with CONFIRM=1 to proceed." >&2
+  exit 3
+fi
+
+if [ "$USE_REFS" = 1 ]; then
+  echo "== uploading references =="
   while read -r KIND FILE; do
     [ -n "$KIND" ] || continue
     ABS="$PROJ/$FILE"
@@ -252,23 +354,7 @@ REFLIST
   done < "$OUT/reflist-$STAMP.txt"
 fi
 
-python3 - "$REQ" "$SLUG" "$PROMPT" "$IDS" <<'BUILD'
-import json, sys
-req, slug, pf, idf = sys.argv[1:5]
-prompt = open(pf).read().strip()
-parts = [{"type": k, "source": {"file_id": v}}
-         for k, v in (l.split() for l in open(idf).read().splitlines() if l.strip())]
-# The prompt goes here and ONLY here. Supagen CONCATENATES rendered system_instructions
-# with message text parts rather than choosing one, so a template that also renders
-# {{prompt}} would send it twice and blow the char cap -- and the rendered copy arrives
-# with its quotes HTML-escaped. Templates from templates.json are messages-only.
-# AGENTS.md rule 4.
-json.dump({
-    "template_slug": slug,
-    "messages": [{"role": "user", "content": [{"type": "text", "text": prompt}] + parts}],
-    "end_user": {"project_id": "ugckit", "feature": "character", "user_id": "local"},
-}, open(req, "w"), indent=2)
-BUILD
+build_request || exit 1
 
 echo "== generating via $SLUG (this runs for minutes) =="
 CODE=$(/usr/bin/curl -s -m 1800 -X POST "https://supagen.dev/api/v1/invoke" \

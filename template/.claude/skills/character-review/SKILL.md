@@ -71,8 +71,11 @@ it.** The checklist (the user sees the same list):
   character's face in every frame; nothing of the original creator's face, hair or marks;
   no handle, watermark or caption of the reference (OCR reads the file and refuses any
   text); no voice. `review.py` approves it only with
-  `--check identity=pass --check no_source_identity=pass --check silent=pass`, and only
-  when the file is within 0.25 s of the clip's length.
+  `--check identity=pass --check no_source_identity=pass --check silent=pass`. On the
+  `edit` route the file is within 0.25 s of the clip's length. On the `guided` route the
+  take is a new clip: it is at least the clip's length (it is trimmed to it at assembly),
+  and it needs `--check follows_reference=pass` too: the reaction follows the clip's
+  expression beats in order and time within the trimmed length.
 
 Pull a frame where you are unsure:
 

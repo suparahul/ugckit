@@ -1,5 +1,5 @@
 {
-  "_comment": "The character pipeline's own model file. It is not the recreation pipeline's templates.json, and the recreation scripts never read it. The character scripts (scripts/character/generate.sh and the model command of scripts/character/state.py) read it to refuse an impossible request before it costs anything, and to compute cost. Same shape as known_model_limits in templates.json, plus min_duration_s and max_reference_images. MiniMax H3 Max reference-to-video is the default; MiniMax H3 reference-to-video stays as a second entry. Add another model only with a measured cap and price. max_reference_images is the most pictures one run may attach; every image counts, the start frame too, and the voice clip does not.",
+  "_comment": "The character pipeline's own model file. It is not the recreation pipeline's templates.json, and the recreation scripts never read it. The character scripts (scripts/character/generate.sh and the model command of scripts/character/state.py) read it to refuse an impossible request before it costs anything, and to compute cost. Same shape as known_model_limits in templates.json, plus min_duration_s and max_reference_images. MiniMax H3 Max reference-to-video is the default; MiniMax H3 reference-to-video stays as a second entry, and is also the guided face-replace route. Wan 2.7 Edit Video is the face-replace model only (founder, 2026-10-04): it has no length range of its own, and state.py model set refuses it as the segment model. Add another model only with a measured cap and price. max_reference_images is the most pictures one run may attach; every image counts, the start frame too, and the voice clip does not.",
   "default": "minimax-h3-max-reference-to-video",
   "known_model_limits": {
     "minimax-h3-max-reference-to-video": {
@@ -14,7 +14,32 @@
       "max_duration_s": 15,
       "price_per_s": 0.06,
       "max_resolution": "768p",
-      "max_reference_images": 9
+      "max_reference_images": 9,
+      "modes": [
+        "face_replace_guided"
+      ],
+      "source_video": {
+        "min_s": 2,
+        "max_s": 15
+      }
+    },
+    "wan-2-7-edit-video": {
+      "modes": [
+        "face_replace"
+      ],
+      "price_per_s": 0.1,
+      "max_resolution": "720p",
+      "max_reference_images": 1,
+      "source_video": {
+        "min_s": 2,
+        "max_s": 10,
+        "max_bytes": 104857600,
+        "formats": [
+          "mp4",
+          "mov"
+        ]
+      },
+      "output_length": "the source video's length (no duration setting)"
     }
   },
   "output": {
@@ -45,9 +70,29 @@
     "output_length": "SETTLED BY MEASUREMENT for minimax-h3-reference-to-video: outputs run 0.1 to 0.6 s long (5 s gave 5.184 s, 6 s gave 6.592 s, 15 s gave 15.104 s). Not measured yet for H3 Max reference. Trim to the planned length at assembly."
   },
   "face_replace": {
-    "_comment": "Founder, 2026-10-04: an X segment (a reaction hook) may run in face-replace mode: the trimmed, masked reference clip and the character's approved face go to a video-to-video model that keeps the motion and timing and replaces the face. generate.sh runs that mode only on a known_model_limits entry whose \"modes\" lists \"face_replace\". No entry has it today, so generate.sh refuses a face-replace run before any cost.",
-    "status": "NO MODEL. Neither minimax-h3-max-reference-to-video nor minimax-h3-reference-to-video replaces a face: they accept video references as conditioning of a new generation, which does not keep the clip's frames, motion and timing (and is not tested). No model of scripts/templates.json is video-to-video.",
-    "proposal": "Wan 2.2 Animate in replace mode (on fal as wan/v2.2-14b/animate/replace): a video plus one character image; it keeps the motion, expression and timing of the video and replaces the person with the character, relit to the scene. Not checked in Supagen: before it is added, read its Supagen model record (read-only, no run) for the slug, the price per second, the length and resolution limits, and the input fields; then add it here with \"modes\": [\"face_replace\"], add a template version in templates.json, and write the video-input part of the request in generate.sh (today it sends pictures and one audio clip only). Its first paid run is the founder's decision.",
+    "_comment": "Founder, 2026-10-04: an X segment (a reaction hook) may run in face-replace mode: the trimmed, masked reference clip and the character's approved face go to a model with the clip as a video input. The shot names its route (shots/<nn>-x.json face_replace.route). generate.sh takes the model and the template from the route, not from state.json, and checks that the model lists the route's mode. Prices and limits: Supagen's public model catalog (GET https://supagen.dev/api/v1/models, no key, no run), read 2026-10-04.",
+    "status": "NOT RUN. The routes are written and tested offline. generate.sh refuses every live face-replace run while capabilities.json bridge.face_replace is false, which it stays until the founder approves a paid test. The founder plans that test in his own Organic Factory space.",
+    "routes": {
+      "edit": {
+        "model": "wan-2-7-edit-video",
+        "mode": "face_replace",
+        "template": "ugc-character-face-replace",
+        "length": "exact",
+        "what": "PRIMARY. Wan 2.7 Edit Video (fal-ai/wan/v2.7/edit-video): the masked clip is the source video and the character's face is its one reference image. It edits the clip, so the frames, motion and timing are the clip's and the output is the clip's length: duration_seconds null, trim_to_seconds the clip's length, gate B within 0.25 s of it.",
+        "limits": "Source video 2 to 10 s, mp4 or mov, at most 100 MB. One reference image. 720p or 1080p, 9:16. $0.10 a second at 720p ($0.15 at 1080p), billed on the output seconds: a 2.9 s clip is about $0.29 (generate.sh quotes whole seconds: $0.30)."
+      },
+      "guided": {
+        "model": "minimax-h3-reference-to-video",
+        "mode": "face_replace_guided",
+        "template": "ugc-character-face-guided",
+        "length": "trim",
+        "duration_s": 5,
+        "what": "FALLBACK. MiniMax H3 reference-to-video (minimax/h3/reference-to-video): the masked clip is a video reference and the character's face an image reference. It makes a new clip guided by the reference, so it does not keep the exact frames and timing: duration_seconds is the template's length (5 s, at least the clip's), trim_to_seconds the clip's length; gate B needs the file at least the clip's length, trims it at assembly, and adds the check that the reaction follows the clip (follows_reference).",
+        "limits": "Video reference 2 to 15 s; 1 to 5 references in all (pictures, video, audio). Output 5 to 15 whole seconds, 768p. $0.06 a second at 768p: a 5 s run is $0.30. A clip longer than 5 s needs a template version at that length."
+      }
+    },
+    "request": "Unverified until the paid test: generate.sh sends the clip as a message part {type: video, source: {file_id}} before the picture parts, the face as {type: image, ...}; the file is uploaded with purpose invocation_input like the pictures. REQUEST_ONLY=1 writes the request it would send, with placeholder file ids, and stops: no upload, no run.",
+    "not_offered": "Wan 2.2 Animate (replace mode) is not in Supagen's catalog. Other Supagen models with a source video and a face picture: kling-o3-pro-edit-video and kling-video-o1-edit-video ($0.168 a second, clip 3 s or more), happyhorse-1-0-edit-video ($0.14 in + $0.14 out a second at 720p, clip 3 s or more).",
     "fallback": "generation_input none: the written expression beats, generated by the default model from the keyframe and the character's references."
   }
 }

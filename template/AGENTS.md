@@ -405,9 +405,12 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
   has framing `app_screen` (R or P). In face-replace mode (founder, 2026-10-04) the
   reference clip, trimmed to its range with its burned-in text masked (`shots.py
   reference`), is the motion input of the X generation and the character's face goes in;
-  research footage is never an input anywhere else, and the run needs a model with the
-  `face_replace` mode in `models.json` (none yet: `generate.sh` stops before any cost; the
-  written expression beats are the fallback). Production refuses a dry-run planning approval, a
+  research footage is never an input anywhere else. The shot's `face_replace.route` picks
+  the model: `edit` (Wan 2.7 Edit Video, the clip's frames, timing and length kept) or
+  `guided` (MiniMax H3 reference-to-video, a new clip trimmed to the clip's length, with
+  its own gate B check). `generate.sh` refuses every live face-replace run until the
+  founder approves a paid test (`capabilities.json` `bridge.face_replace`); the written
+  expression beats are the fallback. Production refuses a dry-run planning approval, a
   number on an overlay without `fact_refs`, and research footage attached to a generation.
   A narrator speaks where no generated face
   talks: the character's approved performance, a supplied voice, or an original synthetic

@@ -28,6 +28,63 @@
           }
         }
       ]
+    },
+    {
+      "slug": "ugc-character-face-replace",
+      "name": "ugc-character-face-replace",
+      "output_type": "video",
+      "required": false,
+      "create_when": "the founder approves the paid face-replace test (models.json face_replace); setup does not create it before",
+      "description": "Face replace, the edit route (models.json face_replace.routes.edit): Wan 2.7 Edit Video. The masked reference clip is the source video and the character's face the one reference image. Messages-only. The output is the source video's length: no duration setting. 720p, 9:16.",
+      "_version_rules": "Every version keeps system_instructions unset, variables empty and duration null, as in ugc-character.",
+      "versions": [
+        {
+          "name": "v1-720p-9x16",
+          "activate": true,
+          "default": true,
+          "model_slug": "wan-2-7-edit-video",
+          "model_id_hint": "260efd88-7916-4a4f-ae2a-e93e39703702",
+          "_model_note": "$0.10/s at 720p, source video 2 to 10 s, one reference image. The resolution form (\"720p\") is the catalog's; check it on the version before the paid test.",
+          "video_settings": {
+            "aspect_ratio": "9:16",
+            "generate_audio": false,
+            "n": 1,
+            "duration": null,
+            "extensions": {
+              "resolution": "720p"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "ugc-character-face-guided",
+      "name": "ugc-character-face-guided",
+      "output_type": "video",
+      "required": false,
+      "create_when": "the founder approves the paid face-replace test (models.json face_replace); setup does not create it before",
+      "description": "Face replace, the guided route (models.json face_replace.routes.guided): MiniMax H3 reference-to-video. The masked reference clip is a video reference and the character's face an image reference; a new clip guided by them, trimmed to the clip's length at assembly. Messages-only. 9:16, 768P, 5 s.",
+      "_version_rules": "Every version keeps system_instructions unset, variables empty and duration null, as in ugc-character. Duration inside extensions, one version per length.",
+      "versions": [
+        {
+          "name": "v1-5s-9x16",
+          "activate": true,
+          "default": true,
+          "model_slug": "minimax-h3-reference-to-video",
+          "model_id_hint": "0b3aab2e-347c-4795-b6f3-83dfd0e18f6c",
+          "_model_note": "$0.06/s at 768p, 5 to 15 s, video reference 2 to 15 s.",
+          "video_settings": {
+            "aspect_ratio": "9:16",
+            "generate_audio": false,
+            "n": 1,
+            "duration": null,
+            "extensions": {
+              "duration": 5,
+              "resolution": "768P"
+            }
+          }
+        }
+      ]
     }
   ]
 }

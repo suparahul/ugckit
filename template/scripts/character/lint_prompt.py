@@ -284,6 +284,9 @@ def lint(video, seg):
         st = os.path.join(ROOT, "pipeline", "character", "state.json")
         slug = (json.load(open(st)).get("model") or {}).get("slug") if os.path.exists(st) else None
         lim = spec["known_model_limits"].get(slug or spec["default"], {})
+        rt = ((spec.get("face_replace") or {}).get("routes") or {}).get((shot.get("face_replace") or {}).get("route"))
+        if t == "X" and rt:
+            lim = spec["known_model_limits"].get(rt["model"], {})
     except Exception:
         lim = {}
     imgs = sum(1 for r in refs if r.get("kind") not in ("voice", "face_replace_clip"))
