@@ -72,7 +72,8 @@ say("\nthe brain")
 # Shipped read-only by install.sh; every phase from the niche read on reads it. A
 # workspace without it was installed by an older kit: re-run install.sh.
 BRAIN = os.path.join(ROOT, "brain")
-for f in ["learnings-slideshows.md", "SLIDESHOW-ANATOMY.md", "ACCOUNT-ARCHITECTURE.md"]:
+for f in ["learnings-slideshows.md", "SLIDESHOW-ANATOMY.md", "ACCOUNT-ARCHITECTURE.md",
+          "VIDEO-ANATOMY.md", "video-patterns.json", "learnings-video.md"]:
     path = os.path.join(BRAIN, f)
     if os.path.exists(path) and os.path.getsize(path) > 0:
         ok(f"brain/{f}", f"{os.path.getsize(path) // 1024} KB")

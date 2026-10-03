@@ -224,10 +224,10 @@ else
   mkdir -p "$DEST/.agents" && ln -s ../.claude/skills "$DEST/.agents/skills" && ok ".agents/skills -> .claude/skills (Codex reads the same skills)"
 fi
 
-# The brain: three learnings files, replaced on every upgrade and read-only on disk so
-# nobody edits the copy the next upgrade overwrites. The user's own findings go beside
-# it, under apps/<slug>/niche/ (see apps/README.md).
-( cd "$SRC" && find brain -type f -name '*.md' ) | while read -r rel; do
+# The brain: the learnings files and the video taxonomy (video-patterns.json), replaced on
+# every upgrade and read-only on disk so nobody edits the copy the next upgrade overwrites.
+# The user's own findings go beside it, under apps/<slug>/niche/ (see apps/README.md).
+( cd "$SRC" && find brain -type f \( -name '*.md' -o -name '*.json' \) ) | while read -r rel; do
   [ -e "$DEST/$rel" ] && chmod u+w "$DEST/$rel"
   copy_managed "$rel"
   chmod 444 "$DEST/$rel"
