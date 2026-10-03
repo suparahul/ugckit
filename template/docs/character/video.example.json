@@ -1,10 +1,12 @@
 {
-  "_comment": "Copy to pipeline/character/<video>/video.json. Written by character-shots (P1) from the locked plan; nothing can be assembled without it. With app_insertion false, it has no O, G, S, H, F, R or P segment. Optional per segment, read by assemble.sh: trim [in, out] in seconds of the source; punch_in; audio_from <video>.<seg> (another approved segment's voice under this one); for R and P screen_id and punch_in_to_hero.",
+  "_comment": "Copy to pipeline/character/<video>/video.json. Written by character-shots (P1) from the locked plan; nothing can be assembled without it. With app_insertion false, it has no O, G, S, H, F, R or P segment. Optional per segment, read by assemble.sh: trim [in, out] in seconds of the source; punch_in; audio_from: '<video>.<seg>' (another approved segment's voice under this one), 'asset:<id>' (a supplied voice or sound approved at gate B, cut to audio_range_s or its trim_s) or 'narration:<take>' (a narrator's take approved at gate B); for R and P screen_id and punch_in_to_hero. For a v2 plan: plan_revision and plan_sha256 (bridge.py digest) pin the plan it was written from, every segment names the plan beats it carries (beat_ids), overlays is the plan's overlays copied exactly, and planned_s may give a segment's planned length. B is a silent generated action (hands only, pet only, or a mascot; never the app); C is supplied media (asset_id, source_range_s for a clip or still_s for a still, fit cover | pad, audio source | mute, and insert {mode, screen_id} for a filmed phone); M lays panels (each one source: asset_id, project of an approved B, or screen_id; source_range_s, rect as shares of the frame, crop, sync_offset_s, audio true on the panel whose sound plays).",
   "video_id": "<video>",
   "characters": [
     "<character>@v<n>"
   ],
   "plan_ref": "pipeline/character/<video>/plan.json",
+  "plan_revision": 1,
+  "plan_sha256": "<bridge.py digest of the plan; v2 only>",
   "app": "<slug>",
   "handle": "<handle>",
   "dimension": "9:16",
@@ -17,7 +19,10 @@
       "type": "T",
       "project": "<video>.01-t",
       "script_lines": "<ids>",
-      "shared": false
+      "shared": false,
+      "beat_ids": [
+        "<v2: plan beat ids>"
+      ]
     },
     {
       "n": 2,
@@ -59,6 +64,82 @@
       "audio_from": "<character>-shared.<screen-id>-vo",
       "shared": true,
       "_note": "the recording with her demo performance in a round bubble; its audio is not trimmed"
+    },
+    {
+      "n": 7,
+      "type": "B",
+      "project": "<video>.07-b",
+      "beat_ids": [
+        "<b>"
+      ],
+      "script_lines": [
+        "<the narrated lines>"
+      ],
+      "audio_from": "narration:<take>",
+      "_note": "a silent generated action: hands only, pet only or a mascot; its lines are narration"
+    },
+    {
+      "n": 8,
+      "type": "C",
+      "asset_id": "<asset id>",
+      "source_range_s": [
+        1.0,
+        5.0
+      ],
+      "beat_ids": [
+        "<b>"
+      ],
+      "script_lines": [],
+      "fit": "cover",
+      "audio": "source",
+      "_note": "supplied media, never generated; a still has still_s instead of source_range_s"
+    },
+    {
+      "n": 9,
+      "type": "M",
+      "beat_ids": [
+        "<b>"
+      ],
+      "duration_s": 6,
+      "script_lines": [
+        "<ids>"
+      ],
+      "audio_from": "narration:<take>",
+      "panels": [
+        {
+          "id": "left",
+          "asset_id": "<asset id>",
+          "source_range_s": [
+            0,
+            6
+          ],
+          "rect": [
+            0,
+            0,
+            0.5,
+            1
+          ],
+          "crop": "cover",
+          "sync_offset_s": 0
+        },
+        {
+          "id": "right",
+          "project": "<video>.10-b",
+          "source_range_s": [
+            0,
+            6
+          ],
+          "rect": [
+            0.5,
+            0,
+            0.5,
+            1
+          ],
+          "crop": "cover",
+          "sync_offset_s": 0
+        }
+      ],
+      "_note": "split_screen or picture_in_picture, copied from the plan's panels"
     }
   ],
   "joins": {
@@ -76,10 +157,22 @@
     "words_per_caption": "3-6",
     "text_source": "the frozen script"
   },
+  "overlays": [
+    {
+      "id": "o1",
+      "role": "hook",
+      "text": "<exact words>",
+      "start_s": 0,
+      "end_s": 3,
+      "placement": "top",
+      "panel_id": null
+    }
+  ],
   "title_overlay": {
     "burn": "<true only when the plan asks for it>",
     "text": "<the line, or null>",
-    "until_s": "<seconds, or null for the whole video>"
+    "until_s": "<seconds, or null for the whole video>",
+    "_note": "legacy (v1) only; drawn as one hook overlay. A v2 video carries its text in overlays."
   },
   "export": {
     "upscale": "lanczos, once, to 1080x1920",

@@ -1,13 +1,18 @@
 {
-  "_comment": "Copy to pipeline/character/<video>/shots/<nn>-<type>.json. Written by character-shots (P1). The video block is compiled to segments/<nn>-<type>/prompt.txt. Character and world paths are relative to the handle's folder; keyframes/ is relative to the video's folder. scripts/character/shots.py validate checks it; shots.py refs writes refs.json from video.references; scripts/character/keyframes.sh renders keyframe_prompt with keyframe_references.",
+  "_comment": "Copy to pipeline/character/<video>/shots/<nn>-<type>.json. Written by character-shots (P1). The video block is compiled to segments/<nn>-<type>/prompt.txt. Character and world paths are relative to the handle's folder; keyframes/ is relative to the video's folder. scripts/character/shots.py validate checks it; shots.py refs writes refs.json from video.references; scripts/character/keyframes.sh renders keyframe_prompt with keyframe_references. B (a silent generated action) uses the same file: framing_kind hands_only or subject_only (face only for an approved mascot), no phone, no line, no voice reference; its action carries the plan beat's action word for word, and fixed_subjects_in_shot the beat's exact subjects.",
   "shot_id": "<video>.01-t",
   "character_ref": "<character>@v<n>",
   "character_file": "apps/<slug>/handles/<handle>/characters/<character>/creator.json",
-  "segment_type": "T | O | G | S | H | F",
+  "segment_type": "T | O | G | S | H | F | B",
   "script_lines": "<ids of the frozen script lines this segment speaks; 'demo-vo' for a demo performance>",
   "set_ref": "<set-id>",
   "outfit_ref": "<outfit-id>",
   "framing": "medium chest-up, phone propped at eye level, face fills most of the frame",
+  "framing_kind": "face | hands_only | subject_only (who is in the picture; the keyframe's people rule)",
+  "cast_kind": "human | mascot",
+  "beat_ids": [
+    "<v2: the plan beats of this segment>"
+  ],
   "action": "<one action, written as movement; ends in a visible state>",
   "hands": {
     "left": "<job and place, or 'out of frame'>",
@@ -163,7 +168,7 @@
       "set layout",
       "light direction",
       "camera position",
-      "exactly one person"
+      "exactly one person (face); one person's hands (hands_only); no person (subject_only)"
     ],
     "word_count": 12,
     "words_per_second_max": 3.75

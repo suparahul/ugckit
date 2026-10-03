@@ -4,6 +4,7 @@
   "fixed_subjects": [
     {
       "id": "<fixed-subject-id>",
+      "origin": "generated | real (a real animal: shown only in supplied footage, never generated; no reference picture needed)",
       "what": "<a pet, a product always held: visible traits only>",
       "reference": "references/subject-<name>.png",
       "count": "<exactly one>",

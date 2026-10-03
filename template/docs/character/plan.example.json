@@ -1,5 +1,7 @@
 {
-  "_comment": "Copy to pipeline/character/<video>/plan.json. The locked plan, the only input of production. Written by hand until the planning system exists, then approved by the user. No production stage edits it.",
+  "_comment": "Copy to pipeline/character/<video>/plan.json. The locked plan, the only input of production. Written by the planning system (video-lock) or by hand, then approved by the user. No production stage edits it. A plan without schema_version is a legacy (v1) plan: only the fields from video_id to approved below exist, and it runs as before. A v2 plan (schema_version 2) adds revision, editorial, the beat fields from id to item_index, overlays, assets, narrators and publishing_note, and is checked by scripts/character/bridge.py; its approval is planning-approval.json beside it (planning-approval.example.json). The contract is plan.schema.json. A v2 plan may leave characters, set and outfit empty when no generated person or mascot appears. No value in angle brackets survives locking.",
+  "schema_version": 2,
+  "revision": 1,
   "video_id": "<video>",
   "app": "<slug>",
   "handle": "<handle>",
@@ -11,30 +13,160 @@
     "length_s": "<target length in seconds>"
   },
   "app_insertion": "<true | false>",
+  "editorial": {
+    "objective": "reach | save_share | product_discovery | product_action",
+    "distribution": "organic | paid",
+    "lane": "pitch | discovery | everyday | education",
+    "filming_format": "talking_head | hook_to_demo | live_use | before_after | text_over_action | voiceover_action (face_to_demo is read as hook_to_demo)",
+    "hook": {
+      "job_id": "<one of the twelve hook jobs>",
+      "channel": "spoken | visual | text | spoken_visual | text_visual",
+      "framing": [
+        "<count | negative | audience_callout | lived_experience | professional_basis>"
+      ]
+    },
+    "recipe_id": "pitch_proof | discovery_demo | routine_log | personal_note | state_change | explain_action | list_steps | setup_reveal",
+    "product": {
+      "role": "absent | incidental_tool | story_solution | main_subject",
+      "name_locations": [
+        "<speech | overlay | caption | bio>"
+      ],
+      "speech_count": 0,
+      "timing": "absent | opening | middle | closing | throughout"
+    },
+    "app_presence": "none | incidental_use | demonstration | result",
+    "proof": {
+      "kind": "none | visible_action | real_screen_result | sourced_fact",
+      "fact_refs": []
+    },
+    "close": "none | payoff | save | share | follow | question | profile | product_action",
+    "cast_kind": "human | mascot | none",
+    "narrator_ref": "<narrators[].id, or null>",
+    "series": "standalone, or {kind: progress_log, series_id, subject_ids, routine_id, episode, day, previous_plan_ref, state_fact_refs}",
+    "comparison_mode": "<before_after | wrong_right | best_worst, or null>",
+    "experiment": {
+      "axis": "none | hook | proof | product_presence | close | cast",
+      "base_video_id": null
+    },
+    "strategy_ref": "<the strategy row or experiment this video executes>",
+    "evidence_ids": [],
+    "taxonomy_version": "<pinned>",
+    "catalogue_digest": "<pinned>"
+  },
   "script": [
     {
       "id": "l1",
-      "speaker": "<character id, or vo>",
+      "speaker": "<character id, or vo (the beat's narrator)>",
       "line": "<the frozen words>",
       "delivery": "<which word lifts, where it slows, the breath>"
     }
   ],
   "beats": [
     {
+      "id": "b1",
+      "role": "<the recipe's beat: attention, problem, item, result...>",
+      "start_s": 0,
+      "end_s": "<seconds; beats meet end to start and cover the length>",
       "lines": [
         "l1"
       ],
+      "action": "<what is visible, copied word for word into the shot's action by P1>",
+      "fact_refs": [],
+      "performance": "on_camera | voiceover | silent_action",
+      "narrator_ref": "<optional; else editorial.narrator_ref>",
+      "source_asset_ids": [],
+      "subject_ids": [
+        "<world.json fixed subject; source:<name> for a subject only in a supplied clip>"
+      ],
+      "set_id": "<world.json set of a generated beat>",
+      "framing": "face | hands_only | subject_only",
+      "layout": "sequence",
+      "panels": [],
+      "repeat_group": null,
+      "item_index": null,
       "app_on_screen": false,
       "screen_id": null,
       "viewer_must": null
     },
     {
+      "id": "b2",
+      "role": "<role>",
+      "start_s": "<s>",
+      "end_s": "<s>",
       "lines": [
         "l2"
+      ],
+      "action": "<visible action>",
+      "fact_refs": [],
+      "performance": "voiceover",
+      "source_asset_ids": [
+        "<asset id>"
+      ],
+      "subject_ids": [],
+      "set_id": null,
+      "framing": "subject_only",
+      "layout": "split_screen | picture_in_picture",
+      "panels": [
+        {
+          "id": "<panel>",
+          "asset_id": "<asset id, or null for a generated B panel>",
+          "source_range_s": [
+            "<in>",
+            "<out>"
+          ],
+          "rect": [
+            0,
+            0,
+            0.5,
+            1
+          ],
+          "crop": "cover | pad",
+          "sync_offset_s": 0
+        }
       ],
       "app_on_screen": "<true only with app_insertion true>",
       "screen_id": "<row id in apps/<slug>/screens/SCREENS.md>",
       "viewer_must": "read | recognise | believe"
+    }
+  ],
+  "overlays": [
+    {
+      "id": "o1",
+      "role": "hook | paragraph | step_label | comparison_label | day_counter | source_credit",
+      "text": "<exact words>",
+      "start_s": 0,
+      "end_s": "<at least words / 3 s, and 1 s>",
+      "placement": "top | middle | upper_left | upper_right | panel",
+      "panel_id": null
+    }
+  ],
+  "assets": [
+    {
+      "id": "<asset>",
+      "kind": "clip | still | screen | audio",
+      "origin": "own_camera | user_supplied | licensed | permitted_reference | verified_expert | app_recording",
+      "path": "<workspace-relative path>",
+      "sha256": "<64 hex>",
+      "source_url": null,
+      "permission_ref": "<licence or permission; required unless own_camera or app_recording>",
+      "subject_ids": [],
+      "set_ref": "<the scene, from the source>",
+      "trim_s": [
+        "<in>",
+        "<out>"
+      ],
+      "screen_id": null,
+      "paired_input_ref": "<for a screen of a live demonstration: {asset_id, input_t_s, output_t_s}, else null>"
+    }
+  ],
+  "narrators": [
+    {
+      "id": "<narrator>",
+      "kind": "character | supplied_speaker | original_synthetic",
+      "character_ref": null,
+      "voice_ref": "<narrator>@v<n> for original_synthetic",
+      "source_ref": "<asset id for supplied_speaker>",
+      "credential_ref": "<supplied_speaker only: the verified credential>"
     }
   ],
   "set": {
@@ -45,6 +177,11 @@
   },
   "hero_strings": {
     "<screen id>": "<the one string the viewer must read>"
+  },
+  "publishing_note": {
+    "caption": "<optional>",
+    "bio_ref": null,
+    "music_note": "<a note only; the file stays music-free>"
   },
   "source": "<a reference post, or a research brief>",
   "approved": {

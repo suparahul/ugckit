@@ -1,0 +1,15 @@
+{
+  "_comment": "What the character production pipeline can make, for the planning skills (scripts/planning/video_plan.py ready): a plan that needs a capability that is false here is locked with that dependency listed, never changed to another format. Each key is one capability of the shared production bridge (scripts/character/bridge.py). true means the scripts, checks and skills exist; real media, approved characters, narrators and screens are still each video's own inputs.",
+  "bridge.B": true,
+  "bridge.C": true,
+  "bridge.narration": true,
+  "bridge.composition": true,
+  "bridge.live": true,
+  "_what": {
+    "bridge.B": "a silent generated action: hands only, pet only or an approved mascot (segment B); never the app",
+    "bridge.C": "supplied media: a clip or a still from the plan's assets, checksum, range and source approval at gate B (segment C); a filmed phone goes through the insertion gates of its mode",
+    "bridge.narration": "a narrator independent of the face: a character's approved performance, a supplied voice, or an original synthetic narrator's approved takes (audio_from)",
+    "bridge.composition": "split-screen and picture-in-picture panels (segment M), sequential stitch, timed overlays, the source credit and the day counter, checked at gate C",
+    "bridge.live": "a real input clip paired with its app recording, the measured offset checked in sequence or in panels"
+  }
+}

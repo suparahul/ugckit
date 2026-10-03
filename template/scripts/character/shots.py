@@ -9,6 +9,11 @@
                                         for the Codex image tool (scripts/character/keyframes.sh)
     shots.py verify <video> [--only a,b]  every keyframe is a real 1080x1920 picture
     shots.py storyboard <video>         keyframes/storyboard.jpg, the sheet of gate A
+    shots.py supplied <video> [segment] the plate of a C segment that shows a filmed phone
+                                        (segments/<seg>/source/plate.mp4) and its insert.json
+
+A v2 plan (schema_version 2) is also checked by scripts/character/bridge.py: check runs
+its plan checks, validate compares video.json with the plan's beats, words and overlays.
 
 <video> is a folder under pipeline/character/. Paths inside a shot file: keyframes/... is
 the video's folder; apps/... and pipeline/... are the workspace; anything else is the
@@ -20,9 +25,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 MODELS = os.path.join(ROOT, "scripts", "character", "models.json")
 STATE = os.path.join(ROOT, "pipeline", "character", "state.json")
 
-GENERATED = ["T", "O", "G", "S", "H", "F"]
-NOT_GENERATED = ["R", "P"]
+GENERATED = ["T", "O", "G", "S", "H", "F", "B"]
+# R, P: the real recording; C: supplied media (a clip or a still); M: panels side by side
+# or one inside another. None is generated.
+NOT_GENERATED = ["R", "P", "C", "M"]
 PHONE = ["O", "G", "S", "H", "F"]
+APP_TYPES = PHONE + ["R", "P"]
 INSERT_MODE = {"O": "over-shoulder", "G": "in-hand", "S": "show-to-camera", "H": "push", "F": "finger"}
 # The only reference kinds a generation may carry (template/AGENTS.md, the character
 # pipeline). Never an app UI, a screenshot or a screen recording.
@@ -31,10 +39,19 @@ KEYFRAME_KINDS = {"hero", "anchor", "subject", "set", "keyframe"}
 AUDIO_EXT = (".mp3", ".wav", ".m4a", ".aac")
 IMAGE_EXT = (".png", ".jpg", ".jpeg", ".webp")
 KEYFRAME_SIZE = (1080, 1920)
+# Who is in a keyframe, by the shot's framing_kind. "Exactly one person" holds only where
+# a face is in the frame.
+PEOPLE = {
+    "face": "Exactly one person.",
+    "hands_only": "Only one person's hands and forearms are in the picture: no face, no second person.",
+    "subject_only": "No person in the picture, no hand, no body part: only the subjects named.",
+}
 MAX_WORDS_PER_S = 3.75          # 15 words per 4 s
 STATUS_OK = {"video-setup", "live"}
 
 PROBLEMS, NOTES = [], []
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bridge
 
 
 def bad(msg):
@@ -128,12 +145,17 @@ def creator_for(plan, cid, ver):
 def cmd_check(video):
     plan = plan_of(video)
     print(f"plan  pipeline/character/{video}/plan.json")
+    v2 = bridge.is_v2(plan)
+    # A v2 plan may leave the set and outfit maps empty: entirely supplied or subject-only
+    # media has no generated person to dress.
     for k in ("video_id", "app", "handle", "characters", "format", "app_insertion", "script",
-              "beats", "set", "outfit", "approved"):
+              "beats", "approved") + (() if v2 else ("set", "outfit")):
         if k not in plan:
             bad(f"plan has no '{k}'")
     if PROBLEMS:
         finish()
+    plan.setdefault("set", {})
+    plan.setdefault("outfit", {})
     if plan["video_id"] != video:
         bad(f"plan video_id '{plan['video_id']}' is not the folder name '{video}'")
     ap = plan.get("approved") or {}
@@ -190,6 +212,8 @@ def cmd_check(video):
     if not PROBLEMS:
         good(f"{len(ids)} frozen line(s) in {len(plan['beats'])} beat(s); app_insertion "
              f"{'true' if ins else 'false'}")
+    if v2:
+        bridge.check_plan(plan, bridge.Out(bad, note, good), script_checked=True)
 
     # The pinned characters and the handle's world.
     hdir = handle_dir(plan)
@@ -202,6 +226,7 @@ def cmd_check(video):
         bad("the handle has no world.json -- run persona-identity (the video half)")
     sets = {s.get("id"): s for s in world.get("sets") or []}
     subjects = {s.get("id"): s for s in world.get("fixed_subjects") or []}
+    beat_sets = {b.get("set_id") for b in plan["beats"] if not placeholder(b.get("set_id"))}
     for raw, cid, ver in pins(plan):
         if not cid:
             bad(f"character pin {raw!r} is not <character>@v<n>")
@@ -211,6 +236,9 @@ def cmd_check(video):
             bad(f"{raw}: no creator file at {os.path.relpath(cpath, ROOT)} -- casting never runs "
                 "per video; run persona-identity first (part A)")
             continue
+        mascot = c.get("cast_kind") == "mascot"
+        if mascot and placeholder((c.get("mascot") or {}).get("style_lock")):
+            bad(f"{raw}: a mascot has its style_lock in creator.json (mascot.style_lock)")
         st = c.get("status")
         if st not in STATUS_OK:
             bad(f"{raw}: status {st!r}; P1 needs 'video-setup' or 'live' (persona-identity, mode 3)")
@@ -230,11 +258,15 @@ def cmd_check(video):
         if not (c.get("anchors") or {}).get("approved"):
             bad(f"{raw}: no approved anchors in creator.json -- the video half is not done")
         vr = ((c.get("voice_profile") or {}).get("voice_reference") or {})
-        if placeholder(vr.get("approved")):
+        if mascot:
+            pass                      # a mascot speaks with its narrator voice (narrators[])
+        elif placeholder(vr.get("approved")):
             note(f"{raw}: no approved voice reference -- talking segments cannot be generated "
                  "until character-voice is done")
         s = (plan.get("set") or {}).get(cid)
-        if placeholder(s):
+        if placeholder(s) and v2 and beat_sets:
+            good(f"{raw}: the sets come from the beats ({', '.join(sorted(beat_sets))})")
+        elif placeholder(s):
             bad(f"{raw}: the plan names no set")
         elif s not in sets:
             bad(f"{raw}: set {s!r} is not in world.json")
@@ -248,7 +280,9 @@ def cmd_check(video):
                 good(f"{raw}: set {s} ({plate})")
         o = (plan.get("outfit") or {}).get(cid)
         outfits = {x.get("id"): x for x in c.get("outfits") or []}
-        if placeholder(o):
+        if placeholder(o) and mascot:
+            pass                      # a mascot's look is its style lock
+        elif placeholder(o):
             bad(f"{raw}: the plan names no outfit")
         elif o not in outfits:
             bad(f"{raw}: outfit {o!r} is not in creator.json outfits")
@@ -261,8 +295,26 @@ def cmd_check(video):
                 continue
             if fs not in subjects:
                 bad(f"{raw}: fixed subject {fs!r} is not in world.json")
+            elif subjects[fs].get("origin") == "real":
+                pass                  # a real animal: supplied footage only, no picture to generate from
             elif not os.path.exists(os.path.join(hdir, subjects[fs].get("reference", ""))):
                 bad(f"{raw}: fixed subject {fs!r} has no picture")
+    if v2:
+        # The world of the generated beats: each set has its plate, each generated subject
+        # its picture. A real subject is never generated, so it needs none.
+        for b in plan["beats"]:
+            if b.get("source_asset_ids") or b.get("layout", "sequence") != "sequence":
+                continue
+            sid = b.get("set_id")
+            if not placeholder(sid) and sid in sets:
+                plate = sets[sid].get("plate")
+                if not plate or not os.path.exists(os.path.join(hdir, plate)):
+                    bad(f"beat {b.get('id')}: set {sid!r} has no plate picture ({plate})")
+            for fs in b.get("subject_ids") or []:
+                x = subjects.get(fs) or {}
+                if x and x.get("origin") != "real" and \
+                        not os.path.exists(os.path.join(hdir, x.get("reference") or "-")):
+                    bad(f"beat {b.get('id')}: fixed subject {fs!r} has no picture")
     slug, lim = model_limits()
     good(f"model {slug}: {lim.get('min_duration_s')} to {lim.get('max_duration_s')} s, "
          f"at most {lim.get('max_reference_images')} reference pictures")
@@ -290,8 +342,16 @@ def gen_refs(shot):
     return (shot.get("video") or {}).get("references") or []
 
 
+def supplied_paths(plan):
+    """Every supplied file of the plan, absolute. Supplied footage is output media, never
+    the conditioning of a generation."""
+    return {os.path.realpath(os.path.join(ROOT, a["path"])) for a in plan.get("assets") or []
+            if isinstance(a.get("path"), str)}
+
+
 def check_refs(video, plan, name, refs, kinds, max_images, what):
     images = 0
+    supplied = supplied_paths(plan)
     for r in refs:
         f, k = r.get("file"), r.get("kind")
         if placeholder(f):
@@ -301,6 +361,8 @@ def check_refs(video, plan, name, refs, kinds, max_images, what):
             bad(f"{name}: {what} reference {f} has kind {k!r}; allowed: {', '.join(sorted(kinds))}")
         if "/screens/" in f:
             bad(f"{name}: {f} is from the screen library -- the app is never a reference")
+        if "/supplied/" in f or os.path.realpath(resolve(video, plan, f)) in supplied:
+            bad(f"{name}: {f} is supplied media -- it goes into the video as it is, never into a generation")
         if f.lower().endswith(AUDIO_EXT):
             if k != "voice":
                 bad(f"{name}: {f} is audio but its kind is {k!r}")
@@ -345,7 +407,8 @@ def cmd_validate(video):
         if t not in GENERATED + NOT_GENERATED:
             bad(f"{name}: type {t!r} is not one of {', '.join(GENERATED + NOT_GENERATED)}")
             continue
-        if not ins and t != "T":
+        if not ins and (t in APP_TYPES or seg.get("insert")
+                        or any(p.get("screen_id") for p in seg.get("panels") or [])):
             bad(f"{name}: a {t} segment shows the app, but the plan has no app insertion")
         sl = seg.get("script_lines") or []
         if isinstance(sl, str):
@@ -361,10 +424,26 @@ def cmd_validate(video):
                 bad(f"{name}: line {lid} comes before a line of an earlier segment")
             last = max(last, idx)
             seen.append(lid)
-        if t in NOT_GENERATED:
+        if t in ("R", "P"):
             if placeholder(seg.get("screen_id")):
                 bad(f"{name}: an {t} segment needs a screen_id")
             note(f"{name}: {t} is not generated; its length comes from the recording")
+            continue
+        if t == "C":
+            if placeholder(seg.get("asset_id")):
+                bad(f"{name}: a C segment names the supplied asset it shows (asset_id)")
+            if seg.get("insert") and placeholder((seg.get("insert") or {}).get("screen_id")):
+                bad(f"{name}: a filmed phone's insert names its screen_id")
+            continue
+        if t == "M":
+            ps = seg.get("panels") or []
+            if len(ps) < 2:
+                bad(f"{name}: an M segment has two panels or more")
+            for p in ps:
+                srcs = [k for k in ("asset_id", "project", "screen_id") if not placeholder(p.get(k))]
+                if len(srcs) != 1:
+                    bad(f"{name}: panel {p.get('id')} names one source: asset_id, project (an approved "
+                        "B segment) or screen_id")
             continue
         shot = shots.get(name)
         if shot is None:
@@ -389,6 +468,17 @@ def cmd_validate(video):
                 "-- fewer words, or a longer segment")
         if t in ("H", "F") and sl:
             bad(f"{name}: an {t} segment speaks no line on camera; its audio is laid at assembly")
+        if t == "B" and sl and not seg.get("audio_from"):
+            bad(f"{name}: a B segment is silent; its lines are a narration laid at assembly (audio_from)")
+        if t == "B":
+            fk = shot.get("framing_kind")
+            if fk not in PEOPLE:
+                bad(f"{name}: framing_kind is face, hands_only or subject_only")
+            elif fk == "face" and shot.get("cast_kind") != "mascot":
+                bad(f"{name}: a B segment with a face is an approved mascot; a human face that acts "
+                    "silently is still a T segment's character")
+            if any(r.get("kind") == "voice" for r in gen_refs(shot)):
+                bad(f"{name}: a B segment is silent: no voice reference")
         for side in ("left", "right"):
             if placeholder((shot.get("hands") or {}).get(side)):
                 bad(f"{name}: hands.{side} has no job")
@@ -399,7 +489,7 @@ def cmd_validate(video):
             if placeholder(phone.get("screen_id")):
                 bad(f"{name}: phone.screen_id names the screen from SCREENS.md")
         elif phone.get("present"):
-            bad(f"{name}: a T segment has no phone")
+            bad(f"{name}: a {t} segment has no phone (the app is shown only by O, G, S, H, F, R or P)")
         if t == "H" and placeholder(((shot.get("phone_motion") or {}).get("push") or {}).get("end_still")):
             bad(f"{name}: an H segment needs its end still (phone_motion.push.end_still)")
         if placeholder(shot.get("keyframe_prompt")):
@@ -414,7 +504,10 @@ def cmd_validate(video):
     if missing:
         bad(f"lines no segment carries: {', '.join(missing)}")
     target = (plan.get("format") or {}).get("length_s")
-    if isinstance(target, (int, float)) and total and abs(total - target) > 0.25 * target:
+    if bridge.is_v2(plan):
+        print(f"bridge: video.json against plan revision {plan.get('revision')}")
+        bridge.check_video(plan, v, shots, bridge.Out(bad, note, good))
+    elif isinstance(target, (int, float)) and total and abs(total - target) > 0.25 * target:
         note(f"the generated segments plan {total:g} s against a target of {target} s "
              "(R and P segments add their recordings' length)")
     finish()
@@ -493,6 +586,7 @@ def cmd_job(video, only):
                 bad(f"{key}: no prompt")
                 continue
             stills.append({"name": key, "prompt": prompt, "references": refs,
+                           "people": PEOPLE.get(shot.get("framing_kind") or "face", PEOPLE["face"]),
                            "out": resolve(video, plan, rel)})
     if PROBLEMS:
         finish()
@@ -506,10 +600,11 @@ pictures with your built-in image generation tool, one call per still (never one
 several, never code that calls an image API).
 
 For each still in the job's "stills":
-  1. Use its "prompt" as written. Its "references" are the person, her outfit, the room and
-     any fixed subject: the picture must show the same person (same face, hair and
-     signature details), in that outfit, in that room, with each fixed subject in its true
-     size. Exactly one person. No text, no captions, no logo in the picture. A phone
+  1. Use its "prompt" as written. Its "references" are the person (or the mascot), the
+     outfit, the room and any fixed subject: the picture must show the same person (same
+     face, hair and signature details), in that outfit, in that room, with each fixed
+     subject in its true size and exact count. Who is in the picture is the still's
+     "people" rule, as written. No text, no captions, no logo in the picture. A phone
      screen, when there is one, is flat solid green (RGB 0 177 64).
   2. Ask the tool for a portrait picture (1024x1536).
   3. Save the generated file next to the still's "out" path as <out without .png>-raw.png,
@@ -553,6 +648,57 @@ def cmd_verify(video, only):
     finish()
 
 
+def cmd_supplied(video, only):
+    """A C segment that shows a filmed phone gets a plate, like a generated phone segment:
+    the approved range of the supplied clip, checked against its checksum, at
+    segments/<nn>-c/source/plate.mp4, and a first insert.json. The plate then goes
+    through the same gates (qc.py, review.py segment, composite.sh): nothing is relaxed."""
+    plan = plan_of(video)
+    vp = os.path.join(vdir(video), "video.json")
+    if not os.path.exists(vp):
+        sys.exit("no video.json")
+    assets = {a.get("id"): a for a in plan.get("assets") or []}
+    n = 0
+    for seg in load(vp).get("segments") or []:
+        name = seg_name(seg.get("n"), str(seg.get("type", "")))
+        if str(seg.get("type", "")).upper() != "C" or not seg.get("insert") or (only and name not in only):
+            continue
+        a = assets.get(seg.get("asset_id"))
+        if not a or a.get("kind") != "clip":
+            bad(f"{name}: a filmed phone is a supplied clip (asset {seg.get('asset_id')!r})")
+            continue
+        src = os.path.join(ROOT, a["path"])
+        if not os.path.exists(src) or bridge.sha256_file(src) != a.get("sha256"):
+            bad(f"{name}: {a['path']} is missing or does not match its sha256")
+            continue
+        rng = seg.get("source_range_s") or a.get("trim_s")
+        sdir = os.path.join(vdir(video), "segments", name)
+        os.makedirs(os.path.join(sdir, "source"), exist_ok=True)
+        plate = os.path.join(sdir, "source", "plate.mp4")
+        r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{rng[0]:.3f}", "-to", f"{rng[1]:.3f}",
+                            "-i", src, "-c:v", "libx264", "-crf", "12", "-preset", "medium",
+                            "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", plate],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            bad(f"{name}: ffmpeg could not cut the plate: {r.stderr[-300:]}")
+            continue
+        ins = seg["insert"]
+        ip = os.path.join(sdir, "insert.json")
+        if not os.path.exists(ip):
+            json.dump({"_comment": "Written by shots.py supplied for a filmed phone in a supplied clip. "
+                                   "P4 fills the source, the beats and the tracking; the gates are those "
+                                   "of the mode (docs/character/insert.example.json).",
+                       "mode": ins.get("mode") or "in-hand", "screen_id": ins.get("screen_id"),
+                       "source": None, "plate_window": [0.0, round(rng[1] - rng[0], 3)],
+                       "hero": {"text": (plan.get("hero_strings") or {}).get(ins.get("screen_id"))}},
+                      open(ip, "w"), indent=2)
+        good(f"{name}: plate {os.path.relpath(plate, ROOT)} ({rng[0]:g} to {rng[1]:g} s of {a['id']})")
+        n += 1
+    if not n and not PROBLEMS:
+        note("no C segment with a filmed phone (segments[].insert) in video.json")
+    finish()
+
+
 def cmd_storyboard(video):
     try:
         import cv2, numpy as np
@@ -592,14 +738,15 @@ def main():
     only = None
     if "--only" in a:
         only = set(a[a.index("--only") + 1].split(","))
-    elif len(a) > 2 and cmd == "refs":
+    elif len(a) > 2 and cmd in ("refs", "supplied"):
         only = {a[2]}
     {"check": lambda: cmd_check(video),
      "validate": lambda: cmd_validate(video),
      "refs": lambda: cmd_refs(video, only),
      "job": lambda: cmd_job(video, only),
      "verify": lambda: cmd_verify(video, only),
-     "storyboard": lambda: cmd_storyboard(video)}.get(cmd, lambda: sys.exit(__doc__))()
+     "storyboard": lambda: cmd_storyboard(video),
+     "supplied": lambda: cmd_supplied(video, only)}.get(cmd, lambda: sys.exit(__doc__))()
 
 
 if __name__ == "__main__":

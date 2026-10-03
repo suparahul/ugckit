@@ -1,0 +1,9 @@
+{
+  "_comment": "Copy to pipeline/character/<video>/planning-approval.json, beside a v2 plan. Written by video-lock (or by hand) when the user approves this exact revision. content_sha256 is the digest of the whole plan without 'approved': scripts/character/bridge.py digest plan.json. Production (shots.py check) refuses a v2 plan whose content does not match it. Any change to words, actions, timing, cast, narrator, sources, series, layout, placement or overlays is a new revision and a new approval.",
+  "video_id": "<video>",
+  "revision": 1,
+  "content_sha256": "<64 hex>",
+  "words": "<the user's words, the same as plan.approved.words>",
+  "date": "<YYYY-MM-DD>",
+  "evidence_snapshot_digest": "<the planning evidence snapshot, or null>"
+}

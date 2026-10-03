@@ -1,6 +1,7 @@
 {
   "_comment": "Copy to apps/<slug>/handles/<handle>/characters/<character>/creator.json. Written by persona-identity: the identity half at handle creation, the video half before the first character video. Paths inside it are relative to the handle's folder. Values in angle brackets are filled at casting.",
   "character_id": "<character>",
+  "cast_kind": "human | mascot (an approved cartoon or animal mascot: no human face casting, its voice is an original synthetic narrator)",
   "handle": "<handle>",
   "handle_kind": "persona (the handle's one character and its identity) | multi-character",
   "identity_character": "<true when this character is the handle's identity: its hero is references/face.png>",
@@ -16,6 +17,12 @@
     "brows": "<from the picture>",
     "skin": "<tone and undertone>, visible pores on nose and cheeks, <make-up>",
     "hair": "<length, texture, colour, how it is worn>"
+  },
+  "mascot": {
+    "_comment": "mascot only; identity_lock, outfits and voice_reference stay empty",
+    "style_lock": "<the look, line and colour that never change>",
+    "not_a_real_animal": true,
+    "narrator_ref": "<narrator>@v<n>"
   },
   "signature_details": [
     "<chosen at casting, with the user; at most three; each at least 1% of frame height in a chest-up shot; only what the approved face shows or the user adds>"

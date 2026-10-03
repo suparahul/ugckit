@@ -1,0 +1,916 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ugckit/docs/character/plan.schema.json",
+  "title": "The locked plan of a character video, v2",
+  "description": "pipeline/character/<video>/plan.json. A plan without schema_version is a legacy (v1) plan and is not described here: it keeps the fields of the v1 example and runs as before. This schema is the shape; scripts/character/bridge.py checks the shape and the rules a schema cannot say: beats in order with no gap that cover format.length_s, at most 15 words per 4 s, each line in one beat, voiceover beats bound to a narrator, an original synthetic narrator never over a human face, a real subject never generated, panel ranges inside the approved asset range, split-screen panels that do not overlap, overlays long enough to read (words / 3 s, 1 s at least) that are never a hero string, a source credit while a licensed or permitted clip is on screen, a day counter that is the series day, the live pairing of an input clip and its app recording, and planning-approval.json matching the digest of this exact content.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "revision",
+    "video_id",
+    "app",
+    "handle",
+    "characters",
+    "format",
+    "app_insertion",
+    "editorial",
+    "script",
+    "beats",
+    "overlays",
+    "assets",
+    "narrators",
+    "approved"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "video_id": {
+      "type": "string"
+    },
+    "app": {
+      "type": "string"
+    },
+    "handle": {
+      "type": "string"
+    },
+    "characters": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]*@v[0-9]+$"
+      }
+    },
+    "format": {
+      "type": "object",
+      "required": [
+        "dimension",
+        "length_s"
+      ],
+      "properties": {
+        "dimension": {
+          "const": "9:16"
+        },
+        "length_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "app_insertion": {
+      "type": "boolean"
+    },
+    "editorial": {
+      "type": "object",
+      "required": [
+        "objective",
+        "distribution",
+        "lane",
+        "filming_format",
+        "hook",
+        "recipe_id",
+        "product",
+        "app_presence",
+        "proof",
+        "close",
+        "cast_kind"
+      ],
+      "properties": {
+        "objective": {
+          "enum": [
+            "product_action",
+            "product_discovery",
+            "reach",
+            "save_share"
+          ]
+        },
+        "distribution": {
+          "enum": [
+            "organic",
+            "paid"
+          ]
+        },
+        "lane": {
+          "enum": [
+            "discovery",
+            "education",
+            "everyday",
+            "pitch"
+          ]
+        },
+        "filming_format": {
+          "enum": [
+            "before_after",
+            "face_to_demo",
+            "hook_to_demo",
+            "live_use",
+            "talking_head",
+            "text_over_action",
+            "voiceover_action"
+          ]
+        },
+        "recipe_id": {
+          "enum": [
+            "discovery_demo",
+            "explain_action",
+            "list_steps",
+            "personal_note",
+            "pitch_proof",
+            "routine_log",
+            "setup_reveal",
+            "state_change"
+          ]
+        },
+        "app_presence": {
+          "enum": [
+            "demonstration",
+            "incidental_use",
+            "none",
+            "result"
+          ]
+        },
+        "close": {
+          "enum": [
+            "follow",
+            "none",
+            "payoff",
+            "product_action",
+            "profile",
+            "question",
+            "save",
+            "share"
+          ]
+        },
+        "cast_kind": {
+          "enum": [
+            "human",
+            "mascot",
+            "none"
+          ]
+        },
+        "hook": {
+          "type": "object",
+          "required": [
+            "job_id",
+            "channel"
+          ],
+          "properties": {
+            "job_id": {
+              "enum": [
+                "category_analogy",
+                "confession_reframe",
+                "discovery_regret",
+                "explanation",
+                "gratitude_discovery",
+                "imminent_need",
+                "in_progress",
+                "peer_question",
+                "quoted_challenge",
+                "specific_promise",
+                "visible_result",
+                "withheld_reveal"
+              ]
+            },
+            "channel": {
+              "enum": [
+                "spoken",
+                "spoken_visual",
+                "text",
+                "text_visual",
+                "visual"
+              ]
+            },
+            "framing": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "audience_callout",
+                  "count",
+                  "lived_experience",
+                  "negative",
+                  "professional_basis"
+                ]
+              }
+            }
+          }
+        },
+        "product": {
+          "type": "object",
+          "properties": {
+            "role": {
+              "enum": [
+                "absent",
+                "incidental_tool",
+                "main_subject",
+                "story_solution"
+              ]
+            },
+            "name_locations": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "bio",
+                  "caption",
+                  "overlay",
+                  "speech"
+                ]
+              }
+            },
+            "speech_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "timing": {
+              "enum": [
+                "absent",
+                "closing",
+                "middle",
+                "opening",
+                "throughout"
+              ]
+            }
+          }
+        },
+        "proof": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "none",
+                "real_screen_result",
+                "sourced_fact",
+                "visible_action"
+              ]
+            },
+            "fact_refs": {
+              "type": "array"
+            }
+          }
+        },
+        "narrator_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "series": {
+          "anyOf": [
+            {
+              "const": "standalone"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "series_id",
+                "subject_ids",
+                "routine_id",
+                "episode",
+                "day",
+                "state_fact_refs"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "progress_log"
+                },
+                "episode": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "day": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previous_plan_ref": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "comparison_mode": {
+          "anyOf": [
+            {
+              "enum": [
+                "before_after",
+                "best_worst",
+                "wrong_right"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "experiment": {
+          "type": "object",
+          "properties": {
+            "axis": {
+              "enum": [
+                "cast",
+                "close",
+                "hook",
+                "none",
+                "product_presence",
+                "proof"
+              ]
+            },
+            "base_video_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "script": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "speaker",
+          "line"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "speaker": {
+            "type": "string"
+          },
+          "line": {
+            "type": "string"
+          },
+          "delivery": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "beats": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "start_s",
+          "end_s",
+          "lines",
+          "action",
+          "performance",
+          "framing"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "start_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "end_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "action": {
+            "type": "string"
+          },
+          "fact_refs": {
+            "type": "array"
+          },
+          "performance": {
+            "enum": [
+              "on_camera",
+              "silent_action",
+              "voiceover"
+            ]
+          },
+          "narrator_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_asset_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "subject_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "set_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "framing": {
+            "enum": [
+              "face",
+              "hands_only",
+              "subject_only"
+            ]
+          },
+          "layout": {
+            "enum": [
+              "picture_in_picture",
+              "sequence",
+              "split_screen"
+            ]
+          },
+          "media_origin": {
+            "enum": [
+              "generated",
+              "mixed",
+              "supplied"
+            ]
+          },
+          "panels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "rect"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "asset_id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "source_range_s": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                "rect": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "minItems": 4,
+                  "maxItems": 4
+                },
+                "crop": {
+                  "enum": [
+                    "cover",
+                    "pad"
+                  ]
+                },
+                "sync_offset_s": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "repeat_group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "item_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "app_on_screen": {
+            "type": "boolean"
+          },
+          "screen_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "viewer_must": {
+            "anyOf": [
+              {
+                "enum": [
+                  "believe",
+                  "read",
+                  "recognise"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "overlays": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "text",
+          "start_s",
+          "end_s",
+          "placement"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "comparison_label",
+              "day_counter",
+              "hook",
+              "paragraph",
+              "source_credit",
+              "step_label"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "start_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "end_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "placement": {
+            "enum": [
+              "middle",
+              "panel",
+              "top",
+              "upper_left",
+              "upper_right"
+            ]
+          },
+          "panel_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "origin",
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "audio",
+              "clip",
+              "screen",
+              "still"
+            ]
+          },
+          "origin": {
+            "enum": [
+              "app_recording",
+              "licensed",
+              "own_camera",
+              "permitted_reference",
+              "user_supplied",
+              "verified_expert"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permission_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subject_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "set_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trim_s": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "screen_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paired_input_ref": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "asset_id",
+                  "input_t_s",
+                  "output_t_s"
+                ],
+                "properties": {
+                  "asset_id": {
+                    "type": "string"
+                  },
+                  "input_t_s": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "output_t_s": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "narrators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "character",
+              "original_synthetic",
+              "supplied_speaker"
+            ]
+          },
+          "character_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "voice_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "credential_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "set": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "outfit": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "hero_strings": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "publishing_note": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "caption": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "bio_ref": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "music_note": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source": {
+      "type": "string"
+    },
+    "approved": {
+      "type": "object",
+      "required": [
+        "words",
+        "date"
+      ],
+      "properties": {
+        "words": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
