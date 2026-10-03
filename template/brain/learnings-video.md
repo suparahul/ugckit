@@ -19,7 +19,7 @@ The compact guide behind `VIDEO-ANATOMY.md` and `video-patterns.json`. It says w
 
 - The hook job is what the first beat does; the channel is how (said, shown, written). A visual-only first beat is valid for `in_progress`.
 - **A reaction hook is never spoken** (user decision, 2026-10-03). It is a silent reacting face with the hook as text on screen.
-- **A reaction is never invented** (user decision, 2026-10-03). An invented reaction looks fake. Each one copies the timing and the expression of a real reaction in the user's own research, chosen by post id and time range. The handle's approved face stays the face. No reference means no plan.
+- **A reaction is never invented** (user decision, 2026-10-03). An invented reaction looks fake. Each one copies the timing and the expression of a real reaction in the user's own research, chosen by post id and time range. The handle's approved face stays the face. No reference means no plan. By default production replaces the face in the reference clip itself (face replace, user decision, 2026-10-04); the written expression beats are the fallback and the review checklist. Prefer a clip with no burned-in text.
 - "A hook is a spoken line, not a title. Usually 6 to 14 words" (claimed, SCRIPT-LEARNINGS § 5). At the speech ceiling of 15 words per 4 s, a 15-word hook needs a full 4 s beat.
 - "The picture is part of the hook… The first frame must stop the scroll alone: something in motion, not a held pose" (claimed, SCRIPT-LEARNINGS § 5).
 - The on-screen hook and the spoken lines are not the same words (claimed, SCRIPT-LEARNINGS § 10). When the hook is spoken, the captions already show it; do not add a hook overlay with the same words.

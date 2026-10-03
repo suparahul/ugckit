@@ -62,7 +62,8 @@ Lowercase, digits and hyphens. It is the folder name here and under `pipeline/ch
       "reaction_reference": {"post_id": "...", "platform": "tiktok", "handle": "@...",
                              "post_dir": "research/<project>/<app>/<handle>/<post>",
                              "video": "<post_dir>/video.mp4", "notes": "<post_dir>/notes.md",
-                             "start_s": 0.0, "end_s": 2.9, "why": "...", "candidates_seen": []},
+                             "start_s": 0.0, "end_s": 2.9, "burned_in_text": "<text, where> or null",
+                             "why": "...", "candidates_seen": []},
                             (only with hook channel "reaction"; null when none is found)
       "facts": [{"id": "f1", "claim": "...", "source": "<title, url or section>", "verified": false}],
       "screens_needed": [{"screen_id": "...", "job": "...", "hero_proposed": "...", "status": "indexed|missing"}],
@@ -109,8 +110,12 @@ Lowercase, digits and hyphens. It is the folder name here and under `pipeline/ch
   the missing input `{"id": "reaction_reference", "owner": "founder", "blocks": "lock"}`
   says what to download. Never describe a made-up reaction.
 - **The reference gives the performance, never the identity.** The face is the handle's
-  approved character. Whether production may give the clip itself to the model is not
-  decided; list it as a founder question, never decide it.
+  approved character. **Face replace is the default** (founder, 2026-10-04): production
+  gives the exact clip range to the video model, which replaces the face. So the clip's
+  room, clothes, hands and camera are in the video: choose a range that suits the handle,
+  with one person, no speech, and no burned-in text if possible (production crops text at
+  an edge; text mid-frame can only be blurred). Write the visible text and where it is in
+  `burned_in_text`, or null. It is not a question to ask.
 - Pin `taxonomy_version` and `catalogue_digest` from `video_plan.py catalogue <slug>`.
 
 ## Finish

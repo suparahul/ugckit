@@ -566,11 +566,13 @@ def check_contract(plan, out, brief=None):
                f"{len(assets)} asset(s); {rp['id'] if rp else '?'} in order")
 
 
-# A reaction hook (user decision, 2026-10-03): never spoken, never invented. The face is
-# the handle's approved character; a real reference reaction from the workspace's research
-# gives only the performance.
+# A reaction hook (user decision, 2026-10-03): never spoken, never invented. Face replace
+# (user decision, 2026-10-04): production gives the reference clip, trimmed to its range,
+# to the video model, which replaces the face with the handle's approved character; the
+# written expression beats are the fallback and the review checklist.
 RX_REF_KEYS = ["id", "post_id", "platform", "handle", "post_dir", "video_path", "video_sha256",
-               "start_s", "end_s", "notes_ref", "generation_input"]
+               "start_s", "end_s", "notes_ref", "generation_input", "burned_in_text"]
+RX_INPUT = ("face_replace", "none")
 RX_KEYS = ["ref_id", "framing", "camera_distance", "expression_beats"]
 RX_STEP_KEYS = ["start_s", "end_s", "ref_s", "face", "eyes", "head"]
 
@@ -600,9 +602,9 @@ def check_reaction(plan, beats, hook, ck, out):
             out.no(f"reaction ref {rid}: paths are relative to the workspace")
         if not (num(r.get("start_s")) and num(r.get("end_s")) and 0 <= r["start_s"] < r["end_s"]):
             out.no(f"reaction ref {rid}: start_s and end_s are the exact range of the reaction in the post")
-        if r.get("generation_input") not in (None, False):
-            out.no(f"reaction ref {rid}: generation_input is null (not decided) or false; the founder has not "
-                   "allowed the reference clip as a generation input, and production refuses true")
+        if r.get("generation_input") not in RX_INPUT:
+            out.no(f"reaction ref {rid}: generation_input is \"face_replace\" (the default, founder "
+                   "2026-10-04) or \"none\"")
     if hook.get("channel") == "reaction" and beats:
         b0 = beats[0]
         if b0.get("lines") or b0.get("performance") != "silent_action":
@@ -634,6 +636,13 @@ def check_reaction(plan, beats, hook, ck, out):
                    "real reference post is made up, and is never written")
             continue
         used.add(r["id"])
+        if r.get("generation_input") == "face_replace":
+            rng = (r.get("end_s") or 0) - (r.get("start_s") or 0)
+            if num(b.get("start_s")) and num(b.get("end_s")) and abs((b["end_s"] - b["start_s"]) - rng) > TOL:
+                out.no(f"beat {bid}: {b['end_s'] - b['start_s']:g} s; a face-replace beat lasts its clip, "
+                       f"{rng:g} s ({r['id']} {r.get('start_s')}–{r.get('end_s')} s), at normal speed")
+            if b.get("set_id"):
+                out.no(f"beat {bid}: a face-replace beat has no set_id; its room, clothes and camera are the clip's")
         steps = rx.get("expression_beats") or []
         t = b.get("start_s")
         for j, st in enumerate(steps, 1):
@@ -680,8 +689,11 @@ def capabilities_needed(plan):
             add("bridge.narration", f"beat {b.get('id')}: voiceover")
         if b.get("layout") != "sequence":
             add("bridge.composition", f"beat {b.get('id')}: {b.get('layout')}")
+    rx_in = {r.get("id"): r.get("generation_input") for r in plan.get("reaction_refs") or []}
     for b in reaction_beats(plan):
         add("bridge.reaction", f"beat {b.get('id')}: a silent face performed from a reference reaction")
+        if rx_in.get((b.get("reaction") or {}).get("ref_id")) == "face_replace":
+            add("bridge.face_replace", f"beat {b.get('id')}: the reference clip with the face replaced")
     if plan.get("overlays"):
         add("bridge.composition", f"{len(plan['overlays'])} timed overlay(s)")
     if ed.get("filming_format") == "live_use" or any(a.get("paired_input_ref") for a in assets.values()):
@@ -739,9 +751,12 @@ def readiness(plan, plan_path):
             block.append(f"reaction ref {rid}: no video_sha256 (video_plan.py pin, then review again)")
         elif r["video_sha256"] != sha256_file(os.path.join(ROOT, vp)):
             block.append(f"reaction ref {rid}: {vp} changed since it was pinned")
-        if r.get("generation_input") is None:
-            dep.append(f"reaction ref {rid}: may production give the reference clip itself to the model? "
-                       "Not decided (a question for the founder); until then it is a description source only")
+        if r.get("generation_input") == "face_replace" and r.get("burned_in_text"):
+            dep.append(f"reaction ref {rid}: burned-in text in the clip ({r['burned_in_text']}). Production crops "
+                       "text at an edge; text mid-frame is blurred and a soft patch stays. Or choose a clean clip")
+        if r.get("generation_input") == "face_replace" and not r.get("permission_ref"):
+            dep.append(f"reaction ref {rid}: no permission_ref from {r.get('handle')} for the use of the clip "
+                       "(a rights risk; production reports it)")
     # Facts, against the brief.
     brief, _ = brief_of(plan_path)
     if brief:
@@ -978,13 +993,17 @@ def write_review(draft_path):
                 w(f"| {fmt_t(st['start_s'], st['end_s'])} | {fmt_t(rs[0], rs[1])} | {st.get('face')} | {st.get('eyes')} | "
                   f"{st.get('head')} | {st.get('hands') or '—'} |")
             w("")
-        w("The face is the handle's approved character. The reference gives only the performance: timing, "
-          "expression, head, eyes, framing and distance. Nothing of the reference creator's face, hair, clothes, "
-          "voice or room is copied, and nothing is said.")
         for r in refs.values():
-            if r.get("generation_input") is None:
-                w(f"- **Open question for the founder:** may production give the clip of `{r.get('post_id')}` itself "
-                  "to the model as a generation input? Not decided. Until then it is a description source only.")
+            if r.get("generation_input") == "face_replace":
+                w(f"**Face replace** (founder, 2026-10-04): production gives `{r.get('video_path')}`, "
+                  f"{fmt_t(r.get('start_s', 0), r.get('end_s', 0))} only, to the video model, which replaces the face "
+                  "with the handle's approved character. The clip's room, clothes, hands and camera stay; its sound "
+                  "is not used, and nothing is said. The steps above are the fallback and the review checklist."
+                  + (f" Burned-in text in the clip: {r['burned_in_text']}." if r.get("burned_in_text") else
+                     " The clip has no burned-in text."))
+            else:
+                w("The reference clip is not a generation input: production performs the steps above with the "
+                  "handle's approved character. Nothing of the reference creator is copied.")
         w("")
     w("## Beat timeline")
     w("")

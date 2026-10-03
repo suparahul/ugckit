@@ -154,7 +154,7 @@ A reaction hook is never spoken. The first beat is a `silent_action` on the `fac
 
 A reaction is never invented, so it does not look fake. `video-plan` picks a real reference reaction from the workspace's downloaded research (`research/<project>/<app>/<handle>/<post>/` or `apps/<slug>/niche/batches/<date>/<handle>/<post>/`, with its video): the post id and the exact time range. `video_plan.py reactions <slug>` lists the candidates. `video-script` writes the performance from it in the beat's `reaction` block: expression beats with their times, the face, the eyes, the head and the hands, the framing and the distance to the camera. The plan records the post in `reaction_refs`. No reference blocks the plan; nothing is written in its place.
 
-The reference drives the performance only. The face is the handle's approved character; nothing of the reference creator's face, hair, clothes, voice or room is copied. Whether production may give the reference clip itself to the model is not decided (`generation_input` null); until the founder decides, the clip is a description source only.
+The face is always the handle's approved character, never the reference creator's; the reference's sound is never used. **Face replace** (user decision, 2026-10-04) is the default (`generation_input: "face_replace"`): production gives the exact reference clip, trimmed to its range, to the video model, which replaces the face with the handle's approved character. The clip's room, clothes, hands and camera stay, so the reaction beat has no set and lasts exactly the clip's range at normal speed. The written expression beats stay in the plan, as the fallback (`"none"`: the character performs them) and as the review checklist. Prefer a range with no burned-in text: production crops text at an edge, but text mid-frame can only be blurred. A face-replace model is a production capability (`bridge.face_replace`); `ready` lists it while production has not declared it.
 
 ### Hook framing
 
@@ -227,7 +227,7 @@ Approved set ids and the exact fixed-subject ids, count and size per beat; one o
 
 ### Media origin and layout
 
-Per beat: origin `generated`, `supplied`, `mixed`; layout `sequence`, `split_screen`, `picture_in_picture`. Supplied media is the user's camera, a permitted reference clip, a real recording or a still, with its source, checksum and permission pinned. Supplied footage is output media, never generation conditioning.
+Per beat: origin `generated`, `supplied`, `mixed`; layout `sequence`, `split_screen`, `picture_in_picture`. Supplied media is the user's camera, a permitted reference clip, a real recording or a still, with its source, checksum and permission pinned. Supplied footage is output media, never generation conditioning; the one exception is a reaction reference clip under face replace.
 
 ## Layer 6 — Audio and text
 
@@ -262,6 +262,7 @@ Separate from the anatomy. Today P1 makes T talking segments without the app, an
 | `bridge.composition` | split screen, timed overlay tracks, source credits, series counters | overlays other than captions, `split_screen`, `picture_in_picture` of two sources |
 | `bridge.live` | a real input clip paired with the app recording that read it, with measured times | `live_use` |
 | `bridge.reaction` | a silent generated face of an approved character, performed from a real reference reaction | hook channel `reaction`, any beat with a `reaction` block |
+| `bridge.face_replace` | the reference clip, trimmed, with its face replaced by the approved character | a reaction reference with `generation_input: "face_replace"` (the default) |
 
 Never call a value runnable before its capability exists. Never replace a requested real cat with generated footage. Never relabel a silent action as talking to pass a check.
 

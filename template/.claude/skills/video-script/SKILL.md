@@ -58,7 +58,8 @@ fields. Production's check is `scripts/character/bridge.py`; the schema, when sh
       "overlays": [{"id", "role", "text", "start_s", "end_s", "placement", "panel_id", "fact_refs"}],
       "reaction_refs": [{"id": "rx1", "post_id", "platform", "handle", "post_dir", "video_path",
                          "video_sha256": null, "start_s", "end_s", "notes_ref",
-                         "generation_input": null}],
+                         "generation_input": "face_replace", "burned_in_text": null,
+                         "permission_ref": null}],
       "assets": [{"id", "kind", "origin", "path", "sha256", "source_url", "permission_ref",
                   "subject_ids", "set_ref", "trim_s", "screen_id", "paired_input_ref"}],
       "narrators": [{"id", "kind", "character_ref", "voice_ref", "source_ref", "credential_ref"}],
@@ -101,8 +102,11 @@ reports every one.
   copies one stretch of it (`ref_s`, in the post's time) into video time; together they
   cover the beat. Describe movement and expression only, never the reference creator's
   face, hair, clothes or room: the face is the handle's character. `reaction_refs` records
-  the post; `generation_input` stays null (the founder has not decided; production refuses
-  true). With no reference, `reaction` is null and `ready` blocks the lock.
+  the post. `generation_input` is `"face_replace"` (founder, 2026-10-04): production gives
+  the clip range to the video model, which replaces the face; the expression beats are the
+  fallback (`"none"`) and the gate-B checklist. A face-replace beat lasts exactly
+  `end_s - start_s`, has `set_id` null (the room and clothes are the clip's), and its
+  `framing`, `camera_distance` and `camera` describe the clip as it is. With no reference, `reaction` is null and `ready` blocks the lock.
 - **Full-screen app beats** are framing `app_screen`.
 - **Cast and world**: the exact fixed subjects of each beat, by id; one set and one outfit
   per generated character; a real animal only in supplied beats.
