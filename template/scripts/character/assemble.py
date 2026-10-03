@@ -4,8 +4,17 @@
     assemble.py <video> [--grain] [--no-captions]
 
 For every segment of pipeline/character/<video>/video.json, in order:
-  generated (T, O, G, S, H, F)  the file approved at gate B (approval.json); for a phone
+  generated (T, O, G, S, H, F, B)  the file approved at gate B (approval.json); for a phone
                                 segment, its approved composite (P4)
+  C                             supplied media: the plan's asset, its checksum checked and
+                                its source approved at gate B; a clip cut to
+                                `source_range_s`, a still held for `still_s`; scaled to cover
+                                9:16 (`fit`: "pad" keeps the whole picture); its own sound
+                                unless `audio` is "mute" or `audio_from` lays another; with
+                                `insert`, the approved composite of its filmed phone
+  M                             panels: each panel (an asset, an approved B project or a
+                                screen recording) cut to its range, scaled into its `rect`
+                                (shares of the frame), started `sync_offset_s` late, on black
   R                             the screen recording, cropped to 9:16 around the hero
                                 element, a slow punch-in to `punch_in_to_hero` (1.25), a
                                 0.3 px blur
@@ -23,18 +32,33 @@ hero element and the green count on the final file. Writes assembly/<video>.mp4 
 assembly/assembly.json; nothing is posted (the pipeline ends at the finished file).
 
 Per segment in video.json, all optional: "trim": [in, out] in seconds of the source;
-"punch_in": 1.10; "audio_from": "<video>.<seg>" (the demo performance under R, P, H or
-F); for R and P "screen_id", "punch_in_to_hero".
+"punch_in": 1.10; "audio_from": "<video>.<seg>" (another approved segment's voice: the
+demo performance under R, P, H, F, B or C), "asset:<id>" (a supplied voice or sound,
+approved at gate B, cut to `audio_range_s` or its trim_s) or "narration:<take>" (a
+narrator's take approved at gate B); for R and P "screen_id", "punch_in_to_hero".
+
+The overlays of a v2 plan (video.json `overlays`, copied from the plan) are drawn at their
+exact times: hook, paragraph, step and comparison labels, the day counter, the source
+credit. A legacy `title_overlay` is drawn as one hook overlay. After the pass, gate C's
+checks add: the overlays as planned, long enough to read, clear of every hero element,
+every caption and each other; the supplied files unchanged.
 """
 import difflib, glob, hashlib, json, os, re, shutil, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import bridge
 CH = os.path.join(ROOT, "pipeline", "character")
 W, H, FPS = 1080, 1920, 30
-GENERATED = ("T", "O", "G", "S", "H", "F")
+GENERATED = ("T", "O", "G", "S", "H", "F", "B")
 PHONE = ("O", "G", "S", "H", "F")
+# Overlay roles: (size as a share of the width, characters per line).
+OVERLAY_STYLE = {"hook": (0.074, 22), "paragraph": (0.048, 30), "step_label": (0.06, 22),
+                 "comparison_label": (0.05, 16), "day_counter": (0.05, 14), "source_credit": (0.032, 40)}
+# Placements: (x as a share of the width, text anchor, top of the block as a share of the height).
+PLACE = {"top": (0.5, "middle", 0.08), "middle": (0.5, "middle", 0.30),
+         "upper_left": (0.06, "start", 0.08), "upper_right": (0.94, "end", 0.08)}
 LOUD = "loudnorm=I=-16:TP=-1.5:LRA=11"
 CAP_BAND = (0.62, 0.82)          # the lower caption band; the safe area ends at 82%
 PROBLEMS = []
@@ -177,6 +201,82 @@ def screen_row(slug, sid):
     return None, None
 
 
+def fits(name, aw, dur):
+    """A voice laid under a picture fits inside it; the plan's timing is never stretched."""
+    if aw[1] - aw[0] > dur + 0.25:
+        sys.exit(f"{name}: the sound under it runs {aw[1] - aw[0]:.2f} s; the picture is {dur:.2f} s. "
+                 "The take is too long for the planned beat: P1 changes the cut, or the plan goes back "
+                 "to planning")
+
+
+def alpha_bbox(png):
+    """[x, y, w, h] of the drawn pixels of a transparent picture."""
+    import cv2, numpy as np
+    im = cv2.imread(png, cv2.IMREAD_UNCHANGED)
+    if im is None or im.ndim < 3 or im.shape[2] < 4:
+        return None
+    ys, xs = np.nonzero(im[:, :, 3] > 8)
+    if not len(xs):
+        return None
+    return [int(xs.min()), int(ys.min()), int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)]
+
+
+def boxes_meet(a, b, pad=8):
+    return bool(a and b) and a[0] < b[0] + b[2] + pad and b[0] < a[0] + a[2] + pad and \
+        a[1] < b[1] + b[3] + pad and b[1] < a[1] + a[3] + pad
+
+
+def approval_doc(video):
+    p = os.path.join(CH, video, "approval.json")
+    return load(p) if os.path.exists(p) else {}
+
+
+def supplied(plan, video, aid):
+    """(path, asset) of a supplied asset approved at gate B, or (None, why)."""
+    a = next((x for x in plan.get("assets") or [] if x.get("id") == aid), None)
+    if not a:
+        return None, f"asset {aid!r} is not in the plan's assets[]"
+    fp = os.path.join(ROOT, a.get("path") or "-")
+    if not os.path.exists(fp):
+        return None, f"{a.get('path')} is not on disk"
+    sha = bridge.sha256_file(fp)
+    if sha != a.get("sha256"):
+        return None, f"{a.get('path')} does not match the plan's sha256 (the file changed)"
+    rows = [e for e in approval_doc(video).get("gate_b_sources") or [] if e.get("asset_id") == aid]
+    # A screen recording is the app's real recording from the screen library, checked there
+    # (screens.py check), as for R and P; its checksum is still the plan's.
+    if a.get("kind") != "screen" and (not rows or rows[-1].get("decision") != "approve"
+                                      or rows[-1].get("sha256") != sha):
+        return None, f"asset {aid} has no source approval at gate B for this file (review.py source)"
+    a = dict(a)
+    a["_duration"] = duration(fp) if a.get("kind") != "still" else None
+    return fp, a
+
+
+def narration(video, take):
+    """The approved file of a narrator's take, or (None, why)."""
+    rows = [e for e in approval_doc(video).get("gate_b_narration") or [] if e.get("take") == take]
+    if not rows or rows[-1].get("decision") != "approve":
+        return None, f"narration take {take!r} is not approved at gate B (review.py narration)"
+    fp = os.path.join(CH, video, rows[-1]["file"])
+    if not os.path.exists(fp) or bridge.sha256_file(fp) != rows[-1].get("sha256"):
+        return None, f"narration/{take} changed after its approval"
+    return fp, rows[-1]
+
+
+def audio_window(it, work):
+    """The window of the sound laid under a segment, and the words heard in it: a supplied
+    sound's approved range, else the words of the take or performance (0.15 s before the
+    first, 0.2 s after the last)."""
+    src = it["audio_src"]
+    if it.get("audio_range"):
+        a0, a1 = [float(x) for x in it["audio_range"]]
+        hw = [w for w in heard_words(src, it["work"]) if a0 <= w[1] < a1]
+        return [a0, a1], hw
+    aw, hw = word_window(src, work)
+    return aw or [0.0, duration(src)], hw
+
+
 def word_window(path, work, pad=(0.15, 0.2)):
     hw = heard_words(path, work)
     if not hw:
@@ -194,7 +294,10 @@ def vf_generated(punch):
 
 def audio_chain(dur, fade):
     f = fade / 1000.0
-    return f"{LOUD},aresample=48000,afade=t=in:st=0:d={f},afade=t=out:st={max(0, dur - f):.3f}:d={f}"
+    # apad: a sound shorter than the picture is padded with silence, so every segment's
+    # sound is exactly as long as its picture and the joins stay in sync.
+    return (f"{LOUD},aresample=48000,apad=whole_dur={dur:.3f},afade=t=in:st=0:d={f},"
+            f"afade=t=out:st={max(0, dur - f):.3f}:d={f}")
 
 
 def encode_segment(out, vin, vf, ain, af, dur, extra_inputs=(), fc=None):
@@ -240,6 +343,95 @@ def r_final_rect(geo, hero_rect, z):
     return [round((rx - x - zx) * s), round((ry - y - zy) * s), round(rw * s), round(rh * s)]
 
 
+def vf_supplied(fit, punch):
+    """A supplied clip or still to 1080x1920: cover (crop the overflow) or pad (keep the
+    whole picture on black)."""
+    if fit == "pad":
+        return (f"fps={FPS},scale={W}:{H}:force_original_aspect_ratio=decrease:flags=lanczos,"
+                f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,format=yuv420p")
+    return vf_generated(punch)
+
+
+def build_c(it, out, dur, ain, fade):
+    """C: the supplied clip in its range, or the still held."""
+    s, a = it["seg"], it["asset"]
+    if a["kind"] == "still":
+        vin = ["-loop", "1", "-t", f"{dur:.3f}", "-i", it["src"]]
+    else:
+        r = s["source_range_s"]
+        vin = ["-ss", f"{r[0]:.3f}", "-to", f"{r[1]:.3f}", "-i", it["src"]]
+    encode_segment(out, vin, vf_supplied(s.get("fit"), s.get("punch_in")), ain, audio_chain(dur, fade), dur)
+
+
+def even(x):
+    return int(round(x / 2.0)) * 2
+
+
+def panel_px(rect):
+    x, y, w, h = rect
+    return even(x * W), even(y * H), max(2, even(w * W)), max(2, even(h * H))
+
+
+def build_m(it, out, dur, audio, fade):
+    """M: the panels on black, each in its rect, each started sync_offset_s late and held
+    on its last frame. The sound: audio_from, else the panel marked "audio": true, else
+    silence."""
+    panels = it["panels"]
+    cmd = ["ffmpeg", "-y", "-v", "error"]
+    fc = [f"color=c=black:s={W}x{H}:r={FPS}:d={dur:.3f},format=yuv420p[b0]"]
+    for k, p in enumerate(panels):
+        if p["kind"] == "still":
+            cmd += ["-loop", "1", "-t", f"{dur:.3f}", "-i", p["src"]]
+        else:
+            cmd += ["-ss", f"{p['range'][0]:.3f}", "-to", f"{p['range'][1]:.3f}", "-i", p["src"]]
+        x, y, w, h = p["px"]
+        sync = float(p.get("sync") or 0)
+        fit = (f"scale={w}:{h}:force_original_aspect_ratio=decrease:flags=lanczos,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black"
+               if p.get("crop") == "pad" else
+               f"scale={w}:{h}:force_original_aspect_ratio=increase:flags=lanczos,crop={w}:{h}")
+        fc.append(f"[{k}:v]fps={FPS},{fit},setsar=1,format=yuv420p,"
+                  f"tpad=start_duration={sync:.3f}:color=black:stop_mode=clone:stop_duration={dur:.3f},"
+                  f"trim=duration={dur:.3f},setpts=PTS-STARTPTS[p{k}]")
+        fc.append(f"[b{k}][p{k}]overlay={x}:{y}:eof_action=repeat[b{k + 1}]")
+    n = len(panels)
+    af = audio_chain(dur, fade)
+    if audio:
+        cmd += ["-ss", f"{audio[1]:.3f}", "-to", f"{audio[2]:.3f}", "-i", audio[0]]
+        fc.append(f"[{n}:a]{af},aformat=channel_layouts=stereo[a]")
+    else:
+        own = next((k for k, p in enumerate(panels) if p.get("audio") and p["kind"] != "still"
+                    and has_audio(p["src"])), None)
+        if own is not None:
+            ms = int(round(float(panels[own].get("sync") or 0) * 1000))
+            fc.append(f"[{own}:a]adelay={ms}|{ms},{af},aformat=channel_layouts=stereo[a]")
+        else:
+            cmd += ["-f", "lavfi", "-t", f"{dur:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
+            fc.append(f"[{n}:a]{af},aformat=channel_layouts=stereo[a]")
+    cmd += ["-filter_complex", ";".join(fc), "-map", f"[b{n}]", "-map", "[a]",
+            "-t", f"{dur:.3f}", "-r", str(FPS), "-c:v", "libx264", "-crf", "14", "-preset", "medium",
+            "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", out]
+    run(cmd)
+
+
+def panel_hero(p, row, t0):
+    """Where a screen panel's hero element lands in the frame, and when (cover fit, centred)."""
+    hero = (row or {}).get("hero") or {}
+    r = hero.get("rect_source_px")
+    if not r or not any(r) or not row.get("size") or p.get("crop") == "pad":
+        return None
+    sw, sh = row["size"]
+    x, y, w, h = p["px"]
+    sc = max(w / sw, h / sh)
+    ox, oy = (sw * sc - w) / 2, (sh * sc - h) / 2
+    rect = [round(x + r[0] * sc - ox), round(y + r[1] * sc - oy), round(r[2] * sc), round(r[3] * sc)]
+    if rect[0] < x or rect[1] < y or rect[0] + rect[2] > x + w or rect[1] + rect[3] > y + h:
+        return None
+    ht = float(hero.get("t") or 0)
+    if not (p["range"][0] <= ht <= p["range"][1]):
+        ht = p["range"][1] - 0.3
+    return {"t": round(t0 + float(p.get("sync") or 0) + ht - p["range"][0], 3), "rect": rect, "text": hero.get("text")}
+
+
 def build_r(seg, row, rec, out, dur, audio, fade, bubble=None):
     """R: the recording, 9:16 around the hero, a slow punch-in, a light blur. P adds the
     bubble: the demo performance in a circle, 28% of the width, in the top corner away
@@ -250,7 +442,8 @@ def build_r(seg, row, rec, out, dur, audio, fade, bubble=None):
     x, y, cw, ch, hx, hy = geo
     zmax = float(seg.get("punch_in_to_hero") or 1.25)
     n = max(1, int(round(dur * FPS)))
-    rlen = duration(rec)
+    tin = float(seg["trim"][0]) if seg.get("trim") else 0.0
+    rlen = duration(rec) - tin
     pad = max(0.0, dur - rlen + 0.1)
     vf = (f"[0:v]fps={FPS},tpad=stop_mode=clone:stop_duration={pad:.3f},crop={cw}:{ch}:{x}:{y},"
           f"zoompan=z='min(1+{zmax - 1:.4f}*on/{n},{zmax})':d=1:fps={FPS}:s={W}x{H}"
@@ -260,9 +453,10 @@ def build_r(seg, row, rec, out, dur, audio, fade, bubble=None):
     if audio:
         ain = ["-ss", f"{audio[1]:.3f}", "-to", f"{audio[2]:.3f}", "-i", audio[0]]
     af = audio_chain(dur, fade)
+    vin = (["-ss", f"{tin:.3f}"] if tin else []) + ["-i", rec]
     if bubble is None:
         fc = vf + "[v];" + f"[1:a]{af},aformat=channel_layouts=stereo[a]"
-        encode_segment(out, ["-i", rec], None, ain, None, dur, fc=fc)
+        encode_segment(out, vin, None, ain, None, dur, fc=fc)
     else:
         bw = int(0.28 * W) // 2 * 2
         left = hero is None or (hero[0] + hero[2] / 2) / max(1, size[0]) >= 0.5
@@ -277,7 +471,7 @@ def build_r(seg, row, rec, out, dur, audio, fade, bubble=None):
               f"geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='if(lte(hypot(X-{bw / 2},Y-{bw / 2}),{bw / 2 - 1}),255,0)'[bub];"
               f"[base][bub]overlay={bx}:{by}:shortest=0,format=yuv420p[v];"
               f"[1:a]{af},aformat=channel_layouts=stereo[a]")
-        encode_segment(out, ["-i", rec], None, ain, None, dur,
+        encode_segment(out, vin, None, ain, None, dur,
                        extra_inputs=[["-ss", f"{bubble[1]:.3f}", "-i", bubble[0]]], fc=fc)
     return geo, zmax
 
@@ -300,6 +494,10 @@ def main():
     fade = int((v.get("joins") or {}).get("audio_fade_ms", 30))
     print(f"assemble {video}: {len(v['segments'])} segment(s), app_insertion "
           f"{'true' if plan.get('app_insertion') else 'false'}")
+
+    if bridge.is_v2(plan) and v.get("plan_sha256") != bridge.digest(plan):
+        sys.exit("video.json was written from another revision of the plan: P1 writes it again "
+                 "(scripts/character/shots.py validate)")
 
     # Resolve every segment first, so a missing approval stops before any encode.
     plan_segs = []
@@ -337,13 +535,77 @@ def main():
                 bad(f"{name}: screen {s.get('screen_id')} is not in apps/{plan['app']}/screens/screens.json or not on disk")
                 continue
             item["row"], item["rec"] = row, rec
+        elif t == "C":
+            fp, a_ = supplied(plan, video, s.get("asset_id"))
+            if not fp:
+                bad(f"{name}: {a_}")
+                continue
+            item["src"], item["asset"] = fp, a_
+            if s.get("insert"):
+                # A filmed phone: its plate went through the gates of its mode at P3 and P4.
+                proj = s.get("project") or f"{video}.{name}"
+                e, sd, _, _ = approved(proj)
+                if not e or not (e.get("composite") or {}).get("file"):
+                    bad(f"{name}: the filmed phone has no approved plate and composite (review.py segment, "
+                        "composite.sh, review.py composite)")
+                    continue
+                item["composite"] = os.path.join(sd, e["composite"]["file"])
+                item["hero"] = e["composite"].get("hero")
+        elif t == "M":
+            panels = []
+            for p in s.get("panels") or []:
+                q = {"id": p.get("id"), "asset_id": p.get("asset_id"),
+                     "px": panel_px(p.get("rect") or [0, 0, 1, 1]), "sync": p.get("sync_offset_s"),
+                     "crop": p.get("crop"), "audio": p.get("audio"), "kind": "clip"}
+                if p.get("asset_id"):
+                    fp, a_ = supplied(plan, video, p["asset_id"])
+                    if not fp:
+                        bad(f"{name}: panel {p.get('id')}: {a_}")
+                        continue
+                    q.update({"src": fp, "kind": "still" if a_["kind"] == "still" else "clip",
+                              "range": p.get("source_range_s") or a_.get("trim_s") or [0.0, a_["_duration"] or 0]})
+                    if a_["kind"] == "screen":
+                        q["row"] = screen_row(plan["app"], a_.get("screen_id"))[0]
+                elif p.get("project"):
+                    e, sd, _, _ = approved(p["project"])
+                    if not e:
+                        bad(f"{name}: panel {p.get('id')}: {p['project']} has no approved file at gate B")
+                        continue
+                    f = os.path.join(sd, e["file"])
+                    q.update({"src": f, "range": p.get("source_range_s") or [0.0, duration(f)]})
+                elif p.get("screen_id"):
+                    row, rec = screen_row(plan["app"], p["screen_id"])
+                    if not row or not rec or not os.path.exists(rec):
+                        bad(f"{name}: panel {p.get('id')}: screen {p['screen_id']} is not in the screen library")
+                        continue
+                    q.update({"src": rec, "row": row, "range": p.get("source_range_s") or [0.0, duration(rec)]})
+                else:
+                    bad(f"{name}: panel {p.get('id')} names no source")
+                    continue
+                panels.append(q)
+            item["panels"] = panels
         else:
             bad(f"{name}: unknown type {t}")
             continue
-        if s.get("audio_from"):
-            e, sd, _, _ = approved(s["audio_from"])
+        af = s.get("audio_from")
+        item["work"] = work
+        if af and bridge.audio_kind(af) == "asset":
+            fp, a_ = supplied(plan, video, af[6:])
+            if not fp:
+                bad(f"{name}: audio_from {af}: {a_}")
+                continue
+            item["audio_src"] = fp
+            item["audio_range"] = s.get("audio_range_s") or a_.get("trim_s") or [0.0, a_["_duration"] or duration(fp)]
+        elif af and bridge.audio_kind(af) == "narration":
+            fp, e = narration(video, af[10:])
+            if not fp:
+                bad(f"{name}: {e}")
+                continue
+            item["audio_src"] = fp
+        elif af:
+            e, sd, _, _ = approved(af)
             if not e:
-                bad(f"{name}: audio_from {s['audio_from']} has no approved file at gate B")
+                bad(f"{name}: audio_from {af} has no approved file at gate B")
                 continue
             item["audio_src"] = os.path.join(sd, e["file"])
         if t == "P" and not item.get("audio_src"):
@@ -360,9 +622,9 @@ def main():
         out = os.path.join(work, f"seg-{k + 1:02d}-{name}.mp4")
         entry = {"n": s["n"], "type": t, "name": name}
         words_src, words_off, heard = None, 0.0, []
-        if t in GENERATED:
-            src = it["src"]
-            if s.get("trim"):
+        if t in GENERATED or it.get("composite"):
+            src = it.get("composite") or it["src"]
+            if s.get("trim") and not it.get("composite"):
                 win = [float(s["trim"][0]), float(s["trim"][1])]
                 how = "the trim in video.json"
             elif it["lines"] and has_audio(src) and not it.get("audio_src"):
@@ -376,8 +638,9 @@ def main():
                 win, how = [0.0, duration(src)], "whole file"
             dur = win[1] - win[0]
             if it.get("audio_src"):
-                aw, aheard = word_window(it["audio_src"], work)
-                aw = aw or [0.0, duration(it["audio_src"])]
+                aw, aheard = audio_window(it, work)
+                if t == "B":
+                    fits(name, aw, dur)
                 ain = ["-ss", f"{aw[0]:.3f}", "-to", f"{aw[1]:.3f}", "-i", it["audio_src"]]
                 words_src, words_off, heard = it["audio_src"], aw[0], aheard
             elif has_audio(src):
@@ -390,19 +653,61 @@ def main():
             encode_segment(out, ["-ss", f"{win[0]:.3f}", "-to", f"{win[1]:.3f}", "-i", src],
                            vf_generated(s.get("punch_in")), ain, audio_chain(dur, fade), dur)
             entry.update({"src": os.path.relpath(src, ROOT), "in": round(win[0], 3), "out": round(win[1], 3),
-                          "trim_by": how, "punch_in": s.get("punch_in")})
-            if it.get("hero") and t in PHONE:
+                          "trim_by": how, "punch_in": s.get("punch_in"),
+                          "composite": bool(it.get("composite")) or None,
+                          "asset_id": (it.get("asset") or {}).get("id")})
+            if it.get("hero") and (t in PHONE or it.get("composite")):
                 h = it["hero"]
                 if win[0] <= h["t"] <= win[1]:
                     entry["hero"] = {"t": round(t_final + h["t"] - win[0], 3), "rect": h["rect"], "text": h.get("text")}
             print(f"  {name}: {os.path.basename(src)} {win[0]:.2f}-{win[1]:.2f}s ({how})"
                   + (f", punch-in {s['punch_in']}" if s.get("punch_in") else ""))
+        elif t == "C":
+            a_ = it["asset"]
+            r = s.get("source_range_s") or a_.get("trim_s") or [0.0, a_.get("_duration") or 0]
+            dur = float(s["still_s"]) if a_["kind"] == "still" else float(r[1] - r[0])
+            if it.get("audio_src"):
+                aw, heard = audio_window(it, work)
+                fits(name, aw, dur)
+                ain = ["-ss", f"{aw[0]:.3f}", "-to", f"{aw[1]:.3f}", "-i", it["audio_src"]]
+                words_src, words_off = it["audio_src"], aw[0]
+                how = "with " + s["audio_from"]
+            elif a_["kind"] != "still" and s.get("audio") != "mute" and has_audio(it["src"]):
+                ain = ["-ss", f"{r[0]:.3f}", "-to", f"{r[1]:.3f}", "-i", it["src"]]
+                words_src, words_off = it["src"], r[0]
+                how = "its own sound"
+            else:
+                ain, how = None, "no sound"
+            build_c(it, out, dur, ain, fade)
+            entry.update({"src": os.path.relpath(it["src"], ROOT), "asset_id": a_["id"],
+                          "in": round(r[0], 3) if a_["kind"] != "still" else 0.0,
+                          "out": round(r[1], 3) if a_["kind"] != "still" else round(dur, 3), "fit": s.get("fit") or "cover"})
+            print(f"  {name}: supplied {a_['id']} ({a_['kind']}) {dur:.2f}s, {how}")
+        elif t == "M":
+            ps = it["panels"]
+            dur = float(s.get("duration_s") or max(p["range"][1] - p["range"][0] + float(p.get("sync") or 0) for p in ps))
+            audio = None
+            if it.get("audio_src"):
+                aw, heard = audio_window(it, work)
+                fits(name, aw, dur)
+                audio = (it["audio_src"], aw[0], aw[1])
+                words_src, words_off = it["audio_src"], aw[0]
+            build_m(it, out, dur, audio, fade)
+            entry.update({"panels": [{"id": p["id"], "asset_id": p.get("asset_id"),
+                                      "src": os.path.relpath(p["src"], ROOT), "range": p["range"],
+                                      "rect_px": list(p["px"]), "sync_offset_s": float(p.get("sync") or 0)}
+                                     for p in ps]})
+            for p in ps:
+                h = panel_hero(p, p.get("row"), t_final) if p.get("row") else None
+                if h:
+                    entry["hero"] = h
+                    break
+            print(f"  {name}: {len(ps)} panels ({', '.join(str(p['id']) for p in ps)}), {dur:.2f}s")
         else:
             row, rec = it["row"], it["rec"]
             audio = None
             if it.get("audio_src"):
-                aw, heard = word_window(it["audio_src"], work)
-                aw = aw or [0.0, duration(it["audio_src"])]
+                aw, heard = audio_window(it, work)
                 if t == "P":
                     aw = [0.0, duration(it["audio_src"])]       # lips in the bubble: never trimmed
                 audio = (it["audio_src"], aw[0], aw[1])
@@ -487,11 +792,30 @@ def main():
         items.append({"lines": wrap(c["text"]), "out": p, "y": 0.14 if top else 0.78,
                       "anchor": "top" if top else "bottom", "size": 0.056})
         overlays.append((p, c["start"], c["end"]))
+    # The overlays: the plan's (v2, copied into video.json), or the legacy title as one
+    # hook overlay. Each at its exact time, in the style of its role.
+    ovs = list(v.get("overlays") or [])
     title = v.get("title_overlay") or {}
-    if title.get("burn") is True and title.get("text") and "<" not in str(title["text"]):
-        p = os.path.join(work, "title.png")
-        items.append({"lines": wrap(title["text"], 22), "out": p, "y": 0.08, "anchor": "top", "size": 0.074})
-        overlays.append((p, 0.0, float(title.get("until_s") or t_final)))
+    if not ovs and title.get("burn") is True and title.get("text") and "<" not in str(title["text"]):
+        ovs = [{"id": "title", "role": "hook", "text": title["text"], "start_s": 0.0,
+                "end_s": float(title.get("until_s") or t_final), "placement": "top", "panel_id": None}]
+    panel_rects = {p["id"]: p["rect_px"] for e in timeline for p in e.get("panels") or []}
+    drawn = []
+    for i, o in enumerate(ovs):
+        size, per = OVERLAY_STYLE.get(o.get("role"), (0.05, 24))
+        pl = o.get("placement") or "top"
+        if pl == "panel" and o.get("panel_id") in panel_rects:
+            x, y, w, h = panel_rects[o["panel_id"]]
+            xs, anchor, ys = (x + w / 2) / W, "middle", (y + 0.015 * H) / H
+            per = max(6, int(w / (size * W * 0.6)))
+        else:
+            xs, anchor, ys = PLACE.get(pl, PLACE["top"])
+        p = os.path.join(work, f"overlay-{i:02d}.png")
+        items.append({"lines": wrap(o["text"], per), "out": p, "y": ys, "anchor": "top", "size": size,
+                      "x": xs, "align": anchor})
+        drawn.append({"id": o.get("id"), "role": o.get("role"), "text": o.get("text"), "placement": pl,
+                      "start": round(float(o["start_s"]), 3), "end": round(min(float(o["end_s"]), t_final), 3),
+                      "planned_end": float(o["end_s"]), "png": p})
     if items:
         if not shutil.which("node"):
             sys.exit("node is not installed: the captions are drawn by scripts/character/captions.mjs")
@@ -501,13 +825,27 @@ def main():
         if r.returncode != 0:
             sys.exit(r.stderr.strip() or "captions.mjs failed")
 
-    # The edit: captions burned, the room tone mixed. Each overlay layer (the captions,
-    # the title) is one stream: its pictures in order, each held for its time, with a
-    # transparent picture in the gaps.
+    for c, it in zip(caps, items):
+        c["bbox"] = alpha_bbox(it["out"])
+    for d in drawn:
+        d["bbox"] = alpha_bbox(d["png"])
+
+    # The edit: captions and overlays burned, the room tone mixed. Each layer is one
+    # stream: its pictures in order, each held for its time, with a transparent picture in
+    # the gaps. The captions are one layer; overlays that run at the same time (a day
+    # counter under a hook) go on separate layers.
     edit = os.path.join(work, "edit.mp4")
-    layers = [[o for o in overlays if not o[0].endswith("title.png")],
-              [o for o in overlays if o[0].endswith("title.png")]]
-    layers = [sorted(l, key=lambda o: o[1]) for l in layers if l]
+    layers = [sorted(overlays, key=lambda o: o[1])] if overlays else []
+    olayers = []
+    for d in sorted(drawn, key=lambda d: d["start"]):
+        o = (d["png"], d["start"], d["end"])
+        for L in olayers:
+            if L[-1][2] <= o[1] + 1e-3:
+                L.append(o)
+                break
+        else:
+            olayers.append([o])
+    layers += olayers
     cmd = ["ffmpeg", "-y", "-v", "error", "-i", joined]
     if layers:
         import cv2, numpy as np
@@ -567,7 +905,7 @@ def main():
         outputs["grain"] = gfile
     print(f"export: {os.path.relpath(final, ROOT)}" + (f" and {os.path.basename(outputs['grain'])}" if "grain" in outputs else ""))
 
-    checks = final_checks(outputs, timeline, work, video)
+    checks = final_checks(outputs, timeline, work, video, plan=plan, v=v, drawn=drawn, caps=caps)
     sheet = os.path.join(adir, "contact-sheet.png")
     n = max(1, min(30, int(t_final)))
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", final, "-vf",
@@ -576,6 +914,9 @@ def main():
     man = {"video_id": video, "file": os.path.relpath(final, ROOT),
            "grain_file": os.path.relpath(outputs["grain"], ROOT) if "grain" in outputs else None,
            "duration_s": round(duration(final), 3), "segments": timeline, "captions": caps,
+           "overlays": [{k: d[k] for k in ("id", "role", "text", "placement", "start", "end", "bbox")} for d in drawn],
+           "plan_revision": plan.get("revision"),
+           "plan_sha256": bridge.digest(plan) if bridge.is_v2(plan) else None,
            "room_tone": os.path.relpath(rt_path, ROOT) if rt_path else None, "checks": checks}
     json.dump(man, open(os.path.join(adir, "assembly.json"), "w"), indent=2)
     print(f"contact sheet: {os.path.relpath(sheet, ROOT)}   manifest: assembly/assembly.json")
@@ -586,7 +927,7 @@ def main():
     sys.exit(1 if failed else 0)
 
 
-def final_checks(outputs, timeline, work, video):
+def final_checks(outputs, timeline, work, video, plan=None, v=None, drawn=(), caps=()):
     """After the pass, on the final file (§ 13, step 8)."""
     import cv2, numpy as np
     out = {}
@@ -596,6 +937,8 @@ def final_checks(outputs, timeline, work, video):
         tag = "NOT RUN" if ok is None else ("PASS" if ok else "FAIL")
         out[name] = {"result": tag, "detail": detail}
         print(f"  {tag:<7}  {name}  ({detail})")
+
+    overlay_checks(rep, out, outputs["default"], timeline, work, plan or {}, v or {}, list(drawn), list(caps))
 
     f = outputs["default"]
     r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
@@ -645,7 +988,7 @@ def final_checks(outputs, timeline, work, video):
     # again on the final file).
     import screen_track as st
     import screen_gates as sg
-    phone = [e for e in timeline if e["type"] in PHONE]
+    phone = [e for e in timeline if e["type"] in PHONE or e.get("composite")]
     for e in phone:
         comp = os.path.join(ROOT, e["src"])
         tp = sg.track_path(os.path.dirname(os.path.dirname(comp)), comp)
@@ -678,6 +1021,78 @@ def final_checks(outputs, timeline, work, video):
         pc.release()
         rep(f"no green left {e['name']}", worst == 0, f"at most {worst} pixel(s) of the plate's green in a sampled frame")
     return out
+
+
+def overlay_checks(rep, out, final, timeline, work, plan, v, drawn, caps):
+    """Gate C's overlay checks: as planned, long enough to read, clear of the hero
+    elements, the captions and each other, read back from the final file; and the supplied
+    files unchanged since the plan was locked."""
+    import cv2
+    keys = ("id", "role", "text", "start_s", "end_s", "placement", "panel_id")
+    if bridge.is_v2(plan):
+        want = [{k: o.get(k) for k in keys} for o in plan.get("overlays") or []]
+        got = [{k: o.get(k) for k in keys} for o in v.get("overlays") or []]
+        drawn_ok = [(d["id"], d["text"], d["start"]) for d in drawn] == \
+                   [(o["id"], o["text"], round(float(o["start_s"]), 3)) for o in want]
+        rep("overlays as planned", want == got and drawn_ok,
+            f"{len(drawn)} drawn, {len(want)} in the plan" + ("" if want == got else "; video.json differs from the plan"))
+    if not drawn:
+        out.setdefault("overlays", {"result": "n/a", "detail": "no overlay in this video"})
+        return
+    short = [d["id"] for d in drawn if d["end"] - d["start"] < max(bridge.MIN_OVERLAY_S,
+                                                                    bridge.words(d["text"]) / bridge.READ_WORDS_PER_S) - 1e-3
+             or d["planned_end"] > d["end"] + 0.05]
+    rep("overlays readable", not short, "every overlay up for its reading time" if not short else
+        f"too short or cut by the end of the file: {', '.join(map(str, short))}")
+    hits = []
+    for d in drawn:
+        for e in timeline:
+            h = e.get("hero")
+            if h and d["start"] <= h["t"] <= d["end"] and boxes_meet(d["bbox"], h["rect"]):
+                hits.append(f"{d['id']} on the hero of {e['name']}")
+        for c in caps:
+            if c["start"] < d["end"] and c["end"] > d["start"] and boxes_meet(d["bbox"], c.get("bbox")):
+                hits.append(f"{d['id']} on the caption at {c['start']:.2f}s")
+                break
+        for o in drawn:
+            if o is not d and o["start"] < d["end"] and o["end"] > d["start"] and boxes_meet(d["bbox"], o["bbox"]) \
+                    and str(o["id"]) > str(d["id"]):
+                hits.append(f"{d['id']} on {o['id']}")
+    rep("overlays clear of heroes, captions and each other", not hits, "; ".join(hits[:6]) or "no overlap")
+    import ocr
+    pngs, want = [], {}
+    cap = cv2.VideoCapture(final)
+    for d in drawn:
+        if not d["bbox"]:
+            continue
+        cap.set(cv2.CAP_PROP_POS_MSEC, (d["start"] + d["end"]) / 2 * 1000)
+        ok, fr = cap.read()
+        if not ok:
+            continue
+        x, y, w, hh = d["bbox"]
+        crop = fr[max(0, y - 12):y + hh + 12, max(0, x - 12):x + w + 12]
+        p = os.path.join(work, f"final-overlay-{d['id']}.png")
+        cv2.imwrite(p, cv2.resize(crop, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC))
+        pngs.append(p)
+        want[p] = d
+    cap.release()
+    got = ocr.read(pngs) if pngs else {}
+    if got is None:
+        rep("overlays read back (OCR)", None, "no OCR engine (brew install tesseract, or macOS with swift)")
+    else:
+        miss = []
+        for p, d in want.items():
+            okm, score = ocr.matches(d["text"], got.get(p, ""), ratio=0.85)
+            if not okm:
+                miss.append(f"{d['id']} ({score})")
+        rep("overlays read back (OCR)", not miss, "every overlay read on the final file" if not miss
+            else "not read: " + ", ".join(miss))
+    used = {e.get("asset_id") for e in timeline if e.get("asset_id")} | \
+        {p.get("asset_id") for e in timeline for p in e.get("panels") or [] if p.get("asset_id")}
+    if used and bridge.is_v2(plan):
+        assets = {a["id"]: a for a in plan.get("assets") or []}
+        changed = [a for a in used if bridge.sha256_file(os.path.join(ROOT, assets[a]["path"])) != assets[a]["sha256"]]
+        rep("supplied files unchanged", not changed, ", ".join(changed) or f"{len(used)} file(s) match the plan's sha256")
 
 
 if __name__ == "__main__":

@@ -4,8 +4,10 @@
 #   scripts/character/composite.sh <video> <nn>-<type> [plate.mp4]
 #   scripts/character/composite.sh <video> <nn>-<type> --propose-grade [plate.mp4]
 #
-# Only for a plan with app_insertion true and a phone segment (O, G, S, H, F) whose
-# segments/<seg>/insert.json names its source (the screens skill). The plate is the one
+# Only for a plan with app_insertion true and a phone segment (O, G, S, H, F, or a C
+# segment whose supplied clip films a phone: its plate is source/plate.mp4 from
+# shots.py supplied, with the gates of its insert mode) whose segments/<seg>/insert.json
+# names its source (the screens skill). The plate is the one
 # approved at gate B (approval.json), else the newest in generated/. Writes
 # segments/<seg>/composite/<seg>-composite-<stamp>.mp4 at 1080x1920 and its track in
 # composite/work/<stamp>/, then runs the insertion gates (qc.py --composite).
@@ -28,8 +30,11 @@ plan = json.load(open(os.path.join(vdir, "plan.json"))) if os.path.exists(os.pat
 if plan.get("app_insertion") is not True:
     sys.exit("the plan has no app insertion: there is no screen stage (P4 is n/a)")
 t = seg.split("-")[-1].upper()
-if t not in ("O", "G", "S", "H", "F"):
-    sys.exit(f"{seg} is not a phone segment (O, G, S, H, F); R and P are built at assembly")
+if t == "C" and not os.path.exists(spec):
+    sys.exit(f"{seg} is supplied media with no filmed phone; it needs no composite (shots.py supplied writes "
+             "insert.json for a C segment whose video.json entry has 'insert')")
+if t not in ("O", "G", "S", "H", "F", "C"):
+    sys.exit(f"{seg} is not a phone segment (O, G, S, H, F, or C with a filmed phone); R and P are built at assembly")
 if not os.path.exists(spec):
     sys.exit(f"no {os.path.relpath(spec, vdir)} -- character-shots starts it, the screens skill fills it")
 s = json.load(open(spec))
@@ -50,7 +55,7 @@ for e in (json.load(open(p)).get("gate_b_segments") or []) if os.path.exists(p) 
 PYEOF
 )
   if [ -z "$PLATE" ]; then
-    PLATE=$(ls -t "$SDIR"/generated/*.mp4 2>/dev/null | head -1 || true)
+    PLATE=$(ls -t "$SDIR"/generated/*.mp4 "$SDIR"/source/plate.mp4 2>/dev/null | head -1 || true)
     [ -n "$PLATE" ] && echo "no approved plate at gate B yet; using the newest: $PLATE"
   fi
 fi

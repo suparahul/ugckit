@@ -46,8 +46,15 @@ class Report:
         print(f"  -> {path}")
 
 
-def seg_type(seg):
-    return seg.split("-")[-1].upper()
+# A C segment that shows a filmed phone takes the gates of its insert mode, unchanged.
+MODE_TYPE = {"over-shoulder": "O", "in-hand": "G", "show-to-camera": "S", "push": "H", "finger": "F"}
+
+
+def seg_type(seg, spec=None):
+    t = seg.split("-")[-1].upper()
+    if t == "C" and spec is not None:
+        return MODE_TYPE.get(spec.get("mode"), "G")
+    return t
 
 
 def spec_of(segdir):
@@ -101,7 +108,8 @@ def width_gate(rep, width_1080, needs):
 # ---------------------------------------------------------------- the plate
 def plate_gates(root, video, seg, plate, out):
     segdir = f"{root}/pipeline/character/{video}/segments/{seg}"
-    spec, t = spec_of(segdir), seg_type(seg)
+    spec = spec_of(segdir)
+    t = seg_type(seg, spec)
     gates = gates_of(spec)
     if t == "H":
         spec.setdefault("track", {"mode": "motion"})
@@ -171,7 +179,8 @@ def plate_gates(root, video, seg, plate, out):
 # ---------------------------------------------------------------- the keyframe
 def keyframe_gates(root, video, seg):
     vdir = f"{root}/pipeline/character/{video}"
-    spec, t = spec_of(f"{vdir}/segments/{seg}"), seg_type(seg)
+    spec = spec_of(f"{vdir}/segments/{seg}")
+    t = seg_type(seg, spec)
     gates = gates_of(spec)
     lo, hi = st.key_range(spec.get("key") or {})
     rep = Report(f"keyframe gates ({t})")
@@ -248,7 +257,8 @@ def tip_in_plate(q, tip):
 
 def composite_gates(root, video, seg, rest):
     segdir = f"{root}/pipeline/character/{video}/segments/{seg}"
-    spec, t = spec_of(segdir), seg_type(seg)
+    spec = spec_of(segdir)
+    t = seg_type(seg, spec)
     gates = gates_of(spec)
     i = rest.index("--composite")
     comp = rest[i + 1] if len(rest) > i + 1 else None

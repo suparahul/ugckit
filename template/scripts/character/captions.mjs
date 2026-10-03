@@ -9,7 +9,9 @@
  * The job: {"width":1080,"height":1920,"items":[{"lines":["…"],"out":"…png","y":0.72,
  * "anchor":"bottom"|"top","size":0.056}]}. `y` is the bottom (or the top) of the text
  * block as a share of the height; `size` a share of the width (5.6% is the slides'
- * medium on 9:16). The drawing uses the Atlas's sharp, as the slide renderer does.
+ * medium on 9:16). Optional, for the overlays: `x`, the share of the width the text
+ * stands on (0.5), and `align`, "middle" | "start" | "end" (middle). The drawing uses the
+ * Atlas's sharp, as the slide renderer does.
  */
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -35,8 +37,10 @@ for (const it of job.items) {
   const n = it.lines.length;
   const top = it.anchor === "top" ? Math.round(it.y * H) : Math.round(it.y * H) - n * lh;
   const stroke = Math.max(4, Math.round(size * 0.14));
+  const x = Math.round((it.x ?? 0.5) * W);
+  const align = it.align ?? "middle";
   const text = it.lines.map((l, i) =>
-    `<text x="${W / 2}" y="${top + (i + 1) * lh - Math.round(lh * 0.22)}" text-anchor="middle" font-family="${font}" font-weight="700" font-size="${size}" fill="#fff" stroke="#000" stroke-width="${stroke}" stroke-linejoin="round" paint-order="stroke fill">${esc(l)}</text>`).join("");
+    `<text x="${x}" y="${top + (i + 1) * lh - Math.round(lh * 0.22)}" text-anchor="${align}" font-family="${font}" font-weight="700" font-size="${size}" fill="#fff" stroke="#000" stroke-width="${stroke}" stroke-linejoin="round" paint-order="stroke fill">${esc(l)}</text>`).join("");
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">${text}</svg>`;
   await sharp(Buffer.from(svg)).png().toFile(it.out);
 }

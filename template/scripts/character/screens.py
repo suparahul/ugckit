@@ -246,18 +246,29 @@ def cmd_fill(slug, sid, video, seg):
     if row is None:
         sys.exit(f"no screen {sid} in apps/{slug}/screens/screens.json")
     t = seg.split("-")[-1].upper()
-    if t not in TYPE_MODE:
-        sys.exit(f"{seg} is not a phone segment (O, G, S, H, F)")
     vdir = os.path.join(ROOT, "pipeline", "character", video)
+    ip = os.path.join(vdir, "segments", seg, "insert.json")
+    if t == "C":
+        # A filmed phone in supplied footage: the type of its insert mode, the length of
+        # its plate (shots.py supplied wrote both).
+        if not os.path.exists(ip):
+            sys.exit(f"no segments/{seg}/insert.json -- run scripts/character/shots.py supplied {video} first")
+        c = json.load(open(ip))
+        t = next((k for k, m in TYPE_MODE.items() if m == c.get("mode")), None)
+        if t is None:
+            sys.exit(f"insert.json mode {c.get('mode')!r} is not one of {', '.join(TYPE_MODE.values())}")
+    if t not in TYPE_MODE:
+        sys.exit(f"{seg} is not a phone segment (O, G, S, H, F, or C with a filmed phone)")
     plan = json.load(open(os.path.join(vdir, "plan.json")))
     if plan.get("app_insertion") is not True:
         sys.exit("the plan has no app insertion")
     shot_p = os.path.join(vdir, "shots", f"{seg}.json")
     shot = json.load(open(shot_p)) if os.path.exists(shot_p) else {}
     dur = float((shot.get("video") or {}).get("duration_seconds") or 0)
+    if not dur and seg.endswith("-c"):
+        dur = float((json.load(open(ip)).get("plate_window") or [0, 0])[1])
     if not dur:
         sys.exit(f"no shots/{seg}.json with video.duration_seconds: the plate window comes from it")
-    ip = os.path.join(vdir, "segments", seg, "insert.json")
     os.makedirs(os.path.dirname(ip), exist_ok=True)
     spec = json.load(open(ip)) if os.path.exists(ip) else {}
     rel = os.path.relpath(os.path.join(sdir(slug), row["file"]), ROOT)
