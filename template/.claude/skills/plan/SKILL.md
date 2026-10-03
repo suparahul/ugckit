@@ -66,8 +66,11 @@ The Organic Factory UI reads this file by these exact conventions:
 The posts table: `Handle` is the short name (the part of the handle before the first
 dot); `Date` is `MM-DD` in the plan's year; `Source` carries the source post's handle,
 its view count and its exact url ("no URL held" when none); `Kind` is `slideshow` or
-`video` and sits last so the UI's column order holds. A row with `kind: video` names
-the video pipeline as its maker (`originate`, stage 5) and joins production at `post`.
+`video` and sits last so the UI's column order holds. A row with `kind: video` names its
+maker in `Format / variation`: a character video names `video-plan` and its `video_id`
+(`video-plan reaction, hannah-2026-10-05-reaction-h5`), planned to a locked plan by the
+video planning skills (AGENTS.md § Video planning); a recreation names `originate`
+(stage 5) and joins production at `post`.
 Two handles at two a day for seven days is 28 rows; write every row with a source.
 
 ## Two platforms

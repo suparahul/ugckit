@@ -57,5 +57,7 @@ which source, then the first experiment.
 ## Finish
 
 Report: rows decided, adopted, experiments, and the feature-to-format map in three
-lines. Then run the `plan` skill. Stage 5 is filled when this file and `PLAN.md`
+lines. When the user's plan requests a character video arm for a handle, run `video-fit`
+for that handle: the video slots are mapped on `brain/VIDEO-ANATOMY.md` in
+`strategy/VIDEO-FIT.md`, not in this file. Then run the `plan` skill. Stage 5 is filled when this file and `PLAN.md`
 exist; the strategy page shows the status counts.

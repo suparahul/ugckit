@@ -9,9 +9,11 @@ who really promotes each one, pull their content, and write one teardown per app
 best post becomes the reference for stage 1, or the teardowns become the brief for
 `originate`. Given an app to grow, you walk the slideshow path (§ The slideshow path):
 the research, then the niche, the account set, the handle identities, the plan, and
-production, two slideshows a day per handle. Given a locked, approved plan for a video
-of one of the handle's characters, you walk the character video path (§ Character
-videos), a separate pipeline with its own skills, scripts, state and template.
+production, two slideshows a day per handle. Given one finalised video idea for a handle
+(the handle, the date and the row of the user's plan), you walk the video planning path
+(§ Video planning) to a locked plan. Given a locked, approved plan for a video of one of the
+handle's characters, you walk the character video path (§ Character videos), a separate
+pipeline with its own skills, scripts, state and template.
 
 **The unit of research is the app.** Not the niche, not the handle. Everything in R1–R5
 is "which apps, and how is each one promoted".
@@ -265,7 +267,8 @@ name in `pipeline.json`; `product` decides it once.
 
 **The read order at every phase from 4 on.** The brain first
 (`brain/learnings-slideshows.md`, `SLIDESHOW-ANATOMY.md`, `ACCOUNT-ARCHITECTURE.md`,
-read-only); the findings trio second (`apps/<slug>/niche/{learnings,anatomy,architecture}.md`,
+read-only; for a video, also `VIDEO-ANATOMY.md`, `video-patterns.json`,
+`learnings-video.md`, then the local overlay `niche/video/patterns.json` when it exists); the findings trio second (`apps/<slug>/niche/{learnings,anatomy,architecture}.md`,
 both sources, `competitor apps` and `niche`, slideshow and video rows, the same shape as
 the brain); the app third. Every value you propose names its source. Nothing is ever
 written into `brain/`; the findings are the only place a niche fact is written, and the
@@ -296,9 +299,11 @@ is checked at the first image run (`images`), the posting service is connected a
 first send (`posting-provider`); each prints the one command or the one recipe and
 waits. Never ask for either earlier.
 
-**The video pipeline sits beside this path**, not inside it: a video the niche read
-found worth recreating goes through `handoff.sh` to stage 1; a plan row with `kind:
-video` is made by `originate` (stage 5) and joins production at `post`.
+**The video pipelines sit beside this path**, not inside it. A plan row with `kind: video`
+names its maker in `Format / variation`: a character video names `video-plan` and its
+`video_id` (§ Video planning, then § Character videos); a recreation names `originate`
+(stage 5) and joins production at `post`, its output unchanged. A video the niche read
+found worth recreating goes through `handoff.sh` to stage 1.
 
 ### Recreation — 1 to 9
 
@@ -316,6 +321,42 @@ video` is made by `originate` (stage 5) and joins production at `post`.
 | 9 | `deliver` | `deliver` | final file + a written summary |
 
 `setup` runs once per machine/workspace, not once per project.
+
+### Video planning — one finalised idea in, a locked plan out
+
+Planning writes the plan the character pipeline runs. It copies the slideshow method:
+choose values from an anatomy (`brain/VIDEO-ANATOMY.md`, `brain/video-patterns.json`),
+inherit the handle's defaults, select a beat recipe, fill its beats, approve the whole
+piece. Free writing fills the chosen slots; it never decides the structure. It makes no
+picture, voice, keyframe, prompt or segment, and it spends nothing.
+
+| # | Step | Skill | Produces |
+|---|---|---|---|
+| 1 | Fit, once per handle and video type | `video-fit` | `apps/<slug>/strategy/VIDEO-FIT.md`: each requested video type on the anatomy, the inherited defaults, the missing inputs, the capability gaps |
+| 2 | Brief, per video | `video-plan` | `apps/<slug>/production/video-plans/<video>/brief.json`: every slot, the recipe, cast, set, narrator, facts, screens and assets needed, up to three hook alternatives in one hook job |
+| 3 | Script, per video | `video-script` | `plan.draft.json` and `REVIEW.md` in the same folder: the exact words, actions, beat times, overlays, screens and proof |
+| 4 | Lock, per video — **the plan gate** | `video-lock` | `pipeline/character/<video>/plan.json` and `planning-approval.json`, with the user's words; then stop |
+
+`scripts/planning/video_plan.py` checks the brief and the draft, writes `REVIEW.md`, lists
+what is missing (`ready`) and writes the lock. Free.
+
+- **Route "plan a character video" here.** An already approved plan enters P1 directly.
+  `app-fit` calls `video-fit` when a video arm is requested.
+- **The user's plan chose the idea.** Planning maps it; it never changes a handle's role,
+  topics, hooks or dates, never decides which idea posts on which day, and never drops a
+  requested format because production cannot make it yet: the lock names the gap.
+- **Nothing starts on its own.** Unlike `deck`, a draft does not start production: the plan
+  gate is the user's words on one exact revision, by digest. Plan approval is not a
+  storyboard or a spending approval; production keeps gates A, B and C and rule 9.
+- **Real or missing.** Real screens, real footage of a real pet, measured live timings and
+  verified facts are inputs; until they exist, `ready` lists them and the lock refuses.
+  A character not `live` is a part-A dependency; planning never starts casting.
+- **No planning state store.** The files say where a video is: a brief, a draft in review, a
+  locked plan. Locking never runs `shots.py check` (it starts production state).
+- **Later steps hook in here, not built yet:** a scheduling step that writes the dated rows
+  planning reads; the setup-time video evidence (competitor and niche observations merged
+  into `apps/<slug>/niche/video/patterns.json`) that `video-fit` and `video-plan` read
+  after the brain.
 
 ### Character videos — part A once, then P1 to P6 per video
 
@@ -339,7 +380,7 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
 | | P6 deliver | `character-deliver` | **gate C**, then the finished file in `final/`; the pipeline ends here |
 
 - **Production starts only from `pipeline/character/<video>/plan.json`**, locked and
-  approved by the user. No production stage edits it. Casting never runs per video: a
+  approved by the user (written by `video-lock`, § Video planning). No production stage edits it. Casting never runs per video: a
   plan whose character is not ready stops and asks for part A.
 - **`app_insertion` false** means no app segment (no O, G, S, H, F, R or P) and no screen
   stage; `scripts/character/state.py` shows P4 as `n/a`.

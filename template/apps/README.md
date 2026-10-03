@@ -26,6 +26,8 @@ is a pending slot on the canvas, never an error.
       strategy/
         ACCOUNTS.md              how many handles, the role of each, the subject, the name pattern, the cadence
         APP-FIT.md               every parameter of both brain sheets, one value each, with a source and a status
+        VIDEO-FIT.md             each requested character-video type on brain/VIDEO-ANATOMY.md: the slots, the
+                                 inherited defaults, the missing inputs, the capability gaps (video-fit)
         HASHTAG-POOL.md          optional: the measured hashtag pool
       handles/<handle>/
         HANDLE.md                the identity: head lines (…, Dimension:, Slide style:), Accounts (optional:
@@ -42,6 +44,8 @@ is a pending slot on the canvas, never an error.
         log.jsonl                append-only decisions: approvals, sends, posted links, outcome reads, ticks
         files/<date>-<short>-<n>/  slide-NN/ candidates, cards/, final/ (and final/instagram/), images-job.json, images-result.json
         posting-accounts.json    handle -> posting-service account per platform, written at the first send
+        video-plans/<video>/     brief.json (video-plan), plan.draft.json and REVIEW.md (video-script); the
+                                 locked plan goes to pipeline/character/<video>/ (video-lock)
 
 `brain/` (read-only, shipped by the kit) is read together with `niche/` at every stage from the
 niche read on. Money is spent only in the competitor-apps phase, the niche phase and the sync,

@@ -22,6 +22,11 @@ The slideshow path, when the user has an app to grow (AGENTS.md § The slideshow
 `app-fit`, `plan`, and per post `deck`, `images`, `callout`, `render`, `post`
 (`posting-provider` once), `sync`; per week `read`.
 
+Video planning (AGENTS.md § Video planning), from one finalised video idea to the locked
+plan the character pipeline runs: `video-fit` (once per handle and video type),
+`video-plan` (the brief), `video-script` (the draft and REVIEW.md), `video-lock` (the
+user's approval, then stop).
+
 Character videos, a separate pipeline (AGENTS.md § Character videos), from a locked,
 approved plan: part A once per character (`persona-identity` video half,
 `character-voice`), then per video `character-shots` (the storyboard, gate A),
