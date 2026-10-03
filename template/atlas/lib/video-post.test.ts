@@ -265,9 +265,14 @@ test("a video with a music note: direct refused before any call, the draft goes,
     "TikTok's video inbox may not carry the caption: paste it from the caption block.",
     "Add the sound on the phone: “lofi under the voice”.",
   ]);
+  const [plan] = selectSends(SLUG, { keys: [KEY] });
+  assert.deepEqual(plan.legs.map((l) => [l.platform, l.skip !== null]), [["tiktok", false], ["instagram", true]]);
+  assert.match(plan.warnings.join("\n"), /Instagram is left out: this video has a music note, so it stays off Instagram: post it there yourself/);
+  assert.match(selectSends(SLUG, { keys: [KEY], only: "instagram" })[0].skip!, /stays off Instagram/);
   const sent = await sendPosts(SLUG, { keys: [KEY], pb });
   assert.equal(sent.results[0].ok, true);
-  assert.deepEqual((calls[2].body as { platform_configurations: { tiktok: unknown } }).platform_configurations.tiktok, { draft: true, is_aigc: true });
+  /* Off Instagram by default: one TikTok account, no Instagram configuration. */
+  assert.deepEqual(calls[2].body, { caption: "what the vet tech said #cattok #vettech", social_accounts: [7], media: ["mid_video"], platform_configurations: { tiktok: { draft: true, is_aigc: true } } });
   /* In the drafts: the reminders stay until it is marked posted. */
   assert.equal(postingNotes(allStates(SLUG)[0]).length, 3);
 });

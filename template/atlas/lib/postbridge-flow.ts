@@ -34,7 +34,7 @@ import { MAX_SLIDES, PLATFORM_NAME, linePlatform, platformOf, primaryOf, type Pl
 import { slotKey, slotTimes } from "./slots.ts";
 import { accountsOf, hasKey, legsPost, postBody, postBridge, sendStatusOf, type CreatePostInput, type PostBridgeClient, type RequestPreview, type Leg, type SentPost, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type AccountsFile, type PBAccount, type SendStatus, type SyncReport } from "./postbridge.ts";
 import { allStates, appendEvent, filesRoot, fileKey, getProduction, isSent, legsOfSent, postingStep, readLog, storeOf, type Event, type PostState } from "./production.ts";
-import { checkVideoSend, directBlock, videoReminders } from "./video-post.ts";
+import { checkVideoSend, directBlock, instagramBlock, videoReminders } from "./video-post.ts";
 import { finalFileOf } from "./video.ts";
 import { findLinks, monidRuns, savedRunsFetch, type LinkReport } from "./tiktok-link.ts";
 import { fmtBoth, postingZone, zonedToUtc } from "./when.ts";
@@ -197,6 +197,8 @@ export function selectSends(slug: string, sel: SendSelect): SendPlan[] {
         !account ? why
         : why ? `${why}; then run node scripts/postbridge-accounts.mjs`
         : sent ? `sent already (${leg!.sent!.at.slice(0, 16).replace("T", " ")}, Post Bridge post ${leg!.sent!.id}${leg!.sent!.mode === "direct" ? ", direct" : ""}${p === "tiktok" ? "" : `, ${PLATFORM_NAME[p]}`}); --force to send again`
+        /* A video with a music note: TikTok draft only; the founder posts it to Instagram himself. */
+        : p === "instagram" && s.video ? instagramBlock(s.video.plan?.music)
         : null;
       return { platform: p, account: account?.id ?? null, skip, sent };
     });

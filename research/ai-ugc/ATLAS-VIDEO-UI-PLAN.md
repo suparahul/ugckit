@@ -163,8 +163,12 @@ prints the exact bodies with a placeholder media id, needs no key and sends noth
    with no music note may go direct.
 4. **Duet and stitch stay on**, sent as `true` in direct mode.
 5. **Instagram gets the Reel at once**, as slides do; "Do not post on Instagram" keeps one
-   post off it. A music-note video in draft mode therefore still publishes a Reel on
-   Instagram at once, without the music.
+   post off it. **Changed later the same day:** a video with a music note stays off
+   Instagram by default. It goes as a TikTok draft only, and the founder posts it to
+   Instagram himself, with the sound. The send leaves the Instagram leg out with that
+   reason (`--only instagram` is refused too); the post page shows Instagram as "you post
+   it", drops the "and Instagram" from the send button, and hides "Do not post on
+   Instagram" for it. A video with no music note still goes to Instagram at once.
 
 ### Draft against direct, for a video
 
@@ -172,6 +176,7 @@ prints the exact bodies with a placeholder media id, needs no key and sends noth
 |---|---|---|---|
 | Where it lands | the TikTok inbox; the user finishes and posts from the phone | Post Bridge publishes at the time | as for slides |
 | Allowed for | every video | a video with no music note | refuses direct for a music note |
+| Instagram | a video with no music note only | a video with no music note only | a music-note video stays off Instagram; the founder posts it there |
 | Caption | TikTok's inbox upload of a video takes no caption in TikTok's API, so it may arrive empty | carried | the page says "paste it from the caption block" |
 | Sound | the user adds it on the phone (the music note) | the file's own sound only; nothing is added | the page names the music note to add |
 | Cover frame | TikTok's default (the user may change it in the app) | TikTok's default | sends no cover setting |

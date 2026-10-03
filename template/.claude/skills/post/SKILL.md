@@ -86,6 +86,10 @@ A `Kind: video` row goes the same way, after **Approve for posting** on its deli
   - **Duet and stitch stay on** (sent as `true` in direct mode).
   - **Instagram gets the Reel at once**, as slides do. "Do not post on Instagram" on the
     post page (`leg.drop`) keeps one post off it.
+  - **A music-note video stays off Instagram** (decided later the same day). It goes as a
+    TikTok draft only; the user posts it to Instagram by hand, with the sound. The dry run
+    says "Instagram is left out", `--only instagram` is refused, and the post page shows
+    "you post it" on Instagram.
 - **Draft mode.** The video lands in the TikTok inbox. TikTok's inbox upload for a video
   may not carry the caption: tell the user to paste it from the post page. Read the
   page's reminders back: the AI label, the caption, and the sound when there is a music
@@ -93,8 +97,7 @@ A `Kind: video` row goes the same way, after **Approve for posting** on its deli
 - **Direct mode.** Public, comments on, duet and stitch on, the AI label on, the file's own
   sound only: TikTok adds no music to a video, and the file is music-free.
 - **Instagram** gets the file as a Reel, published when the post is processed, with the
-  file's own sound and Instagram's default cover. A music note is not applied there; say
-  so once.
+  file's own sound and Instagram's default cover; only a video with no music note.
 - `--request` (or `REQUEST_ONLY=1`) prints the upload request and the post body with a
   placeholder media id and sends nothing; it needs no key. Read it back before the first
   real video send of a workspace.

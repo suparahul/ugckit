@@ -11,6 +11,7 @@ import type { PostState } from "@/lib/production";
 import type { View } from "@/lib/read";
 import { PlatformSwitch } from "@/components/Platform";
 import { LegToggle } from "./LegToggle";
+import { instagramBlock } from "@/lib/video-post";
 
 type Word = { text: string; tone?: "waiting" | "approved" | "out" | "failed" };
 
@@ -19,6 +20,7 @@ export function legWord(s: PostState, p: Platform): Word {
   const leg = s.legs?.[p];
   if (s.killed) return { text: "killed" };
   if (leg?.dropped) return { text: "not on this post", tone: "out" };
+  if (p === "instagram" && !leg?.sent && !leg?.posted && s.video && instagramBlock(s.video.plan?.music)) return { text: "you post it", tone: "out" };
   if (leg?.failed) return { text: "failed", tone: "failed" };
   if (leg?.posted) return { text: "posted", tone: "approved" };
   if (leg?.sent) return leg.sent.mode === "direct" && leg.sent.scheduledAt ? { text: "scheduled", tone: "approved" } : p === "tiktok" ? { text: "in drafts", tone: "waiting" } : { text: "sent", tone: "approved" };
@@ -34,16 +36,18 @@ export function Legs({ s, href, view }: { s: PostState; href: string; view: View
   const ig = s.legs?.instagram;
   const slides = s.deck?.slides.length ?? 0;
   const over = slides > 10 && !ig?.dropped;
+  const offIg = !ig?.sent && !ig?.posted && !!s.video && !!instagramBlock(s.video.plan?.music);
   const note = ig?.failed
     ? <>Instagram refused it ({ig.failed.at.slice(0, 16).replace("T", " ")} UTC): <em>“{ig.failed.error}”</em> TikTok is not touched. To send it again: <code>node scripts/posting-send.mjs {s.row.slug} --post {s.row.key} --only instagram --send</code></>
     : over ? <>{slides} slides: Instagram takes 10. Cut the deck, or take Instagram off this post.</>
     : ig?.posted && !ig.synced ? (s.video ? <>Live on Instagram as a Reel. Turn on its AI label in the Instagram app, if it is not on.</> : <>Live on Instagram. Add the music in the Instagram app: Edit, then Replace Audio.</>)
+    : offIg && !ig?.dropped ? <>This video has a music note, so it stays off Instagram: post it there yourself, with the sound. TikTok gets it as a draft.</>
     : !ig?.sent && !ig?.dropped ? (s.video ? <>Instagram publishes the video directly as a Reel, at the same time as TikTok, with the file&rsquo;s own sound. Post Bridge cannot set Instagram&rsquo;s AI label: turn it on in the Instagram app.</> : <>Instagram publishes directly, at the same time as TikTok, with no music: add it in the Instagram app afterwards.</>)
     : null;
   return (
     <div className="legs">
       <PlatformSwitch href={href} view={view} words={words} label="The platforms of this post" note={note} />
-      {ig && !ig.sent && !s.killed ? <LegToggle slug={s.row.slug} post={s.row.key} platform="instagram" dropped={!!ig.dropped} name={PLATFORM_NAME.instagram} /> : null}
+      {ig && !ig.sent && !s.killed && !offIg ? <LegToggle slug={s.row.slug} post={s.row.key} platform="instagram" dropped={!!ig.dropped} name={PLATFORM_NAME.instagram} /> : null}
       {ig?.link ? <a className="legs__open" href={ig.link} target="_blank" rel="noreferrer">open on Instagram →</a> : null}
     </div>
   );

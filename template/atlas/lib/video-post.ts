@@ -111,6 +111,11 @@ export function directBlock(music: string | null | undefined): string | null {
   return placeholder(music) ? null : `this video has a music note (“${music!.trim()}”), so it goes as a TikTok draft only: send it to the drafts and add the sound on the phone`;
 }
 
+/** A video with a music note stays off Instagram (the founder, 2026-10-04): he posts it there himself, with a sound. Null otherwise. */
+export function instagramBlock(music: string | null | undefined): string | null {
+  return placeholder(music) ? null : "this video has a music note, so it stays off Instagram: post it there yourself, with the sound";
+}
+
 /** What the user does on the phone with a TikTok draft of a video. Shown before the send and on the post page. */
 export function videoReminders(music: string | null | undefined): string[] {
   return [
