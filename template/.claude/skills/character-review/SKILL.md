@@ -61,6 +61,12 @@ it.** The checklist (the user sees the same list):
   cats as two. The set as planned. No phone and no screen. No mouth moving as if
   speaking. A mascot: its style lock in every second. The face, voice and mouth checks do
   not apply; the hands, the set and the motion do.
+- **X segments** (a silent reaction): the face is the character's (the anchors, every
+  second), the hands are whole, the mouth never forms words and no voice is heard, and
+  the reaction follows the written expression beats at their times. The face is never
+  the reference creator's. `review.py` approves an X only with
+  `--check identity=pass --check hands=pass --check silent=pass --check performance=pass`,
+  and only when the file is as long as the shot plans (the duration gate).
 
 Pull a frame where you are unsure:
 

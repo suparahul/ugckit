@@ -65,6 +65,18 @@ Mark the cut points on the frozen script first, then give each segment its lines
   subject ids and count, the beat's set. No line on camera and no voice reference; a
   narration is laid at assembly (`audio_from`). **Never the app**: a beat that shows the
   app is O, G, S, H, F, R or P.
+- **X, a silent reaction** (v2, a beat with `reaction`; founder, 2026-10-03: a reaction
+  hook is never spoken): the handle's approved generated face reacts, framing_kind
+  `face`, with no line, no `audio_from`, no voice reference and no lip sync; the hook is
+  the plan's timed text overlay over it. One reaction beat per X segment. The shot
+  copies the beat's `reaction` exactly. The prompt's PERFORMANCE writes each expression
+  beat's face, eyes and head word for word, with its time from the segment's start ("At
+  0.8 s, ..."), and says "No lip sync" and "She does not speak". The reference reaction
+  (`reaction_refs`) gives the performance only: never name its post, its creator or its
+  file in the prompt, and never attach the clip or a frame of it to a keyframe or a
+  generation; the face stays the handle's own. A beat with `reaction: null` has no
+  reference yet: stop and send it back to planning.
+- **A full-screen app beat** has framing `app_screen`: it is R or P, never generated.
 - **C, supplied media** (v2): the plan's clip (`source_range_s`, inside the asset's
   approved `trim_s`) or still (`still_s`). No casting, no keyframe, no prompt, no
   generation. Its own sound plays unless `audio` is `mute` or `audio_from` lays another.
@@ -76,7 +88,7 @@ Mark the cut points on the frozen script first, then give each segment its lines
   its input clip and its app recording.
 - **Supplied media is never a reference.** No plan asset and nothing under `supplied/`
   is attached to a keyframe or a generation; `shots.py validate` and `generate.sh`
-  refuse it.
+  refuse it. The same holds for research footage and a reference reaction's post.
 - **The references, at most four pictures on the default model**, in this order: the
   keyframe, the hero, the sheet of each fixed subject in the shot, then one more (the
   angle anchor nearest the shot, or the last frame of the neighbour segment). The voice

@@ -108,6 +108,14 @@ if refs:
         if "/supplied/" in r.get("file", "") or os.path.realpath(os.path.join(root, r.get("file", ""))) in supplied:
             sys.exit(f"FATAL: refs.json reference {r.get('file')} is supplied media (the plan's assets). "
                      "Supplied footage goes into the video as it is; it never conditions a generation.")
+        posts = {str(x.get(k)).strip().rstrip("/") for x in plan.get("reaction_refs") or []
+                 for k in ("post_id", "post_dir", "video_path") if isinstance(x.get(k), str) and x[k].strip()}
+        f = r.get("file", "")
+        if f.startswith("research/") or "/research/" in f or any(p in f for p in posts):
+            sys.exit(f"FATAL: refs.json reference {f} is research footage or a reference reaction. The "
+                     "written performance carries a reaction; the clip never conditions a generation.")
+        if seg.split("-")[-1].upper() == "X" and r.get("kind") == "voice":
+            sys.exit(f"FATAL: {seg} is a silent reaction: no voice reference (a reaction hook is never spoken)")
 GATES
 
 # ---- cost, computed from list price x seconds. Reported costs are unreliable (rule 7).

@@ -177,6 +177,7 @@
             },
             "channel": {
               "enum": [
+                "reaction",
                 "spoken",
                 "spoken_visual",
                 "text",
@@ -344,6 +345,45 @@
               ]
             }
           }
+        },
+        "strategy_ref": {
+          "description": "The row of the user's strategy this video executes, copied from the brief: {file, section, row (verbatim), disposition}. A plain string (early drafts) is still read, with a note.",
+          "anyOf": [
+            {
+              "type": "object",
+              "required": [
+                "file",
+                "section",
+                "row",
+                "disposition"
+              ],
+              "properties": {
+                "file": {
+                  "type": "string"
+                },
+                "section": {
+                  "type": "string"
+                },
+                "row": {
+                  "type": "string"
+                },
+                "disposition": {
+                  "enum": [
+                    "avoid",
+                    "candidate",
+                    "scheduled",
+                    "stopped"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
@@ -455,10 +495,12 @@
           },
           "framing": {
             "enum": [
+              "app_screen",
               "face",
               "hands_only",
               "subject_only"
-            ]
+            ],
+            "description": "Who or what fills the frame. app_screen: the real app full frame (an R or P segment), app_on_screen true, layout sequence."
           },
           "layout": {
             "enum": [
@@ -574,6 +616,84 @@
                 "type": "null"
               }
             ]
+          },
+          "reaction": {
+            "description": "A silent reaction (segment X): the handle's approved generated face performs the written expression beats of a real reference reaction; no line, no voice, no lip sync. null while no reference is found (production waits). Founder, 2026-10-03: a reaction hook is never spoken.",
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "ref_id",
+                  "framing",
+                  "camera_distance",
+                  "expression_beats"
+                ],
+                "properties": {
+                  "ref_id": {
+                    "type": "string"
+                  },
+                  "framing": {
+                    "type": "string"
+                  },
+                  "camera_distance": {
+                    "type": "string"
+                  },
+                  "expression_beats": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "start_s",
+                        "end_s",
+                        "ref_s",
+                        "face",
+                        "eyes",
+                        "head"
+                      ],
+                      "properties": {
+                        "start_s": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "end_s": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "ref_s": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          },
+                          "minItems": 2,
+                          "maxItems": 2
+                        },
+                        "face": {
+                          "type": "string"
+                        },
+                        "eyes": {
+                          "type": "string"
+                        },
+                        "head": {
+                          "type": "string"
+                        },
+                        "hands": {
+                          "type": "string",
+                          "description": "optional: what the hands do"
+                        }
+                      }
+                    }
+                  },
+                  "camera": {
+                    "type": "string",
+                    "description": "optional: the camera of the reference (handheld, locked off)"
+                  }
+                }
+              }
+            ]
           }
         }
       }
@@ -634,6 +754,13 @@
                 "type": "null"
               }
             ]
+          },
+          "fact_refs": {
+            "description": "The facts (brief facts ids) an overlay states. Required when the text has a digit, except step_label and day_counter.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       }
@@ -909,6 +1036,75 @@
         },
         "date": {
           "type": "string"
+        }
+      }
+    },
+    "reaction_refs": {
+      "description": "The real reference reactions from the user's research, named by post and range. They drive the written performance only; the clip is never a generation input (generation_input true is refused).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "post_id",
+          "platform",
+          "handle",
+          "post_dir",
+          "video_path",
+          "video_sha256",
+          "start_s",
+          "end_s",
+          "notes_ref",
+          "generation_input"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "post_id": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "handle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "post_dir": {
+            "type": "string"
+          },
+          "video_path": {
+            "type": "string"
+          },
+          "video_sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "end_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "notes_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "generation_input": {
+            "enum": [
+              null,
+              false
+            ]
+          }
         }
       }
     }

@@ -29,7 +29,9 @@ file.
    away from the hero element; its audio is not trimmed (her lips are visible).
    **C**: the supplied clip cut to `source_range_s` (a still held for `still_s`), scaled
    to cover 9:16 (`fit: pad` keeps the whole picture on black); a filmed phone uses its
-   approved composite. **B**: the approved generation, like T, silent. **M**: each panel
+   approved composite. **B**: the approved generation, like T, silent. **X**: the approved
+   reaction, its generated sound dropped (no voice; the room tone runs under it), the hook
+   overlay over it. **M**: each panel
    (a supplied asset, an approved B, or a screen recording) cut to its range, scaled into
    its `rect`, started `sync_offset_s` late and held on its last frame, on black; a
    screen panel's hero element is found and read by OCR like R's.

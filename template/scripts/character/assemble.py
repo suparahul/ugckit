@@ -4,7 +4,7 @@
     assemble.py <video> [--grain] [--no-captions]
 
 For every segment of pipeline/character/<video>/video.json, in order:
-  generated (T, O, G, S, H, F, B)  the file approved at gate B (approval.json); for a phone
+  generated (T, O, G, S, H, F, B, X)  the file approved at gate B (approval.json); for a phone
                                 segment, its approved composite (P4)
   C                             supplied media: the plan's asset, its checksum checked and
                                 its source approved at gate B; a clip cut to
@@ -51,7 +51,7 @@ sys.path.insert(0, HERE)
 import bridge
 CH = os.path.join(ROOT, "pipeline", "character")
 W, H, FPS = 1080, 1920, 30
-GENERATED = ("T", "O", "G", "S", "H", "F", "B")
+GENERATED = ("T", "O", "G", "S", "H", "F", "B", "X")
 PHONE = ("O", "G", "S", "H", "F")
 # Overlay roles: (size as a share of the width, characters per line).
 OVERLAY_STYLE = {"hook": (0.074, 22), "paragraph": (0.048, 30), "step_label": (0.06, 22),
@@ -643,6 +643,8 @@ def main():
                     fits(name, aw, dur)
                 ain = ["-ss", f"{aw[0]:.3f}", "-to", f"{aw[1]:.3f}", "-i", it["audio_src"]]
                 words_src, words_off, heard = it["audio_src"], aw[0], aheard
+            elif t == "X":
+                ain = None              # a silent reaction: no voice; the room tone runs under it
             elif has_audio(src):
                 ain = ["-ss", f"{win[0]:.3f}", "-to", f"{win[1]:.3f}", "-i", src]
                 words_src, words_off = src, win[0]
@@ -952,7 +954,16 @@ def final_checks(outputs, timeline, work, video, plan=None, v=None, drawn=(), ca
     m = re.findall(r"I:\s+(-?[\d.]+) LUFS", lr)
     if m:
         lufs = float(m[-1])
-        rep("loudness", -19 <= lufs <= -13, f"{lufs} LUFS integrated; the segments are levelled to -16")
+        # A video of silent reactions and real screens only carries the room tone: nothing
+        # to level. Every other segment, a line or a laid voice makes sound to measure.
+        segs = (v or {}).get("segments") or []
+        sounded = any(str(x.get("type", "")).upper() not in ("X", "R", "P") or x.get("script_lines")
+                      or x.get("audio_from") for x in segs)
+        if not sounded and lufs < -40:
+            rep("loudness", None, f"{lufs} LUFS: no voice or sound in the plan, the room tone only "
+                                  "(the music is added at posting)")
+        else:
+            rep("loudness", -19 <= lufs <= -13, f"{lufs} LUFS integrated; the segments are levelled to -16")
     import ocr
     heroes = [e for e in timeline if e.get("hero")]
     if heroes:

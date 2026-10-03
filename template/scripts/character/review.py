@@ -25,7 +25,9 @@ adds a row to the model's table in pipeline/character/model-failures.md (the use
 the table is made at the model's first reject); --fixed-by on a later approve fills the
 "Prompt change that fixed it" column of that segment's open rows. Nothing is approved
 without the user's words. Gate C refuses an approval when the file is stale (the plan
-changed after assembly) or its overlays are not the plan's.
+changed after assembly) or its overlays are not the plan's. An X segment (a silent
+reaction) is approved only with --check identity=pass, hands=pass, silent=pass and
+performance=pass, and only when the file is as long as the shot plans.
 """
 import glob, json, os, re, subprocess, sys, time
 
@@ -35,7 +37,10 @@ import bridge
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CH = os.path.join(ROOT, "pipeline", "character")
 LEDGER = os.path.join(CH, "model-failures.md")
-GENERATED = ("T", "O", "G", "S", "H", "F", "B")
+GENERATED = ("T", "O", "G", "S", "H", "F", "B", "X")
+# X, a silent reaction: approved only with these checks passed by eye, and its length
+# measured against the shot's planned length.
+REACTION_CHECKS = ("identity", "hands", "silent", "performance")
 AUDIO_EXT = (".wav", ".mp3", ".m4a", ".aac")
 PHONE = ("O", "G", "S", "H", "F")
 PLANNED = {"T": 60, "O": 50, "G": 37, "S": 37, "H": 30, "F": 25}
@@ -234,6 +239,19 @@ def cmd_segment(video, seg, a):
              "words": words or None, "date": today(), "model": o.get("--model") or model_slug(),
              "set_id": o.get("--set"), "failure_class": o.get("--class"), "fix": o.get("--fix"),
              "checks": dict(c.split("=", 1) for c in o.get("--check", []) if "=" in c)}
+    if t == "X" and dec == "approve":
+        miss = [k for k in REACTION_CHECKS if entry["checks"].get(k) != "pass"]
+        if miss:
+            sys.exit(f"a silent reaction is approved with {' '.join(f'--check {k}=pass' for k in miss)}: the face is the "
+                     "character's (identity), the hands are whole, no mouth forms words and no voice is heard "
+                     "(silent), and the reaction follows the written performance")
+        sp = os.path.join(vdir(video), "shots", f"{seg}.json")
+        sv = (json.load(open(sp)).get("video") or {}) if os.path.exists(sp) else {}
+        want = sv.get("trim_to_seconds") if bridge.num(sv.get("trim_to_seconds")) else sv.get("duration_seconds")
+        got = bridge.probe(os.path.join(sdir, f))[0]
+        if not bridge.num(want) or not got or got < float(want) - 0.05:
+            sys.exit(f"the file is {got or 0:.2f} s; the shot plans {want} s (duration gate)")
+        entry["checks"]["duration"] = "pass"
     gp = os.path.join(sdir, os.path.dirname(f), "qc", "gates.json")        # beside the plate
     if (t in PHONE or t == "C") and os.path.exists(gp):
         g = json.load(open(gp))

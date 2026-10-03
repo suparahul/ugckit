@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to pipeline/character/<video>/plan.json. The locked plan, the only input of production. Written by the planning system (video-lock) or by hand, then approved by the user. No production stage edits it. A plan without schema_version is a legacy (v1) plan: only the fields from video_id to approved below exist, and it runs as before. A v2 plan (schema_version 2) adds revision, editorial, the beat fields from id to item_index, overlays, assets, narrators and publishing_note, and is checked by scripts/character/bridge.py; its approval is planning-approval.json beside it (planning-approval.example.json). The contract is plan.schema.json. A v2 plan may leave characters, set and outfit empty when no generated person or mascot appears. No value in angle brackets survives locking.",
+  "_comment": "Copy to pipeline/character/<video>/plan.json. The locked plan, the only input of production. Written by the planning system (video-lock) or by hand, then approved by the user. No production stage edits it. A plan without schema_version is a legacy (v1) plan: only the fields from video_id to approved below exist, and it runs as before. A v2 plan (schema_version 2) adds revision, editorial, the beat fields from id to item_index (and reaction), overlays, assets, narrators, reaction_refs and publishing_note, and is checked by scripts/character/bridge.py; its approval is planning-approval.json beside it (planning-approval.example.json). The contract is plan.schema.json. A v2 plan may leave characters, set and outfit empty when no generated person or mascot appears. No value in angle brackets survives locking.",
   "schema_version": 2,
   "revision": 1,
   "video_id": "<video>",
@@ -20,7 +20,7 @@
     "filming_format": "talking_head | hook_to_demo | live_use | before_after | text_over_action | voiceover_action (face_to_demo is read as hook_to_demo)",
     "hook": {
       "job_id": "<one of the twelve hook jobs>",
-      "channel": "spoken | visual | text | spoken_visual | text_visual",
+      "channel": "spoken | visual | text | spoken_visual | text_visual | reaction (a silent reacting face with the hook as a text overlay; never spoken)",
       "framing": [
         "<count | negative | audience_callout | lived_experience | professional_basis>"
       ]
@@ -48,7 +48,12 @@
       "axis": "none | hook | proof | product_presence | close | cast",
       "base_video_id": null
     },
-    "strategy_ref": "<the strategy row or experiment this video executes>",
+    "strategy_ref": {
+      "file": "<the strategy file, as the brief>",
+      "section": "<its section>",
+      "row": "<the row, verbatim>",
+      "disposition": "scheduled | candidate | stopped | avoid"
+    },
     "evidence_ids": [],
     "taxonomy_version": "<pinned>",
     "catalogue_digest": "<pinned>"
@@ -62,6 +67,46 @@
     }
   ],
   "beats": [
+    {
+      "id": "b0",
+      "role": "<hook>",
+      "start_s": 0,
+      "end_s": "<s>",
+      "lines": [],
+      "action": "<what is visible: her face reacts, silent>",
+      "fact_refs": [],
+      "performance": "silent_action",
+      "source_asset_ids": [],
+      "subject_ids": [],
+      "set_id": "<set>",
+      "framing": "face",
+      "layout": "sequence",
+      "panels": [],
+      "repeat_group": null,
+      "item_index": null,
+      "app_on_screen": false,
+      "screen_id": null,
+      "viewer_must": null,
+      "reaction": {
+        "_comment": "A silent reaction (segment X): the handle's own face performs these written beats; no line, no voice, no lip sync. null while no reference is found: production waits.",
+        "ref_id": "<reaction_refs[].id>",
+        "framing": "<e.g. chest-up, centred>",
+        "camera_distance": "<e.g. arm's length>",
+        "expression_beats": [
+          {
+            "start_s": 0,
+            "end_s": "<s>",
+            "ref_s": [
+              "<in>",
+              "<out>"
+            ],
+            "face": "<the expression>",
+            "eyes": "<where the eyes go>",
+            "head": "<the head movement>"
+          }
+        ]
+      }
+    },
     {
       "id": "b1",
       "role": "<the recipe's beat: attention, problem, item, result...>",
@@ -79,7 +124,7 @@
         "<world.json fixed subject; source:<name> for a subject only in a supplied clip>"
       ],
       "set_id": "<world.json set of a generated beat>",
-      "framing": "face | hands_only | subject_only",
+      "framing": "face | hands_only | subject_only | app_screen (the real app full frame: R or P)",
       "layout": "sequence",
       "panels": [],
       "repeat_group": null,
@@ -137,7 +182,9 @@
       "start_s": 0,
       "end_s": "<at least words / 3 s, and 1 s>",
       "placement": "top | middle | upper_left | upper_right | panel",
-      "panel_id": null
+      "panel_id": null,
+      "fact_refs": [],
+      "_fact_refs": "the facts the text states; required when the text has a digit (not for step_label or day_counter)"
     }
   ],
   "assets": [
@@ -167,6 +214,22 @@
       "voice_ref": "<narrator>@v<n> for original_synthetic",
       "source_ref": "<asset id for supplied_speaker>",
       "credential_ref": "<supplied_speaker only: the verified credential>"
+    }
+  ],
+  "reaction_refs": [
+    {
+      "_comment": "A real reference reaction from the user's research. It gives the written performance only; its clip is never a generation input (generation_input true is refused).",
+      "id": "<ref>",
+      "post_id": "<post id>",
+      "platform": "tiktok",
+      "handle": "<the creator's handle>",
+      "post_dir": "<workspace-relative post folder>",
+      "video_path": "<workspace-relative video>",
+      "video_sha256": "<64 hex>",
+      "start_s": "<in>",
+      "end_s": "<out>",
+      "notes_ref": "<the notes that describe it, or null>",
+      "generation_input": null
     }
   ],
   "set": {

@@ -49,7 +49,8 @@ notification. Do not poll with sleep.
 
 - The storyboard approval, the character's `live` status, the reference kinds (never an
   app screen: the app is inserted at P4), and never supplied media (a plan asset or a
-  file under `supplied/`). C, M, R and P are never generated.
+  file under `supplied/`), research footage or a reference reaction's post. C, M, R and P
+  are never generated. An X segment (a silent reaction) carries no voice clip.
 - At most `max_reference_images` pictures (4 on the default model); the voice clip does
   not count.
 - The prompt under 5,000 characters, counted as characters; sent once, as message

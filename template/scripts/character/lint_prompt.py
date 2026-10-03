@@ -13,7 +13,11 @@ finger sentence in F with their times, no spoken line in H, F or B, lip sync sta
 talking segment, the shot times within the generated length, no generation
 parameter, and the reference-picture limit. For B (a silent generated action): no phone
 and no app, the people rule of its framing (hands only: no face; subject only: no person,
-and no "exactly one person"), and the exact count of each fixed subject.
+and no "exactly one person"), and the exact count of each fixed subject. For X (a silent
+reaction): no line and the silence stated, no lip sync, exactly one person, no phone and
+no app, every expression beat of the written performance (its face, eyes and head) word for
+word with its time from the segment's start, and no copy of the reference (its post id,
+its creator's handle, its file, or words that ask the model to copy a clip).
 """
 import json, os, re, sys
 
@@ -44,6 +48,8 @@ SILENT = ("does not speak", "no one speaks", "nobody speaks", "do not speak")
 APP_WORDS = [r"green screen", r"phone screen", r"\bthe app\b", r"app screen", r"screen recording",
              r"holds? (a|the|her|his) phone", r"\bsmartphone\b"]
 COUNT_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
+COPY_WORDS = [r"reference (video|clip|reaction)", r"\bcopy\b", r"\brecreate\b", r"\breplicate\b",
+              r"\bmimic\b", r"same as the (video|clip)"]
 
 
 def sections(text):
@@ -179,17 +185,18 @@ def lint(video, seg):
                                                    r"flat solid green under and around the finger",
                                                    r"never passes through the phone"])
         check("the finger sentence with its times", ok, "" if ok else "the F sentence of the character-shots skill")
-    if t in ("H", "F", "B"):
+    if t in ("H", "F", "B", "X"):
         quoted = re.findall(r"[\"“][^\"”]{3,}[\"”]", "\n".join(shots_b))
         silent = any(x in text.lower() for x in SILENT)
         check("no spoken line", not spoken and not quoted and silent,
               f"an {t} segment has no line on camera and says so ('She does not speak', 'No one speaks')")
-    if t == "B":
+    if t in ("B", "X"):
         low = front.lower()
         app = [p for p in APP_WORDS if any(not negated(low, m.start()) for m in re.finditer(p, low))]
         check("no phone and no app", "THE PHONE SCREEN" not in heads and not app,
-              ", ".join(app) or ("THE PHONE SCREEN section in a B prompt" if "THE PHONE SCREEN" in heads else
+              ", ".join(app) or (f"THE PHONE SCREEN section in a {t} prompt" if "THE PHONE SCREEN" in heads else
                                  "") or "the app is shown only by O, G, S, H, F, R or P")
+    if t == "B":
         fk = shot.get("framing_kind")
         tl = text.lower()
         if fk == "subject_only":
@@ -199,6 +206,7 @@ def lint(video, seg):
         elif fk == "hands_only":
             ok = re.search(r"\bno face\b", tl) is not None
             check("the people rule (hands only)", ok, "" if ok else "say 'Only her hands and forearms; no face'")
+    if t in ("B", "X"):
         subs = shot.get("fixed_subjects_in_shot") or []
         if subs:
             ap = allb("ANIMALS/PROPS").lower()
@@ -206,6 +214,38 @@ def lint(video, seg):
             ok = re.search(rf"\bexactly ({n}|{COUNT_WORDS.get(n, n)})\b", ap) is not None
             check("the exact count of the subjects", ok,
                   f"{n} fixed subject(s): ANIMALS/PROPS says 'exactly {COUNT_WORDS.get(n, n)}' with their true size")
+    if t == "X":
+        tl = text.lower()
+        flat = " ".join(tl.split())
+        check("no lip sync", re.search(r"\bno lip[- ]?sync\b", tl) is not None and "voice-over" not in
+              allb("PERFORMANCE").lower(),
+              "say 'No lip sync: her mouth does not form words'; a reaction hook is never spoken")
+        check("the people rule (face)", "exactly one person" in tl, "say 'Exactly one person.'")
+        rx = shot.get("reaction") or {}
+        steps = [x for x in rx.get("expression_beats") or [] if isinstance(x, dict)]
+        perf_t = " ".join(allb("PERFORMANCE").lower().split())
+        t0 = steps[0].get("start_s") if steps and isinstance(steps[0].get("start_s"), (int, float)) else 0
+        miss = []
+        for j, x in enumerate(steps, 1):
+            tt = x.get("start_s")
+            rel = (tt - t0) if isinstance(tt, (int, float)) else None
+            times = {f"{rel:g} s", f"{rel:.1f} s"} if rel is not None else set()
+            if not any(f"at {w}" in perf_t for w in times):
+                miss.append(f"step {j}: 'at {rel if rel is None else f'{rel:g}'} s'")
+            for k in ("face", "eyes", "head"):
+                v = " ".join(str(x.get(k) or "").lower().split())
+                if not v or v not in perf_t:
+                    miss.append(f"step {j} {k}")
+        check("the written performance, word for word", bool(steps) and not miss,
+              ("PERFORMANCE lacks: " + "; ".join(miss)) if miss else
+              "" if steps else "the shot has no reaction.expression_beats")
+        ref = next((r for r in plan.get("reaction_refs") or [] if r.get("id") == rx.get("ref_id")), {})
+        names = [str(ref.get(k)) for k in ("post_id", "handle") if ref.get(k)]
+        if ref.get("video_path"):
+            names.append(os.path.basename(str(ref["video_path"])))
+        cp = [w for w in COPY_WORDS if re.search(w, flat)] + [n for n in names if n.lower() in flat]
+        check("no copy of the reference", not cp, ", ".join(cp) or
+              "the written performance is the brief; the face is the handle's own")
     if spoken:
         perf = allb("PERFORMANCE").lower()
         bans = allb("NO TEXT").lower()

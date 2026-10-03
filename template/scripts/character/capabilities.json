@@ -5,11 +5,13 @@
   "bridge.narration": true,
   "bridge.composition": true,
   "bridge.live": true,
+  "bridge.reaction": true,
   "_what": {
     "bridge.B": "a silent generated action: hands only, pet only or an approved mascot (segment B); never the app",
     "bridge.C": "supplied media: a clip or a still from the plan's assets, checksum, range and source approval at gate B (segment C); a filmed phone goes through the insertion gates of its mode",
     "bridge.narration": "a narrator independent of the face: a character's approved performance, a supplied voice, or an original synthetic narrator's approved takes (audio_from)",
     "bridge.composition": "split-screen and picture-in-picture panels (segment M), sequential stitch, timed overlays, the source credit and the day counter, checked at gate C",
-    "bridge.live": "a real input clip paired with its app recording, the measured offset checked in sequence or in panels"
+    "bridge.live": "a real input clip paired with its app recording, the measured offset checked in sequence or in panels",
+    "bridge.reaction": "a silent reaction (segment X): the handle's approved generated face, no voice and no lip sync, performed from the written expression beats of a real reference reaction (reaction_refs), under the timed hook overlay; identity, hands, silence, performance and duration approved at gate B. The reference clip is never a generation input"
   }
 }

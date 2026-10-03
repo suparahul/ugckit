@@ -396,7 +396,13 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
   pairing). Three more segment types: **B**, a silent generated action (hands only, pet
   only, or an approved mascot; never the app); **C**, supplied media (a clip or a still of
   the plan's assets: never generated, approved at gate B with `review.py source`); **M**,
-  panels (split screen, picture in picture). A narrator speaks where no generated face
+  panels (split screen, picture in picture); and **X**, a silent reaction (the handle's
+  approved generated face, no voice and no lip sync, performed from the written
+  expression beats of a real reference reaction in `reaction_refs`, under the timed hook
+  overlay; founder, 2026-10-03: a reaction hook is never spoken). A full-screen app beat
+  has framing `app_screen` (R or P). Production refuses a dry-run planning approval, a
+  number on an overlay without `fact_refs`, and a reference clip as a generation input.
+  A narrator speaks where no generated face
   talks: the character's approved performance, a supplied voice, or an original synthetic
   narrator (`character-voice`, narrator mode: never a clone of a real person, never a
   credential, never over a human face). Overlays are the plan's, timed, checked at gate C.

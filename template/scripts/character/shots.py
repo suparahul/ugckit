@@ -25,7 +25,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 MODELS = os.path.join(ROOT, "scripts", "character", "models.json")
 STATE = os.path.join(ROOT, "pipeline", "character", "state.json")
 
-GENERATED = ["T", "O", "G", "S", "H", "F", "B"]
+# X: a silent reaction, the handle's own face with no voice and no lip sync.
+GENERATED = ["T", "O", "G", "S", "H", "F", "B", "X"]
 # R, P: the real recording; C: supplied media (a clip or a still); M: panels side by side
 # or one inside another. None is generated.
 NOT_GENERATED = ["R", "P", "C", "M"]
@@ -349,9 +350,22 @@ def supplied_paths(plan):
             if isinstance(a.get("path"), str)}
 
 
+def reaction_marks(plan):
+    """What names a reference reaction on disk: its post id, post folder and video path.
+    The reference drives the written performance only; its clip is never a reference of a
+    generation."""
+    marks = set()
+    for r in plan.get("reaction_refs") or []:
+        for k in ("post_id", "post_dir", "video_path"):
+            if isinstance(r.get(k), str) and r[k].strip():
+                marks.add(r[k].strip().rstrip("/"))
+    return marks
+
+
 def check_refs(video, plan, name, refs, kinds, max_images, what):
     images = 0
     supplied = supplied_paths(plan)
+    posts = reaction_marks(plan)
     for r in refs:
         f, k = r.get("file"), r.get("kind")
         if placeholder(f):
@@ -363,6 +377,9 @@ def check_refs(video, plan, name, refs, kinds, max_images, what):
             bad(f"{name}: {f} is from the screen library -- the app is never a reference")
         if "/supplied/" in f or os.path.realpath(resolve(video, plan, f)) in supplied:
             bad(f"{name}: {f} is supplied media -- it goes into the video as it is, never into a generation")
+        if f.startswith("research/") or "/research/" in f or any(pid in f for pid in posts):
+            bad(f"{name}: {f} is research footage or the reference reaction -- the written performance "
+                "carries the reaction; the clip is never a reference of a generation")
         if f.lower().endswith(AUDIO_EXT):
             if k != "voice":
                 bad(f"{name}: {f} is audio but its kind is {k!r}")
@@ -468,6 +485,16 @@ def cmd_validate(video):
                 "-- fewer words, or a longer segment")
         if t in ("H", "F") and sl:
             bad(f"{name}: an {t} segment speaks no line on camera; its audio is laid at assembly")
+        if t == "X":
+            if sl or seg.get("audio_from"):
+                bad(f"{name}: an X segment is a silent reaction: no line, no audio_from (a reaction hook is "
+                    "never spoken)")
+            if shot.get("framing_kind") != "face":
+                bad(f"{name}: an X segment shows the face (framing_kind face)")
+            if any(r.get("kind") == "voice" for r in gen_refs(shot)):
+                bad(f"{name}: an X segment is silent: no voice reference")
+            if not isinstance(shot.get("reaction"), dict):
+                bad(f"{name}: an X shot carries its beat's reaction (the reference and the written performance)")
         if t == "B" and sl and not seg.get("audio_from"):
             bad(f"{name}: a B segment is silent; its lines are a narration laid at assembly (audio_from)")
         if t == "B":

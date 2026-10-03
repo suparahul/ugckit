@@ -17,7 +17,11 @@ Exit 1 when a check fails.
 The bridge adds no generation. B is a silent generated action (hands only, pet only, or
 an approved mascot); C is supplied media (a clip or a still, never generated, never a
 reference of a generation); M lays panels side by side or one inside another. A narrator
-speaks over a beat where no generated face talks.
+speaks over a beat where no generated face talks. X is a silent reaction: the handle's own
+generated face reacts, with no voice and no lip sync, while the hook runs as a timed text
+overlay; a written performance taken from a real reference reaction drives it, and the
+reference clip itself is never a generation input (founder, 2026-10-03: a reaction hook
+is never spoken).
 """
 import hashlib, json, os, re, subprocess, sys
 
@@ -40,7 +44,8 @@ FORMAT_ALIASES = {"face_to_demo": "hook_to_demo"}
 HOOK_JOBS = {"discovery_regret", "imminent_need", "confession_reframe", "quoted_challenge",
              "specific_promise", "peer_question", "visible_result", "in_progress",
              "gratitude_discovery", "category_analogy", "withheld_reveal", "explanation"}
-HOOK_CHANNELS = {"spoken", "visual", "text", "spoken_visual", "text_visual"}
+# reaction: a silent reacting face with the hook as a text overlay (never spoken).
+HOOK_CHANNELS = {"spoken", "visual", "text", "spoken_visual", "text_visual", "reaction"}
 HOOK_FRAMINGS = {"count", "negative", "audience_callout", "lived_experience", "professional_basis"}
 PRODUCT_ROLES = {"absent", "incidental_tool", "story_solution", "main_subject"}
 NAME_LOCATIONS = {"speech", "overlay", "caption", "bio"}
@@ -50,7 +55,8 @@ COMPARISON = {"before_after", "wrong_right", "best_worst"}
 EXPERIMENT_AXES = {"none", "hook", "proof", "product_presence", "close", "cast"}
 
 PERFORMANCE = {"on_camera", "voiceover", "silent_action"}
-FRAMING = {"face", "hands_only", "subject_only"}
+# app_screen: the real app fills the frame (an R or P segment); no person, nothing generated.
+FRAMING = {"face", "hands_only", "subject_only", "app_screen"}
 LAYOUT = {"sequence", "split_screen", "picture_in_picture"}
 OVERLAY_ROLES = {"hook", "paragraph", "step_label", "comparison_label", "day_counter", "source_credit"}
 # Where an overlay may sit. Never the lower band: the captions and the platform's buttons
@@ -66,6 +72,10 @@ ASSET_ORIGINS = {"own_camera", "user_supplied", "licensed", "permitted_reference
 NEEDS_PERMISSION = {"user_supplied", "licensed", "permitted_reference", "verified_expert"}
 NEEDS_CREDIT = {"licensed", "permitted_reference"}
 LIVE_INPUT_ORIGINS = {"own_camera", "user_supplied"}
+STRATEGY_DISPOSITIONS = {"scheduled", "candidate", "stopped", "avoid"}
+# Overlay roles whose digits are not claims: a step number, the series day (bound by the
+# series' state_fact_refs). Any other number on screen names its fact_refs.
+NUMBER_EXEMPT_ROLES = {"step_label", "day_counter"}
 NARRATOR_KINDS = {"character", "supplied_speaker", "original_synthetic"}
 
 MAX_WORDS_PER_S = 3.75          # 15 words per 4 s: the speech ceiling of the plan
@@ -223,6 +233,7 @@ def check_plan(plan, out, verify_files=True, script_checked=False):
         if l.get("speaker") not in pins | {"vo"}:
             out.bad(f"script line {l.get('id')}: speaker {l.get('speaker')!r} is not a pinned character or 'vo'")
     beats = plan.get("beats") or []
+    check_reaction_refs(plan, out)
     check_beats(plan, beats, lines, length, pins, subjects, sets, assets, narrators, ed, out, script_checked)
     check_overlays(plan, beats, length, assets, ed, out)
     check_live(plan, beats, assets, ed, out)
@@ -279,6 +290,7 @@ def check_editorial(plan, pins, narrators, out):
         out.bad(f"editorial.experiment.axis {exp.get('axis')!r}")
     elif exp.get("axis") != "none" and placeholder(exp.get("base_video_id")):
         out.bad("an experiment names the base video it changes one axis of")
+    check_strategy_ref(ed.get("strategy_ref"), out)
     # The app is shown only through app insertion.
     ins = plan.get("app_insertion") is True
     if ed.get("app_presence") not in (None, "none") and not ins:
@@ -312,6 +324,29 @@ def check_editorial(plan, pins, narrators, out):
             if not s.get("state_fact_refs"):
                 out.bad("a progress log binds the actual state with state_fact_refs; a counter alone is not progress")
     return ed
+
+
+def check_strategy_ref(sr, out):
+    """editorial.strategy_ref: the row of the user's strategy this video executes, as the
+    brief names it: {file, section, row (verbatim), disposition}. A plain string (the
+    first planning drafts) is still read, as a free-text pointer."""
+    if sr is None:
+        return
+    if isinstance(sr, str):
+        if placeholder(sr):
+            out.bad("editorial.strategy_ref is empty; it names the strategy row {file, section, row, disposition}")
+        else:
+            out.note("editorial.strategy_ref is a plain string; the shape is {file, section, row, disposition}")
+        return
+    if not isinstance(sr, dict):
+        out.bad("editorial.strategy_ref is {file, section, row, disposition}")
+        return
+    for k in ("file", "section", "row"):
+        if placeholder(sr.get(k)):
+            out.bad(f"editorial.strategy_ref.{k} is empty")
+    if sr.get("disposition") not in STRATEGY_DISPOSITIONS:
+        out.bad(f"editorial.strategy_ref.disposition {sr.get('disposition')!r}; "
+                f"one of {', '.join(sorted(STRATEGY_DISPOSITIONS))}")
 
 
 def check_assets(plan, out, verify_files):
@@ -507,6 +542,21 @@ def check_beats(plan, beats, lines, length, pins, subjects, sets, assets, narrat
         on = b.get("app_on_screen")
         if on and not ins:
             out.bad(f"{tag} shows the app, but app_insertion is false")
+        if framing == "app_screen":
+            if not on:
+                out.bad(f"{tag}: framing app_screen is the real app full frame (app_on_screen true)")
+            if layout != "sequence":
+                out.bad(f"{tag}: app_screen fills the frame; a recording beside other media is a panel")
+            if any((assets.get(a) or {}).get("kind") in ("clip", "still") for a in src):
+                out.bad(f"{tag}: app_screen shows the real recording, not a clip or a still")
+            if b.get("subject_ids"):
+                out.bad(f"{tag}: app_screen shows no subject")
+        elif on and framing == "subject_only" and layout == "sequence" and \
+                all((assets.get(a) or {}).get("kind") == "screen" for a in src):
+            out.note(f"{tag}: a full-screen app beat is framing app_screen (subject_only is read as it)")
+        if is_reaction(plan, b, i == 1):
+            check_reaction(plan, tag, b, i == 1, perf, framing, layout, src, cast, plan.get("overlays") or [],
+                           ed, out)
         # The cast and the world.
         if generated and framing == "face" and cast not in ("human", "mascot"):
             out.bad(f"{tag}: a generated face needs a cast (cast_kind human or mascot)")
@@ -543,6 +593,104 @@ def check_beats(plan, beats, lines, length, pins, subjects, sets, assets, narrat
     missing = [l for l in lines if l not in carried]
     if missing and not script_checked:
         out.bad(f"script lines no beat carries: {', '.join(missing)}")
+
+
+RX_REF_KEYS = ("id", "post_id", "platform", "handle", "post_dir", "video_path", "video_sha256",
+               "start_s", "end_s", "notes_ref", "generation_input")
+RX_KEYS = ("ref_id", "framing", "camera_distance", "expression_beats")
+RX_STEP_KEYS = ("start_s", "end_s", "ref_s", "face", "eyes", "head")
+
+
+def reaction_refs(plan):
+    return {r.get("id"): r for r in plan.get("reaction_refs") or [] if isinstance(r, dict)}
+
+
+def is_reaction(plan, b, first):
+    """A beat that performs a reaction: it has a `reaction` key, or it opens a reaction hook."""
+    ch = ((plan.get("editorial") or {}).get("hook") or {}).get("channel")
+    return "reaction" in b or (first and ch == "reaction")
+
+
+def check_reaction_refs(plan, out):
+    """The real reference reactions, from the user's research. Each names a post and the
+    exact range; it gives the written performance only. Its clip is never a generation
+    input: the founder has not allowed that, so generation_input true is refused."""
+    seen = set()
+    for r in plan.get("reaction_refs") or []:
+        rid = r.get("id") if isinstance(r, dict) else None
+        if placeholder(rid) or rid in seen:
+            out.bad(f"reaction ref {rid!r} is missing or used twice")
+            continue
+        seen.add(rid)
+        for k in RX_REF_KEYS:
+            if k not in r:
+                out.bad(f"reaction ref {rid}: no '{k}'")
+        if placeholder(r.get("post_id")) or placeholder(r.get("video_path")):
+            out.bad(f"reaction ref {rid}: a real post (post_id and video_path)")
+        if not (num(r.get("start_s")) and num(r.get("end_s")) and 0 <= r["start_s"] < r["end_s"]):
+            out.bad(f"reaction ref {rid}: start_s and end_s are the exact range of the reaction in the post")
+        if r.get("generation_input") is True:
+            out.bad(f"reaction ref {rid}: generation_input true -- the reference clip is never a generation "
+                    "input (the founder has not allowed it); the written performance carries the reaction")
+        elif r.get("generation_input") not in (None, False):
+            out.bad(f"reaction ref {rid}: generation_input is null or false")
+
+
+def check_reaction(plan, tag, b, first, perf, framing, layout, src, cast, ovs, ed, out):
+    """A silent reaction (an X segment): the handle's own generated face reacts, with no
+    voice and no lip sync. Founder, 2026-10-03: a reaction hook is never spoken; the hook
+    is a timed text overlay over the face."""
+    rx = b.get("reaction")
+    if perf != "silent_action" or b.get("lines"):
+        out.bad(f"{tag}: a reaction is silent (silent_action, no line); a reaction hook is never spoken")
+    if not placeholder(b.get("narrator_ref")):
+        out.bad(f"{tag}: a reaction has no voice and no narrator")
+    if framing != "face":
+        out.bad(f"{tag}: a reaction shows the face (framing face)")
+    if layout != "sequence" or src or b.get("app_on_screen"):
+        out.bad(f"{tag}: a reaction is the generated face alone: no source asset, no panel, no app")
+    if cast not in ("human", "mascot"):
+        out.bad(f"{tag}: a reaction is the face of the handle's approved generated character "
+                "(cast_kind human or mascot)")
+    if rx is None:
+        out.bad(f"{tag}: no reference reaction yet (reaction null); a reaction is never invented, so "
+                "production waits for the planned one")
+    elif not isinstance(rx, dict):
+        out.bad(f"{tag}: reaction is {{ref_id, framing, camera_distance, expression_beats}}")
+    else:
+        for k in RX_KEYS:
+            if not rx.get(k):
+                out.bad(f"{tag}: reaction has no '{k}'")
+        r = reaction_refs(plan).get(rx.get("ref_id"))
+        if not r and rx.get("ref_id"):
+            out.bad(f"{tag}: reaction {rx.get('ref_id')!r} is not in reaction_refs")
+        t = b["start_s"]
+        for j, st in enumerate(rx.get("expression_beats") or [], 1):
+            st = st if isinstance(st, dict) else {}
+            for k in RX_STEP_KEYS:
+                if st.get(k) in (None, "", []):
+                    out.bad(f"{tag}: expression beat {j} has no '{k}'")
+            s_, e_ = st.get("start_s"), st.get("end_s")
+            if not (num(s_) and num(e_) and e_ > s_):
+                out.bad(f"{tag}: expression beat {j}: start_s and end_s, end after start")
+                continue
+            if abs(s_ - t) > BEAT_TOL_S:
+                out.bad(f"{tag}: expression beat {j} starts at {s_:g} s; the one before ends at {t:g} s")
+            t = e_
+            rs = st.get("ref_s")
+            if r and not (isinstance(rs, list) and len(rs) == 2 and all(num(x) for x in rs) and rs[0] < rs[1]
+                          and num(r.get("start_s")) and num(r.get("end_s"))
+                          and r["start_s"] - BEAT_TOL_S <= rs[0] and rs[1] <= r["end_s"] + BEAT_TOL_S):
+                out.bad(f"{tag}: expression beat {j}: ref_s is inside the reference range of {r.get('id')}")
+        if rx.get("expression_beats") and abs(t - b["end_s"]) > BEAT_TOL_S:
+            out.bad(f"{tag}: the expression beats end at {t:g} s; the beat ends at {b['end_s']:g} s")
+    if first or b.get("role") == "hook":
+        ch = str((ed.get("hook") or {}).get("channel", ""))
+        if ch not in ("reaction", "text", "text_visual"):
+            out.bad(f"{tag}: a reaction hook is never spoken; the hook channel is reaction (or text), not {ch!r}")
+        if not any(o.get("role") == "hook" and num(o.get("start_s")) and num(o.get("end_s"))
+                   and o["start_s"] < b["end_s"] and o["end_s"] > b["start_s"] for o in ovs):
+            out.bad(f"{tag}: a reaction hook runs the hook as a timed text overlay (role hook) over the face")
 
 
 def check_panels(tag, layout, panels, src, assets, out):
@@ -613,6 +761,12 @@ def check_overlays(plan, beats, length, assets, ed, out):
         if norm(o.get("text")) in heroes:
             out.bad(f"{tag}: the text is a hero string; the app's real words come from the real screen, "
                     "never from an overlay")
+        if re.search(r"\d", str(o.get("text"))) and o.get("role") not in NUMBER_EXEMPT_ROLES \
+                and not o.get("fact_refs"):
+            out.bad(f"{tag}: a number on screen names its fact_refs (the sourced fact it states)")
+        if o.get("fact_refs") is not None and not (isinstance(o["fact_refs"], list)
+                                                  and all(isinstance(x, str) and x for x in o["fact_refs"])):
+            out.bad(f"{tag}: fact_refs is a list of fact ids")
         if o.get("role") == "day_counter":
             if not series:
                 out.bad(f"{tag}: a day counter belongs to a progress_log series")
@@ -630,7 +784,7 @@ def check_overlays(plan, beats, length, assets, ed, out):
                 out.bad(f"beat {b.get('id')}: {aid} is a {a.get('origin')} clip; a source_credit overlay "
                         "runs while it is on screen")
     hook = ed.get("hook") or {}
-    if str(hook.get("channel", "")).startswith("text") and beats:
+    if (str(hook.get("channel", "")).startswith("text") or hook.get("channel") == "reaction") and beats:
         first_end = beats[0].get("end_s") or 0
         if not any(o.get("role") == "hook" and num(o.get("start_s")) and o["start_s"] < first_end for o in ovs):
             out.bad(f"the hook channel is {hook.get('channel')}: a hook overlay starts in the first beat")
@@ -676,12 +830,17 @@ def check_live(plan, beats, assets, ed, out):
 
 def check_planning_approval(plan, out):
     """A locked plan carries the user's approval of its exact content. A draft (no
-    approval words yet, as the planning skills check it) has nothing to match."""
+    approval words yet, as the planning skills check it) has nothing to match. A dry run
+    of the lock is never an approval."""
+    vd = os.path.join(ROOT, "pipeline", "character", str(plan.get("video_id")))
+    p = os.path.join(vd, "planning-approval.json")
+    if "approved" in plan and os.path.exists(p) and load(p).get("dry_run"):
+        out.bad("planning-approval.json is a dry run (dry_run true): a rehearsal of the lock, not the user's "
+                "approval; lock the plan with the user's words")
+        return
     if placeholder((plan.get("approved") or {}).get("words")):
         out.note("not approved yet: the planning approval and its digest are checked once the plan is locked")
         return
-    vd = os.path.join(ROOT, "pipeline", "character", str(plan.get("video_id")))
-    p = os.path.join(vd, "planning-approval.json")
     if not os.path.exists(p):
         out.bad("no planning-approval.json beside the v2 plan: the user's approval of this exact revision")
         return
@@ -791,7 +950,8 @@ def check_video(plan, v, shots, out):
         if d is None:
             out.bad(f"{name}: no planned length (planned_s, the shot's duration, or the source range)")
             d = 0.0
-        timeline.append({"seg": s, "name": name, "type": ty, "beats": bids, "start": t, "end": t + d, "shot": shot})
+        timeline.append({"seg": s, "name": name, "type": ty, "beats": bids, "start": t, "end": t + d, "shot": shot,
+                         "first": not timeline})
         t += d
     missing = [b.get("id") for b in beats if b.get("id") not in covered]
     if missing:
@@ -866,6 +1026,26 @@ def check_segment_against_beats(plan, it, bmap, lines, assets, narrators, subjec
         fk = shot.get("framing_kind")
         if fk not in framings or len(framings) != 1:
             out.bad(f"{name}: the shot's framing_kind {fk!r} is not the beats' framing {sorted(framings)}")
+    # A silent reaction: one reaction beat, the handle's face, no voice, the written
+    # performance copied exactly.
+    rx_beats = [b for b in bb if "reaction" in b]
+    if ty == "X":
+        if len(bb) != 1 or len(rx_beats) != 1:
+            out.bad(f"{name}: an X segment carries exactly one reaction beat")
+        if sl or af:
+            out.bad(f"{name}: a reaction is never spoken: no line, no audio_from, no voice")
+        if shot.get("framing_kind") != "face":
+            out.bad(f"{name}: a reaction shows the face (framing_kind face)")
+        if rx_beats and shot.get("reaction") != rx_beats[0]["reaction"]:
+            out.bad(f"{name}: the shot's reaction is not beat {rx_beats[0].get('id')}'s reaction, copied exactly "
+                    "(the written performance)")
+    elif rx_beats:
+        out.bad(f"{name}: beat {rx_beats[0].get('id')} is a silent reaction; it is an X segment, not {ty}")
+    if ty != "X" and it.get("first") and ((plan.get("editorial") or {}).get("hook") or {}).get("channel") == "reaction":
+        out.bad(f"{name}: the hook is a reaction; the first segment is an X segment")
+    # The real app full frame is a recording, never a generated picture.
+    if "app_screen" in framings and ty not in ("R", "P"):
+        out.bad(f"{name}: its beats are framing app_screen (the real app full frame): an R or P segment")
     if "silent_action" in perfs and perfs <= {"silent_action"} and (sl or audio_kind(af) == "narration"):
         out.bad(f"{name}: its beats are silent_action; it carries no line and no narration")
     # Voice-over beats: the narration comes from the bound narrator.
@@ -891,7 +1071,7 @@ def check_segment_against_beats(plan, it, bmap, lines, assets, narrators, subjec
                                                               {n.get("source_ref") for n in narrators.values()}):
         out.bad(f"{name}: speaks lines but has no audio_from")
     # The generated pictures: action, subjects, set, framing.
-    if ty in ("T", "B", "O", "G", "S", "H", "F") and shot:
+    if ty in ("T", "B", "X", "O", "G", "S", "H", "F") and shot:
         said = norm(" ".join([str(shot.get("action") or "")] +
                              [str(x.get("action") or "") for x in (shot.get("video") or {}).get("beats") or []]))
         for b in bb:
@@ -947,7 +1127,7 @@ def check_segment_against_beats(plan, it, bmap, lines, assets, narrators, subjec
         sid = (shot.get("phone") or {}).get("screen_id")
         if sid not in {b.get("screen_id") for b in app_beats}:
             out.bad(f"{name}: phone.screen_id {sid!r} is not the screen of its app beat(s)")
-    if app_beats and ty in ("T", "B", "C") and not (ty == "C" and s.get("insert")):
+    if app_beats and ty in ("T", "B", "X", "C") and not (ty == "C" and s.get("insert")):
         if len(bb) == len(app_beats):
             out.bad(f"{name}: its beats show the app; a {ty} segment does not (O, G, S, H, F, R, P, or M "
                     "with the recording as a panel)")
