@@ -8,7 +8,7 @@ Builds a scratch workspace from template/ (scripts/character, docs/character, th
 link for the caption renderer), a handle with its world, a human character, a mascot and a
 synthetic narrator, a screen library, and synthetic media made locally with ffmpeg, cv2
 and macOS `say`. The "generated" segments are ffmpeg test pictures standing in for
-approved generations. Then, for every fixture plan in fixtures/ (two v1, seven v2):
+approved generations. Then, for every fixture plan in fixtures/ (two v1, nine v2):
 
   - shots.py check, the bridge plan check, shots.py validate and the bridge video check pass;
   - the B prompt passes the lint;
@@ -345,6 +345,155 @@ The same two cats, the same counter, the same light.
 NO TEXT
 No captions, no text, no watermark, no logo.
 """
+
+
+X_PROMPT = """Vertical 9:16 selfie video of a woman in a small kitchen, window light from the left, handheld.
+REFERENCES
+keyframes/01-x.png is the first frame: composition, her pose, the light. Nothing else.
+face.png is her face: identity, hair and signature details. Not its background.
+STRUCTURE
+One shot, no cuts.
+SUBJECT
+Exactly one person. Nora in her green apron, chest-up, centred, at arm's length.
+SETTING
+The kitchen of the set plate, no other location.
+SHOT 1 (0.0 to 3.0 s)
+She looks into the lens and reacts. End state: she smiles at the lens.
+PERFORMANCE
+She does not speak. No lip sync: her mouth never forms words.
+At 0 s, brows lift and her lips press together; eyes widen at the lens; head pulls back a little.
+At 1.2 s, a slow disbelieving smile spreads; eyes drop to the side, then come back to the lens; one small shake of the head.
+AUDIO
+Kitchen room sound only. No voice, no music.
+CONSISTENCY
+The same face, hair and apron as the references.
+NO TEXT
+No captions, no text, no watermark, no logo.
+"""
+
+
+def reaction(assemble_on):
+    v_ = "v2-reaction"
+    pl = lock(fixture(v_))
+    checks(v_)
+    sh = shot(v_, "01-x", "X", [], pl["beats"][0]["action"])
+    sh["video"]["trim_to_seconds"] = 3
+    sh["reaction"] = copy.deepcopy(pl["beats"][0]["reaction"])
+    wj(p("pipeline", "character", v_, "shots", "01-x.json"), sh)
+    video_json(pl, [{"n": 1, "type": "X", "project": f"{v_}.01-x", "beat_ids": ["b1"], "script_lines": []},
+                    {"n": 2, "type": "R", "screen_id": "scan-result", "trim": [1, 6], "beat_ids": ["b2"],
+                     "script_lines": []}])
+    validate(v_)
+    sd = p("pipeline", "character", v_, "segments", "01-x")
+    os.makedirs(sd, exist_ok=True)
+    pp = os.path.join(sd, "prompt.txt")
+    open(pp, "w").write(X_PROMPT)
+    expect(f"{v_}: shots.py refs", [PY, f"{SC}/shots.py", "refs", v_])
+    expect(f"{v_}: lint of the X prompt", [PY, f"{SC}/lint_prompt.py", v_, "01-x"])
+    for label, text, why in (
+            ("a reaction without 'No lip sync'", X_PROMPT.replace("No lip sync: her mouth never forms words.", ""),
+             "no lip sync"),
+            ("an expression beat left out", X_PROMPT.replace("one small shake of the head", "she nods"),
+             "written performance"),
+            ("a prompt that names the reference post",
+             X_PROMPT.replace("She looks into the lens", "Copy the reference video 7412000000000000001; she looks"),
+             "no copy of the reference"),
+            ("a spoken line in a reaction", X_PROMPT.replace("She does not speak.", 'She says "no way".'),
+             "no spoken line")):
+        open(pp, "w").write(text)
+        expect(f"{v_}: lint refuses {label}", [PY, f"{SC}/lint_prompt.py", v_, "01-x"], ok=False, contains=why)
+    open(pp, "w").write(X_PROMPT)
+    f = gen_file(v_, "01-x", "action")
+    rel = os.path.relpath(f, sd)
+    rv = [PY, f"{SC}/review.py", "segment", v_, "01-x", "--decision", "approve", "--file", rel, "--words", "Keep it."]
+    expect(f"{v_}: gate B refuses a reaction without its checks", rv, ok=False, contains="--check identity=pass")
+    ok_checks = ["--check", "identity=pass", "--check", "hands=pass", "--check", "silent=pass",
+                 "--check", "performance=pass"]
+    short = os.path.join(sd, "generated", "01-x-short.mp4")
+    clip(short, 2, "testsrc", 120, size="720x1280")
+    expect(f"{v_}: gate B refuses a reaction shorter than planned",
+           rv[:8] + ["generated/01-x-short.mp4"] + rv[9:] + ok_checks, ok=False, contains="duration gate")
+    os.remove(short)
+    expect(f"{v_}: gate B approves the reaction with its checks", rv + ok_checks)
+    assemble(v_, assemble_on)
+    if assemble_on:
+        man = rj(p("pipeline", "character", v_, "assembly", "assembly.json"))
+        x = [s for s in man.get("segments") or man.get("timeline") or [] if s.get("type") == "X"]
+        ok = bool(x) and x[0].get("trim_by") == "trim_to_seconds"
+        RESULTS.append((f"{v_}: the X segment is cut to its planned 3 s", ok))
+        print(f"{'PASS' if ok else 'FAIL'}  {v_}: the X segment is cut to its planned 3 s {x[:1]}")
+    # The plan: never spoken, never invented, never the clip as an input.
+    mutate(v_, "a spoken reaction hook", plan_fn=lambda q: q["editorial"]["hook"].update(channel="spoken"),
+           cmd="plan", contains="never spoken")
+    mutate(v_, "a reaction that talks on camera",
+           plan_fn=lambda q: q["beats"][0].update(performance="on_camera"), cmd="plan", contains="a reaction is silent")
+    mutate(v_, "the reference clip as a generation input",
+           plan_fn=lambda q: q["reaction_refs"][0].update(generation_input=True), cmd="plan",
+           contains="never a generation input")
+    mutate(v_, "a reaction with no reference post",
+           plan_fn=lambda q: q["beats"][0]["reaction"].update(ref_id="r9"), cmd="plan", contains="not in reaction_refs")
+    mutate(v_, "a reaction not found yet (null)", plan_fn=lambda q: q["beats"][0].update(reaction=None),
+           cmd="plan", contains="never invented")
+    mutate(v_, "a reaction hook without its text overlay", plan_fn=lambda q: q.update(overlays=[]),
+           cmd="plan", contains="timed text overlay")
+    mutate(v_, "expression beats that leave a gap",
+           plan_fn=lambda q: q["beats"][0]["reaction"]["expression_beats"][1].update(start_s=1.6), cmd="plan",
+           contains="the one before ends")
+    mutate(v_, "a number on an overlay without fact_refs",
+           plan_fn=lambda q: q["overlays"][0].update(text="9 in 10 cats do this"), cmd="plan", contains="fact_refs")
+    mutate(v_, "a strategy_ref with an unknown disposition",
+           plan_fn=lambda q: q["editorial"]["strategy_ref"].update(disposition="maybe"), cmd="plan",
+           contains="strategy_ref.disposition")
+    mutate(v_, "app_screen on a beat that does not show the app",
+           plan_fn=lambda q: q["beats"][1].update(app_on_screen=False, screen_id=None, viewer_must=None),
+           cmd="plan", contains="framing app_screen is the real app")
+    # video.json and the shot.
+    mutate(v_, "a reaction with narration laid under it",
+           video_fn=lambda v: v["segments"][0].update(audio_from="narration:n1"), contains="never spoken")
+    mutate(v_, "a reaction built as a B segment",
+           video_fn=lambda v: v["segments"][0].update(type="B"), contains="it is an X segment")
+    shp = p("pipeline", "character", v_, "shots", "01-x.json")
+    mutate(v_, "a shot that changes the written performance",
+           video_fn=lambda v: wj(shp, {**rj(shp), "reaction": {**rj(shp)["reaction"], "camera_distance": "far"}}),
+           contains="copied exactly")
+    research = "apps/catapp/research/posts/7412000000000000001/frame.png"
+    picture(p(research))
+    mutate(v_, "a frame of the reference reaction as a generation reference",
+           video_fn=lambda v: wj(shp, {**rj(shp), "video": {**rj(shp)["video"], "references":
+                                 rj(shp)["video"]["references"] + [{"file": research, "kind": "anchor"}]}}),
+           contains="research footage")
+    # The planning approval: a dry run is never an approval.
+    vd = p("pipeline", "character", v_)
+    keep = {f: open(os.path.join(vd, f)).read() for f in ("plan.json", "planning-approval.json")}
+    pa = rj(os.path.join(vd, "planning-approval.json"))
+    wj(os.path.join(vd, "planning-approval.json"), {**pa, "words": None, "date": None, "dry_run": True})
+    q = rj(os.path.join(vd, "plan.json"))
+    wj(os.path.join(vd, "plan.json"), {**q, "approved": {"words": None, "date": None}})
+    expect(f"{v_}: refuses a dry-run planning approval", [PY, f"{SC}/bridge.py", "plan", v_], ok=False,
+           contains="dry run")
+    wj(os.path.join(vd, "plan.json"), q)
+    wj(os.path.join(vd, "planning-approval.json"), {**pa, "dry_run": True})
+    expect(f"{v_}: refuses dry_run even with words filled in", [PY, f"{SC}/shots.py", "check", v_], ok=False,
+           contains="dry run")
+    for f_, t_ in keep.items():
+        open(os.path.join(vd, f_), "w").write(t_)
+    # generate.sh refuses before any cost: the research frame, a voice clip on a reaction.
+    ap = os.path.join(vd, "approval.json")
+    a = rj(ap)
+    a["gate_a_storyboard"] = {"decision": "approve", "words": "Storyboard is good."}
+    wj(ap, a)
+    refs = os.path.join(sd, "refs.json")
+    keep_refs = open(refs).read()
+    wj(refs, {"references": [{"kind": "anchor", "file": research}]})
+    expect(f"{v_}: generate.sh refuses the reference reaction before any cost",
+           ["bash", f"{SC}/generate.sh", v_, "01-x"], ok=False, contains="research footage", env={"ALLOW_REFS": "1"})
+    wj(refs, {"references": [{"kind": "voice", "file": "characters/nora/references/voice/voice-reference.wav"}]})
+    expect(f"{v_}: generate.sh refuses a voice clip on a reaction",
+           ["bash", f"{SC}/generate.sh", v_, "01-x"], ok=False, contains="silent reaction", env={"ALLOW_REFS": "1"})
+    open(refs, "w").write(keep_refs)
+    # The legacy full-screen app beat (subject_only) is still read, with a note.
+    expect("v2-live-cat: subject_only on a full-screen app beat is read as app_screen",
+           [PY, f"{SC}/bridge.py", "plan", "v2-live-cat"], contains="framing app_screen")
 
 
 # ---------------------------------------------------------------- per fixture
@@ -739,6 +888,9 @@ def main():
     ok = bool(flat) and any(r["result"] == "FAIL" for r in flat) and not g["pass"]
     RESULTS.append(("v2-tilted-phone: the flat-on gate refuses a tilted filmed phone", ok))
     print(f"{'PASS' if ok else 'FAIL'}  v2-tilted-phone: the flat-on gate refuses a tilted filmed phone {flat}")
+
+    # ---- v2: a silent reaction hook (X), then the real app full frame (app_screen, R)
+    reaction(assemble_on)
 
     print()
     bad = [l for l, ok in RESULTS if not ok]

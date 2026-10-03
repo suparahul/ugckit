@@ -1,0 +1,178 @@
+{
+  "schema_version": 2,
+  "revision": 1,
+  "video_id": "v2-reaction",
+  "app": "catapp",
+  "handle": "nora",
+  "characters": [
+    "nora@v1"
+  ],
+  "format": {
+    "dimension": "9:16",
+    "length_s": 8
+  },
+  "app_insertion": true,
+  "editorial": {
+    "objective": "product_discovery",
+    "distribution": "organic",
+    "lane": "discovery",
+    "filming_format": "hook_to_demo",
+    "hook": {
+      "job_id": "withheld_reveal",
+      "channel": "reaction",
+      "framing": []
+    },
+    "recipe_id": "discovery_demo",
+    "product": {
+      "role": "main_subject",
+      "name_locations": [
+        "caption"
+      ],
+      "speech_count": 0,
+      "timing": "closing"
+    },
+    "app_presence": "result",
+    "proof": {
+      "kind": "real_screen_result",
+      "fact_refs": []
+    },
+    "close": "payoff",
+    "cast_kind": "human",
+    "narrator_ref": null,
+    "series": "standalone",
+    "comparison_mode": null,
+    "experiment": {
+      "axis": "none",
+      "base_video_id": null
+    },
+    "strategy_ref": {
+      "file": "strategy/APP-FIT.md",
+      "section": "Videos",
+      "row": "reaction hook, then the scan result",
+      "disposition": "scheduled"
+    },
+    "evidence_ids": [],
+    "taxonomy_version": "1",
+    "catalogue_digest": "fixture"
+  },
+  "script": [],
+  "beats": [
+    {
+      "id": "b1",
+      "role": "attention",
+      "start_s": 0,
+      "end_s": 3,
+      "lines": [],
+      "action": "Nora stares at the lens, stunned, then breaks into a slow smile",
+      "fact_refs": [],
+      "performance": "silent_action",
+      "source_asset_ids": [],
+      "subject_ids": [],
+      "set_id": "kitchen",
+      "framing": "face",
+      "layout": "sequence",
+      "panels": [],
+      "app_on_screen": false,
+      "screen_id": null,
+      "viewer_must": null,
+      "reaction": {
+        "ref_id": "r1",
+        "framing": "chest-up, centred",
+        "camera_distance": "arm's length, phone in her hand",
+        "camera": "handheld selfie",
+        "expression_beats": [
+          {
+            "start_s": 0,
+            "end_s": 1.2,
+            "ref_s": [
+              1.0,
+              2.2
+            ],
+            "face": "brows lift and her lips press together",
+            "eyes": "eyes widen at the lens",
+            "head": "head pulls back a little"
+          },
+          {
+            "start_s": 1.2,
+            "end_s": 3,
+            "ref_s": [
+              2.2,
+              4.0
+            ],
+            "face": "a slow disbelieving smile spreads",
+            "eyes": "eyes drop to the side, then come back to the lens",
+            "head": "one small shake of the head",
+            "hands": "none in frame"
+          }
+        ]
+      }
+    },
+    {
+      "id": "b2",
+      "role": "result",
+      "start_s": 3,
+      "end_s": 8,
+      "lines": [],
+      "action": "The app shows its reading of the tail flick",
+      "fact_refs": [],
+      "performance": "silent_action",
+      "source_asset_ids": [],
+      "subject_ids": [],
+      "set_id": null,
+      "framing": "app_screen",
+      "layout": "sequence",
+      "panels": [],
+      "app_on_screen": true,
+      "screen_id": "scan-result",
+      "viewer_must": "read"
+    }
+  ],
+  "overlays": [
+    {
+      "id": "o1",
+      "role": "hook",
+      "text": "His tail said WHAT",
+      "start_s": 0,
+      "end_s": 2.5,
+      "placement": "top",
+      "panel_id": null,
+      "fact_refs": []
+    }
+  ],
+  "assets": [],
+  "hero_strings": {
+    "scan-result": "Relaxed tail"
+  },
+  "publishing_note": {
+    "caption": "what his tail said",
+    "bio_ref": null,
+    "music_note": null
+  },
+  "narrators": [],
+  "set": {
+    "nora": "kitchen"
+  },
+  "outfit": {
+    "nora": "apron"
+  },
+  "source": "tests/character-bridge fixture",
+  "approved": {
+    "words": "Yes, lock this plan.",
+    "date": "2026-10-03"
+  },
+  "reaction_refs": [
+    {
+      "id": "r1",
+      "post_id": "7412000000000000001",
+      "platform": "tiktok",
+      "handle": "@somecreator",
+      "post_dir": "apps/catapp/research/posts/7412000000000000001",
+      "video_path": "apps/catapp/research/posts/7412000000000000001/video.mp4",
+      "video_sha256": null,
+      "start_s": 1.0,
+      "end_s": 4.0,
+      "notes_ref": null,
+      "generation_input": null
+    }
+  ]
+}
