@@ -8,7 +8,7 @@ Builds a scratch workspace from template/ (scripts/character, docs/character, th
 link for the caption renderer), a handle with its world, a human character, a mascot and a
 synthetic narrator, a screen library, and synthetic media made locally with ffmpeg, cv2
 and macOS `say`. The "generated" segments are ffmpeg test pictures standing in for
-approved generations. Then, for every fixture plan in fixtures/ (two v1, nine v2):
+approved generations. Then, for every fixture plan in fixtures/ (two v1, ten v2):
 
   - shots.py check, the bridge plan check, shots.py validate and the bridge video check pass;
   - the B prompt passes the lint;
@@ -427,9 +427,9 @@ def reaction(assemble_on):
            cmd="plan", contains="never spoken")
     mutate(v_, "a reaction that talks on camera",
            plan_fn=lambda q: q["beats"][0].update(performance="on_camera"), cmd="plan", contains="a reaction is silent")
-    mutate(v_, "the reference clip as a generation input",
+    mutate(v_, "a generation_input that is not face_replace or none",
            plan_fn=lambda q: q["reaction_refs"][0].update(generation_input=True), cmd="plan",
-           contains="never a generation input")
+           contains="'face_replace' or 'none'")
     mutate(v_, "a reaction with no reference post",
            plan_fn=lambda q: q["beats"][0]["reaction"].update(ref_id="r9"), cmd="plan", contains="not in reaction_refs")
     mutate(v_, "a reaction not found yet (null)", plan_fn=lambda q: q["beats"][0].update(reaction=None),
@@ -494,6 +494,186 @@ def reaction(assemble_on):
     # The legacy full-screen app beat (subject_only) is still read, with a note.
     expect("v2-live-cat: subject_only on a full-screen app beat is read as app_screen",
            [PY, f"{SC}/bridge.py", "plan", "v2-live-cat"], contains="framing app_screen")
+
+
+def reference_clip(path, dur=4.0):
+    """A stand-in for a downloaded reaction post: a face-like shape, a caption burned in
+    across the chest and the creator's handle at the bottom edge, 720x1280."""
+    import cv2, numpy as np
+    w, h, fps = 720, 1280, 30
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".avi"
+    vw = cv2.VideoWriter(tmp, cv2.VideoWriter_fourcc(*"MJPG"), fps, (w, h))
+    for i in range(int(dur * fps)):
+        f = np.full((h, w, 3), (70, 110, 150), np.uint8)
+        cx = 360 + int(20 * np.sin(i / 8))
+        cv2.ellipse(f, (cx, 420), (150, 190), 0, 0, 360, (150, 180, 220), -1)
+        cv2.rectangle(f, (170, 640), (550, 1180), (60, 60, 60), -1)
+        cv2.putText(f, "4 YEARS AT THE GYM", (40, 720), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (255, 255, 255), 4, cv2.LINE_AA)
+        cv2.putText(f, "@somecreator", (230, 1240), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (255, 255, 255), 3, cv2.LINE_AA)
+        vw.write(f)
+    vw.release()
+    ff("-i", tmp, "-c:v", "libx264", "-pix_fmt", "yuv420p", path)
+    os.remove(tmp)
+
+
+FR_PROMPT = """Vertical 9:16 selfie video, the room, light and camera of the input clip.
+REFERENCES
+reference.mp4 is the motion, timing, expression and camera only: keep them frame for frame.
+face.png is her face: identity, hair and signature details. Not its background.
+STRUCTURE
+One shot, no cuts, as long as the clip.
+SUBJECT
+Exactly one person. Replace the face with the face of face.png in every frame. Nothing of the original person's face, hair or identity remains.
+SETTING
+The room of the clip, unchanged.
+SHOT 1 (0.0 to 2.9 s)
+She reacts to the lens as in the clip. End state: she smiles at the lens.
+PERFORMANCE
+She does not speak. No lip sync: her mouth never forms words.
+AUDIO
+No voice, no music.
+CONSISTENCY
+The same face as face.png in every frame.
+NO TEXT
+No captions, no text, no watermark, no logo.
+"""
+
+
+def face_replace(assemble_on):
+    v_ = "v2-face-replace"
+    fx = fixture(v_)
+    ref = fx["reaction_refs"][0]
+    src = p(ref["video_path"])
+    reference_clip(src)
+    ref["video_sha256"] = sha(src)
+    pl = lock(fx)
+    checks(v_)
+    clip_rel = "segments/01-x/source/reference.mp4"
+    masks = [{"rect": [0, 0.9, 1, 0.1], "how": "crop", "text": "@somecreator"},
+             {"rect": [0.02, 0.52, 0.96, 0.07], "how": "blur", "text": "4 YEARS AT THE GYM"}]
+    sh = shot(v_, "01-x", "X", [], pl["beats"][0]["action"])
+    sh["video"].update(duration_seconds=None, trim_to_seconds=2.9,
+                       references=[{"file": clip_rel, "kind": "face_replace_clip", "role": "the motion and timing"},
+                                   {"file": "references/face.png", "kind": "hero", "role": "her face"}])
+    sh["reaction"] = copy.deepcopy(pl["beats"][0]["reaction"])
+    sh["face_replace"] = {"ref_id": "r1", "clip": clip_rel, "range_s": [0.0, 2.9], "masks": masks}
+    shp = p("pipeline", "character", v_, "shots", "01-x.json")
+    wj(shp, sh)
+    video_json(pl, [{"n": 1, "type": "X", "project": f"{v_}.01-x", "beat_ids": ["b1"], "script_lines": []},
+                    {"n": 2, "type": "R", "screen_id": "scan-result", "trim": [1, 6], "beat_ids": ["b2"],
+                     "script_lines": []}])
+    # The input clip: the pinned post, trimmed, masked, read back with no text left.
+    wj(shp, {**sh, "face_replace": {**sh["face_replace"], "masks": masks[:1]}})
+    expect(f"{v_}: shots.py reference refuses a caption left unmasked",
+           [PY, f"{SC}/shots.py", "reference", v_], ok=False, contains="OCR still reads text")
+    wj(shp, sh)
+    expect(f"{v_}: shots.py reference (trimmed, masked, no text)", [PY, f"{SC}/shots.py", "reference", v_])
+    ref_mp4 = p("pipeline", "character", v_, clip_rel)
+    d_ = run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", ref_mp4])[1].strip()
+    ok = abs(float(d_ or 0) - 2.9) < 0.1
+    RESULTS.append((f"{v_}: the reference clip is the planned 2.9 s", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  {v_}: the reference clip is the planned 2.9 s ({d_} s)")
+    validate(v_)
+    sd = p("pipeline", "character", v_, "segments", "01-x")
+    pp = os.path.join(sd, "prompt.txt")
+    open(pp, "w").write(FR_PROMPT)
+    expect(f"{v_}: shots.py refs (the clip and her face)", [PY, f"{SC}/shots.py", "refs", v_])
+    expect(f"{v_}: lint of the face-replace prompt", [PY, f"{SC}/lint_prompt.py", v_, "01-x"])
+    for label, text, why in (
+            ("a prompt that does not replace the face",
+             FR_PROMPT.replace("Replace the face with the face of face.png in every frame. ", ""),
+             "the face replaced"),
+            ("a prompt without 'nothing of the original person'",
+             FR_PROMPT.replace("Nothing of the original person's face, hair or identity remains.", ""),
+             "no trace of the original person"),
+            ("a prompt that names the creator", FR_PROMPT.replace("as in the clip", "as @somecreator does"),
+             "no copy of the reference"),
+            ("a clip not bound to motion and timing",
+             FR_PROMPT.replace("is the motion, timing, expression and camera only: keep them frame for frame",
+                               "is the look of the video"), "bound to motion and timing")):
+        open(pp, "w").write(text)
+        expect(f"{v_}: lint refuses {label}", [PY, f"{SC}/lint_prompt.py", v_, "01-x"], ok=False, contains=why)
+    open(pp, "w").write(FR_PROMPT)
+    # generate.sh stops before any cost: no face-replace model; the raw research file; a
+    # face-replace clip on a segment that is not face replace.
+    vd = p("pipeline", "character", v_)
+    ap = os.path.join(vd, "approval.json")
+    wj(ap, {**(rj(ap) if os.path.exists(ap) else {}),
+            "gate_a_storyboard": {"decision": "approve", "words": "Storyboard is good."}})
+    expect(f"{v_}: generate.sh stops before any cost: no face-replace model",
+           ["bash", f"{SC}/generate.sh", v_, "01-x"], ok=False, contains="video-to-video face-replace model",
+           env={"ALLOW_REFS": "1"})
+    refs = os.path.join(sd, "refs.json")
+    keep_refs = open(refs).read()
+    wj(refs, {"references": [{"kind": "face_replace_clip", "file": ref["video_path"]},
+                             {"kind": "hero", "file": "apps/catapp/handles/nora/references/face.png"}]})
+    expect(f"{v_}: generate.sh refuses the raw research file as the clip",
+           ["bash", f"{SC}/generate.sh", v_, "01-x"], ok=False, contains="Research footage is never an input",
+           env={"ALLOW_REFS": "1"})
+    open(refs, "w").write(keep_refs)
+    wsd = p("pipeline", "character", "v2-reaction", "segments", "01-x")
+    wrefs = os.path.join(wsd, "refs.json")
+    keep_w = open(wrefs).read()
+    wj(wrefs, {"references": [{"kind": "face_replace_clip", "file": f"pipeline/character/{v_}/{clip_rel}"}]})
+    expect("v2-reaction: generate.sh refuses a clip on the written route",
+           ["bash", f"{SC}/generate.sh", "v2-reaction", "01-x"], ok=False, contains="is a face-replace clip",
+           env={"ALLOW_REFS": "1"})
+    open(wrefs, "w").write(keep_w)
+    # Gate B: the face, no trace of the creator, silent, the clip's length, no text.
+    gen = os.path.join(sd, "generated", "01-x-take1.mp4")
+    os.makedirs(os.path.dirname(gen), exist_ok=True)
+    ff("-i", ref_mp4, "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-shortest", "-c:v", "libx264",
+       "-pix_fmt", "yuv420p", "-c:a", "aac", gen)
+    rv = [PY, f"{SC}/review.py", "segment", v_, "01-x", "--decision", "approve", "--file",
+          "generated/01-x-take1.mp4", "--words", "Keep it."]
+    ok_checks = ["--check", "identity=pass", "--check", "no_source_identity=pass", "--check", "silent=pass"]
+    expect(f"{v_}: gate B refuses a face replace without the no-trace check",
+           rv + ["--check", "identity=pass", "--check", "silent=pass"], ok=False, contains="no_source_identity")
+    dirty = os.path.join(sd, "generated", "01-x-dirty.mp4")
+    ff("-ss", "0", "-to", "2.9", "-i", src, "-c:v", "libx264", "-pix_fmt", "yuv420p", dirty)
+    expect(f"{v_}: gate B refuses a file with the creator's caption and handle",
+           rv[:8] + ["generated/01-x-dirty.mp4"] + rv[9:] + ok_checks, ok=False, contains="OCR reads text")
+    os.remove(dirty)
+    long_ = os.path.join(sd, "generated", "01-x-long.mp4")
+    clip(long_, 5, "smptebars", 120, size="720x1280")
+    expect(f"{v_}: gate B refuses a file longer than the clip",
+           rv[:8] + ["generated/01-x-long.mp4"] + rv[9:] + ok_checks, ok=False, contains="length gate")
+    os.remove(long_)
+    expect(f"{v_}: gate B approves the face replace with its checks", rv + ok_checks)
+    assemble(v_, assemble_on)
+    # The plan and the shot.
+    mutate(v_, "a face-replace beat that is not the clip's length",
+           plan_fn=lambda q: q["reaction_refs"][0].update(end_s=3.5), cmd="plan", contains="lasts its clip's range")
+    mutate(v_, "a set on a face-replace beat", plan_fn=lambda q: q["beats"][0].update(set_id="kitchen"),
+           cmd="plan", contains="has no set_id")
+    mutate(v_, "a face-replace clip with no checksum",
+           plan_fn=lambda q: q["reaction_refs"][0].update(video_sha256=None), cmd="plan", contains="video_sha256")
+    keep_src = open(src, "rb").read()
+    open(src, "ab").write(b"\0")
+    expect(f"{v_}: refuses a reference post changed after the lock", [PY, f"{SC}/shots.py", "check", v_],
+           ok=False, contains="does not match its video_sha256")
+    open(src, "wb").write(keep_src)
+    mutate(v_, "burned-in text with no mask",
+           video_fn=lambda v: wj(shp, {**sh, "face_replace": {**sh["face_replace"], "masks": []}}),
+           contains="masks it before generation")
+    mutate(v_, "a shot range that is not the reference range",
+           video_fn=lambda v: wj(shp, {**sh, "face_replace": {**sh["face_replace"], "range_s": [0.5, 3.4]}}),
+           contains="face_replace.range_s")
+    mutate(v_, "a crop mask in the middle of the frame",
+           video_fn=lambda v: wj(shp, {**sh, "face_replace": {**sh["face_replace"], "masks": [
+               {"rect": [0.02, 0.52, 0.96, 0.07], "how": "crop", "text": "x"}]}}), contains="lies at an edge")
+    mutate(v_, "a face replace without the character's face",
+           video_fn=lambda v: wj(shp, {**sh, "video": {**sh["video"], "references": sh["video"]["references"][:1]}}),
+           contains="character's approved face")
+    mutate(v_, "a face-replace length that is not the clip's",
+           video_fn=lambda v: wj(shp, {**sh, "video": {**sh["video"], "trim_to_seconds": 3}}),
+           contains="its clip's 2.9 s")
+    mutate(v_, "a clip on the written route (generation_input none)",
+           plan_fn=lambda q: q["reaction_refs"][0].update(generation_input="none"), contains="written performance route")
+    mutate(v_, "a clip on a segment that is not face replace",
+           plan_fn=lambda q: q["reaction_refs"][0].update(generation_input="none"),
+           contains="only an X segment in face-replace mode")
 
 
 # ---------------------------------------------------------------- per fixture
@@ -891,6 +1071,8 @@ def main():
 
     # ---- v2: a silent reaction hook (X), then the real app full frame (app_screen, R)
     reaction(assemble_on)
+    # ---- v2: the same hook in face-replace mode: the reference clip, trimmed and masked
+    face_replace(assemble_on)
 
     print()
     bad = [l for l, ok in RESULTS if not ok]
