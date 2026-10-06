@@ -42,6 +42,20 @@
   position: absolute; inset: 0; display: grid; place-items: center;
   font: italic 400 1rem var(--serif); color: var(--ink-3);
 }
+.niche-video { position: relative; display: block; aspect-ratio: 3 / 4; background: #171612; }
+.niche-video img, .niche-video video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.post__videobox.niche-video { aspect-ratio: auto; min-height: 320px; border-radius: 3px; overflow: hidden; }
+.post__videobox.niche-video video { height: auto; max-height: 80vh; background: #171612; }
+.post__videobox.niche-video img { height: auto; }
+.niche-video__play {
+  position: absolute; inset: 0; display: grid; place-items: center; border: 0; cursor: pointer;
+  background: rgba(20, 18, 14, 0.18); color: #fff; font-size: 1.2rem; transition: background 120ms ease;
+}
+.niche-video__play:hover, .niche-video__play:focus-visible { background: rgba(20, 18, 14, 0.38); }
+.niche-video__play span {
+  display: grid; place-items: center; width: 48px; height: 48px; padding-left: 4px; border-radius: 50%;
+  background: rgba(20, 18, 14, 0.62); box-shadow: 0 1px 10px rgba(0, 0, 0, 0.3);
+}
 .niche-tile__badge {
   position: absolute; left: 8px; top: 8px; padding: 2px 7px; border-radius: 3px;
   background: var(--slab); color: var(--slab-ink); font: 500 0.7rem var(--mono);

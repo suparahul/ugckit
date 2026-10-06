@@ -40,6 +40,8 @@ export type NichePost = {
   url: string;
   /** A batch post (window BATCH_<date>): its video or slides are on disk, or it is metadata only. */
   held?: "video" | "slides" | "metadata";
+  /** A held batch video: its video.mp4 as a /media URL. */
+  video?: string;
   /** A batch video's length in seconds. */
   durationS?: number | null;
 };
@@ -201,6 +203,8 @@ export type NicheDetail = {
   cover: string | null;
   /** The slides on disk (a post from your scroll), as /media URLs. */
   slides: string[];
+  /** The downloaded video as a /media URL, or null: it is not on disk. */
+  video: string | null;
   sound: string | null;
   /** Where the search found it: keyword and window, one per row. */
   found: { keyword: string; window: string }[];
@@ -223,18 +227,30 @@ export function nicheDetailOf(posts: NichePost[], platform: Platform, id: string
     views: best.views, likes: best.likes, comments: best.comments, shares: best.shares, saves: best.saves,
     caption: best.caption, hashtags: hashtagsOf(best.caption),
     cover: rows.find((r) => r.coverLocal)?.cover ?? null,
-    slides: [], sound: null, found,
+    slides: [], video: rows.find((r) => r.video)?.video ?? null, sound: null, found,
   };
 }
 
+/** What a post folder holds for viewing: its slide images, its video.mp4, and the cover (a video's poster), as URLs under `base`. */
+export function batchMediaOf(files: string[], base: string): { slides: string[]; video: string | null; cover: string | null } {
+  const at = (f: string) => `${base}/${f}`;
+  const slides = files.filter((f) => /^slide-\d+\.(jpe?g|png|webp)$/i.test(f)).sort();
+  return { slides: slides.map(at), video: files.includes("video.mp4") ? at("video.mp4") : null, cover: files.includes("cover.jpg") ? at("cover.jpg") : null };
+}
+
+/** The content of a post is on disk for viewing: a slideshow's slide images, or a video's video.mp4. */
+export function isViewable(p: { kind: "slideshow" | "video"; slides?: string[]; video?: string | null; held?: "video" | "slides" | "metadata" }): boolean {
+  return p.kind === "video" ? !!p.video : p.held ? p.held === "slides" : !!p.slides?.length;
+}
+
 /** The detail of a post from your own scroll (a read batch; TikTok): the slides, or a video's cover, are on disk. */
-export function scrollDetailOf(p: { id: string; handle: string; url: string; date: string | null; views: number; likes: number; comments: number; shares: number; saves: number; slideCount: number; caption: string; sound: string | null; slides: string[]; kind?: "slideshow" | "video" }): NicheDetail {
+export function scrollDetailOf(p: { id: string; handle: string; url: string; date: string | null; views: number; likes: number; comments: number; shares: number; saves: number; slideCount: number; caption: string; sound: string | null; slides: string[]; video?: string | null; kind?: "slideshow" | "video" }): NicheDetail {
   const video = p.kind === "video";
   return {
     platform: "tiktok", id: p.id, src: "scroll", handle: p.handle, url: p.url, date: p.date ?? "",
     mediaType: video ? "video" : "slideshow", slideCount: video ? null : p.slideCount || p.slides.length || null,
     views: p.views, likes: p.likes, comments: p.comments, shares: p.shares, saves: p.saves,
-    caption: p.caption, hashtags: hashtagsOf(p.caption), cover: p.slides[0] ?? null, slides: p.slides, sound: p.sound,
+    caption: p.caption, hashtags: hashtagsOf(p.caption), cover: p.slides[0] ?? null, slides: p.slides, video: video ? p.video ?? null : null, sound: p.sound,
     found: [{ keyword: "", window: "SCROLL" }],
   };
 }

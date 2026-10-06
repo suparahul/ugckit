@@ -19,13 +19,14 @@ import { day7Rows, readAccountTable, readFindings, readPostTable, readValues, ty
 import { listHandles } from "@/lib/handles";
 import { getNiche, listBatches, type BatchPost, type NichePost } from "@/lib/niche";
 import { markWins, overFloor, WIN_VIEWS, type Rated } from "@/lib/niche-win";
-import { nichePostHref, windowLabel } from "@/lib/niche-posts";
+import { isViewable, nichePostHref, windowLabel } from "@/lib/niche-posts";
 import { PLATFORM_NAME, profileUrl, type Platform } from "@/lib/platform";
 import { clip } from "@/lib/text";
 import { dmy, n, pct, Room, Section } from "@/components/factory/Bits";
 import { Anat } from "@/components/factory/Anat";
 import { BatchShow } from "@/components/factory/Cards";
 import { NicheFilters, type Pick } from "@/components/factory/NicheFilters";
+import { NicheVideo } from "@/components/factory/NicheVideo";
 import { PlatformIcon, PlatformSwitch, viewOf } from "@/components/Platform";
 import { StateBand } from "@/components/factory/StateBand";
 
@@ -47,6 +48,10 @@ type Tile = Rated & {
   cover: string | null; caption: string; url: string;
   /** A batch post: its video or slides on disk, or metadata only. */
   held?: "video" | "slides" | "metadata";
+  /** The downloaded video.mp4 as a /media URL: the tile plays it. */
+  video?: string | null;
+  /** The slides or the video are on disk for viewing. */
+  viewable: boolean;
 };
 
 const PAGE = 24;
@@ -65,12 +70,12 @@ function tilesOf(posts: NichePost[], scrolled: BatchPost[]): Tile[] {
     const batch = p.window.startsWith("BATCH_");
     if (seen.has(`${platform}:${p.id}`) || (batch && fromScroll.has(p.id))) continue;
     seen.add(`${platform}:${p.id}`);
-    out.push({ id: p.id, platform, src: batch ? "batch" : "search", held: p.held, kind: p.mediaType, kw: p.keyword, win: p.window, date: p.date, handle: p.handle, views: p.views, likes: p.likes, comments: p.comments, saves: p.saves, shares: p.shares, shrate: p.views && p.shares ? p.shares / p.views : 0, slides: p.slideCount, cover: p.coverLocal ? p.cover : null, caption: p.caption, url: p.url, win_: false, strength: null });
+    out.push({ id: p.id, platform, src: batch ? "batch" : "search", held: p.held, video: p.video ?? null, viewable: isViewable({ kind: p.mediaType, held: p.held, video: p.video }), kind: p.mediaType, kw: p.keyword, win: p.window, date: p.date, handle: p.handle, views: p.views, likes: p.likes, comments: p.comments, saves: p.saves, shares: p.shares, shrate: p.views && p.shares ? p.shares / p.views : 0, slides: p.slideCount, cover: p.coverLocal ? p.cover : null, caption: p.caption, url: p.url, win_: false, strength: null });
   }
   for (const p of scrolled) {
     if (seen.has(`tiktok:${p.id}`) || !p.views) continue;
     seen.add(`tiktok:${p.id}`);
-    out.push({ id: p.id, platform: "tiktok", src: "scroll", kind: p.kind, kw: "", win: "SCROLL", date: p.date ?? "", handle: p.handle, views: p.views, likes: p.likes, comments: p.comments, saves: p.saves, shares: p.shares, shrate: p.shares / p.views, slides: p.slideCount || null, cover: p.slides[0] ?? null, caption: p.caption, url: p.url, win_: false, strength: null });
+    out.push({ id: p.id, platform: "tiktok", src: "scroll", kind: p.kind, kw: "", win: "SCROLL", date: p.date ?? "", handle: p.handle, views: p.views, likes: p.likes, comments: p.comments, saves: p.saves, shares: p.shares, shrate: p.shares / p.views, slides: p.slideCount || null, cover: p.slides[0] ?? null, video: p.video, viewable: isViewable({ kind: p.kind, slides: p.slides, video: p.video }), caption: p.caption, url: p.url, win_: false, strength: null });
   }
   return out;
 }
@@ -92,11 +97,18 @@ function TileCard({ t, mixed, slug }: { t: Tile; mixed: boolean; slug: string })
   const badge = t.kind === "video" ? (t.platform === "instagram" ? "reel" : "video") : t.platform === "instagram" && t.slides === 1 ? "photo" : t.slides ? `${t.slides} slides` : "slideshow";
   return (
     <li className={`niche-tile niche-tile--${t.kind}${t.win_ ? " is-win" : ""}`}>
+{t.kind === "video" && t.video ? (
+        <NicheVideo className="niche-tile__cover niche-video" src={t.video} poster={t.cover} label={`@${t.handle}`}>
+          <span className="niche-tile__badge">{badge}</span>
+        {t.src === "scroll" ? <span className="niche-tile__src">your scroll</span> : t.src === "batch" ? <span className="niche-tile__src">{t.held === "metadata" ? "metadata only" : `${t.held} on disk`}</span> : null}
+        </NicheVideo>
+      ) : (
       <Link className="niche-tile__cover" href={nichePostHref(slug, t.platform, t.id)} aria-label={`@${t.handle} on ${PLATFORM_NAME[t.platform]}: the post in detail`}>
         {t.cover ? <img src={t.cover} alt="" loading="lazy" /> : <span className="niche-tile__nocover">{t.kind}<small>cover not held on disk</small></span>}
         <span className="niche-tile__badge">{badge}</span>
         {t.src === "scroll" ? <span className="niche-tile__src">your scroll</span> : t.src === "batch" ? <span className="niche-tile__src">{t.held === "metadata" ? "metadata only" : `${t.held} on disk`}</span> : null}
       </Link>
+      )}
       <div className="niche-tile__body">
         <div className="niche-tile__head"><a href={profileUrl(t.platform, t.handle)} {...ext}>{mixed ? <PlatformIcon p={t.platform} /> : null}@{t.handle}</a>{t.views !== null ? <strong>{n(t.views)}<small>views</small></strong> : <strong className="is-none">—<small>no views reported</small></strong>}</div>
         <Nums t={t} />
@@ -144,7 +156,7 @@ export default async function NichePage({ params, searchParams }: { params: Prom
   const niche = getNiche(slug);
   const batches = listBatches(slug);
   const read = batches.filter((b) => b.read);
-  const scrolled = read.flatMap((b) => b.posts.filter((p) => p.slides.length));
+  const scrolled = read.flatMap((b) => b.posts.filter((p) => p.slides.length || p.video));
   const findings = readFindings(slug);
   const postTable = readPostTable(slug);
   const values = readValues(slug);
@@ -177,7 +189,7 @@ export default async function NichePage({ params, searchParams }: { params: Prom
   const q = {
     platform: view === "both" ? "" : view,
     src: one("src"), kind: one("kind", "slideshow"), kw: one("kw"), win: one("win"), min: one("min", String(WIN_VIEWS)),
-    recent: one("recent"), winners: one("winners"), sort: one("sort", "rate"),
+    recent: one("recent"), winners: one("winners"), held: one("held"), sort: one("sort", "rate"),
   };
   const tiles = tilesOf(niche?.posts ?? [], scrolled);
   const rule = markWins(tiles);
@@ -193,7 +205,8 @@ export default async function NichePage({ params, searchParams }: { params: Prom
     (!q.win || t.win === q.win) &&
     overFloor(t, min, rule) &&
     (q.recent !== "1" || t.date >= since) &&
-    (q.winners !== "1" || t.win_),
+    (q.winners !== "1" || t.win_) &&
+    (q.held !== "1" || t.viewable),
   );
   /* "rate" is the rate against the post's own bar: saves per view over the TikTok median, likes over the Instagram one; within one platform it orders as the rate itself. Posts with no measure go last. */
   const key: Record<string, (t: Tile) => number | string> = { rate: (t) => t.strength ?? -1, views: (t) => t.views ?? -1, saves: (t) => t.saves ?? -1, likes: (t) => t.likes ?? -1, shrate: (t) => t.shrate, date: (t) => t.date };
@@ -270,7 +283,7 @@ export default async function NichePage({ params, searchParams }: { params: Prom
         {tiles.length ? (
           <>
             {onIg ? <PlatformSwitch href={hrefWith({ ...q, platform: "" })} view={view} counts={{ both: tiles.length, tiktok: tiles.filter((t) => t.platform === "tiktok").length, instagram: tiles.filter((t) => t.platform === "instagram").length }} /> : null}
-            <NicheFilters picks={picks} checks={[{ key: "recent", label: "last 90 days" }, { key: "winners", label: "winners only" }]} values={q} sort={sortPick} />
+            <NicheFilters picks={picks} checks={[{ key: "recent", label: "last 90 days" }, { key: "winners", label: "winners only" }, { key: "held", label: "downloaded only" }]} values={q} sort={sortPick} />
             <p className="state hx__count" aria-live="polite"><b>{n(match.length)}</b> match · <b>{n(winsIn)}</b> win · showing <b>{n(shown)}</b>{match.length > shown ? <> · then {PAGE} more each time</> : null}</p>
             {match.length ? <ul className="niche-grid">{match.slice(0, shown).map((t) => <TileCard key={`${t.platform}:${t.id}`} t={t} mixed={onIg} slug={slug} />)}</ul> : <p className="niche-empty">No post matches these filters. Lower the views floor or widen the window.</p>}
             {match.length > shown ? <p style={{ marginTop: 14 }}><Link className="read__again" href={moreHref()} scroll={false}>Show {Math.min(PAGE, match.length - shown)} more</Link></p> : null}

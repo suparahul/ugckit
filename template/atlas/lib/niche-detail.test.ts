@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { batchKindOf, batchSlideCount, hashtagsOf, nicheDetailOf, nichePostHref, scrollDetailOf, type NichePost } from "./niche-posts.ts";
+import { batchKindOf, batchMediaOf, batchSlideCount, hashtagsOf, isViewable, nicheDetailOf, nichePostHref, scrollDetailOf, type NichePost } from "./niche-posts.ts";
 
 const row = (o: Partial<NichePost>): NichePost => ({
   id: "1", keyword: "cattips", window: "PHOTO_TAB", handle: "h", mediaType: "slideshow", slideCount: 4,
@@ -80,4 +80,36 @@ test("batchKindOf and batchSlideCount: the Kind cell first, then the Slides / le
   assert.equal(batchSlideCount("12", "slideshow"), 12);
   assert.equal(batchSlideCount("45 s", "video"), 0);
   assert.equal(batchSlideCount("", "slideshow"), 0);
+});
+
+const B = "/media/apps/catwise/niche/batches/2026-10-01/mishmish.honey/7666141879120956685";
+
+test("batchMediaOf: a video folder gives the video and the cover; a slideshow folder gives its slides in order", () => {
+  const v = batchMediaOf(["cover.jpg", "video.mp4", "meta.json"], B);
+  assert.equal(v.video, `${B}/video.mp4`);
+  assert.equal(v.cover, `${B}/cover.jpg`);
+  assert.deepEqual(v.slides, []);
+  const s = batchMediaOf(["slide-02.jpg", "slide-01.jpg", "notes.txt"], B);
+  assert.deepEqual(s.slides, [`${B}/slide-01.jpg`, `${B}/slide-02.jpg`]);
+  assert.equal(s.video, null);
+  assert.deepEqual(batchMediaOf([], B), { slides: [], video: null, cover: null });
+});
+
+test("isViewable: a video needs its video.mp4; a slideshow needs its slides on disk (a cover alone is not enough)", () => {
+  assert.equal(isViewable({ kind: "video", video: `${B}/video.mp4` }), true);
+  assert.equal(isViewable({ kind: "video", video: null, slides: [`${B}/cover.jpg`] }), false);
+  assert.equal(isViewable({ kind: "video", held: "metadata" }), false);
+  assert.equal(isViewable({ kind: "slideshow", slides: [`${B}/slide-01.jpg`] }), true);
+  assert.equal(isViewable({ kind: "slideshow", slides: [] }), false);
+  assert.equal(isViewable({ kind: "slideshow", held: "slides" }), true);
+  assert.equal(isViewable({ kind: "slideshow", held: "metadata" }), false);
+});
+
+test("nicheDetailOf and scrollDetailOf: the video URL goes through to the detail", () => {
+  assert.equal(nicheDetailOf([row({ mediaType: "video", held: "video", video: `${B}/video.mp4` })], "tiktok", "1")!.video, `${B}/video.mp4`);
+  assert.equal(nicheDetailOf([row({})], "tiktok", "1")!.video, null);
+  const p = { id: "9", handle: "h", url: "u", date: null, views: 10, likes: 1, comments: 0, shares: 0, saves: 2, slideCount: 0, caption: "", sound: null, slides: [`${B}/cover.jpg`] };
+  assert.equal(scrollDetailOf({ ...p, video: `${B}/video.mp4`, kind: "video" }).video, `${B}/video.mp4`);
+  assert.equal(scrollDetailOf({ ...p, kind: "video" }).video, null);
+  assert.equal(scrollDetailOf({ ...p, slides: [`${B}/slide-01.jpg`], kind: "slideshow" }).video, null);
 });

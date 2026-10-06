@@ -19,6 +19,7 @@ import { getNicheDetail } from "@/lib/niche";
 import { nichePostHref, windowLabel, type NicheDetail } from "@/lib/niche-posts";
 import { isPlatform, PLATFORM_NAME, profileUrl } from "@/lib/platform";
 import { Cover, StatRow, StealThis, TikTokLink } from "@/components/Bits";
+import { NicheVideo } from "@/components/factory/NicheVideo";
 import { PlatformIcon } from "@/components/Platform";
 import "@/app/post/[id]/post.css";
 
@@ -75,7 +76,9 @@ export default async function NichePostPage({ params }: { params: Params }) {
 
       <div className="post__body">
         <div className="post__asset">
-          {p.slides.length ? (
+          {p.video ? (
+            <NicheVideo className="post__videobox niche-video" src={p.video} poster={p.cover} label={`@${p.handle}`} />
+          ) : p.slides.length ? (
             <ul className="post__slides">
               {p.slides.map((src, i) => (
                 <li key={src}>

@@ -31,7 +31,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFile
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { generalItems, generalPost, igItems, igPost, lenientJson } from "../lib/niche-posts.ts";
+import { batchMediaOf, generalItems, generalPost, igItems, igPost, lenientJson } from "../lib/niche-posts.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ATLAS = resolve(HERE, "..");
@@ -158,8 +158,10 @@ function build(slug) {
       const pdir = join(bdir, handle, String(r.id));
       const held = existsSync(join(pdir, "video.mp4")) ? "video" : existsSync(join(pdir, "slide-01.jpg")) ? "slides" : "metadata";
       const views = Number(r.views ?? 0), saves = Number(r.bookmarks ?? 0);
-      const local = coverUrl(r.id);
-      batchPosts.push({ id: r.id, keyword: "batch", window: `BATCH_${date}`, handle, mediaType: slideshow ? "slideshow" : "video", slideCount: slideshow ? images.length : null, views, likes: Number(r.likes ?? 0), comments: Number(r.comments ?? 0), saves, shares: Number(r.shares ?? 0), saveRate: views > 0 ? saves / views : 0, date: (r.uploadedAtFormatted ?? "").slice(0, 10), caption: (r.title ?? "").replace(/\s+/g, " ").trim(), cover: local ?? (slideshow ? images[0]?.url : r.video?.cover) ?? null, coverLocal: !!local, url: r.postPage ?? `https://www.tiktok.com/@${handle}/${slideshow ? "photo" : "video"}/${r.id}`, held, durationS: slideshow ? null : Number(r.video?.duration ?? 0) || null });
+      const media = existsSync(pdir) ? batchMediaOf(readdirSync(pdir), `/media/apps/${slug}/niche/batches/${date}/${encodeURIComponent(handle)}/${r.id}`) : null;
+      /* The cover: the one the searches saved, else a video's cover.jpg in its own folder. */
+      const local = coverUrl(r.id) ?? (!slideshow ? media?.cover ?? null : null);
+      batchPosts.push({ id: r.id, keyword: "batch", window: `BATCH_${date}`, handle, mediaType: slideshow ? "slideshow" : "video", slideCount: slideshow ? images.length : null, views, likes: Number(r.likes ?? 0), comments: Number(r.comments ?? 0), saves, shares: Number(r.shares ?? 0), saveRate: views > 0 ? saves / views : 0, date: (r.uploadedAtFormatted ?? "").slice(0, 10), caption: (r.title ?? "").replace(/\s+/g, " ").trim(), cover: local ?? (slideshow ? images[0]?.url : r.video?.cover) ?? null, coverLocal: !!local, url: r.postPage ?? `https://www.tiktok.com/@${handle}/${slideshow ? "photo" : "video"}/${r.id}`, held, ...(media?.video ? { video: media.video } : {}), durationS: slideshow ? null : Number(r.video?.duration ?? 0) || null });
     }
   }
   posts.unshift(...batchPosts);
