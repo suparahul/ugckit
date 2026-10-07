@@ -868,22 +868,15 @@ export function addDays(iso: string, n: number): string {
   return isoOf(dt);
 }
 
-/** Monday of the week containing iso. */
 /**
- * The seven-day window a date belongs to. Inside the plan's range the week is
- * the plan's own (day 1 to day 7, whatever weekday it starts on); outside it,
- * the calendar week from Monday.
+ * The week a date belongs to, always the calendar week from Monday. A plan that
+ * starts mid-week has a short first week; its empty days show as empty.
  */
-export function weekStartOf(slug: string, iso: string): string {
-  const range = getProduction(slug).plan.range;
-  if (range && iso >= range.from) {
-    const days = Math.floor((Date.parse(iso + "T00:00:00Z") - Date.parse(range.from + "T00:00:00Z")) / 86400000);
-    const start = addDays(range.from, Math.floor(days / 7) * 7);
-    if (start <= range.to) return start;
-  }
+export function weekStartOf(_slug: string, iso: string): string {
   return mondayOf(iso);
 }
 
+/** Monday of the week containing iso. */
 export function mondayOf(iso: string): string {
   const { dt } = dateParts(iso);
   const day = (dt.getUTCDay() + 6) % 7;

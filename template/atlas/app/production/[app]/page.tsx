@@ -20,7 +20,7 @@ import { getApp } from "@/lib/apps";
 import { canvasOf } from "@/lib/canvas";
 import { listHandles } from "@/lib/handles";
 import { withStatusWords } from "@/lib/postbridge-flow";
-import { addDays, allStates, dateParts, dayTasks, getProduction, today, validSlug, weekStartOf, type PostState } from "@/lib/production";
+import { addDays, allStates, dateParts, dayTasks, getProduction, mondayOf, today, validSlug, weekStartOf, type PostState } from "@/lib/production";
 import { dayViews, readOf, weekDays } from "@/lib/read";
 import { SLOTS, SLOT_TIME, slotTimes } from "@/lib/slots";
 
@@ -125,7 +125,7 @@ export default async function Studio({ params, searchParams }: { params: Promise
 
   const p = dateParts(date);
   const range = prod.plan.range;
-  const planWeek = range && monday >= range.from && monday <= range.to ? Math.floor((Date.parse(monday + "T00:00:00Z") - Date.parse(range.from + "T00:00:00Z")) / (7 * 86400000)) + 1 : null;
+  const planWeek = range && addDays(monday, 6) >= range.from && monday <= range.to ? Math.round((Date.parse(monday + "T00:00:00Z") - Date.parse(mondayOf(range.from) + "T00:00:00Z")) / (7 * 86400000)) + 1 : null;
   const period =
     zoom === "month" ? `${p.month} ${p.y}` : zoom === "week" ? `${planWeek ? `Week ${planWeek} · ` : ""}${dateParts(monday).weekday.slice(0, 3)} ${dateParts(monday).d} – ${dateParts(addDays(monday, 6)).weekday.slice(0, 3)} ${dateParts(addDays(monday, 6)).d} ${dateParts(addDays(monday, 6)).month}` : `${p.weekday} ${p.d} ${p.month}`;
 

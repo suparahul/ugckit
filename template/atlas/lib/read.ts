@@ -107,13 +107,13 @@ export function readSentence(r: Read): string {
   return `${src}${when}${partial}`;
 }
 
-/** The seven days of the plan week a date falls in. */
+/** The seven days of the calendar week a date falls in, Monday to Sunday. */
 export function weekDays(slug: string, iso: string): string[] {
   const start = weekStartOf(slug, iso);
   return Array.from({ length: 7 }, (_, i) => addDays(start, i));
 }
 
-/** The seven days of the calendar week a date falls in, Monday to Sunday. The numbers card uses this, not the plan week. */
+/** The seven days of the calendar week a date falls in, Monday to Sunday. */
 export function calendarWeek(iso: string): string[] {
   const start = mondayOf(iso);
   return Array.from({ length: 7 }, (_, i) => addDays(start, i));
