@@ -17,9 +17,40 @@
 import type { CardState, Dimension, Layout, LayoutCard, Slide, SlideState } from "@/lib/production";
 import type { CSSProperties } from "react";
 import { BIG_FROM, FONT_SIZE_BY, frameOf } from "@/lib/layout";
+import { cardKind, isScreenBlock, phoneLabel, phoneOf, shownCards, type PhoneSlot } from "@/lib/callout";
 import { CrossIcon, LockIcon } from "./Marks";
 
 const fileUrl = (rel: string) => `/api/production/file/${rel.split("/").map(encodeURIComponent).join("/")}`;
+
+/**
+ * The phone callout of a slide (lib/callout.ts), drawn empty before the picture exists. Style E: the
+ * phone stands at the left from the deck's top to its bottom, the side column takes the rest of the
+ * width, from the phone's right edge. Style N: the phone stands where the deck puts it in the picture (a hand holds it).
+ */
+const SIDE_GAP = 3.3;
+
+function PhoneCallout({ slot, held, alt }: { slot: PhoneSlot; held: string | null; alt: string }) {
+  const left = slot.left + slot.width + SIDE_GAP;
+  return (
+    <>
+      <div className={`frame__phone${held ? "" : " is-empty"}${slot.cut ? " is-cut" : ""}${slot.kind === "N" ? " is-hand" : ""}`} style={{ left: `${slot.left}%`, top: `${slot.top}%`, height: `${slot.height}%`, width: `${slot.width}%` }}>
+        {held ? <img src={fileUrl(held)} alt={alt} /> : <span>{phoneLabel(slot)}</span>}
+      </div>
+      {slot.side ? (
+        <div className="frame__side" style={{ left: `${left}%`, right: "3.7%", top: `${slot.top}%`, height: `${slot.height}%` }}>
+          {slot.side === "icon" ? (
+            <>
+              <div className="frame__sideicon is-empty" aria-hidden="true">app icon</div>
+              {slot.line ? <p className="frame__t frame__sideline">{slot.line}</p> : null}
+            </>
+          ) : (
+            <div className="frame__sidecard is-empty">App Store card, upright</div>
+          )}
+        </div>
+      ) : null}
+    </>
+  );
+}
 
 /**
  * The frame's shape and safe area as CSS variables, from lib/layout.ts
@@ -42,7 +73,7 @@ export function frameStyle(dimension: Dimension = "3:4") {
 
 function Stacks({ slide, sketch }: { slide: Slide; sketch?: boolean }) {
   const groups: Record<"top" | "middle" | "bottom", Slide["blocks"]> = { top: [], middle: [], bottom: [] };
-  for (const b of slide.blocks) groups[b.place === "flow" ? "top" : b.place].push(b);
+  for (const b of slide.blocks) if (!isScreenBlock(b.label)) groups[b.place === "flow" ? "top" : b.place].push(b);
   const isLeft = (t: string) => /^[•\-–]/m.test(t) || /\n[•\-–]/.test(t);
   return (
     <>
@@ -89,15 +120,19 @@ function FreeBlocks({ layout }: { layout: Layout }) {
 }
 
 export function Sketch({ slide, total, dimension = "3:4" }: { slide: Slide; total?: number; dimension?: Dimension }) {
-  const hasCards = slide.cards.length > 0;
+  const phone = phoneOf(slide, dimension);
+  /* A phone in a hand never shows the App Store card (lib/callout.ts shownCards). */
+  const shown = shownCards(slide, dimension);
+  const hasCards = shown.length > 0;
   return (
     <div className={`frame is-sketch${hasCards ? " has-cards" : ""}`} style={frameStyle(dimension)} aria-label={`Sketch of slide ${slide.n}: text placement only`} role="img">
       <Stacks slide={slide} sketch />
       {total ? <span className="frame__no tabular" aria-hidden="true">{slide.n} / {total}</span> : null}
+      {phone ? <PhoneCallout slot={phone} held={null} alt="" /> : null}
       {hasCards ? (
         <div className="frame__cards" aria-hidden="true">
-          {slide.cards.map((_, i) => (
-            <div key={i} className="frame__card is-empty">{i === 0 ? "product callout · App Store image" : "product callout · in-app image"}</div>
+          {shown.map((c) => (
+            <div key={c.index} className="frame__card is-empty">{`product callout · ${cardKind(c.item)}`}</div>
           ))}
         </div>
       ) : null}
@@ -125,7 +160,12 @@ export function Replica({
   /** The post's slide dimension: the frame's shape and its safe area. */
   dimension?: Dimension;
 }) {
-  const hasCards = slide.cards.length > 0;
+  const phone = phoneOf(slide, dimension);
+  /* A phone in a hand never shows the App Store card (lib/callout.ts shownCards). */
+  const shown = shownCards(slide, dimension);
+  const hasCards = shown.length > 0;
+  /* The locked card is the first card file; it is drawn only when that card is shown. */
+  const firstShown = shown[0]?.index === 1;
   const cls = ["frame"];
   if (text === "ghost") cls.push("is-ghost");
   if (text === "off") cls.push("is-textless");
@@ -141,22 +181,24 @@ export function Replica({
       )}
       {layout ? <FreeBlocks layout={layout} /> : <Stacks slide={slide} />}
       {layout ? <span className="frame__lock" role="img" aria-label="saved layout" title="saved layout"><LockIcon /></span> : null}
-      {hasCards && layout?.card && (state.cardFile ?? cards.find((k) => k.index === 1)?.file) ? (
+      {/* The slide's picture holds the phone once it exists; the slot shows only before. */}
+      {phone && !state.current ? <PhoneCallout slot={phone} held={null} alt="" /> : null}
+      {hasCards && firstShown && layout?.card && (state.cardFile ?? cards.find((k) => k.index === 1)?.file) ? (
         /* The card where Rahul locked it, with the post's own strings when the layout carries them. */
         <div className="frame__card is-free" data-card="" style={freeCardStyle(layout.card)}>
           <img src={fileUrl(state.cardFile ?? cards.find((k) => k.index === 1)!.file!)} alt={`Product callout image 1: ${slide.cards[0]}${state.cardFile ? " (this post's own words)" : ""}`} />
         </div>
       ) : hasCards ? (
         <div className="frame__cards">
-          {slide.cards.map((c, i) => {
-            const held = cards.find((k) => k.index === i + 1)?.file ?? null;
+          {shown.map(({ item: c, index }) => {
+            const held = cards.find((k) => k.index === index)?.file ?? null;
             return held ? (
-              <div key={i} className="frame__card" data-card={i === 0 ? "" : undefined}>
-                <img src={fileUrl(held)} alt={`Product callout image ${i + 1}: ${c}`} />
+              <div key={index} className="frame__card" data-card={index === 1 ? "" : undefined}>
+                <img src={fileUrl(held)} alt={`Product callout image ${index}: ${c}`} />
               </div>
             ) : (
-              <div key={i} className="frame__card is-empty">
-                {i === 0 ? "product callout · App Store image · not made yet" : "product callout · in-app image · not made yet"}
+              <div key={index} className="frame__card is-empty">
+                {`product callout · ${cardKind(c)} · not made yet`}
               </div>
             );
           })}

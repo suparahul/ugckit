@@ -466,6 +466,34 @@ function parseSlide(heading, body, postTextSize) {
     }
   }
 
+  /* A slide set in HTML from a "Composition spec" paragraph (no "On-image text" block; the `callout` skill § The
+   * templates): its quoted words are the slide's text. The number and the headline, the lines, the app sentence above
+   * the card ("the app sentence" or "the <App> sentence"), the save line; the cover has the cover's own words. The spec
+   * also stands as the slide's position when the deck gives none. */
+  const spec = body.find((l) => /^Composition spec\b/.test(l));
+  if (spec && !slide.blocks.length) {
+    const nl = (t) => t.replace(/\s+\/\s+/g, "\n");
+    const q = (re) => spec.match(re)?.[1];
+    const quotes = (t) => [...(t || "").matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    const num = q(/\bnumber "([^"]+)"/);
+    const head = q(/\bthe headline "([^"]+)"/);
+    const lines = quotes(q(/\bthe lines\b[^"]*?("[^"]+"(?:\s*\/\s*"[^"]+")*)/));
+    const cover = spec.match(/\bthe cover: ("[^;]+)/)?.[1];
+    const add = (label, text) => text && slide.blocks.push({ label, hint: null, text: strip(text) });
+    if (head) {
+      add("On-image text, top (headline, medium)", `${num ? `${num}. ` : ""}${nl(head)}`);
+      add("On-image text, top (the lines, small)", lines.join("\n"));
+    } else if (cover) {
+      const c = quotes(cover);
+      add("On-image text, top (cover title, medium)", c.slice(0, 3).map(nl).join("\n"));
+      add("On-image text, top (the line, small)", c.length > 3 ? c[c.length - 1] : "");
+    }
+    add("On-image text, above the card (the app sentence, small)", q(/\bthe (?:app|[A-Z][\w-]*) sentence[^:]*?: "([^"]+)"/));
+    add("On-image text, bottom (the save line, small)", q(/\bthe save line bold: "([^"]+)"/));
+    if (!slide.position) slide.position = strip(spec);
+    slide.composed = slide.blocks.length > 0;
+  }
+
   /* Placement and size per block, from the block's own words first, then the
    * slide's position sentence. The hook slide is the one with big type. */
   for (const b of slide.blocks) {

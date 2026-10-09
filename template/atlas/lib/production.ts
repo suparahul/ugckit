@@ -28,6 +28,7 @@ import { fmtBoth, setZones } from "./when.ts";
 import { declaredPlatforms } from "./accounts.ts";
 import { PLATFORMS, PLATFORM_NAME, linePlatform, platformOf, primaryOf, slideLimit, type Platform } from "./platform.ts";
 import { directBlock } from "./video-post.ts";
+import { shownCards } from "./callout.ts";
 import { readVideo, videoPlanPoint, type VideoState } from "./video.ts";
 import type { Kind, VideoIdea } from "./video-row.ts";
 
@@ -137,6 +138,8 @@ export type Slide = {
   position: string | null;
   why: string | null;
   cards: string[];
+  /** The words come from a "Composition spec" paragraph: the slide is composed in HTML, so a picture of it already holds the text. */
+  composed?: boolean;
 };
 
 export type Deck = {
@@ -574,12 +577,15 @@ const isCustomCard = (f: string) => /-[0-9a-f]{10}\.png$/.test(f);
 function cardStates(slug: string, deck: Deck, key: string): CardState[] {
   const product = deck.slides.find((s) => s.isProduct && s.cards.length);
   if (!product) return [];
+  /* Callout style E (the full-height phone): the slide's picture holds the phone and the card, so no card file is waited for. */
+  if (/full-height phone/i.test(product.cards[0] ?? "")) return [];
   const files = uploadedFiles(slug, key, "cards").filter((f) => !isCustomCard(f));
   const text = defaultCardText(slug);
-  return product.cards.map((_, i) => ({
-    index: i + 1,
-    file: last(files.filter((f) => /\/cards\/(\d+)-/.test(f) && Number(f.match(/\/cards\/(\d+)-/)![1]) === i + 1)) ?? null,
-    ...(i === 0 && text ? { text } : {}),
+  /* A phone in a hand drops the App Store card (lib/callout.ts shownCards), so no file is waited for it. */
+  return shownCards(product, deck.dimension).map(({ index }) => ({
+    index,
+    file: last(files.filter((f) => /\/cards\/(\d+)-/.test(f) && Number(f.match(/\/cards\/(\d+)-/)![1]) === index)) ?? null,
+    ...(index === 1 && text ? { text } : {}),
   }));
 }
 

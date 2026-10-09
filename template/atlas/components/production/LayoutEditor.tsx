@@ -30,6 +30,7 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as R
 import type { CardState, Dimension, Slide, SlideState } from "@/lib/production";
 import { cardTextOf, frameOf, type CardText, type Layout, type LayoutBlock, type LayoutCard } from "@/lib/layout";
 import { frameStyle, freeBlockProps, freeCardStyle, fileUrl } from "./Frame";
+import { phoneOf, shownCards } from "@/lib/callout";
 import { appFromPath } from "./scope";
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -127,7 +128,10 @@ export function LayoutEditor({
   const setCardLine = (k: keyof CardText, v: string) => patchCard({ ...cardText, [k]: v });
   const cardIsDefault = !custom || (!!defaultText && custom.name === defaultText.name && custom.subtitle === defaultText.subtitle && custom.button === defaultText.button);
 
-  const hasCards = slide.cards.length > 0;
+  /* A phone in a hand never shows the App Store card (lib/callout.ts shownCards); the editor's other slides keep every card. */
+  const ePhone = phoneOf(slide, dimension)?.kind.startsWith("E");
+  const shown = ePhone ? slide.cards.map((item, i) => ({ item, index: i + 1 })) : shownCards(slide, dimension);
+  const hasCards = shown.length > 0;
   const selBlock = sel !== null && sel >= 0 ? layout.blocks[sel] : null;
 
   return (
@@ -146,7 +150,7 @@ export function LayoutEditor({
             </div>
           );
         })}
-        {hasCards && layout.card ? (
+        {hasCards && shown[0].index === 1 && layout.card ? (
           <div className={`frame__editcard${sel === CARD ? " is-selected" : ""}`} style={freeCardStyle(layout.card)} onPointerDown={(e) => start(e, CARD, "move")} role="group" aria-label="Product callout card; drag its edge to move it, click a line to edit it">
             <div className="frame__cardhtml" aria-hidden={false}>
               <img className="frame__cardicon" src={`/media/apps/${encodeURIComponent(appFromPath())}/icon.jpg`} alt="" draggable={false} />
@@ -158,9 +162,9 @@ export function LayoutEditor({
           </div>
         ) : hasCards ? (
           <div className="frame__cards" aria-hidden="true">
-            {slide.cards.map((c, i) => {
-              const held = cards.find((k) => k.index === i + 1)?.file ?? null;
-              return held ? <div key={i} className="frame__card"><img src={fileUrl(held)} alt="" /></div> : <div key={i} className="frame__card is-empty">product callout · not made yet</div>;
+            {shown.map(({ index }) => {
+              const held = cards.find((k) => k.index === index)?.file ?? null;
+              return held ? <div key={index} className="frame__card"><img src={fileUrl(held)} alt="" /></div> : <div key={index} className="frame__card is-empty">product callout · not made yet</div>;
             })}
           </div>
         ) : null}

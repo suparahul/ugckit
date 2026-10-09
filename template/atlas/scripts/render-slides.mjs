@@ -57,6 +57,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import sharp from "sharp";
 import { cardHash, renderAppStoreCard } from "./lib/appstore-card.mjs";
+import { isScreenBlock, shownCards } from "../lib/callout.ts";
 
 const ROOT = resolve(process.cwd());
 const WORKSPACE = process.env.ATLAS_ROOT ? resolve(process.env.ATLAS_ROOT) : resolve(ROOT, "..");
@@ -75,6 +76,11 @@ const cq = W / 100; // one cqw of the replica, in px
 const FONT = "Helvetica Neue, Helvetica, Arial, sans-serif";
 /* cqw, as lib/layout.ts FONT_SIZE_BY: keep the two in step. 9:16 is the original default; 3:4 is the default since 2026-09-17. */
 const FONT_SIZE_BY = { "9:16": { big: 7.4, medium: 5.6, small: 3.9 }, "3:4": { big: 7.4, medium: 5.1, small: 4.3 } };
+/* Callout style E (the full-height phone): the slide's picture already holds the phone and the card, so no card is pasted. As Frame.tsx phoneOf(). */
+const isPhoneCallout = (slide) => /full-height phone/i.test(slide.cards[0] ?? "");
+/* The card file 1 is pasted only when the slide shows its first card: never on a full-height phone slide (the picture holds it),
+ * and never the App Store card on a phone-in-hand slide (lib/callout.ts shownCards; Rahul, 2026-10-09). */
+const showsCard = (slide, dimension) => !isPhoneCallout(slide) && shownCards(slide, dimension).some((c) => c.index === 1);
 const BOX_FONT_SIZE = 3.7;
 const BIG_FROM = 6.5; // a block at or above this size is drawn in the hook style (lib/layout.ts BIG_FROM)
 /* The safe area and the card geometry, as lib/layout.ts frameOf() and CARD: keep the two in step. */
@@ -223,7 +229,8 @@ async function blockSvg(b, x, y, w, sizeCqw) {
  */
 async function defaultLayoutSvg(slide, hasCard) {
   const groups = { top: [], middle: [], bottom: [] };
-  for (const b of slide.blocks) groups[b.place === "flow" ? "top" : b.place].push(b);
+  /* A "The screen" or "The phone" block is a build note for the phone's screen, not words on the slide (as Frame.tsx Stacks). */
+  for (const b of slide.blocks) if (!isScreenBlock(b.label)) groups[b.place === "flow" ? "top" : b.place].push(b);
   const gap = 3 * cq;
   const isLeft = (t) => /^[•\-–]/m.test(t) || /\n[•\-–]/.test(t);
   let out = "";
@@ -305,7 +312,7 @@ async function renderPost(key, { force = false, override = {}, burnCover = false
     const cropped = meta.width && meta.height && Math.abs(meta.width / meta.height - W / H) > 0.02 ? `${meta.width}×${meta.height} centre-cropped to ${FR.dimension}` : "";
     const base = sharp(srcPath).resize(W, H, { fit: "cover", position: "centre" });
     const layers = [];
-    const hasCard = slide.cards.length > 0 && !!cardPath;
+    const hasCard = !!cardPath && showsCard(slide, FR.dimension);
     /* Direct mode: the cover carries its text, in the deck's slide-1 style (or its locked layout), since no hand types it.
      * An illustrated deck (the item row `Slide style: illustrated`) has its text drawn into the picture by the generator:
      * no text layer on any slide, the callout card still on the product slide. An absent row, or `photo`, is today's path. */
@@ -313,7 +320,7 @@ async function renderPost(key, { force = false, override = {}, burnCover = false
 
     if (flag === "baked") {
       const layout = layoutOf(slide.n, events);
-      const body = layout ? await lockedLayoutSvg(layout) : await defaultLayoutSvg(slide, slide.cards.length > 0);
+      const body = layout ? await lockedLayoutSvg(layout) : await defaultLayoutSvg(slide, showsCard(slide, FR.dimension));
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><defs><filter id="sh" x="-5%" y="-5%" width="110%" height="110%"><feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-color="#000" flood-opacity="0.6"/></filter></defs>${body}</svg>`;
       layers.push({ input: Buffer.from(svg), top: 0, left: 0 });
     }

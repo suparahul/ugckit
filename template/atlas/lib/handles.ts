@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { declaredAccounts, handleOf, type DeclaredAccount } from "./accounts";
 import { PLATFORM_NAME, type Platform } from "./platform";
 import { accountsOf, type AccountsFile } from "./postbridge";
-import { readLog, storeOf, type Event } from "./production";
+import { getProduction, readLog, storeOf, type Event } from "./production";
 import { appDir, exists, headLines, listDirs, listFiles, readJson, readText, sectionOf, tableRows } from "./root";
 
 export type Reference = { file: string; role: string; what: string; use: string; exists: boolean; url: string | null; approved: string | null; rejected: string | null };
@@ -38,7 +38,10 @@ export type Handle = {
   dir: string;
   /** `@name`. */
   handle: string;
-  /** The plan's short name: the part before the first dot. */
+  /** The plan's short name for this handle, the one its plan rows and log posts carry. The folder
+   *  name without its dots when the plan has that short ("catwise.cats" is "catwisecats"), else the
+   *  folder name before its first dot. The folder keeps the old name until a renamed account's plan
+   *  rows move with it, so the rows still find it. */
   short: string;
   platform: string | null;
   role: string | null;
@@ -85,7 +88,15 @@ export function readAccounts(slug: string): AccountsFile | null {
 const day = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : null);
 const last = <T,>(a: T[]) => (a.length ? a[a.length - 1] : null);
 
-function readHandle(slug: string, dir: string, log: Event[], accounts: AccountsFile | null): Handle | null {
+/** The plan short of a folder: the dotless name when the plan has it, else the name before the first dot. */
+export function shortOf(dir: string, planShorts: Iterable<string>): string {
+  const bare = dir.replace(/^@/, "");
+  const known = new Set(planShorts);
+  const dotless = bare.replace(/\./g, "");
+  return known.has(dotless) ? dotless : bare.split(".")[0];
+}
+
+function readHandle(slug: string, dir: string, log: Event[], accounts: AccountsFile | null, planShorts: Iterable<string> = []): Handle | null {
   const base = join(appDir(slug), "handles", dir);
   const md = readText(join(base, "HANDLE.md"));
   if (md === null) return null;
@@ -137,7 +148,10 @@ function readHandle(slug: string, dir: string, log: Event[], accounts: AccountsF
   const dimension = head["Dimension"] ?? sectionOf(md, /^Default dimension/i)?.match(/(\d+\s*:\s*\d+)/)?.[1]?.replace(/\s/g, "") ?? null;
 
   /* The connection of each declared account. The primary one is the handle's `connected`, `connection` and `account`. */
-  const onService = accountsOf(accounts, handle);
+  const short = shortOf(dir, planShorts);
+  /* The map may key the account by the plan's short ("@catwisecats") while HANDLE.md names the TikTok username ("@catwise.cats"). */
+  const byName = (h: string) => accountsOf(accounts, h);
+  const onService = Object.keys(byName(handle)).length ? byName(handle) : Object.keys(byName(`@${short}`)).length ? byName(`@${short}`) : byName(handle);
   const connectLine = (p: Platform) => day(last(mine.filter((e) => e.kind === "account.connect" && (e.data?.platform ?? "tiktok") === p))?.at);
   const handleAccounts: HandleAccount[] = declaredAccounts(md, dir).map((d) => {
     const a = onService[d.platform] ?? null;
@@ -166,7 +180,7 @@ function readHandle(slug: string, dir: string, log: Event[], accounts: AccountsF
   const s5 = !!(head["Format"] && dimension && head["Slots"] && head["Cadence"]);
   const done = [s1, s2, s3, s4, s5];
   const facts = [
-    s1 ? `done${head["Created"] ? ` ${head["Created"]}` : ""}` : head["Role"] ? `the account is created on ${handleAccounts.map((a) => PLATFORM_NAME[a.platform]).join(" and ")} by you, then the date is written` : "the role and the name come first",
+    s1 ? `done${head["Created"] ? ` ${head["Created"]}` : ""}` : head["Role"] && connected ? `the account is live and connected${acct?.username ? ` as @${acct.username}` : ""} · the Created and Tier lines are missing from HANDLE.md` : head["Role"] ? `the account is created on ${handleAccounts.map((a) => PLATFORM_NAME[a.platform]).join(" and ")} by you, then the date is written` : "the role and the name come first",
     s2 ? (approvals.persona ? `approved ${approvals.persona}` : "written · a look from you is asked") : "drafted by the agent from the findings",
     s3 ? `${approvedRefs ? `${approvedRefs} approved` : `${identityRefs.length} drawn`}${references.some((r) => r.exists && !r.approved && /identity|face|subject/i.test(r.role)) ? " · a look from you is asked" : ""}` : styleOnly ? (references.some((r) => r.exists) ? "the style references are here · a look from you is asked" : "the style references are drawn after the persona") : "the face and the subjects are drawn after the persona",
     s4 ? `${approvals.bio ? `approved ${approvals.bio}` : "written"}${taskDone("set on TikTok") ? " · set on TikTok" : ""}` : profileRef ? "the picture is here; the bio is next" : bioQuote ? "the bio is here; the picture is next" : "after the references",
@@ -183,7 +197,7 @@ function readHandle(slug: string, dir: string, log: Event[], accounts: AccountsF
   });
 
   return {
-    slug, dir, handle, short: handle.slice(1).split(".")[0],
+    slug, dir, handle, short,
     platform: head["Platform"] ?? null, role: head["Role"] ?? null, tier: head["Tier"] ?? null, created: head["Created"] ?? null,
     format: head["Format"] ?? null, dimension, slots: head["Slots"] ?? null, postingZone: head["Posting zone"] ?? null, cadence: head["Cadence"] ?? null, sound: head["Sound"] ?? null, warmup: head["Warm-up"] ?? null,
     persona: personaBody, bio: bioQuote, bioRule, references, defaults: defaultsRows,
@@ -199,9 +213,10 @@ export function listHandles(slug: string): Handle[] {
   if (!/^[\w.-]+$/.test(slug)) return [];
   const log = readLog(slug);
   const accounts = readAccounts(slug);
+  const planShorts = Object.keys(getProduction(slug).plan.handles ?? {});
   return listDirs(join(appDir(slug), "handles"))
     .filter((d) => !/^EXAMPLE$/i.test(d))
-    .map((d) => readHandle(slug, d, log, accounts))
+    .map((d) => readHandle(slug, d, log, accounts, planShorts))
     .filter((h): h is Handle => !!h);
 }
 

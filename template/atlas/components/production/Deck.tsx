@@ -20,6 +20,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Deck as DeckT, DeckFile, PostState, Slide } from "@/lib/production";
+import { calloutWhy, dropsAppStoreCard } from "@/lib/callout";
 import { BOX_FONT_SIZE, FONT_SIZE_BY, type Layout } from "@/lib/layout";
 import { PhoneTick, SlideActions, SlideNote, SlideTextFlag, useDecide } from "./Actions";
 import { Replica, Sketch } from "./Frame";
@@ -164,7 +165,7 @@ export function Deck({ state, deck, deckFile, initial, src, overlayOff, readOnly
               <div className="sr__h">
                 <span className="sr__title"><b>Slide {n} of {total}</b> · {slide.label} {slide.isProduct ? <Diamond /> : null}</span>
               </div>
-              {slide.why ? <p className="sr__why">{slide.why}</p> : slide.isProduct ? <p className="sr__why">The app's one appearance in the deck: a first-person line and the product callout (the App Store image and one in-app image).</p> : null}
+              {slide.why ? <p className="sr__why">{slide.why}</p> : slide.isProduct ? <p className="sr__why">{calloutWhy(slide, state.dimension)}</p> : null}
               <div className="sr__copy">
                 {slide.blocks.map((b, i) => (
                   <div key={i}>
@@ -207,7 +208,7 @@ export function Deck({ state, deck, deckFile, initial, src, overlayOff, readOnly
           {draft ? (
             <LayoutEditor post={row.key} slide={slide} state={ss} cards={state.cards} total={total} layout={draft} onChange={setDraft} dimension={state.dimension} onSave={lock} onCancel={() => setDraft(null)} busy={busy} error={lockErr} />
           ) : (
-            <Replica slide={slide} state={ss} cards={state.cards} total={total} text={illustrated || !overlay ? "off" : "on"} layout={illustrated ? null : ss.layout} dimension={state.dimension} />
+            <Replica slide={slide} state={ss} cards={state.cards} total={total} text={illustrated || !overlay || (slide.composed && ss.current) ? "off" : "on"} layout={illustrated ? null : ss.layout} dimension={state.dimension} />
           )}
           {canDecide && ss.text === "baked" && !draft && !illustrated ? (
             <p className="rep__lockrow">
@@ -253,9 +254,15 @@ export function Deck({ state, deck, deckFile, initial, src, overlayOff, readOnly
                   <dt>Product callout</dt>
                   <dd>
                     {slide.cards.map((c, i) => {
-                      const held = state.cards.find((k) => k.index === i + 1)?.file ?? null;
+                      /* A phone in a hand drops the App Store card (lib/callout.ts shownCards): say so, never "not made yet". */
+                      if (/app store/i.test(c) && dropsAppStoreCard(slide, state.dimension)) {
+                        return <p key={i} className="sr__card"><span className="check is-ok"><CheckIcon ok />not shown</span> {i + 1}. {c} (a phone in a hand never shares the slide with the App Store card)</p>;
+                      }
+                      /* Callout style E: the phone and the card are in the slide's own picture, so the picture is the callout. */
+                      const inPicture = /full-height phone/i.test(c);
+                      const held = inPicture ? state.slides.find((p) => p.n === slide.n)?.current ?? null : state.cards.find((k) => k.index === i + 1)?.file ?? null;
                       return (
-                        <p key={i} className="sr__card"><span className={`check ${held ? "is-ok" : "is-bad"}`}><CheckIcon ok={!!held} />{held ? "made" : "not made yet"}</span> {i + 1}. {c}</p>
+                        <p key={i} className="sr__card"><span className={`check ${held ? "is-ok" : "is-bad"}`}><CheckIcon ok={!!held} />{held ? (inPicture ? "in the picture" : "made") : "not made yet"}</span> {i + 1}. {c}</p>
                       );
                     })}
                   </dd>
