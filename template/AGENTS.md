@@ -126,6 +126,17 @@ like success* — the run keeps going and leaves plausible files behind.
     published by hand from the phone. Do not use `platform_data.id` (`p_pub_url~v2.<n>`):
     that number is not the post id.
 
+16. **A USER'S CORRECTION BECOMES A LEARNING, IN THE SAME TURN.** Whenever the user
+    corrects a deck, a slide, a callout, a screen choice or a picture, fix the post, and
+    also write a dated, general learning into the section "Iterative learnings and
+    improvements" of the skill that produced the mistake (`deck`, `callout`, `images`,
+    `plan` or `slideshow-review`), in the form that section gives: a rule for every future
+    post, not a note about this one. For a screen choice, also write a dated line under
+    that screen's **Corrections** in `apps/<slug>/PRODUCT-SCREENS.md`. Then tell the user
+    in one line which learning you added, and where. A fresh install ships these sections
+    empty, and this rule is what fills them; without it, the same mistake comes back on
+    the next post.
+
 ---
 
 ## STATE

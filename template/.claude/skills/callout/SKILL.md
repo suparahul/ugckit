@@ -111,6 +111,15 @@ read only when the slide has no bold-label text blocks.
 
 Say which template, which screen and which words, then run the `render` skill.
 
+## Before you finish
+
+Did the user correct anything in this run? If yes, add the learning before you finish:
+a dated, general entry in the section "Iterative learnings and improvements" of the skill
+that produced the mistake (this one, or `deck`, `callout`, `images`, `plan`,
+`slideshow-review`), and for a screen choice a dated line under that screen's
+**Corrections** in `apps/<slug>/PRODUCT-SCREENS.md` (AGENTS.md, hard rule 16). Then tell
+the user in one line which learning you added.
+
 ## Iterative learnings and improvements
 
 A dated list that agents add to over time, from the user's feedback on real callouts.

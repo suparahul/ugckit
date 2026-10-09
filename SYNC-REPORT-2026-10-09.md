@@ -51,7 +51,7 @@ line edits there, which merge cleanly.
 - `docs/product-screens.example.md`, `AGENTS.md`, `CLAUDE.md`, `apps/README.md`,
   `.ugckit-manifest`, `production/LEARNINGS-2026-10-08.md` (one row).
 - Atlas: `lib/callout.ts` hides a `The component…` block; `scripts/render-slides.mjs` does
-  not burn screen blocks. `npm test` 109/109 pass; type check clean.
+  not burn screen blocks. `npm test` 132/132 pass (after the kit update below); type check clean.
 
 ## Left out as CatWise-specific
 
@@ -68,8 +68,9 @@ D/C/I/P/R learnings entries, the chat-bubble callout (`--template chat`, CatWise
   illustrated callouts, "(wide)" blocks, chat bubbles, `**Source slide:**`, the
   caption-only-quoted-lines rule, a style prefix per post, `card: "chat"`. OF keeps them
   as local changes.
-- OF `atlas/package.json` does not list `video.test.ts` and `video-post.test.ts`; one OF
-  video test fails. This was not changed, and its manifest entry was not moved.
+- OF `atlas/package.json` is now the kit's file: it lists `video.test.ts`,
+  `video-post.test.ts` and `callout.test.ts`. The video test that failed passes since
+  OF received the kit's `export-flow.ts`; OF `npm test`: 132/132 pass.
 - `AGENTS.md` and `CLAUDE.md` still differ (the earlier `AGENTS.md.ugckit-new`, OF's
   "Approval by word", the video-planning text). This was there before and is out of scope.
 - Many other drifted files (the posting, niche and character code) were not touched.
