@@ -5,6 +5,9 @@ description: Stage 7 — QC a generated video. Measures cuts, green-screen quali
 
 # Stage 7 — review
 
+This skill reviews a generated video. A slideshow deck and its finished slides are
+checked by the `slideshow-review` skill.
+
     scripts/qc.py <project> [video.mp4]
 
 ## What it measures
@@ -41,3 +44,10 @@ owns the fix — almost always stage 5, the prompt.
 Check `pipeline/state/feedback.jsonl` for open notes from the UI and address them.
 
     scripts/state.py set <project> review done
+
+## Iterative learnings and improvements
+
+A dated list that agents add to over time, from the user's feedback on reviewed videos.
+Add new entries at the bottom under a new date heading (`### <date> — <what>`), with short
+IDs; keep the IDs. Where an entry disagrees with older text in this file, the entry says
+so; the older text is not rewritten until the user decides.

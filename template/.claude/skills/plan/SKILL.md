@@ -116,6 +116,25 @@ over 10 on a two-platform handle; nothing is cut by the kit.
 On Instagram they stay in the caption, as on TikTok; there is no first comment.
 The pool is not measured on Instagram.
 
+## Topics across handles and weeks
+
+- Give a topic a long leash. One weak post usually means a weak angle, not a weak topic:
+  try it again with another angle and hook, on the same or another handle, before you
+  retire it. A topic with one strong post gets its second test soon (within the week when
+  a slot allows). Never write "do not try this topic on another handle".
+- On one handle, change the angle and the hook when a topic comes back. Across handles, a
+  hit hook may be copied within a week, with new pictures. A topic that failed gets a new
+  angle or a new hook on the next try.
+- Before you propose a topic, read the handle's last 30 days, not only this week, and the
+  week's other posts that cover the parts of a combined topic.
+- Never lose a post. A replaced post moves to a free slot with all its fields; two posts
+  that trade places keep any deck already written for either one.
+- The topic fits the handle's pictures: a topic whose slides a real photo cannot show goes
+  to an illustrated or a generic handle.
+- The callout's screen is chosen by the `deck` skill from `apps/<slug>/PRODUCT-SCREENS.md`,
+  not here. A row may name one in `Format / variation` when the user asked for it; the deck
+  then keeps it.
+
 ## Then the index
 
     cd atlas && ATLAS_ROOT=.. node scripts/build-production.mjs
@@ -129,3 +148,11 @@ not the parser. The board is at http://localhost:3210/production/<slug>.
 
 Report: handles, posts, the format lock per handle, the day-7 date, the spend on the
 pool if any. Then, for the first post, run the `deck` skill.
+
+## Iterative learnings and improvements
+
+A dated list that agents add to over time, from the user's feedback on real plans. Each
+entry is a rule for every future plan, not only for the day it came from. Add new entries
+at the bottom under a new date heading (`### <date> — <what>`), with short IDs (P1, P2, …);
+keep the IDs. Where an entry disagrees with older text in this file, the entry says so;
+the older text is not rewritten until the user decides.

@@ -19,7 +19,8 @@ written from research instead of from a reference video.
 The slideshow path, when the user has an app to grow (AGENTS.md § The slideshow path):
 `product`, the research above, then `apps-learnings`, `niche-search`, `niche-hunt`,
 `niche-fetch`, `niche-read`, `account-architecture`, `handles` (`persona-identity`),
-`app-fit`, `plan`, and per post `deck`, `images`, `callout`, `render`, `post`
+`app-fit`, `plan`, and per post `deck`, `slideshow-review` (pass 1, then the user's go-ahead),
+`images`, `callout`, `render`, `slideshow-review` (pass 2), `post`
 (`posting-provider` once), `sync`; per week `read`.
 
 Video planning (AGENTS.md § Video planning), from one finalised video idea to the locked

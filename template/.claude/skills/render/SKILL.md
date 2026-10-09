@@ -62,7 +62,8 @@ Text-free slides (the words typed in TikTok) are the post page's export control
 
 Open two or three of the finals yourself: the text inside the safe area, the callout on
 the right slide, the cat the right cat. With an Instagram set, open two of its JPEGs as
-well: the cover's text whole, the callout not cut at the bottom. Then the user approves the final on the post
+well: the cover's text whole, the callout not cut at the bottom. Then run pass 2 of the `slideshow-review` skill on
+every finished slide and fix what fails. Then the user approves the final on the post
 page (`final.approve`). Nothing is sent without that line.
 
 ## Finish

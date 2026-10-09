@@ -9,13 +9,19 @@ description: Phase 8, the pictures — every candidate picture of one post, from
     scripts/codex-images.sh <slug> <post> [--only 3,5]  the bridge: the check, the job, one codex exec, the verify (Claude)
     scripts/images.sh <slug> <post> --verify          the check of every slide's file; images-result.json; the log lines
 
-`<post>` is the post key, `2026-09-17/maya/1`. One post per call, serial. The deck
-must exist before the first picture; no plan approval is waited for. The Organic Factory UI counts
-the plan done once the deck exists, shows the post at the pictures stage, and reads
-"final: waiting for you" once every slide has a candidate — the user's look is at the
-slides, one by one, not at a gate before them. The one stop: a `plan.sendback` line
-for this post in `log.jsonl` whose `hash` equals the deck's current hash. Then the deck
-is refused; rewrite it (the `deck` skill) before any picture.
+`<post>` is the post key, `2026-09-17/maya/1`. One post per call, serial.
+
+**No picture before the user's go-ahead (Rahul, 2026-10-09).** The deck text is made
+first, it passes pass 1 of the `slideshow-review` skill, and the user reviews it, the
+callout's screen and in-app text included. The first picture of a post is made only
+after the user's go-ahead for that deck: said in the conversation, or a `plan.approve`
+line for the post in `log.jsonl`. A deck that changes after the go-ahead goes back to the
+user before any new picture. A `plan.sendback` line for this post whose `hash` equals the
+deck's current hash means the deck is refused; rewrite it (the `deck` skill) and ask
+again. The Organic Factory UI counts the plan done once the deck exists; that count is
+not the go-ahead. The product slide's plate is made as the deck wrote it (the phone's
+place, the chroma screen, the room for the card); the screen itself is the `callout`
+step's, and neither step chooses another one.
 
 The prompts come from the deck as written. A photo handle's prompts hold no text (the
 compositor burns it); an illustrated handle's prompts hold the slide's words, so the
@@ -66,6 +72,25 @@ file is reported by number. Then **look at every picture yourself** against the
 identity rule of the handle (the coat, the eye colour, the face): a wrong cat is a
 defect, not a variant. Point the user at the post page to approve each slide or ask for
 a new one (`slide.approve`, `slide.note` "ask for a new one").
+
+What to look for on a photo handle, before a slide is chosen:
+
+- The framing is the natural view of the person who would take the photo: standing or
+  sitting height, wide enough to show the subject in its setting and what the slide says.
+  Close only when the slide needs a touch or a detail; the slide decides.
+- True proportions: the subject against the furniture, the props and the other subjects.
+  One that looks too big for its setting is a defect: make it again from further away.
+- The picture shows what the slide's text says; the cover shows the hook's situation.
+- The right subject on every slide, named in the prompt and checked in the picture.
+- No hands-only handling shot (hands and a body lifting or holding the subject): it looks
+  made by AI. Choose a framing or a tip that does not need it.
+- A clip or a photo shown inside a phone is the owner's own view of it.
+- Redo the slides the user named. For any other slide, say how many and why before you
+  spend a run, and offer the smallest set.
+- When the slides are composed, make the finished slide the chosen candidate of each
+  slide; no placeholder covers a finished picture.
+
+Then run pass 2 of the `slideshow-review` skill on the post's pictures.
 
 ## Re-run
 
@@ -119,3 +144,12 @@ never as the argument after `-i`; and `codex exec` reads stdin when it is not a
 terminal, so a run with no stdin hangs on "Reading prompt from stdin". The bridge
 does both right. The stderr carries an MCP transport error from an unrelated server
 config; it is noise.
+
+## Iterative learnings and improvements
+
+A dated list that agents add to over time, from the user's feedback on real pictures.
+Each entry is a rule for every future picture, not only for the post it came from. Add
+new entries at the bottom under a new date heading (`### <date> — <what>`), with short IDs
+(I1, I2, …) that the `slideshow-review` skill can cite. Where an entry disagrees with other
+text the image agent reads (a handle's style prefix, a realism guide), the entry says so;
+that text is not rewritten until the user decides.

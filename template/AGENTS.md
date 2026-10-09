@@ -172,7 +172,7 @@ others), just read that file and follow it. Same instructions either way.
 
 | # | Stage | Skill | Produces |
 |---|---|---|---|
-| R0 | `product` | `product` | `apps/<slug>/APP.md`, `product.json`, `icon.jpg` — what the user's own app is, its market, its niche, the callout facts. Optional for a video project; phase 2 of the slideshow path. No cost. |
+| R0 | `product` | `product` | `apps/<slug>/APP.md`, `product.json`, `icon.jpg`, `PRODUCT-SCREENS.md` — what the user's own app is, its market, its niche, the callout facts, the screens a callout can show. Optional for a video project; phase 2 of the slideshow path. No cost. |
 | R1 | `apps` | `apps` | up to five apps in the niche, found by keyword search in rounds → the app ledger, `scan.tsv`, `handles.tsv` |
 | R2 | `network` | `network` | per app: the handles that really promote it, with evidence → the handle ledger, `<app>/candidates.tsv`, `NETWORK.md` |
 | R3 | `harvest` | `harvest` | per handle: `posts.json`, `index.tsv`, `covers/`, `HOOKS.md` |
@@ -223,13 +223,20 @@ the Organic Factory UI reads them in place, and "filled" is derived from the fil
 | # | Phase | Skill(s) | Produces | Filled when |
 |---|---|---|---|---|
 | 1 | Setup | `setup` | the state file, the keys, the brain in place | `setup` done |
-| 2 | The app | `product` (`product-facts.sh`) | `apps/<slug>/APP.md`, `product.json`, `icon.jpg` | both exist and `product.json` has a source |
+| 2 | The app | `product` (`product-facts.sh`) | `apps/<slug>/APP.md`, `product.json`, `icon.jpg`, `PRODUCT-SCREENS.md` | both exist and `product.json` has a source |
 | 3 | Competitor apps | `apps` → `teardown` as above, then `apps-learnings` | the ledger, the teardowns; the first sections of `niche/{learnings,anatomy,architecture}.md`, marked `competitor apps` | every ledger app has a teardown |
 | 4 | The niche | `niche-search` (`niche-search.sh`, `niche-import.sh`), `niche-hunt`, `niche-fetch` (`niche-fetch.sh`, `niche-raw.py`), `niche-read` (`niche-stats.py`) | `niche/NICHE.md`, `searches/` (TikTok: the Photo tab for slideshows, the general search for recent videos), `covers/`, `instagram/{searches,covers}/` after a yes, `batches/<date>/{LINKS.md, posts.raw.json, …, BATCH.md}`; the `niche` sections and rows of the findings trio | one batch read and the trio exists |
 | 5 | Account architecture | `account-architecture` | `strategy/ACCOUNTS.md` | it exists; the user approves on the strategy page |
 | 6 | Handle identities | `handles`, `persona-identity` | `handles/<handle>/HANDLE.md`, `references/` | one handle complete at five steps; two recommended |
 | 7 | App fit and plan | `app-fit`, `plan` (`hashtag-pool.sh`) | `strategy/APP-FIT.md`, `production/PLAN.md`, optionally `strategy/HASHTAG-POOL.md` | the fit exists and the plan parses with a handle and a row |
-| 8 | Production | per post: `deck`, `images` (`images.sh`, `codex-images.sh`), `callout` (`render-callout.mjs`), `render` (`render-slides.mjs`), `post` (`posting-send.mjs`; `posting-provider` once, `posting-accounts.mjs`), `sync` (`posting-sync.mjs`); per week: `read` | `production/decks/`, `files/<post>/`, the log lines, `posting-accounts.json`; the day-7 rows in `niche/anatomy.md` | the first `posted` line |
+| 8 | Production | per post: `deck` (it chooses the callout's screen from `PRODUCT-SCREENS.md` and writes its in-app text), `slideshow-review` (pass 1, on the deck text; then the user's go-ahead), `images` (`images.sh`, `codex-images.sh`), `callout` (`render-callout.mjs`; it builds the deck's screen and never chooses again), `render` (`render-slides.mjs`), `slideshow-review` (pass 2, on the finished slides), `post` (`posting-send.mjs`; `posting-provider` once, `posting-accounts.mjs`), `sync` (`posting-sync.mjs`); per week: `read` | `production/decks/`, `files/<post>/`, the log lines, `posting-accounts.json`; the day-7 rows in `niche/anatomy.md` | the first `posted` line |
+
+**The callout is chosen at the deck, not in production** (Rahul, 2026-10-09). The `deck`
+skill chooses each post's callout template and its product screen or component from
+`apps/<slug>/PRODUCT-SCREENS.md`, and writes the in-app text in the deck beside the slide
+words, so the user reviews both before any picture. `images`, `callout` and `render`
+make only what the deck chose. When the user changes the choice, the deck agent records
+the correction in `PRODUCT-SCREENS.md`.
 
 **The niche refresh.** Phase 4 runs again each week, in a new batch folder
 `batches/<date>/`: the handles to follow as `@handle` rows of `LINKS.md` (`niche-hunt`,
