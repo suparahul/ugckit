@@ -1,6 +1,6 @@
 ---
 name: product
-description: Phase 2 of the slideshow path (stage R0 of the research) — understand the user's own app before any research. Reads a store listing, a website, a document or a repo and writes apps/<slug>/APP.md with the facts, the market, the niche and the hero features, plus product.json and icon.jpg, the callout facts. One free script, no cost.
+description: Phase 2 of the slideshow path (stage R0 of the research) — understand the user's own app before any research. Reads a store listing, a website, a document or a repo and writes apps/<slug>/APP.md with the facts, the market, the niche and the hero features, plus product.json and icon.jpg, the callout facts, and PRODUCT-SCREENS.md, the screens and components a callout slide can show. One free script, no cost.
 ---
 
 # Phase 2 — the app (R0)
@@ -96,6 +96,49 @@ Then record the niche where the scripts read it:
     scripts/state.py niche <slug> "<the phrase>"
     scripts/state.py app-set <slug> <app> note "our own app"   # only after phase 3 has the ledger
 
+## The product screens: `apps/<slug>/PRODUCT-SCREENS.md`
+
+The list of the app's screens and components that a slideshow's callout slide can show,
+so the deck agent chooses the screen for each post and the user does not have to. The
+shape is `docs/product-screens.example.md`; keep its headings and bold labels exactly.
+
+It is its own file, beside `APP.md` and `product.json`, because: `product.json` belongs to
+`product-facts.sh`, which rewrites it; `APP.md` is the research summary with a fixed order
+that the research phases read; `screens/` is the video pipeline's recording library with a
+strict schema (the `screens` skill). This list is judgement (when a screen fits, when it
+does not, how its text may change), it grows with every correction, and the user edits
+it. No upgrade of the kit touches `apps/`.
+
+Write one `## <Screen Name>` section per screen or component, up to about ten, from the
+listing's screenshots, the onboarding, the hero features and, when a repo is given, the
+screens in the code (read only; never guess a path: find the file and name it). The name
+is in Title Case and is the name the deck writes as `The screen: "<Screen Name>"`. Each
+section has these lines:
+
+- **Kind:** `screen` (shown on a phone) or `component` (the app's own card, shown on the
+  photo without a phone).
+- **Shows:** what is on it, in one or two sentences.
+- **Fits:** the stories and the problems it answers, with a real example when there is one.
+- **Does not fit:** where it would be wrong, with the example that showed it.
+- **Staging:** phone in hand, phone beside the App Store card, or component on its own
+  (the `callout` skill § The templates); the preferred one first.
+- **Source:** where the picture comes from: the code file (to rebuild it as HTML), a
+  screenshot, or a row of the screen library (`screens/screens.json` id).
+- **In-app text:** what the deck may rewrite for a post (and how long it may be), what
+  stays as the app shows it.
+- **Used:** one line per post that showed it (date, handle, post, slide, what it said).
+- **Corrections:** one dated line per correction from the user, in the user's words, with
+  the rule taken from it.
+
+Head the file with the app's name, `App code:` (the repo path, if any), `Updated:`, and §
+How to choose (the order of the example; add app-specific rules under it). Write what you
+can see; a screen you cannot see in a screenshot or the code is listed under "What I could
+not find" in `APP.md`, not invented. Show the list to the user with the niche phrase.
+
+Afterwards the file grows: the `deck` skill adds a **Used** line for each post and a
+**Corrections** line (and fixes **Fits** or **Does not fit**) whenever the user changes the
+screen the deck chose; a new screen the user names gets its own section.
+
 ## Where the niche is not obvious
 
 Some products sit between two niches. Pick the one whose audience already watches content
@@ -113,7 +156,7 @@ canvas shows stage 1 as waiting for the user. When the app exists, come back her
 
     scripts/state.py set <slug> product done
 
-Report the niche phrase, the search-word list and the callout facts as written (name,
-subtitle, source), and ask the user to confirm the phrase and the words before phase 3
+Report the niche phrase, the search-word list, the callout facts as written (name,
+subtitle, source) and the product screens (their names and kinds), and ask the user to confirm the phrase and the words before phase 3
 spends on them. Stage 1 is filled when `APP.md` exists and `product.json` has a source:
 open http://localhost:3210/app/<slug> if the Organic Factory UI runs.

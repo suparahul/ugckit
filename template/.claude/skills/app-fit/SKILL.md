@@ -16,7 +16,8 @@ plan row says otherwise.
    parameter heading; `brain/learnings-slideshows.md` for the reasons.
 2. The findings trio, both sources: `niche/anatomy.md` (the post table, the added
    values), `niche/architecture.md`, `niche/learnings.md` (both dated sections).
-3. The app: `apps/<slug>/APP.md`, `product.json`; then `strategy/ACCOUNTS.md`,
+3. The app: `apps/<slug>/APP.md`, `product.json`, `PRODUCT-SCREENS.md` (the screens a
+   callout can show); then `strategy/ACCOUNTS.md`,
    `handles/*/HANDLE.md`, the teardowns.
 
 ## Write `apps/<slug>/strategy/APP-FIT.md`
@@ -32,7 +33,9 @@ The shape of the reference file, in this order:
   filled: for each feature, does its screen say what it does in one frozen frame, yes
   or no, with the reason. Then `### Feature-to-format map`: each feature that reads as
   a still paired with the format from the findings that carries it, with the source
-  post's views.
+  post's views. A feature that reads as a still and has no section in
+  `PRODUCT-SCREENS.md` gets one (the `product` skill § The product screens), so the deck
+  can choose it.
 - **## Part A — the post** (Layers 0 to 5 of the anatomy): one table, one row per
   parameter: `| Parameter | Value | Status | Source | Evidence |`. `Source` is
   `competitor apps`, `niche` or `brain`. Where the two sources disagree, the row is an

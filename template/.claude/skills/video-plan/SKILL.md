@@ -25,7 +25,9 @@ the row of the user's plan. The idea is already chosen; this step does not choos
    choice with status `user`; an empty one is yours to choose.
 3. The brain: the hook job and the recipe in `brain/video-patterns.json`, the slots in
    `brain/VIDEO-ANATOMY.md`; the local overlay when it exists.
-4. The handle's world, characters, narrators; the app's screen library and `APP.md`.
+4. The handle's world, characters, narrators; the app's screen library and `APP.md`;
+   `PRODUCT-SCREENS.md` for which screen answers the video's story (its **Fits**, **Does
+   not fit** and **Corrections** lines), chosen here, in the brief, never later.
 
 ## The video id
 

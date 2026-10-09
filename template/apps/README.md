@@ -8,6 +8,9 @@ is a pending slot on the canvas, never an error.
       APP.md                     the app: what it is, the niche phrase, the hero features
       product.json               the product callout facts: name, subtitle, button, icon, source, fetchedAt
       icon.jpg                   the App Store icon
+      PRODUCT-SCREENS.md         the screens and components a callout slide can show: what each shows, the stories it
+                                 fits and does not fit, the staging, the source, the in-app text rules, the uses and
+                                 the user's corrections (the product skill; shape: docs/product-screens.example.md)
       niche/
         NICHE.md                 the keywords, the doors run, the search log
         searches/                photo.<kw>.p<N>.json (the Photo tab door: slideshows), general.<kw>.p<N>.json
