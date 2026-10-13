@@ -5,7 +5,9 @@
  * scrolled posts as playable previews; the findings the agent
  * wrote, the verdict open and one fold per note, then the post table, the
  * parameter values and the accounts. Informative only. Before the phase
- * starts the page shows its state band and the rooms.
+ * starts the page shows its state band and the rooms. One search box
+ * (`search=`, lib/search.ts) narrows the grid, the scroll and the three
+ * tables together, and stays with every other filter.
  */
 
 import type { Metadata } from "next";
@@ -21,12 +23,14 @@ import { getNiche, listBatches, type BatchPost, type NichePost } from "@/lib/nic
 import { markWins, overFloor, WIN_VIEWS, type Rated } from "@/lib/niche-win";
 import { isViewable, nichePostHref, windowLabel } from "@/lib/niche-posts";
 import { PLATFORM_NAME, profileUrl, type Platform } from "@/lib/platform";
+import { batchFields, matches, quoted as quote, terms, tileFields } from "@/lib/search";
 import { clip } from "@/lib/text";
 import { dmy, n, pct, Room, Section } from "@/components/factory/Bits";
 import { Anat } from "@/components/factory/Anat";
 import { BatchShow } from "@/components/factory/Cards";
 import { NicheFilters, type Pick } from "@/components/factory/NicheFilters";
 import { NicheVideo } from "@/components/factory/NicheVideo";
+import { PostSearch } from "@/components/factory/PostSearch";
 import { PlatformIcon, PlatformSwitch, viewOf } from "@/components/Platform";
 import { StateBand } from "@/components/factory/StateBand";
 
@@ -132,9 +136,9 @@ const gist = (b: FindingBlock) => {
   return clip(t, 149);
 };
 
-function Fold({ title, gist, id, children }: { title: ReactNode; gist: string; id?: string; children: ReactNode }) {
+function Fold({ title, gist, id, open, children }: { title: ReactNode; gist: string; id?: string; /** Open on arrival: a search found rows in it. */ open?: boolean; children: ReactNode }) {
   return (
-    <details className="fold" id={id}>
+    <details className="fold" id={id} open={open}>
       <summary><span className="fold__title">{title}</span><span className="fold__gist">{gist}</span></summary>
       <div className="fold__body">{children}</div>
     </details>
@@ -190,14 +194,25 @@ export default async function NichePage({ params, searchParams }: { params: Prom
     platform: view === "both" ? "" : view,
     src: one("src"), kind: one("kind", "slideshow"), kw: one("kw"), win: one("win"), min: one("min", String(WIN_VIEWS)),
     recent: one("recent"), winners: one("winners"), held: one("held"), sort: one("sort", "rate"),
+    search: one("search").trim(),
   };
   const tiles = tilesOf(niche?.posts ?? [], scrolled);
   const rule = markWins(tiles);
+  /* The search narrows the grid before the pickers, so their counts say what the search holds. The wins are marked on every tile first: a search never moves the bar. */
+  const words = terms(q.search);
+  const quoted = quote(q.search);
+  const found = words.length ? tiles.filter((t) => matches(words, tileFields(t, [t.kw], [winLabel(t.win)]))) : tiles;
+  const scrollFound = words.length ? scrolled.filter((p) => matches(words, batchFields(p))) : scrolled;
+  const rowsFound = (rows: string[][]) => (words.length ? rows.filter((r) => matches(words, r)) : rows);
+  const postRows = postTable ? rowsFound(postTable.rows) : [];
+  const valueRows = rowsFound(values.map((v) => [v.layer, v.param, v.value, v.seen, v.evidence]));
+  const accountRows = accounts ? rowsFound(accounts.rows) : [];
+  const hits = (k: number) => (words.length ? ` · ${k} ${k === 1 ? "row matches" : "rows match"} ${quoted}` : "");
   const onIg = tiles.some((t) => t.platform === "instagram");
   const min = Number(q.min) || 0;
   const since = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
   const inView = (t: Tile) => view === "both" || t.platform === view;
-  const match = tiles.filter((t) =>
+  const match = found.filter((t) =>
     inView(t) &&
     (!q.src || t.src === q.src) &&
     (q.kind === "both" || t.kind === q.kind) &&
@@ -214,7 +229,7 @@ export default async function NichePage({ params, searchParams }: { params: Prom
   match.sort((a, b) => (k(b) > k(a) ? 1 : k(b) < k(a) ? -1 : 0));
   const shown = Math.min(match.length, Math.max(PAGE, Number(one("n")) || PAGE));
   const winsIn = match.filter((t) => t.win_).length;
-  const count = (f: (t: Tile) => boolean) => tiles.filter((t) => inView(t) && f(t)).length;
+  const count = (f: (t: Tile) => boolean) => found.filter((t) => inView(t) && f(t)).length;
   const picks: Pick[] = [
     { key: "src", label: "source", def: "", opts: [{ v: "", label: "search, batches and your scroll" }, { v: "search", label: "search only", n: count((t) => t.src === "search") }, { v: "batch", label: "batches only", n: count((t) => t.src === "batch") }, { v: "scroll", label: "your scroll only", n: count((t) => t.src === "scroll") }] },
     { key: "kind", label: "kind", def: "slideshow", opts: [{ v: "slideshow", label: "slideshows", n: count((t) => t.kind === "slideshow") }, { v: "video", label: "videos", n: count((t) => t.kind === "video") }, { v: "both", label: "both" }] },
@@ -246,6 +261,7 @@ export default async function NichePage({ params, searchParams }: { params: Prom
     findings ? <>findings of {dmy(findings.date)}</> : "no findings yet",
   ];
   const latest = batches[0];
+  const searchCount = words.length ? `${n(found.filter(inView).length)} of ${n(tiles.filter(inView).length)} posts in What wins${scrolled.length ? ` · ${n(scrollFound.length)} of ${n(scrolled.length)} from your scroll` : ""} match` : "";
   const handlesIn = latest ? latest.links.filter((l) => /^@/.test(l)).length : 0;
 
   return (
@@ -257,6 +273,8 @@ export default async function NichePage({ params, searchParams }: { params: Prom
         </div>
       </header>
       {band}
+
+      {tiles.length || scrolled.length || postTable || values.length || accounts ? <PostSearch value={q.search} count={searchCount} placeholder={'caption, handle, #keyword, post id, date… "exact phrase"'} drop={["n"]} /> : null}
 
       <section id="wins">
         <div className="section__head">
@@ -282,10 +300,10 @@ export default async function NichePage({ params, searchParams }: { params: Prom
         </div>
         {tiles.length ? (
           <>
-            {onIg ? <PlatformSwitch href={hrefWith({ ...q, platform: "" })} view={view} counts={{ both: tiles.length, tiktok: tiles.filter((t) => t.platform === "tiktok").length, instagram: tiles.filter((t) => t.platform === "instagram").length }} /> : null}
+            {onIg ? <PlatformSwitch href={hrefWith({ ...q, platform: "" })} view={view} counts={{ both: found.length, tiktok: found.filter((t) => t.platform === "tiktok").length, instagram: found.filter((t) => t.platform === "instagram").length }} /> : null}
             <NicheFilters picks={picks} checks={[{ key: "recent", label: "last 90 days" }, { key: "winners", label: "winners only" }, { key: "held", label: "downloaded only" }]} values={q} sort={sortPick} />
             <p className="state hx__count" aria-live="polite"><b>{n(match.length)}</b> match · <b>{n(winsIn)}</b> win · showing <b>{n(shown)}</b>{match.length > shown ? <> · then {PAGE} more each time</> : null}</p>
-            {match.length ? <ul className="niche-grid">{match.slice(0, shown).map((t) => <TileCard key={`${t.platform}:${t.id}`} t={t} mixed={onIg} slug={slug} />)}</ul> : <p className="niche-empty">No post matches these filters. Lower the views floor or widen the window.</p>}
+            {match.length ? <ul className="niche-grid">{match.slice(0, shown).map((t) => <TileCard key={`${t.platform}:${t.id}`} t={t} mixed={onIg} slug={slug} />)}</ul> : words.length ? <p className="niche-empty">No post matches {quoted} with these filters. <Link href={hrefWith({ ...q, search: "" })} scroll={false}>Clear the search</Link>, lower the views floor or widen the window.</p> : <p className="niche-empty">No post matches these filters. Lower the views floor or widen the window.</p>}
             {match.length > shown ? <p style={{ marginTop: 14 }}><Link className="read__again" href={moreHref()} scroll={false}>Show {Math.min(PAGE, match.length - shown)} more</Link></p> : null}
           </>
         ) : (
@@ -293,13 +311,13 @@ export default async function NichePage({ params, searchParams }: { params: Prom
         )}
       </section>
 
-      <Section id="scroll" title="From your own scroll" small={scrolled.length ? `${scrolled.length} posts · hover or tap to play` : undefined}>
+      <Section id="scroll" title="From your own scroll" small={scrolled.length ? `${words.length ? `${scrollFound.length} of ` : ""}${scrolled.length} posts · hover or tap to play` : undefined}>
         {scrolled.length ? (
           <>
             <p className="lede lede--full">
               These posts did not come from a search. You found them in your feed and pasted the links on {dmy(latest.date)}: {latest.links.length - handlesIn} post links{handlesIn ? ` and ${handlesIn === 1 ? "one handle" : `${handlesIn} handles`}` : ""}. The agent pulled every slide, the counts and the top comments, and read them slide by slide. They are the only posts in the niche read that way, and the findings below come from them. Hover or tap a card to step through its slides.
             </p>
-            <ul className="sgrid">{scrolled.map((p) => <li key={p.id}><BatchShow p={p} href={p.url} /></li>)}</ul>
+            {scrollFound.length ? <ul className="sgrid">{scrollFound.map((p) => <li key={p.id}><BatchShow p={p} href={p.url} /></li>)}</ul> : <p className="niche-empty">No post from your scroll matches {quoted}. <Link href={hrefWith({ ...q, search: "" })} scroll={false}>Clear the search</Link>.</p>}
             <div className="next" style={{ marginTop: 14 }}>
               <div className="next__left"><p className="next__text is-you"><span className="next__who">Your turn</span>Bring the next batch when you have one: up to ten links from your scroll, pasted in the conversation. The agent fetches the slides, the counts and the comments, reads them, and adds to the findings.</p></div>
             </div>
@@ -337,18 +355,18 @@ export default async function NichePage({ params, searchParams }: { params: Prom
                 </Fold>
               ))}
               {postTable ? (
-                <Fold id="posts-read" title={`The ${postTable.rows.length - ours} posts, one row each${ours ? ` · ${ours} day-7 ${ours === 1 ? "row" : "rows"} of ours` : ""}`} gist="who posts, slides, the hook, the text density, what is kept, where the product sits, the last slide’s ask, the numbers">
-                  <Anat head={postTable.head} rows={postTable.rows} keys={["#", "Handle / post", "Persona", "Slides", "Hook shape", "Text density", "Keepable", "Product slot", "Last-slide ask", "Views", "Saves/view"]} lede="One row per post read, one column per part of the post: who posts, how many slides, the hook, how dense the text is, what the viewer keeps, where the product sits, what the last slide asks. Blank means the slides do not say. After every post of ours goes out, one row is added seven days later, and it is compared with the rows that differ in one part only." />
+                <Fold id="posts-read" open={words.length > 0 && postRows.length > 0} title={`The ${postTable.rows.length - ours} posts, one row each${ours ? ` · ${ours} day-7 ${ours === 1 ? "row" : "rows"} of ours` : ""}${hits(postRows.length)}`} gist="who posts, slides, the hook, the text density, what is kept, where the product sits, the last slide’s ask, the numbers">
+                  <Anat head={postTable.head} rows={postRows} keys={["#", "Handle / post", "Persona", "Slides", "Hook shape", "Text density", "Keepable", "Product slot", "Last-slide ask", "Views", "Saves/view"]} lede="One row per post read, one column per part of the post: who posts, how many slides, the hook, how dense the text is, what the viewer keeps, where the product sits, what the last slide asks. Blank means the slides do not say. After every post of ours goes out, one row is added seven days later, and it is compared with the rows that differ in one part only." />
                 </Fold>
               ) : null}
               {values.length ? (
-                <Fold id="values" title={`The values seen: ${values.length} across ${new Set(values.map((v) => v.param)).size} parameters`} gist={[...new Set(values.map((v) => v.value))].slice(0, 6).join(" · ")}>
-                  <Anat head={["Layer", "Parameter", "Value", "Seen in", "Evidence"]} rows={values.map((v) => [v.layer, v.param, v.value, v.seen, v.evidence])} lede="Every part of a post has a list of values seen so far, with where each was seen. A value stays on the list once it is seen; a new niche or a new batch adds to it." />
+                <Fold id="values" open={words.length > 0 && valueRows.length > 0} title={`The values seen: ${values.length} across ${new Set(values.map((v) => v.param)).size} parameters${hits(valueRows.length)}`} gist={[...new Set(values.map((v) => v.value))].slice(0, 6).join(" · ")}>
+                  <Anat head={["Layer", "Parameter", "Value", "Seen in", "Evidence"]} rows={valueRows} lede="Every part of a post has a list of values seen so far, with where each was seen. A value stays on the list once it is seen; a new niche or a new batch adds to it." />
                 </Fold>
               ) : null}
               {accounts ? (
-                <Fold id="accounts" title="The accounts behind the posts" gist={`${accounts.rows.length} accounts`}>
-                  <Anat head={accounts.head} rows={accounts.rows} lede="One row per account behind the scrolled posts: how the handle is named, what the bio says, whether one persona holds, whether one format is locked, and what tier the account is." />
+                <Fold id="accounts" open={words.length > 0 && accountRows.length > 0} title={`The accounts behind the posts${hits(accountRows.length)}`} gist={`${accounts.rows.length} accounts`}>
+                  <Anat head={accounts.head} rows={accountRows} lede="One row per account behind the scrolled posts: how the handle is named, what the bio says, whether one persona holds, whether one format is locked, and what tier the account is." />
                 </Fold>
               ) : null}
             </div>

@@ -1,10 +1,11 @@
 "use client";
 
 /**
- * The search box over the All posts grid. The search is a URL like every
- * other filter (`search=`): this component only writes it, a short pause
- * after the last key, and the server filters the posts by it (lib/search.ts).
- * Escape or the ✕ clears it. The page number drops out on every change.
+ * The search box over the All posts grid and the Niche page. The search is a
+ * URL like every other filter (`search=`): this component only writes it, a
+ * short pause after the last key, and the server filters the posts by it
+ * (lib/search.ts). Escape or the ✕ clears it. The paging param (`page`, or
+ * the Niche page's `n`) drops out on every change.
  */
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -12,7 +13,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 const PAUSE_MS = 180;
 
-export function PostSearch({ value, count, placeholder }: { value: string; /** The matches line, from the server. */ count: string; placeholder: string }) {
+export function PostSearch({ value, count, placeholder, drop = ["page"] }: { value: string; /** The matches line, from the server. */ count: string; placeholder: string; /** Params that go back to their default on a new search. */ drop?: string[] }) {
   const router = useRouter();
   const path = usePathname();
   const params = useSearchParams();
@@ -36,7 +37,7 @@ export function PostSearch({ value, count, placeholder }: { value: string; /** T
     const u = new URLSearchParams(params?.toString() ?? "");
     if (t) u.set("search", t);
     else u.delete("search");
-    u.delete("page");
+    for (const k of drop) u.delete(k);
     const q = u.toString();
     start(() => router.replace(`${path}${q ? `?${q}` : ""}`, { scroll: false }));
   };

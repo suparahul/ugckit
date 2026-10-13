@@ -1,5 +1,6 @@
 /**
- * The search box of the All posts page: one rule for every tab. The words of
+ * The search box of the All posts page and the Niche page: one rule for
+ * every tab, grid and table. The words of
  * the search are matched without case, each one anywhere in the post's text,
  * and a post matches when every word is found. Words in double quotes are one
  * phrase, found only together and in that order; a quote left open runs to the
@@ -8,6 +9,7 @@
  */
 
 import type { Brand, Post } from "./data.ts";
+import type { BatchPost } from "./niche.ts";
 import type { PostState } from "./production.ts";
 
 type Field = string | null | undefined;
@@ -24,6 +26,9 @@ export function terms(search: string): string[] {
   }
   return out;
 }
+
+/** The search as a sentence shows it: in curly quotes, unless it holds quotes of its own. */
+export const quoted = (search: string): string => (/["“”]/.test(search) ? search : `“${search}”`);
 
 /**
  * True when every word or phrase is somewhere in the fields. A leading @ is
@@ -54,3 +59,16 @@ export const stateFields = (st: Pick<PostState, "row" | "deck" | "posted" | "lin
   st.posted?.at,
   st.link,
 ];
+
+/** A post of the Niche grid: the caption, the handle, every keyword (as #kw) and window that found it, the id and the date. */
+export const tileFields = (t: { caption: string; handle: string; id: string; date: string }, keywords: string[], windows: string[]): Field[] => [
+  t.caption,
+  t.handle,
+  ...keywords.filter(Boolean).map((k) => `#${k}`),
+  ...windows,
+  t.id,
+  t.date,
+];
+
+/** A post from your scroll: the caption, the handle, the sound, the id and the date. */
+export const batchFields = (p: Pick<BatchPost, "caption" | "handle" | "sound" | "id" | "date">): Field[] => [p.caption, p.handle, p.sound, p.id, p.date];

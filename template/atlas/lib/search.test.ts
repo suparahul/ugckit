@@ -10,7 +10,7 @@ import { test } from "node:test";
 
 import type { Post } from "./data.ts";
 import type { PostState } from "./production.ts";
-import { matches, postFields, stateFields, terms } from "./search.ts";
+import { batchFields, matches, postFields, quoted, stateFields, terms, tileFields } from "./search.ts";
 
 test("terms: lower case, split on space, an empty search has none", () => {
   assert.deepEqual(terms("  Cat  FOOD "), ["cat", "food"]);
@@ -85,4 +85,31 @@ test("one of our posts is found by its topic, deck, first slide, handle, key and
   assert.equal(matches(terms("dog"), stateFields(st)), false);
   /* No deck yet: the row alone still answers. */
   assert.equal(matches(terms("hide"), stateFields({ ...st, deck: null })), true);
+});
+
+test("a Niche post is found by its caption, handle, keywords, windows, id and date", () => {
+  const t = { caption: "My cat's vet bill was $900", handle: "kitty.costs", id: "7300001", date: "2026-08-30" };
+  const f = tileFields(t, ["catcare", ""], ["last three months", "photo tab"]);
+  for (const s of ["VET BILL", '"vet bill was"', "@kitty.costs", "#catcare", "catcare", '"photo tab"', "three months", "7300001", "2026-08"]) assert.equal(matches(terms(s), f), true, s);
+  for (const s of ['"bill vet"', "#dogcare", '"three photo"']) assert.equal(matches(terms(s), f), false, s);
+  /* An empty keyword adds no lone "#". */
+  assert.equal(f.includes("#"), false);
+});
+
+test("a post from your scroll is found by its caption, handle, sound, id and date; no date is fine", () => {
+  const p = { caption: "Indoor cat enrichment ideas", handle: "whisker.lab", sound: "original sound - whisker.lab", id: "7400002", date: null };
+  for (const s of ["enrichment", "@whisker.lab", '"original sound"', "7400002"]) assert.equal(matches(terms(s), batchFields(p)), true, s);
+  assert.equal(matches(terms("2026"), batchFields(p)), false);
+});
+
+test("a findings table row is its cells", () => {
+  const row = ["3", "@kitty.costs / 7300001", "vet tech", "7", "Question hook"];
+  assert.equal(matches(terms('"question hook" kitty'), row), true);
+  assert.equal(matches(terms('"hook question"'), row), false);
+});
+
+test("quoted: curly quotes around a search, none added to one that has its own", () => {
+  assert.equal(quoted("cat food"), "“cat food”");
+  assert.equal(quoted('"cat food" vet'), '"cat food" vet');
+  assert.equal(quoted("“cat food"), "“cat food");
 });

@@ -16,7 +16,7 @@ import { brandsOf, captionBody, commas, views as shortViews, type Brand, type Po
 import { listHandles } from "@/lib/handles";
 import { allStates } from "@/lib/production";
 import { isPosted } from "@/lib/read";
-import { matches, postFields, stateFields, terms } from "@/lib/search";
+import { matches, postFields, quoted as quote, stateFields, terms } from "@/lib/search";
 import { Room, Section } from "@/components/factory/Bits";
 import { PostedShow } from "@/components/factory/Cards";
 import { NicheFilters, type Pick } from "@/components/factory/NicheFilters";
@@ -52,7 +52,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const found = words.length ? rows.filter((r) => matches(words, postFields(r.p, r.b))) : rows;
   const postedFound = words.length ? posted.filter((st) => matches(words, stateFields(st))) : posted;
   const nHeld = found.filter((r) => r.held).length;
-  const quoted = `“${search}”`;
+  const quoted = quote(search);
 
   const tabHref = (t: string, keep = search) => `/posts?app=${s}${t === "held" ? "" : `&tab=${t}`}${keep ? `&search=${encodeURIComponent(keep)}` : ""}`;
   const tabs = (
