@@ -3,7 +3,9 @@
  * with one tab of our own. Three tabs: the held posts (a cover, a video or
  * the slides on disk), the posts not held, and our posts (what went out, from
  * the log). The tiles play in place and expand for the text. Every filter is
- * a URL; the page is a server component over data/index.json.
+ * a URL; the page is a server component over data/index.json. The search
+ * (`search=`) is one box over all three tabs and stays when the tab changes;
+ * what it reads of a post is lib/search.ts.
  */
 
 import type { Metadata } from "next";
@@ -14,9 +16,11 @@ import { brandsOf, captionBody, commas, views as shortViews, type Brand, type Po
 import { listHandles } from "@/lib/handles";
 import { allStates } from "@/lib/production";
 import { isPosted } from "@/lib/read";
+import { matches, postFields, stateFields, terms } from "@/lib/search";
 import { Room, Section } from "@/components/factory/Bits";
 import { PostedShow } from "@/components/factory/Cards";
 import { NicheFilters, type Pick } from "@/components/factory/NicheFilters";
+import { PostSearch } from "@/components/factory/PostSearch";
 import PostTile from "@/components/PostTile";
 import "./posts.css";
 
@@ -36,20 +40,26 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const s = slug ? encodeURIComponent(slug) : "";
   const brands = slug ? brandsOf(slug) : [];
   const tab = (["held", "unheld", "ours"].includes(one("tab")) ? one("tab") : "held") as "held" | "unheld" | "ours";
+  const search = one("search").trim();
+  const words = terms(search);
 
   const rows: Row[] = brands.flatMap((b) => b.accounts.flatMap((a) => a.posts.map((p) => ({ p, b, held: !!(p.cover || p.video || p.slides.length), kind: (p.format === "slideshow" ? "carousel" : "video") as "video" | "carousel" }))));
   const states = slug ? allStates(slug) : [];
   const handles = slug ? listHandles(slug) : [];
   const posted = states.filter(isPosted).sort((a, b) => (b.posted!.at > a.posted!.at ? 1 : -1));
   const planned = states.filter((st) => !st.posted && !st.killed).length;
-  const nHeld = rows.filter((r) => r.held).length;
+  /* The search narrows every tab, and the tab counts say what each tab holds of it. */
+  const found = words.length ? rows.filter((r) => matches(words, postFields(r.p, r.b))) : rows;
+  const postedFound = words.length ? posted.filter((st) => matches(words, stateFields(st))) : posted;
+  const nHeld = found.filter((r) => r.held).length;
+  const quoted = `“${search}”`;
 
-  const tabHref = (t: string) => `/posts?app=${s}${t === "held" ? "" : `&tab=${t}`}`;
+  const tabHref = (t: string, keep = search) => `/posts?app=${s}${t === "held" ? "" : `&tab=${t}`}${keep ? `&search=${encodeURIComponent(keep)}` : ""}`;
   const tabs = (
     <nav className="tabs" aria-label="Set">
       <Link className={`tabs__tab${tab === "held" ? " is-on" : ""}`} aria-current={tab === "held" ? "true" : undefined} href={tabHref("held")}>Atlas · held <span className="tabs__n">{commas(nHeld)}</span></Link>
-      <Link className={`tabs__tab${tab === "unheld" ? " is-on" : ""}`} aria-current={tab === "unheld" ? "true" : undefined} href={tabHref("unheld")}>Atlas · not held <span className="tabs__n">{commas(rows.length - nHeld)}</span></Link>
-      <Link className={`tabs__tab${tab === "ours" ? " is-on" : ""}`} aria-current={tab === "ours" ? "true" : undefined} href={tabHref("ours")}>Our posts <span className="tabs__n">{posted.length}</span></Link>
+      <Link className={`tabs__tab${tab === "unheld" ? " is-on" : ""}`} aria-current={tab === "unheld" ? "true" : undefined} href={tabHref("unheld")}>Atlas · not held <span className="tabs__n">{commas(found.length - nHeld)}</span></Link>
+      <Link className={`tabs__tab${tab === "ours" ? " is-on" : ""}`} aria-current={tab === "ours" ? "true" : undefined} href={tabHref("ours")}>Our posts <span className="tabs__n">{postedFound.length}</span></Link>
     </nav>
   );
   const head = (
@@ -69,8 +79,11 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
         {head}
         <section>
           {tabs}
-          {posted.length ? (
-            <ul className="sgrid" style={{ marginTop: 16 }}>{posted.map((st) => <li key={st.row.key}><PostedShow s={st} handle={handleOf(st.row.short)} /></li>)}</ul>
+          {posted.length ? <PostSearch value={search} placeholder="topic, caption, handle, date…" count={words.length ? `${commas(postedFound.length)} of ${commas(posted.length)} of ours match` : ""} /> : null}
+          {postedFound.length ? (
+            <ul className="sgrid" style={{ marginTop: 16 }}>{postedFound.map((st) => <li key={st.row.key}><PostedShow s={st} handle={handleOf(st.row.short)} /></li>)}</ul>
+          ) : posted.length ? (
+            <p className="xempty">No post of ours matches {quoted}. <Link href={tabHref("ours", "")}>Clear the search</Link>, or try a research tab.</p>
           ) : (
             <Room text="Every post of ours that went out, newest first, with its numbers when the read is in." small={app ? "fills at production" : "fills once an app is named"} />
           )}
@@ -80,8 +93,9 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   }
 
   /* ---- the research tabs, from the URL */
-  const q = { brand: one("brand"), kind: one("kind"), hook: one("hook"), handle: one("handle"), sort: one("sort", "views"), tab: tab === "unheld" ? "unheld" : "" };
-  const inTab = rows.filter((r) => r.held === (tab === "held"));
+  const q = { brand: one("brand"), kind: one("kind"), hook: one("hook"), handle: one("handle"), sort: one("sort", "views"), tab: tab === "unheld" ? "unheld" : "", search };
+  const inTab = found.filter((r) => r.held === (tab === "held"));
+  const inTabAll = words.length ? rows.filter((r) => r.held === (tab === "held")).length : inTab.length;
   const hooks = [...new Set(inTab.flatMap((r) => r.p.tags.hook.map((t) => t.label)))].sort();
   const match = inTab.filter((r) => (!q.brand || r.b.id === q.brand) && (!q.kind || r.kind === q.kind) && (!q.hook || r.p.tags.hook.some((t) => t.label === q.hook)) && (!q.handle || r.p.handle === q.handle));
   match.sort((a, b) => (q.sort === "date" ? b.p.date.localeCompare(a.p.date) : b.p.views - a.p.views));
@@ -94,10 +108,10 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     { key: "hook", label: "hook", def: "", opts: [{ v: "", label: "any hook" }, ...hooks.map((h) => ({ v: h, label: h, n: inTab.filter((r) => r.p.tags.hook.some((t) => t.label === h)).length }))] },
   ];
   const sortPick: Pick = { key: "sort", label: "sort", def: "views", opts: [{ v: "views", label: "by views" }, { v: "date", label: "by date" }] };
-  const pageHref = (n: number) => {
+  const pageHref = (n: number, over: Partial<typeof q> = {}) => {
     const u = new URLSearchParams();
     if (slug) u.set("app", slug);
-    for (const [k, v] of Object.entries(q)) if (v && !(k === "sort" && v === "views")) u.set(k, v);
+    for (const [k, v] of Object.entries({ ...q, ...over })) if (v && !(k === "sort" && v === "views")) u.set(k, v);
     if (n > 1) u.set("page", String(n));
     return `/posts?${u.toString()}#grid`;
   };
@@ -109,6 +123,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
         {tabs}
         {rows.length ? (
           <>
+            <PostSearch value={search} placeholder="hook, caption, handle, post id, date…" count={words.length ? `${commas(inTab.length)} of ${commas(inTabAll)} in this tab match` : ""} />
             <NicheFilters picks={picks} checks={[]} values={{ ...q, app: slug ?? "" }} sort={sortPick} keep={["app", "tab", "handle"]} anchor="grid" />
             <p className="state hx__count">
               {q.handle ? <>@{q.handle} · <Link href={pageHref(1).replace(`&handle=${encodeURIComponent(q.handle)}`, "").replace(`handle=${encodeURIComponent(q.handle)}&`, "")}>every handle</Link> · </> : null}
@@ -139,7 +154,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
                 })}
               </ul>
             ) : (
-              <p className="xempty">No post in this tab matches. Try the other tab, or clear a filter.</p>
+              <p className="xempty">No post in this tab matches{search ? <> {quoted}. <Link href={pageHref(1, { search: "" })}>Clear the search</Link>, try</> : ". Try"} the other tab, or clear a filter.</p>
             )}
             {pages > 1 ? (
               <nav className="xpager" aria-label="Pages">
