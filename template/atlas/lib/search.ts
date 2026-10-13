@@ -1,8 +1,10 @@
 /**
  * The search box of the All posts page: one rule for every tab. The words of
  * the search are matched without case, each one anywhere in the post's text,
- * and a post matches when every word is found. Pure: the page uses it,
- * lib/search.test.ts checks it.
+ * and a post matches when every word is found. Words in double quotes are one
+ * phrase, found only together and in that order; a quote left open runs to the
+ * end, so the box reads as a phrase while it is being typed. Pure: the page
+ * uses it, lib/search.test.ts checks it.
  */
 
 import type { Brand, Post } from "./data.ts";
@@ -10,13 +12,28 @@ import type { PostState } from "./production.ts";
 
 type Field = string | null | undefined;
 
-/** The words of a search, lower case. An empty search has none and matches everything. */
-export const terms = (search: string): string[] => search.toLowerCase().split(/\s+/).filter(Boolean);
+/** A quoted phrase (straight or curly quotes, the closing one optional), or one word outside quotes. */
+const TERM = /["“”]([^"“”]*)(?:["“”]|$)|[^\s"“”]+/g;
 
-/** True when every word is somewhere in the fields. A leading @ on a word is dropped, so "@handle" finds the handle. */
+/** The words and quoted phrases of a search, lower case, a phrase's spaces made single. An empty search has none and matches everything. */
+export function terms(search: string): string[] {
+  const out: string[] = [];
+  for (const m of search.toLowerCase().matchAll(TERM)) {
+    const t = m[1] === undefined ? m[0] : m[1].trim().replace(/\s+/g, " ");
+    if (t) out.push(t);
+  }
+  return out;
+}
+
+/**
+ * True when every word or phrase is somewhere in the fields. A leading @ is
+ * dropped, so "@handle" finds the handle. A field's spaces and line breaks are
+ * made single so a phrase finds its words across a line break, but never
+ * across two fields.
+ */
 export function matches(words: string[], fields: Field[]): boolean {
   if (!words.length) return true;
-  const text = fields.filter(Boolean).join("\n").toLowerCase();
+  const text = fields.filter((f): f is string => !!f).map((f) => f.replace(/\s+/g, " ")).join("\n").toLowerCase();
   return words.every((w) => text.includes(w.replace(/^@(?=.)/, "")));
 }
 

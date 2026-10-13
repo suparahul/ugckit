@@ -79,7 +79,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
         {head}
         <section>
           {tabs}
-          {posted.length ? <PostSearch value={search} placeholder="topic, caption, handle, date…" count={words.length ? `${commas(postedFound.length)} of ${commas(posted.length)} of ours match` : ""} /> : null}
+          {posted.length ? <PostSearch value={search} placeholder="topic, caption, handle, date… &quot;exact phrase&quot;" count={words.length ? `${commas(postedFound.length)} of ${commas(posted.length)} of ours match` : ""} /> : null}
           {postedFound.length ? (
             <ul className="sgrid" style={{ marginTop: 16 }}>{postedFound.map((st) => <li key={st.row.key}><PostedShow s={st} handle={handleOf(st.row.short)} /></li>)}</ul>
           ) : posted.length ? (
@@ -123,7 +123,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
         {tabs}
         {rows.length ? (
           <>
-            <PostSearch value={search} placeholder="hook, caption, handle, post id, date…" count={words.length ? `${commas(inTab.length)} of ${commas(inTabAll)} in this tab match` : ""} />
+            <PostSearch value={search} placeholder="hook, caption, handle, post id, date… &quot;exact phrase&quot;" count={words.length ? `${commas(inTab.length)} of ${commas(inTabAll)} in this tab match` : ""} />
             <NicheFilters picks={picks} checks={[]} values={{ ...q, app: slug ?? "" }} sort={sortPick} keep={["app", "tab", "handle"]} anchor="grid" />
             <p className="state hx__count">
               {q.handle ? <>@{q.handle} · <Link href={pageHref(1).replace(`&handle=${encodeURIComponent(q.handle)}`, "").replace(`handle=${encodeURIComponent(q.handle)}&`, "")}>every handle</Link> · </> : null}

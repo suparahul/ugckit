@@ -1,6 +1,7 @@
 /**
  * The search of the All posts page (lib/search.ts): without case, every word
- * somewhere in the text, an @ before a handle dropped. No file, no network.
+ * somewhere in the text, a quoted phrase only as a whole, an @ before a
+ * handle dropped. No file, no network.
  * Run with `npm test` (node --test).
  */
 
@@ -15,6 +16,40 @@ test("terms: lower case, split on space, an empty search has none", () => {
   assert.deepEqual(terms("  Cat  FOOD "), ["cat", "food"]);
   assert.deepEqual(terms(""), []);
   assert.deepEqual(terms("   "), []);
+});
+
+test("terms: a quoted phrase is one term, mixed with words, curly quotes too", () => {
+  assert.deepEqual(terms('"Cat Food"'), ["cat food"]);
+  assert.deepEqual(terms('kitten "cat   food" 2026'), ["kitten", "cat food", "2026"]);
+  assert.deepEqual(terms('“wet food” “dry food”'), ["wet food", "dry food"]);
+  assert.deepEqual(terms('vet"cat food"'), ["vet", "cat food"]);
+  /* Empty quotes say nothing. */
+  assert.deepEqual(terms('"" "  " cat'), ["cat"]);
+});
+
+test("terms: a quote left open makes the rest one phrase", () => {
+  assert.deepEqual(terms('"cat fo'), ["cat fo"]);
+  assert.deepEqual(terms('vet "cat food'), ["vet", "cat food"]);
+  assert.deepEqual(terms('"'), []);
+});
+
+test("matches: a phrase only together and in order, words still apart", () => {
+  const f = ["Best CAT FOOD for kittens", "food your cat will love"];
+  assert.equal(matches(terms('"cat food"'), f), true);
+  assert.equal(matches(terms('"food cat"'), f), false);
+  assert.equal(matches(terms('"cat food"'), ["food your cat will love"]), false);
+  assert.equal(matches(terms("cat food"), ["food your cat will love"]), true);
+  /* Mixed: every part must match. */
+  assert.equal(matches(terms('"cat food" kittens'), f), true);
+  assert.equal(matches(terms('"cat food" puppies'), f), false);
+  /* A line break or double space in the text still holds the phrase; two fields do not. */
+  assert.equal(matches(terms('"cat food"'), ["wet cat\n  food"]), true);
+  assert.equal(matches(terms('"cat food"'), ["my cat", "food"]), false);
+  /* A phrase is found as text, like a word is. */
+  assert.equal(matches(terms('"cat food"'), ["bobcat foodie"]), true);
+  /* Typing: an open quote is a phrase so far. */
+  assert.equal(matches(terms('"cat fo'), f), true);
+  assert.equal(matches(terms('"cat fo'), ["food your cat"]), false);
 });
 
 test("matches: no words match everything, every word must be found", () => {
