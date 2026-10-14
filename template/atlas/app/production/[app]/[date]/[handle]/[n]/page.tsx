@@ -24,7 +24,7 @@ import { Face } from "@/components/factory/Bits";
 import { Reads } from "@/components/factory/Reads";
 import { Account, hasSecondPlatform, viewOf } from "@/components/Platform";
 import { Legs } from "@/components/production/Legs";
-import { cardText, restParts } from "@/lib/plan-parts";
+import { cardText } from "@/lib/plan-parts";
 
 export const dynamic = "force-dynamic";
 
@@ -67,8 +67,6 @@ export default async function ProductionPost({ params, searchParams }: { params:
   const bridge = step ? bridgeInfo(state) : undefined;
   const notes = step ? postingNotes(state) : [];
   const warning = bridge ? sendWarning(state, bridge) : null;
-  /* The plan cell's parts about the handle (format, images, handle rule), which the day card leaves out. */
-  const rest = row.video ? [] : restParts(row);
 
   /* prev / next walk the day's posts in board order. */
   const day = allStates(app).filter((s) => s.row.date === row.date);
@@ -107,11 +105,6 @@ export default async function ProductionPost({ params, searchParams }: { params:
             <Link className="post-head__mode" href={`${base}?as=plan`}>view as plan</Link>
           )}
         </p>
-        {rest.length ? (
-          <dl className="post-head__parts">
-            {rest.map((p, k) => <div key={k}><dt>{p.label}</dt><dd>{p.text}</dd></div>)}
-          </dl>
-        ) : null}
         {two ? <Legs s={state} href={`${base}${slideNo > 1 ? `?slide=${slideNo}` : ""}`} view={view} /> : null}
         <div className="next" id="decision">
           <div className="next__left">

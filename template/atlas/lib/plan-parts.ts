@@ -1,9 +1,9 @@
 /**
  * The labelled parts of a plan row's Format / variation cell, split by
  * scripts/build-production.mjs (formatPartsOf) into `formatParts`. The day card
- * shows what the post is about (topic, angle, overwrites, slides); the post page
- * shows the rest under their labels: the format, the images and the handle rule,
- * which are about the handle and repeat on every row.
+ * shows what the post is about (topic, angle, overwrites, slides); the idea view
+ * shows the format part. The images and the handle rule are about the handle, not
+ * the post, so no post view shows them; they stay in the data.
  */
 
 import type { PlanRow } from "@/lib/production";
@@ -24,6 +24,5 @@ export function cardText(row: PlanRow): string {
   return parts.length ? joined(parts) : row.format;
 }
 
-/** The parts the card leaves out (format, images, handle rule and any other label), for the post page. */
-export const restParts = (row: PlanRow): FormatPart[] =>
-  formatParts(row).some((p) => CARD.has(p.label.toLowerCase())) ? formatParts(row).filter((p) => !CARD.has(p.label.toLowerCase())) : [];
+/** The text under the cell's format label, for the idea view; the whole cell when it has no such label. */
+export const formatText = (row: PlanRow): string => formatParts(row).find((p) => p.label.toLowerCase() === "format")?.text ?? row.format;

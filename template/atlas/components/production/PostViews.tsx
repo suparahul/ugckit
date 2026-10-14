@@ -14,6 +14,7 @@
 import Link from "next/link";
 
 import { getPost } from "@/lib/data";
+import { formatText } from "@/lib/plan-parts";
 import { dateParts, getProduction, outcomesOpenAt, postPath, type Deck, type DeckFile, type PostState, type SourceRef } from "@/lib/production";
 import { Deck as DeckView } from "./Deck";
 import { VideoView } from "./VideoView";
@@ -144,7 +145,7 @@ export function IdeaBrief({ state }: { state: PostState }) {
               {row.tags?.length ? <div className="idea__row"><dt>Tags</dt><dd>{row.tags.join(" ")}</dd></div> : null}
             </>
           ) : (
-            <div className="idea__row"><dt>Format</dt><dd>{row.format}</dd></div>
+            <div className="idea__row"><dt>Format</dt><dd>{formatText(row)}</dd></div>
           )}
           <div className="idea__row"><dt>Feature card</dt><dd>{idea.feature ?? <span className="is-blank">none named</span>}</dd></div>
           <div className="idea__row">
