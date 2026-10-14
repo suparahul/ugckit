@@ -13,6 +13,7 @@ import { Account, LegSplit } from "@/components/Platform";
 import { SLOTS, SLOT_TIME, slotKey } from "@/lib/slots";
 import { firstPicture } from "@/components/factory/Wait";
 import { Dot, Marks } from "./Marks";
+import { CellText } from "./CellText";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -195,7 +196,7 @@ export function DayGrid({ states, handles, times = {} }: { states: PostState[]; 
   );
 }
 
-/** A planned post in the day view: the thumbnail slot at the left (the first picture once one exists), then the slot, the topic, the format and the state; the numbers once posted. */
+/** A planned post in the day view: the thumbnail slot at the left (the first picture once one exists), then the slot, the topic, the format (both held to three lines, with Show more) and the state; the numbers once posted. */
 export function Cell({ s, time }: { s: PostState; time?: string }) {
   const cls = ["cell", "cell--thumb"];
   if (s.waiting) cls.push("is-waiting");
@@ -210,8 +211,7 @@ export function Cell({ s, time }: { s: PostState; time?: string }) {
     <Link href={postHref(s)} className={cls.join(" ")}>
       <span className={`cell__thumb${pic ? "" : " is-empty"}`} aria-hidden="true">{pic ? <img src={pic} alt="" /> : <span className="cell__nopic">{word}</span>}</span>
       <span className="cell__handle">{s.row.slot}{time ? ` · ${time}` : ""}</span>
-      <span className="cell__topic">{s.row.topic}</span>
-      <span className="cell__format"><span className="state">{s.row.video ? `video${s.row.video.type ? ` · ${s.row.video.type}` : ""}` : `${s.row.format}${s.deck ? ` · ${s.deck.slides.length} slides` : ""}`} · {s.dimension}</span></span>
+      <CellText topic={s.row.topic} format={`${s.row.video ? `video${s.row.video.type ? ` · ${s.row.video.type}` : ""}` : `${s.row.format}${s.deck ? ` · ${s.deck.slides.length} slides` : ""}`} · ${s.dimension}`} />
       <span className="cell__state"><Marks state={s} /><StateWord s={s} /></span>
       {nb ? <span className="cell__read" aria-label={`${n(nb.views)} views, ${nb.saves} saves, ${nb.shares} shares`}><b>{n(nb.views)}</b><span className={z(nb.saves)}>{nb.saves} {nb.saves === 1 ? "save" : "saves"}</span><span className={z(nb.shares)}>{nb.shares} {nb.shares === 1 ? "share" : "shares"}</span></span> : null}
       <LegSplit s={s} className="cell__split" />

@@ -378,6 +378,12 @@
 }
 .cell__format,
 .cell__state { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+/* The day card's text: three lines at most until "Show more" opens that card (CellText). */
+.cell__clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.cell__topic.is-open, .cell__clamp.is-open { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.cell__more { grid-column: 1; justify-self: start; margin-top: 4px; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--ember-deep); cursor: pointer; }
+.cell__more:hover { text-decoration: underline; }
+.cell--thumb .cell__more { grid-column: 2; }
 /* Reserved. Statistics come back here later; nothing else does. */
 /* Room for statistics later: kept as space, not drawn as a line. */
 .cell__room {
