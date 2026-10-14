@@ -19,6 +19,29 @@ import type { CSSProperties } from "react";
 import { BIG_FROM, FONT_SIZE_BY, frameOf } from "@/lib/layout";
 import { cardKind, isScreenBlock, phoneLabel, phoneOf, shownCards, type PhoneSlot } from "@/lib/callout";
 import { CrossIcon, LockIcon } from "./Marks";
+import { CAMERA, cameraLines, cameraTexts, cameraZoom } from "@/lib/camera-cover";
+
+/** A camera cover (lib/camera-cover.ts): the grid, the zoom buttons and the stacked hook, as the compositor draws them. */
+function CameraCover({ slide, dimension }: { slide: Slide; dimension: Dimension }) {
+  const f = frameOf(dimension);
+  const aspect = f.w / f.h;
+  const { big, small } = cameraTexts(slide.blocks);
+  return (
+    <div className="frame__camera" aria-label={`camera cover: ${big.replace(/\n/g, " ")}${small ? ` ${small.replace(/\n/g, " ")}` : ""}`}>
+      <span className="frame__camgrid" aria-hidden="true" />
+      {slide.cover?.zoom
+        ? cameraZoom().map((b) => (
+            <span key={b.label} className={`frame__camzoom${b.active ? " is-active" : ""}`} aria-hidden="true" style={{ left: `${b.left}%`, top: `calc(${CAMERA.zoom.top}% - ${b.d / 2}cqw)`, width: `${b.d}cqw`, height: `${b.d}cqw`, fontSize: `${CAMERA.zoom.fs}cqw` }}>
+              {b.label}
+            </span>
+          ))
+        : null}
+      {cameraLines(big, small, aspect).map((l, i) => (
+        <span key={i} className="frame__camline" style={{ left: `${l.cx}%`, top: `${l.top}%`, fontSize: `${l.size}cqw` }}>{l.text}</span>
+      ))}
+    </div>
+  );
+}
 
 const fileUrl = (rel: string) => `/api/production/file/${rel.split("/").map(encodeURIComponent).join("/")}`;
 
@@ -126,7 +149,7 @@ export function Sketch({ slide, total, dimension = "3:4" }: { slide: Slide; tota
   const hasCards = shown.length > 0;
   return (
     <div className={`frame is-sketch${hasCards ? " has-cards" : ""}`} style={frameStyle(dimension)} aria-label={`Sketch of slide ${slide.n}: text placement only`} role="img">
-      <Stacks slide={slide} sketch />
+      {slide.cover?.style === "camera" ? <CameraCover slide={slide} dimension={dimension} /> : <Stacks slide={slide} sketch />}
       {total ? <span className="frame__no tabular" aria-hidden="true">{slide.n} / {total}</span> : null}
       {phone ? <PhoneCallout slot={phone} held={null} alt="" /> : null}
       {hasCards ? (
@@ -179,7 +202,7 @@ export function Replica({
       ) : (
         <div className="frame__empty" aria-hidden="true" />
       )}
-      {layout ? <FreeBlocks layout={layout} /> : <Stacks slide={slide} />}
+      {layout ? <FreeBlocks layout={layout} /> : slide.cover?.style === "camera" ? <CameraCover slide={slide} dimension={dimension} /> : <Stacks slide={slide} />}
       {layout ? <span className="frame__lock" role="img" aria-label="saved layout" title="saved layout"><LockIcon /></span> : null}
       {/* The slide's picture holds the phone once it exists; the slot shows only before. */}
       {phone && !state.current ? <PhoneCallout slot={phone} held={null} alt="" /> : null}

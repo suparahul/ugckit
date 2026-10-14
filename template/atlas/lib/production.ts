@@ -140,6 +140,8 @@ export type Slide = {
   cards: string[];
   /** The words come from a "Composition spec" paragraph: the slide is composed in HTML, so a picture of it already holds the text. */
   composed?: boolean;
+  /** A `**Cover style:** camera` line: the slide is drawn as a phone camera screen (lib/camera-cover.ts). */
+  cover?: { style: "camera"; zoom: boolean } | null;
 };
 
 export type Deck = {

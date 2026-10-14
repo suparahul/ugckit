@@ -56,6 +56,9 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import sharp from "sharp";
+import { ImageResponse } from "next/dist/compiled/@vercel/og/index.node.js";
+import { createElement as h } from "react";
+import { CAMERA, cameraLines, cameraTexts, cameraZoom } from "../lib/camera-cover.ts";
 import { cardHash, renderAppStoreCard } from "./lib/appstore-card.mjs";
 import { isScreenBlock, shownCards } from "../lib/callout.ts";
 
@@ -236,6 +239,8 @@ async function defaultLayoutSvg(slide, hasCard) {
   let out = "";
   for (const place of ["top", "middle", "bottom"]) {
     const bs = groups[place];
+  /* A camera cover's words are drawn by cameraLayer, in its own type. */
+  if (slide.cover?.style === "camera") return "";
     if (!bs.length) continue;
     /* The callout stack is 94% wide (production.css), so the sentence's trailing emoji does not strand on a line of its own. */
     const wide = hasCard && place === "bottom";
@@ -267,6 +272,44 @@ async function lockedLayoutSvg(layout) {
   }
   return out;
 }
+/**
+ * The camera cover's layer (lib/camera-cover.ts): the 3x3 grid and the zoom buttons over the
+ * picture, and with `withText` the hook in its stacked, staggered lines. A transparent PNG at
+ * W × H, drawn with next/og so the font file is used as it is (librsvg and Pango take only
+ * installed fonts).
+ */
+let cameraFont = null;
+async function cameraLayer(slide, withText) {
+  cameraFont ??= readFileSync(join(ROOT, CAMERA.fontFile));
+  const px = (v) => (v / 100) * W, py = (v) => (v / 100) * H;
+  const type = { fontFamily: "Camera", fontWeight: CAMERA.weight };
+  const kids = [];
+  const gw = Math.max(1, Math.round(px(CAMERA.grid.width)));
+  const rule = (style) => h("div", { style: { position: "absolute", display: "flex", background: `rgba(255,255,255,${CAMERA.grid.opacity})`, ...style } });
+  for (const f of [1 / 3, 2 / 3]) {
+    kids.push(rule({ left: Math.round(W * f - gw / 2), top: 0, width: gw, height: H }));
+    kids.push(rule({ top: Math.round(H * f - gw / 2), left: 0, height: gw, width: W }));
+  }
+  if (slide.cover.zoom) {
+    for (const b of cameraZoom()) {
+      const d = px(b.d);
+      kids.push(h("div", { style: { ...type, position: "absolute", display: "flex", alignItems: "center", justifyContent: "center", left: px(b.left), top: py(CAMERA.zoom.top) - d / 2, width: d, height: d, borderRadius: d / 2, background: "rgba(28,28,30,0.6)", color: b.active ? CAMERA.zoomInk : "#fff", fontSize: px(CAMERA.zoom.fs) } }, b.label));
+    }
+  }
+  if (withText) {
+    const { big, small } = cameraTexts(slide.blocks);
+    for (const l of cameraLines(big, small, W / H)) {
+      /* A full-width row centres the line; a margin on one side moves its centre to l.cx (half the margin). */
+      const shift = 2 * (px(l.cx) - W / 2);
+      kids.push(h("div", { style: { position: "absolute", display: "flex", justifyContent: "center", left: 0, width: W, top: py(l.top) } },
+        h("div", { style: { ...type, display: "flex", whiteSpace: "nowrap", color: CAMERA.ink, fontSize: px(l.size), lineHeight: CAMERA.lineHeight, marginLeft: Math.max(0, shift), marginRight: Math.max(0, -shift) } }, l.text)));
+    }
+  }
+  const root = h("div", { style: { display: "flex", position: "relative", width: W, height: H } }, ...kids);
+  const res = new ImageResponse(root, { width: W, height: H, fonts: [{ name: "Camera", data: cameraFont, weight: CAMERA.weight, style: "normal" }] });
+  return Buffer.from(await res.arrayBuffer());
+}
+
 
 /* ------------------------------------------------------------- render */
 
@@ -332,6 +375,8 @@ async function renderPost(key, { force = false, override = {}, burnCover = false
       const { path, note } = await cardFor(key, layout, cardPath);
       cardNote = note;
       const lc = layout?.card;
+    /* A camera cover: the grid and the zoom buttons always (they belong to the picture), the hook when the text is burned. */
+    if (slide.cover?.style === "camera" && !illustrated) layers.push({ input: await cameraLayer(slide, flag === "baked" && !layoutOf(slide.n, events)), top: 0, left: 0 });
       const cw = Math.round(((lc ? lc.w : CARD.w) / 100) * W), ch = Math.round(cw * CARD.ratio);
       const cardLeft = Math.round(lc ? (lc.x / 100) * W : (W - cw) / 2);
       const cardTop = Math.round(lc ? (lc.y / 100) * H : (FR.safe.bottom / 100) * H - ch);

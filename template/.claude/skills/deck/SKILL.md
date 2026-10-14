@@ -95,6 +95,15 @@ in-app text: Atlas and the compositor never draw it as slide text; the callout s
 it inside the app's picture. "The screen:" in "Why this slide" names the screen on the
 Atlas placeholder.
 
+A camera cover (a slide drawn as a phone camera screen, such as a mirror selfie): the line
+`**Cover style:** camera` on the slide (`camera, no zoom` leaves out the zoom buttons). The
+compositor and Atlas then draw, over the picture, the camera's 3x3 grid and its ".5 1x 2"
+zoom buttons, and the hook in TikTok Sans SemiBold, pale yellow (#F4EEAC), lowercase, no
+outline and no box, one line per line of the block, the lines staggered over the middle of
+the frame (`atlas/lib/camera-cover.ts`). Write the hook as `**On-image text (big):**`, one or
+two words a line, and an optional `**On-image text, under it (small):**` block for a bracketed
+part. The image prompt asks for a clean photo: no grid lines, no camera interface, no text.
+
 An illustrated handle puts the text in the picture. Each slide's image prompt carries,
 after the style prefix and the scene, the slide's text word for word in quotation
 marks, where it sits, the lettering feel and the text colour (`… the words "How to stop

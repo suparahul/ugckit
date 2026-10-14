@@ -30,6 +30,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import { parseCoverStyle } from "../lib/camera-cover.ts";
 import { parsePlatforms } from "../lib/platform.ts";
 import { brainValues, columnsOf, isRecreation, kindOf, tagsOf, videoIdIn, videoIdeaOf } from "../lib/video-row.ts";
 
@@ -474,6 +475,10 @@ function parseSlide(heading, body, postTextSize) {
       slide.prompt = text.replace(/^\[style prefix\]\s*/i, "");
     } else if (/^position and size/i.test(rawLabel)) {
       slide.position = text;
+    } else if (/^cover style/i.test(rawLabel)) {
+      /* "**Cover style:** camera": the slide is drawn as a phone camera screen (lib/camera-cover.ts); not a text block. */
+      slide.cover = parseCoverStyle(text);
+      if (!slide.cover) warn(`deck: slide ${n} cover style "${text}" is not one the compositor draws (camera)`);
     } else if (/^why this slide/i.test(rawLabel)) {
       slide.why = text;
     } else if (/^cards/i.test(rawLabel)) {

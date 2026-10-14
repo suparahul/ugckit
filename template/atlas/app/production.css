@@ -771,6 +771,17 @@
 /* The slide's number in the frame's corner: small, and quiet on the sketch. */
 .frame__no { position: absolute; left: 3.5cqw; top: 3cqw; font-size: 3.4cqw; font-weight: 500; color: var(--slab-ink); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
 .frame.is-sketch .frame__no, .frame.is-empty .frame__no { color: var(--ink-3); text-shadow: none; }
+/* A camera cover (lib/camera-cover.ts; the compositor draws the same): the grid, the zoom buttons, the stacked hook. */
+@font-face { font-family: "TikTok Sans"; src: url("/fonts/TikTokSans36pt-SemiBold.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+.frame__camera { position: absolute; inset: 0; pointer-events: none; }
+.frame__camgrid { position: absolute; inset: 0; background:
+  linear-gradient(to right, transparent calc(33.333% - 0.095cqw), rgba(255, 255, 255, 0.55) calc(33.333% - 0.095cqw), rgba(255, 255, 255, 0.55) calc(33.333% + 0.095cqw), transparent calc(33.333% + 0.095cqw), transparent calc(66.667% - 0.095cqw), rgba(255, 255, 255, 0.55) calc(66.667% - 0.095cqw), rgba(255, 255, 255, 0.55) calc(66.667% + 0.095cqw), transparent calc(66.667% + 0.095cqw)),
+  linear-gradient(to bottom, transparent calc(33.333% - 0.095cqw), rgba(255, 255, 255, 0.55) calc(33.333% - 0.095cqw), rgba(255, 255, 255, 0.55) calc(33.333% + 0.095cqw), transparent calc(33.333% + 0.095cqw), transparent calc(66.667% - 0.095cqw), rgba(255, 255, 255, 0.55) calc(66.667% - 0.095cqw), rgba(255, 255, 255, 0.55) calc(66.667% + 0.095cqw), transparent calc(66.667% + 0.095cqw)); }
+.frame__camzoom { position: absolute; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(28, 28, 30, 0.6); color: #fff; font-family: "TikTok Sans", sans-serif; font-weight: 600; }
+.frame__camzoom.is-active { color: #ffd60a; }
+.frame__camline { position: absolute; transform: translateX(-50%); white-space: nowrap; color: #f4eeac; font-family: "TikTok Sans", sans-serif; font-weight: 600; line-height: 1.05; }
+.frame.is-ghost .frame__camline { opacity: 0.3; }
+.frame.is-textless .frame__camline { display: none; }
 .frame.is-ghost .frame__stack { opacity: 0.3; }
 .frame.is-textless .frame__stack { display: none; }
 .rep__overlay { margin-left: 10px; padding: 3px 10px; border: 1px solid var(--rule); border-radius: 999px; background: none; font: inherit; font-size: 11.5px; color: var(--ink-3); cursor: pointer; }
