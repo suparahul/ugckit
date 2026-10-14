@@ -228,6 +228,22 @@ function ideaOf(arm, h, slotKey) {
   return { premise: lock, product: params["Product slot"] || null, feature, reasons, experiments: h ? h.experiments : [], answer, record: answer && h.record.length ? h.record : null };
 }
 
+/**
+ * The labelled parts of a plan row's Format / variation cell: "**topic** T4 … ·
+ * **angle** … · **slides** 7 · **images** … · **handle rule** …", one { label,
+ * text } per bold label, in the cell's order. A part starts at a bold label at the
+ * cell's start or after " · ". A cell that does not start with a label has no
+ * parts (null), and the studio shows the whole cell, as `format` keeps it.
+ */
+function formatPartsOf(cell) {
+  const s = strip(cell);
+  if (!/^\*\*[^*]+\*\*/.test(s)) return null;
+  return s.split(/\s+·\s+(?=\*\*[^*]+\*\*)/).map((p) => {
+    const m = p.match(/^\*\*([^*]+?):?\*\*:?\s*([\s\S]*)$/);
+    return { label: m[1].trim(), text: m[2].replace(/\*\*/g, "").trim() };
+  });
+}
+
 /* ---------------------------------------------------------------- plan */
 
 function readPlan() {
@@ -338,6 +354,7 @@ function readPlan() {
         slot: slot.toUpperCase(),
         topic: strip(topic),
         format: strip(format.replace(/\*\*/g, "")),
+        formatParts: formatPartsOf(format),
         arm: strip(arm),
         source: parseSource(source),
         sourceRaw: strip(source.replace(/\*\*/g, "")),

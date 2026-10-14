@@ -467,6 +467,11 @@
 }
 .post-head__meta .marks { margin-left: 8px; }
 .post-head__meta .state { font-size: 13px; }
+/* The plan cell's parts about the handle (format, images, handle rule), each under its label. */
+.post-head__parts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 12px 0 0; max-width: 980px; font-size: 13px; line-height: 1.45; color: var(--ink-3); }
+.post-head__parts > div { display: contents; }
+.post-head__parts dt { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-4); padding-top: 2px; }
+.post-head__parts dd { margin: 0; }
 .post-head__mode { margin-left: 8px; font-size: 12.5px; color: var(--ember-deep); }
 /* What happens next, and the decision beside it. One line, in the first fold. */
 .next {
