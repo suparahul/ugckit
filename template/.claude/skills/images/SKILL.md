@@ -51,6 +51,12 @@ never stored. A missing `codex` is `npm install -g @openai/codex`.
   --json -o images-result.md -i <every reference> -` with the instruction on stdin),
   then verifies. About two minutes a picture: a seven-slide post is about twelve
   minutes; say so.
+  Before the verify, the bridge checks that every new slide file is a byte copy of a
+  picture in the run's own `~/.codex/generated_images/<thread>/` folder (the thread from
+  the `thread.started` event). Parallel runs share that parent folder, so a worker can
+  copy another run's picture. Such a file moves to `foreign/`, the script exits 1 with no
+  log line, and it lists the run's own pictures: put each on its slide by hand, or re-run
+  those slides with `--only`.
 
 ## What is on disk after a run
 
