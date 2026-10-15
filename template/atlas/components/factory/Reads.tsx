@@ -1,12 +1,13 @@
 /**
  * The reads block of a posted post: the numbers of the latest read, the
  * sentence with the sources and times, and the series of reads since posting
- * as a small line. Every point is an `outcome.sync` or `outcomes` line in
- * the log.
+ * as a small line. Every point is an `outcome.current` line in the log: the
+ * post's current numbers each time a sync changed them (lib/outcome.ts).
  */
 
 import type { PostState } from "@/lib/production";
 import { linePlatform, platformOf } from "@/lib/platform";
+import { sourcesText, type OutcomeMarks } from "@/lib/outcome";
 import { numbersIn, type View } from "@/lib/read";
 import { n, pct } from "./Bits";
 
@@ -53,9 +54,9 @@ export function Reads({ s, view = "both" }: { s: PostState; view?: View }) {
   const two = view !== "both" || (nb?.legs?.length ?? 1) > 1;
   /* Saves: TikTok's alone. On the Instagram view there are none to show. */
   const saves = leg === "instagram" ? null : two ? numbersIn(s, "tiktok") : nb;
-  const reads = s.log.filter((e) => e.kind === "outcome.sync" && e.data && (linePlatform(e.data) ?? "tiktok") === leg).map((e) => ({ at: String(e.data!.syncedAt ?? e.at), views: Number(e.data!.views ?? 0), source: String(e.data!.source ?? "postbridge") }));
-  const monid = reads.filter((r) => r.source === "monid");
-  const series = monid.length ? monid : reads;
+  const reads = s.log.filter((e) => e.kind === "outcome.current" && e.data && linePlatform(e.data) === leg).map((e) => ({ at: String((e.data!.fields as OutcomeMarks | undefined)?.views?.at ?? e.at), views: Number(e.data!.views ?? 0) }));
+  const series = reads;
+  const synced = leg === (s.primary ?? "tiktok") ? s.synced : s.legs?.[leg]?.synced ?? null;
   const z = (v: number) => (v === 0 ? " is-zero" : "");
   const opens = s.posted ? new Date(Date.parse(s.posted.at.slice(0, 10)) + 7 * 86400000).toISOString().slice(0, 10) : null;
   return (
@@ -72,7 +73,7 @@ export function Reads({ s, view = "both" }: { s: PostState; view?: View }) {
       ) : null}
       <p className="reads__line">
         {nb
-          ? `Read ${reads.length === 1 ? "once" : reads.length === 2 ? "twice" : `${reads.length} times`}${monid.length ? " through Monid" : ""}, last ${nb.at.slice(0, 10)} ${nb.at.slice(11, 16)} UTC${reads.some((r) => r.source === "postbridge") && monid.length ? " · Post Bridge agrees" : ""}${s.outcomes ? " · the day-7 numbers are typed" : opens ? ` · on day 7 (${opens}) two counts are typed by hand: “what app?” comments and store impressions` : ""}`
+          ? `Read ${reads.length === 1 ? "once" : reads.length === 2 ? "twice" : `${reads.length} times`}, last ${nb.at.slice(0, 10)} ${nb.at.slice(11, 16)} UTC${synced && !s.outcomes ? ` · ${sourcesText(synced.fields)}` : ""}${s.outcomes ? " · the day-7 numbers are typed" : opens ? ` · on day 7 (${opens}) two counts are typed by hand: “what app?” comments and store impressions` : ""}`
           : `Posted ${posted.time}. No read yet; the sync brings the numbers.`}
       </p>
       {series.length ? <div className="series"><Series reads={series} postedAt={posted.at} /></div> : null}

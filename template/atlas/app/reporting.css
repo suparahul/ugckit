@@ -2,7 +2,7 @@
  * Reporting layer for the production pages — PROPOSED additions to
  * atlas/app/production/production.css. Nothing here is in the app yet.
  *
- * Three things, all read from `outcome.sync` lines in production/log.jsonl:
+ * Three things, all read from `outcome.current` lines in production/log.jsonl:
  *   .read       the period's read on the board: the totals as one count line,
  *               set large, and the week's columns beside them. Under the toolbar,
  *               above the grid. Every column is a link to its day.

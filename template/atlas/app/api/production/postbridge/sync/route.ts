@@ -1,7 +1,7 @@
 /**
  * POST { post? } — the whole sync for every sent post (or the one named):
  * the TikTok link and the numbers through Monid (`posted.link`, `outcome.sync`),
- * then the Post Bridge analytics as the second source.
+ * then the Post Bridge analytics; each fetch merged into the current record (`outcome.current`).
  * The same as node scripts/postbridge-sync.mjs.
  */
 

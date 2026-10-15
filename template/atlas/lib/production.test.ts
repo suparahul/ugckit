@@ -8,9 +8,21 @@ import { test } from "node:test";
 
 import { linePlatform, parsePlatforms, platformOf, primaryOf, slideLimit } from "./platform.ts";
 import { legState, legsOfSent, platformsOf, slideLimitCheck, type Event, type PlanRow } from "./production.ts";
+import { backfillOutcome } from "./outcome.ts";
 
 const P = "2026-09-23/maya/1";
 const ev = (at: string, kind: Event["kind"], data?: Event["data"], extra: Partial<Event> = {}): Event => ({ at: `2026-09-23T${at}:00.000Z`, post: P, kind, actor: "agent", ...(data ? { data } : {}), ...extra });
+/** The log after the backfill (scripts/outcome-backfill.mjs): one `outcome.current` line per post leg with `outcome.sync` lines. The reader reads only those. */
+const withCurrent = (log: Event[]): Event[] => {
+  const out = [...log];
+  for (const p of ["tiktok", "instagram"] as const) {
+    for (const post of new Set(log.map((e) => e.post))) {
+      const rec = backfillOutcome(log.filter((e) => e.post === post && e.kind === "outcome.sync" && linePlatform(e.data) === p), p);
+      if (rec) out.push({ at: "2026-09-24T00:00:00.000Z", post, kind: "outcome.current", actor: "backfill", data: rec as unknown as Event["data"] });
+    }
+  }
+  return out;
+};
 
 test("platform names: absent is TikTok, unknown is null, a cell lists both in order", () => {
   assert.equal(platformOf(undefined), "tiktok");
@@ -49,14 +61,16 @@ test("a log with no platform gives one TikTok leg", () => {
     ev("10:00", "outcome.sync", { source: "postbridge", views: 100, likes: 5, comments: 1, shares: 2, url: "", syncedAt: "2026-09-23T10:00:00Z", pbPost: "pb1" }),
     ev("11:00", "outcome.sync", { source: "monid", views: 120, likes: 6, comments: 1, shares: 2, saves: 4, url: "", syncedAt: "2026-09-23T11:00:00Z", pbPost: "" }),
   ];
-  const tt = legState(log, "tiktok");
+  assert.equal(legState(log, "tiktok").synced, null, "outcome.sync lines alone are history: the reader shows only a current record");
+  const tt = legState(withCurrent(log), "tiktok");
   assert.equal(tt.sent?.id, "pb1");
   assert.equal(tt.sent?.account, 97911);
   assert.equal(tt.sent?.mode, "draft");
   assert.deepEqual(tt.sent?.media, ["m1", "m2"]);
   assert.equal(tt.posted?.time, "09:00");
   assert.equal(tt.link, "https://www.tiktok.com/@maya.petmom/photo/1");
-  assert.equal(tt.synced?.source, "monid", "Monid first");
+  assert.equal(tt.synced?.source, "monid", "the later read");
+  assert.equal(tt.synced?.views, 120);
   assert.equal(tt.synced?.saves, 4);
   const ig = legState(log, "instagram");
   assert.equal(ig.sent, null);
@@ -73,7 +87,8 @@ test("two legs: one send, one leg each; a failed Instagram leg leaves TikTok as 
     ev("13:05", "posted", { time: "13:00", url: "" }),
     ev("13:06", "posting.failed", { platform: "instagram", account: 98014, error: "The aspect ratio is not supported." }),
     ev("14:00", "outcome.sync", { platform: "instagram", source: "postbridge", views: 50, likes: 2, comments: 0, shares: 1, saves: null, url: "https://www.instagram.com/p/x/", syncedAt: "2026-09-23T14:00:00Z", pbPost: "pb2" }),
-  ];
+  ].concat([]);
+  log.push(...withCurrent(log).slice(log.length));
   assert.equal(legsOfSent(log[0]).length, 2);
   const tt = legState(log, "tiktok");
   const ig = legState(log, "instagram");
@@ -114,7 +129,8 @@ test("the read: views add up over the legs; saves come only from the leg that kn
     ev("09:00", "posted", { platform: "instagram", time: "09:00", url: "" }),
     ev("10:00", "outcome.sync", { source: "monid", views: 1000, likes: 50, comments: 5, shares: 3, saves: 20, url: "", syncedAt: "2026-09-23T10:00:00Z", pbPost: "" }),
     ev("10:30", "outcome.sync", { platform: "instagram", source: "postbridge", views: 400, likes: 30, comments: 2, shares: 1, saves: null, url: "", syncedAt: "2026-09-23T10:30:00Z", pbPost: "pb4" }),
-  ];
+  ].concat([]);
+  log.push(...withCurrent(log).slice(log.length));
   const tt = legState(log, "tiktok");
   const ig = legState(log, "instagram");
   const s = { platforms: ["tiktok", "instagram"], primary: "tiktok", legs: { tiktok: tt, instagram: ig }, sent: tt.sent, posted: tt.posted, synced: tt.synced, link: tt.link, outcomes: null, killed: null, log } as unknown as Parameters<typeof numbersOf>[0];
@@ -145,6 +161,6 @@ test("legState: an Instagram reel's numbers written without the platform count f
     { at: "2026-05-05T13:51:48.000Z", post: "p", kind: "outcome.sync", data: { source: "postbridge", views: 400, url: "https://www.tiktok.com/@x/video/789?utm_campaign=a" } },
     { at: "2026-05-05T13:51:51.000Z", post: "p", kind: "outcome.sync", data: { source: "postbridge", views: 10, url: "https://www.instagram.com/reel/AbC123/" } },
   ];
-  assert.equal(legState(log, "tiktok").synced?.views, 400);
-  assert.equal(legState(log, "instagram").synced?.views, 10);
+  assert.equal(legState(withCurrent(log), "tiktok").synced?.views, 400);
+  assert.equal(legState(withCurrent(log), "instagram").synced?.views, 10);
 });

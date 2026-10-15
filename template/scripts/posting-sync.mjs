@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Phase 8, the sync (the `sync` skill): the posted link and the outcome numbers of
- * every sent post, plus the provider's own analytics as a second source. A post
+ * every sent post, plus the provider's own analytics. A post
  * Post Bridge published live takes its link from Post Bridge, with no Monid call
  * (AGENTS.md rule 15); Monid finds the link of a draft published by hand.
  *
@@ -15,7 +15,8 @@
  * scraper, $0.00045 a post; under a cent for three posts), matched by caption and upload
  * time (atlas/lib/tiktok-link.ts); one match writes `posted.link` (and `posted` when
  * missing); several write nothing and print the candidates. Every linked post gets an
- * `outcome.sync` line: views, likes, comments, saves, shares, data.source "monid".
+ * `outcome.sync` line: views, likes, comments, saves, shares, data.source "monid". Each fetch is
+ * merged into the post's one current record, an `outcome.current` line (atlas/lib/outcome.ts).
  * Post Bridge: atlas/scripts/postbridge-sync.mjs. Another provider: scripts/lib/posting/<p>.mjs.
  */
 import { providerOf, runProvider } from "./lib/posting/index.mjs";

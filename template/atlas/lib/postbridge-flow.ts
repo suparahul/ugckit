@@ -33,7 +33,7 @@ import { identitiesOf } from "./accounts.ts";
 import { MAX_SLIDES, PLATFORM_NAME, linePlatform, platformOf, primaryOf, type Platform } from "./platform.ts";
 import { slotKey, slotTimes } from "./slots.ts";
 import { accountsOf, hasKey, legsPost, postBody, postBridge, sendStatusOf, type CreatePostInput, type PostBridgeClient, type RequestPreview, type Leg, type SentPost, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type AccountsFile, type PBAccount, type SendStatus, type SyncReport } from "./postbridge.ts";
-import { allStates, appendEvent, filesRoot, fileKey, getProduction, isSent, legsOfSent, postingStep, readLog, storeOf, type Event, type PostState } from "./production.ts";
+import { allStates, appendEvent, filesRoot, fileKey, getProduction, isSent, legsOfSent, postingStep, readLog, recordOutcome, storeOf, type Event, type PostState } from "./production.ts";
 import { checkVideoSend, directBlock, instagramBlock, videoReminders } from "./video-post.ts";
 import { finalFileOf } from "./video.ts";
 import { findLinks, monidRuns, savedRunsFetch, type LinkReport } from "./tiktok-link.ts";
@@ -483,17 +483,19 @@ export function sentPostsOf(log: Event[], wanted: string[] | null = null): Map<s
 
 /**
  * The Post Bridge half of the sync: reads the analytics of every sent post (or
- * the ones named) and appends one `outcome.sync` line per post whose numbers
- * changed since the last Post Bridge line (the Monid lines are a separate
- * series). The core is syncOutcomesWith. Post Bridge rarely has numbers for a
- * draft published from the phone; Monid (syncAll) is the first source.
+ * the ones named), appends one `outcome.sync` line per leg whose numbers
+ * changed since the last Post Bridge line (the history of the fetches), and
+ * merges every leg it read into the leg's current record (`recordOutcome`):
+ * views, likes, comments and shares replaced, saves kept. The core is
+ * syncOutcomesWith. Post Bridge rarely has numbers for a draft published
+ * from the phone.
  */
 export async function syncOutcomes(slug: string, sel: { date?: string; keys?: string[] } = {}): Promise<{ refreshed: boolean; reports: SyncReport[] }> {
   const log = readLog(slug);
   const wanted = sel.keys ?? (sel.date ? getProduction(slug).rows.filter((r) => r.date === sel.date).map((r) => r.key) : null);
   const sends = sentPostsOf(log, wanted);
   const lineOf = (post: string, kind: Event["kind"], p: Platform, after = "") => log.some((e) => e.post === post && e.kind === kind && (linePlatform(e.data) ?? "tiktok") === p && e.at >= after);
-  return syncOutcomesWith(
+  const out = await syncOutcomesWith(
     postBridge(),
     [...sends.values()],
     (post, p) => ([...log].reverse().find((e) => e.post === post && e.kind === "outcome.sync" && e.data?.source !== "monid" && (linePlatform(e.data) ?? "tiktok") === p)?.data as Record<string, unknown> | undefined) ?? null,
@@ -510,14 +512,24 @@ export async function syncOutcomes(slug: string, sel: { date?: string; keys?: st
       }
     },
   );
+  const now = new Date().toISOString();
+  for (const r of out.reports) {
+    const o = r.outcome;
+    if (!o) continue;
+    const { changed } = recordOutcome(slug, r.post, r.platform ?? "tiktok", { source: "postbridge", at: o.syncedAt || now, values: { views: o.views, likes: o.likes, comments: o.comments, shares: o.shares }, url: o.url, pbPost: o.pbPost });
+    r.written = changed;
+    r.note = changed ? "written" : r.note === "written" ? "kept: the current numbers were read later" : r.note;
+  }
+  return out;
 }
 
 export type SyncAll = { links: LinkReport[]; refreshed: boolean; reports: SyncReport[]; postBridgeError: string | null };
 
 /**
  * The whole sync, the same for the button and scripts/postbridge-sync.mjs:
- * first "find the link" (lib/tiktok-link.ts findLinks), then the Post Bridge
- * analytics as the second source when it has data. A Post Bridge failure (no
+ * first "find the link" and the Monid numbers (lib/tiktok-link.ts findLinks),
+ * then the Post Bridge analytics when it has data. Each one merges what it
+ * read into the post's current record; neither ranks above the other. A Post Bridge failure (no
  * key, an API error) does not undo the link half.
  * The link comes from Post Bridge for every post Post Bridge published live
  * (a `direct` send) and from Monid only for a post it did not (a draft

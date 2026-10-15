@@ -31,7 +31,10 @@
  *               Without --send: print the selection and send nothing.
  *   status      print the service's state of each sent post.
  *   sync        the posted url when the service returns one (append posted.link + posted), the
- *               service's numbers (append outcome.sync with data.source "<name>"); the Monid link
+ *               service's numbers (append outcome.sync with data.source "<name>", then merge the fetch
+ *               into the post's current record: recordOutcome(slug, post, platform, { source, at,
+ *               values, url }) of atlas/lib/production.ts, which appends outcome.current; the Atlas
+ *               reads only that record); the Monid link
  *               match of atlas/lib/tiktok-link.ts can be reused for a TikTok draft the service cannot
  *               see. A line of another leg than TikTok carries "platform": "instagram"; a line with
  *               no platform is TikTok's.

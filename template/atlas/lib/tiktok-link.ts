@@ -31,7 +31,9 @@
  *      more than one: write nothing and return the candidates.
  * Then, for every linked post, one `outcome.sync` line from the Monid record
  * (views, likes, comments, saves, shares; data.source = "monid") when the
- * numbers changed. Server-side only (node:child_process). Pure parts at the top.
+ * numbers changed, and the fetch merged into the post's current record
+ * (`recordOutcome`, lib/outcome.ts). Server-side only (node:child_process).
+ * Pure parts at the top.
  */
 
 import { execFile } from "node:child_process";
@@ -40,7 +42,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { allStates, appendEvent, getProduction, readLog, type Event, type PostState } from "./production.ts";
+import { allStates, appendEvent, getProduction, readLog, recordOutcome, type Event, type PostState } from "./production.ts";
 import { linePlatform } from "./platform.ts";
 import { hasKey, legStatusOf, postBridge, type Leg, type PBAnalytics, type PBPost, type PBPostResult, type PostBridgeClient } from "./postbridge.ts";
 
@@ -129,10 +131,11 @@ export function tiktokUrl(handle: string, p: MonidPost): string {
  * its `posted` line (`data.format`): a video posted by hand is a video, even
  * when its deck holds one slide (the frame shown on the board).
  */
-export function postKindOf(s: Pick<PostState, "deck"> & { log?: Event[] }): PostKind {
+export function postKindOf(s: Pick<PostState, "deck"> & { log?: Event[]; row?: { video?: unknown } }): PostKind {
   const format = s.log ? handPostedLine(s.log)?.data?.format : undefined;
   if (format === "video") return "video";
   if (format === "photo" || format === "slideshow") return "photo";
+  if (s.row?.video) return "video";
   return s.deck?.slides.length ? "photo" : "video";
 }
 
@@ -240,9 +243,33 @@ export function handPostedLine(log: Event[]): Event | null {
   return [...log].reverse().find((e) => e.kind === "posted" && (e.data?.manual as unknown) === true && tiktokLine(e)) ?? null;
 }
 
-/** A TikTok post the sync reads: sent through the posting service, or published on TikTok by hand (`handPostedLine`). */
+/** How many days back the sync looks for a row that may be live with nothing in the log (`unmarkedOnTiktok`). */
+export const UNMARKED_DAYS = 7;
+
+/**
+ * A row the studio shows as a slot card that may be live on TikTok with
+ * nothing in the log: not killed, no send, no `posted` line, dated in the
+ * UNMARKED_DAYS before today. Not today: a row of today with nothing in the
+ * log is most often not out yet, and reading it would buy a Monid fetch and
+ * risk a wrong match; the next day's sync reads it. A video or a slideshow published from the
+ * phone that nobody marked posted is such a row; before, the sync never read
+ * it, and its numbers were lost. The sync looks for it in its handle's Monid
+ * fetch like a post published by hand; a match writes `posted` with
+ * `manual: true`, so every later sync reads it as one. `today` is a UTC date.
+ */
+export function unmarkedOnTiktok(s: Pick<PostState, "sent" | "posted" | "killed"> & { row: { date: string } }, today = new Date().toISOString().slice(0, 10)): boolean {
+  if (s.killed || s.sent || s.posted || s.row.date >= today) return false;
+  const from = new Date(Date.parse(`${today}T00:00:00Z`) - UNMARKED_DAYS * DAY_MS).toISOString().slice(0, 10);
+  return s.row.date >= from;
+}
+
+/**
+ * A TikTok post the sync reads: sent through the posting service, marked
+ * posted (by hand or with "Mark posted"), or a slot card that may be live
+ * unmarked (`unmarkedOnTiktok`). One argument: it is passed to `filter` as it is.
+ */
 export function syncsOnTiktok(s: PostState): boolean {
-  return (s.primary ?? "tiktok") === "tiktok" && (!!s.sent || !!handPostedLine(s.log));
+  return (s.primary ?? "tiktok") === "tiktok" && (!!s.sent || !!s.posted || !!handPostedLine(s.log) || unmarkedOnTiktok(s));
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -528,7 +555,8 @@ async function linkViaDirectSend(s: PostState, pb: PostBridgeClient): Promise<Li
  */
 function writeLink(s: PostState, url: string, id: string, uploadedAt: string): void {
   appendEvent(s.row.slug, { post: s.row.key, kind: "posted.link", actor: "sync", data: { url, id, uploadedAt } });
-  if (!s.posted || !tiktokIdOf(s.posted.url)) appendEvent(s.row.slug, { post: s.row.key, kind: "posted", actor: "sync", data: { time: uploadedAt.slice(11, 16), url } });
+  /* No send: the post went out by hand, so the line says so and later syncs read it as one (`handPostedLine`). */
+  if (!s.posted || !tiktokIdOf(s.posted.url)) appendEvent(s.row.slug, { post: s.row.key, kind: "posted", actor: "sync", data: { time: uploadedAt.slice(11, 16), url, ...(s.sent ? {} : { manual: true }) } as unknown as Event["data"] });
 }
 
 /** A post Post Bridge already reports the link for: no caption match, no Monid call. The url is rebuilt from the id (share_url says /video/ for a photo post too). */
@@ -549,7 +577,8 @@ export function zeroOverReal(prev: Record<string, unknown> | null, o: MonidOutco
 /**
  * A link already known to have this `id`, matched against a Monid fetch: an
  * `outcome.sync` line (source "monid") when the record is in the fetch and
- * the numbers changed since the last Monid line. Shared by `linkOne` (a link
+ * the numbers changed since the last Monid line, then the fetch merged into
+ * the current record (`recordOutcome`). Shared by `linkOne` (a link
  * just found, or already known) and `refreshStatsOnly` (any other sent post
  * of a handle that got fetched anyway).
  */
@@ -561,7 +590,8 @@ function syncOutcomeFromRecords(s: PostState, status: LinkReport["status"], url:
   if (zeroOverReal(prev, o)) return { ...base, status, url, tiktokId: id, outcome: null, written: false, note: ZERO_KEPT_NOTE };
   const same = !!prev && (["views", "likes", "comments", "saves", "shares"] as const).every((k) => Number(prev[k] ?? -1) === o[k]);
   if (!same) appendEvent(s.row.slug, { post: s.row.key, kind: "outcome.sync", actor: "sync", data: { ...o } });
-  return { ...base, status, url, tiktokId: id, outcome: o, written: !same, note: same ? "numbers unchanged" : "numbers written" };
+  const { changed } = recordOutcome(s.row.slug, s.row.key, "tiktok", { source: "monid", at: o.syncedAt, values: o, url: o.url, tiktokId: o.tiktokId });
+  return { ...base, status, url, tiktokId: id, outcome: o, written: changed, note: changed ? "numbers written" : same ? "numbers unchanged" : "kept: the current numbers were read later" };
 }
 
 /**
@@ -647,10 +677,11 @@ function linkOne(s: PostState, handle: string, records: MonidPost[], claimed: Se
   const pick = pickRecord(target, records, claimed, pass);
   if (!pick) return null;
   const cands = (list: { post: MonidPost; score: number }[]) => list.map((m) => ({ url: tiktokUrl(handle, m.post), title: m.post.title ?? "", uploadedAt: m.post.uploadedAtFormatted, score: m.score }));
-  if (pick.status !== "linked") return { ...base, candidates: cands(pick.candidates), status: pick.status, url: null, tiktokId: null, outcome: null, written: false, note: pick.note };
+  const unmarked = !s.sent && !s.posted ? "not marked posted; " : "";
+  if (pick.status !== "linked") return { ...base, candidates: cands(pick.candidates), status: pick.status, url: null, tiktokId: null, outcome: null, written: false, note: `${unmarked}${pick.note}` };
   const url = tiktokUrl(handle, pick.record);
   writeLink(s, url, pick.record.id, pick.record.uploadedAtFormatted);
   const r = syncOutcomeFromRecords(s, "linked", url, pick.record.id, records, { ...base, candidates: cands([{ post: pick.record, score: pick.score }]) });
   const how = pick.how === "caption" ? "" : pick.how === "time" ? "matched by time (the caption is hashtags only); " : `matched by kind, slide count and time (caption ${Math.round(pick.score * 100)}%, edited on the phone?); `;
-  return { ...r, note: `${s.sent ? "" : "posted by hand; "}${how}${r.note}` };
+  return { ...r, note: `${s.sent ? "" : unmarked ? "found live, not marked posted; " : "posted by hand; "}${how}${r.note}` };
 }

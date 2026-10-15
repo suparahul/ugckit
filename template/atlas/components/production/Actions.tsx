@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import type { Event, EventKind, PostState, SlideState } from "@/lib/production";
+import { sourcesText } from "@/lib/outcome";
 import type { Zones } from "@/lib/when";
 import { PostedRail, PostingRail, type BridgeInfo } from "./Bridge";
 import { fileUrl } from "./Frame";
@@ -69,7 +70,8 @@ const KIND_WORD: Record<string, string> = {
   "leg.drop": "platform taken off",
   "leg.add": "platform put back",
   "posted.link": "link found",
-  "outcome.sync": "outcomes synced",
+  "outcome.sync": "outcomes fetched",
+  "outcome.current": "current numbers updated",
   export: "files exported",
   kill: "killed",
   unkill: "un-killed",
@@ -189,7 +191,7 @@ const OUTCOME_FIELDS: { key: string; label: string }[] = [
 ];
 
 function OutcomesForm({ post, busy, onDecide, synced }: { post: string; busy: boolean; onDecide: (e: Omit<Event, "at">) => Promise<void>; synced: PostState["synced"] }) {
-  /* The synced numbers start the form (saves too when they came from Monid); the two counts by hand stay empty. */
+  /* The current numbers start the form (saves too when a source gave them); the two counts by hand stay empty. */
   const [v, setV] = useState<Record<string, string>>(synced ? { views: String(synced.views), shares: String(synced.shares), comments: String(synced.comments), ...(synced.saves != null ? { saves: String(synced.saves) } : {}) } : {});
   const n = (k: string) => Number(v[k] ?? 0);
   return (
@@ -209,7 +211,7 @@ function OutcomesForm({ post, busy, onDecide, synced }: { post: string; busy: bo
         </label>
       ))}
       <button type="submit" className="rail__go" disabled={busy}>Record outcomes</button>
-      {synced ? <span className="rail__why">{synced.source === "monid" ? `views, saves, shares and comments from the Monid sync of ${synced.at.slice(0, 10)}` : `views, shares and comments from the Post Bridge sync of ${synced.at.slice(0, 10)}; saves are not in its analytics`}</span> : null}
+      {synced ? <span className="rail__why">{sourcesText(synced.fields)}{synced.saves == null ? "; no source gave the saves" : ""}</span> : null}
       <span className="rail__computed">
         → saves/view <b>{pct(n("saves"), n("views"))}</b> · shares/view <b>{pct(n("shares"), n("views"))}</b> · comments/view <b>{pct(n("comments"), n("views"))}</b> (computed)
       </span>

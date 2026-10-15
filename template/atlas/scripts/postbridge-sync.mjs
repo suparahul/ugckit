@@ -13,8 +13,13 @@
  *      writes nothing and prints the candidates. Every linked post then gets an
  *      `outcome.sync` line from its Monid record: views, likes, comments, saves,
  *      shares (data.source "monid"), when the numbers changed.
- *   2. the Post Bridge analytics, as a second source when it has data (no saves;
- *      rarely anything for a draft published from the phone).
+ *   2. the Post Bridge analytics, when it has data (no saves; rarely anything
+ *      for a draft published from the phone).
+ *
+ * Each fetch is merged into the post's one current record, an `outcome.current`
+ * line (lib/outcome.ts): the fields it read are replaced, the others (saves,
+ * for Post Bridge) keep their last value, and each field names its source and
+ * read time. The Atlas shows that record; no source ranks above the other.
  *
  * An Instagram leg (a post sent to TikTok and Instagram) needs no Monid call:
  * its link, its post time and its numbers come from Post Bridge, one
@@ -82,19 +87,16 @@ for (const l of links) {
   if (l.status === "many" || l.status === "none") for (const c of l.candidates) console.log(`  ${"".padEnd(26)}   candidate ${c.url} · ${c.uploadedAt} · ${Math.round(c.score * 100)}% · “${c.title.split("\n")[0].slice(0, 60)}”`);
 }
 
-console.log("Post Bridge — the second source:");
+console.log("Post Bridge — its analytics:");
 if (postBridgeError) console.log(`  not read: ${postBridgeError}`);
 else {
   const platforms = [...new Set(reports.map((r) => r.platform ?? "tiktok"))].map((p) => (p === "instagram" ? "Instagram" : "TikTok")).join(" and ") || "TikTok";
   console.log(refreshed ? `  Post Bridge pulled fresh numbers from ${platforms}.` : "  Post Bridge is on its 30-minute cooldown; the numbers are the last it holds.");
   const labelled = reports.some((x) => x.platform);
-  /* A TikTok leg Monid read too: Atlas shows Monid's numbers, so say so when Post Bridge's differ (its analytics lag). */
-  const monidViews = new Map(links.filter((l) => l.outcome).map((l) => [l.post, l.outcome.views]));
   for (const r of reports) {
     const o = r.outcome;
     const leg = labelled ? ` ${r.platform ?? "tiktok"}` : "";
-    const other = !r.platform && o && monidViews.has(r.post) && monidViews.get(r.post) !== o.views ? `; Atlas shows Monid's ${monidViews.get(r.post)} views` : "";
-    console.log(`  ${`${r.post}${leg}`.padEnd(labelled ? 36 : 26)} ${r.result.padEnd(14)} ${o ? `${o.views} views · ${o.likes} likes · ${o.comments} comments · ${o.shares} shares${r.platform === "instagram" ? " · saves not reported on Instagram" : ""}` : "no numbers yet"}  (${r.note}${other})`);
+    console.log(`  ${`${r.post}${leg}`.padEnd(labelled ? 36 : 26)} ${r.result.padEnd(14)} ${o ? `${o.views} views · ${o.likes} likes · ${o.comments} comments · ${o.shares} shares${r.platform === "instagram" ? " · saves not reported on Instagram" : ""}` : "no numbers yet"}  (${r.note})`);
   }
 }
 process.exit(links.some((l) => l.status === "error") ? 1 : 0);

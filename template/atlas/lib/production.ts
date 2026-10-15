@@ -31,6 +31,7 @@ import { directBlock } from "./video-post.ts";
 import { shownCards } from "./callout.ts";
 import { readVideo, videoPlanPoint, type VideoState } from "./video.ts";
 import type { Kind, VideoIdea } from "./video-row.ts";
+import { backfillOutcome, currentOfLine, mergeOutcome, sameOutcome, type CurrentOutcome, type Fetched, type OutcomeMarks } from "./outcome.ts";
 
 /* ------------------------------------------------------------------- authored */
 
@@ -281,7 +282,10 @@ export type EventKind =
   | "posting.sent"
   | "posting.rescheduled"
   | "posted.link"
+  /* One fetch of the numbers, by one source: the history (lib/outcome.ts). */
   | "outcome.sync"
+  /* The current numbers of one leg, a full merged snapshot written by the sync: the one the Atlas reads. */
+  | "outcome.current"
   /* One leg of a send failed on its platform (data.platform, data.error: the platform's words). */
   | "posting.failed"
   /* A leg taken off a post, or put back (data.platform, note). */
@@ -317,7 +321,7 @@ export type Event = {
   card?: number;
   file?: string;
   hash?: string;
-  data?: Record<string, string | number | null | LegData[]>;
+  data?: Record<string, string | number | null | LegData[] | OutcomeMarks>;
   task?: string;
 };
 
@@ -355,6 +359,22 @@ export function appendEvent(slug: string, e: Omit<Event, "at">): Event {
   const full: Event = { at: new Date().toISOString(), ...e };
   appendFileSync(logOf(slug), JSON.stringify(full) + "\n");
   return full;
+}
+
+/**
+ * The one write of the numbers: merges a fetch into the leg's current record and appends the
+ * new `outcome.current` snapshot when a value or a source changed. A leg with no record yet
+ * starts from its `outcome.sync` lines (`backfillOutcome`), so an old log loses nothing.
+ * The caller appends its own `outcome.sync` line first, as the history of the fetch.
+ */
+export function recordOutcome(slug: string, post: string, platform: Platform, f: Fetched): { changed: boolean; current: CurrentOutcome } {
+  const mine = readLog(slug).filter((e) => e.post === post && linePlatform(e.data) === platform);
+  const curEv = last(mine.filter((e) => e.kind === "outcome.current"));
+  const prev = curEv ? currentOfLine(curEv.data) : backfillOutcome(mine.filter((e) => e.kind === "outcome.sync"), platform);
+  const current = mergeOutcome(prev, platform, f);
+  const changed = !curEv || !sameOutcome(prev, current);
+  if (changed) appendEvent(slug, { post, kind: "outcome.current", actor: "sync", data: current as unknown as Event["data"] });
+  return { changed, current };
 }
 
 /** A post key `2026-09-15/petfacts/am` as a safe directory name. */
@@ -472,7 +492,7 @@ export type PostState = {
   link: string | null;
   /** The last export of the finished files to ~/Downloads (an `export` line), or null. */
   exported: { at: string; dir: string } | null;
-  /** The last synced numbers from Post Bridge (an `outcome.sync` line), or null. Shown in the Outcomes block; the day-7 form stays the fallback. */
+  /** The current numbers of the primary leg (its last `outcome.current` line), or null. Shown in the Outcomes block; the day-7 form stays the fallback. */
   synced: SyncedState | null;
   /** The day-7 numbers Rahul typed, or null. */
   outcomes: Record<string, string | number> | null;
@@ -513,8 +533,12 @@ export type LegState = {
 
 /** `mode` "draft" (the inbox; the phone publishes) or "direct" (Post Bridge publishes at `scheduledAt`, ISO UTC). Lines before the modes are drafts. */
 export type SentState = { at: string; id: string; media: string[]; account: number; status: string; mode: "draft" | "direct"; scheduledAt: string | null };
-/** The last synced numbers: from Monid (`source` "monid", with saves) when a Monid line exists, else from Post Bridge (no saves). */
-export type SyncedState = { at: string; source: "monid" | "postbridge"; views: number; likes: number; comments: number; saves: number | null; shares: number; url: string; syncedAt: string; pbPost: string };
+/**
+ * The current numbers of a leg: its last `outcome.current` line, as written (lib/outcome.ts). `fields` names
+ * each field's source and read time; `source` and `syncedAt` are the views field's, for the short labels.
+ * `saves` is null when no source has given it (Instagram).
+ */
+export type SyncedState = { at: string; source: string; views: number; likes: number; comments: number; saves: number | null; shares: number; url: string; syncedAt: string; pbPost: string; fields: OutcomeMarks };
 
 const last = <T,>(arr: T[]) => (arr.length ? arr[arr.length - 1] : null);
 
@@ -658,11 +682,11 @@ export function legState(log: Event[], p: Platform): LegState {
     : null;
   const postedEv = last(log.filter((e) => e.kind === "posted" && onLeg(e, p)));
   const posted = postedEv ? { at: postedEv.at, time: String(postedEv.data?.time ?? hhmm(postedEv.at)), url: String(postedEv.data?.url ?? "") } : null;
-  /* Monid first: it is the source that knows the link and the saves. */
-  const mine = log.filter((e) => e.kind === "outcome.sync" && onLeg(e, p));
-  const syncEv = last(mine.filter((e) => e.data?.source === "monid")) ?? last(mine);
-  const synced: SyncedState | null = syncEv?.data
-    ? { at: syncEv.at, source: syncEv.data.source === "monid" ? "monid" : "postbridge", views: Number(syncEv.data.views ?? 0), likes: Number(syncEv.data.likes ?? 0), comments: Number(syncEv.data.comments ?? 0), saves: syncEv.data.saves == null ? null : Number(syncEv.data.saves), shares: Number(syncEv.data.shares ?? 0), url: String(syncEv.data.url ?? ""), syncedAt: String(syncEv.data.syncedAt ?? syncEv.at), pbPost: String(syncEv.data.pbPost ?? "") }
+  /* The current record, as the sync wrote it: the leg's last `outcome.current` line. */
+  const curEv = last(log.filter((e) => e.kind === "outcome.current" && onLeg(e, p)));
+  const cur = curEv ? currentOfLine(curEv.data) : null;
+  const synced: SyncedState | null = curEv && cur
+    ? { at: curEv.at, source: cur.fields.views?.source ?? cur.by, views: cur.views ?? 0, likes: cur.likes ?? 0, comments: cur.comments ?? 0, saves: cur.saves ?? null, shares: cur.shares ?? 0, url: cur.url ?? "", syncedAt: cur.fields.views?.at ?? curEv.at, pbPost: cur.pbPost ?? "", fields: cur.fields }
     : null;
   /* The link: the `posted.link` line the sync wrote, else the link typed with "Mark posted". */
   const linkEv = last(log.filter((e) => e.kind === "posted.link" && e.data?.url && onLeg(e, p)));

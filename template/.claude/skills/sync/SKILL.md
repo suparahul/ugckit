@@ -1,6 +1,6 @@
 ---
 name: sync
-description: Phase 8, the outcomes — the posted link from Post Bridge for a post it published live (no Monid call), else through Monid by matching the handle's latest posts to the caption, then the numbers (views, likes, comments, saves, shares) as outcome.sync lines; the service's own analytics as a second source; per platform (an Instagram leg's link and numbers come from the service, with no Monid call). Under a cent per post.
+description: Phase 8, the outcomes — the posted link from Post Bridge for a post it published live (no Monid call), else through Monid by matching the handle's latest posts to the caption, then the numbers (views, likes, comments, saves, shares), each fetch merged into the post's one current record (outcome.current); the service's own analytics merged the same way; per platform (an Instagram leg's link and numbers come from the service, with no Monid call). Under a cent per post.
 ---
 
 # Phase 8 — the sync
@@ -21,17 +21,31 @@ filled the id yet (a minute or two after the scheduled time), the sync says so; 
 again later. Never fall back to Monid for that post (AGENTS.md rule 15).
 `--no-monid` makes no Monid call at all and still writes these links.
 
-For every other sent post without a `posted.link` line (a draft published by hand from
-the phone): the handle's latest posts through
+For every other post without a `posted.link` line (a draft published by hand from the
+phone, a post marked posted by hand, and every slot card of the 7 days before today that
+has no send and no `posted` line, since a video or slideshow posted from the phone and
+never marked is one of them): the handle's latest posts through
 Monid (the profile scraper, $0.00045 a post; a call reads a handful, so three posts are
 under a cent), matched by the caption's first line (hashtags off, word overlap with
 stems) and an upload time after the send. One match writes `posted.link` and `posted`
 (when missing); several matches write nothing and print the candidates, so you ask the
-user which url it is and they paste it (the post page's "posted link" field). Then
-every linked post gets `outcome.sync` with views, likes, comments, saves, shares,
-`data.source: "monid"`, and the time the numbers changed. Post Bridge's analytics are
-printed as a second source when it has any (rarely for a hand-posted draft, and never
-saves).
+user which url it is and they paste it (the post page's "posted link" field). A slot
+card found live that way gets `posted` with `manual: true`, so every later sync reads
+it. Then every linked post gets `outcome.sync` with views, likes, comments, saves,
+shares, `data.source: "monid"`, when the numbers changed. Post Bridge's analytics are
+read too when it has any (rarely for a hand-posted draft, and never saves).
+
+## The numbers: one current record per post and platform
+
+`outcome.sync` lines are the history: one per fetch whose numbers changed. The numbers
+the Atlas shows are the leg's last `outcome.current` line, a full snapshot the sync
+writes (`atlas/lib/outcome.ts`). Each fetch, from Monid or from Post Bridge, is merged
+into it at write time: a field the fetch read is replaced, unless the record holds a
+later read of it; a field it did not read (saves, from Post Bridge) keeps its last value;
+each field names its source and read time. 0 views over real views is a failed read and
+changes nothing. Neither source ranks above the other; the reader computes nothing.
+A log written before the record existed: `node atlas/scripts/outcome-backfill.mjs <slug>`
+once (it backs the log up first; the newest number per field across the old lines).
 
 Say the figure before a run over many posts: a day of four posts is about a cent.
 
@@ -41,7 +55,8 @@ A post sent to TikTok and Instagram is read per platform. The TikTok part is the
 above. **The Instagram leg needs no Monid call**, so the cost does not rise: Post Bridge
 reports its link, its post time and its numbers. The sync writes, for that leg, `posted`
 and `posted.link` once it is live, and one `outcome.sync` line with
-`data.platform: "instagram"` (views, likes, comments, shares) whenever they change. A leg
+`data.platform: "instagram"` (views, likes, comments, shares) whenever they change,
+merged into the Instagram leg's own current record. A leg
 that failed is written once as `posting.failed`, with Instagram's own words; say it to
 the user and offer the retry (the `post` skill).
 

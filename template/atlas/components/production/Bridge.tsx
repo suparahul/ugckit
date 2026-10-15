@@ -13,7 +13,7 @@
  *   posted  open on TikTok · Export files again · [Sync outcomes]   (the day-7 form above, when open)
  *
  * "Sync outcomes" runs the whole sync (lib/postbridge-flow.ts syncAll): the
- * link and the numbers through Monid, then Post Bridge as the second source.
+ * link and the numbers through Monid, then Post Bridge's; each merged into the post's current record.
  *
  * The send calls the same lib function as scripts/postbridge-send.mjs.
  * "Export files" writes ~/Downloads/tiktok-<post>/ (lib/export-flow.ts) and
@@ -26,6 +26,7 @@ import { useRouter } from "next/navigation";
 
 import type { PBAccount } from "@/lib/postbridge";
 import type { Event, SentState, SyncedState } from "@/lib/production";
+import { sourcesText } from "@/lib/outcome";
 import { fmtBoth, fmtIn, shortOf, tomorrowIn, weekdayIn, zonedToUtc, type Zones } from "@/lib/when";
 import { appFromPath } from "./scope";
 
@@ -293,9 +294,9 @@ export function PostedRail({ post, sent, link, exported, synced, children, video
       <div className="posting__row">
         <OpenOnTikTok link={link} />
         {video ? null : <ExportFiles post={post} exported={exported} />}
-        {sent ? <button type="button" className="rail__go" disabled={busy} title="Finds the TikTok link and pulls views, likes, comments, saves and shares through Monid into the log; Post Bridge analytics second" onClick={() => void sync()}>{busy ? "Syncing…" : "Sync outcomes"}</button> : null}
+        {sent ? <button type="button" className="rail__go" disabled={busy} title="Finds the TikTok link, pulls views, likes, comments, saves and shares through Monid and Post Bridge, and updates the post's current numbers" onClick={() => void sync()}>{busy ? "Syncing…" : "Sync outcomes"}</button> : null}
       </div>
-      {synced ? <p className="posting__under">{synced.source === "monid" ? "Monid" : "Post Bridge"} {synced.at.slice(0, 10)}: {synced.views.toLocaleString("en-US")} views · {synced.likes.toLocaleString("en-US")} likes · {synced.comments.toLocaleString("en-US")} comments{synced.saves != null ? ` · ${synced.saves.toLocaleString("en-US")} saves` : ""} · {synced.shares.toLocaleString("en-US")} shares</p> : null}
+      {synced ? <p className="posting__under">{synced.views.toLocaleString("en-US")} views · {synced.likes.toLocaleString("en-US")} likes · {synced.comments.toLocaleString("en-US")} comments{synced.saves != null ? ` · ${synced.saves.toLocaleString("en-US")} saves` : ""} · {synced.shares.toLocaleString("en-US")} shares · {sourcesText(synced.fields)}</p> : null}
       {note ? <p className="posting__under">{note}</p> : null}
     </div>
   );

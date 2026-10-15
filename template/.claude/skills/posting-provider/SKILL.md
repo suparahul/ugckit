@@ -52,7 +52,9 @@ The user names it and points you at its API documentation. Then:
    of the post, create a photo post as a draft or scheduled, append `posting.sent` with
    `data.legs` when there is more than TikTok, and `posting.failed` per failed leg),
    `status`,
-   `sync` (the posted url and the numbers → `posted.link`, `posted`, `outcome.sync`;
+   `sync` (the posted url and the numbers → `posted.link`, `posted`, `outcome.sync`,
+   then the fetch merged into the current record with `recordOutcome` of
+   `atlas/lib/production.ts`, which writes `outcome.current`;
    reuse the Monid link match of `atlas/lib/tiktok-link.ts` for a draft the service
    cannot see), `reschedule` (→ `posting.rescheduled`). The template says what each
    writes.

@@ -1,6 +1,6 @@
 ---
 name: read
-description: Phase 8, the day-7 read — one row per posted post into niche/anatomy.md (source "own posts"), a verdict per handle and per format into PLAN.md's day-7 table by the judgement rules, the format lock for the next week. Reads the log's outcome.sync lines. No script, no cost. Never writes into brain/.
+description: Phase 8, the day-7 read — one row per posted post into niche/anatomy.md (source "own posts"), a verdict per handle and per format into PLAN.md's day-7 table by the judgement rules, the format lock for the next week. Reads the log's outcome.current lines. No script, no cost. Never writes into brain/.
 ---
 
 # Phase 8 — the day-7 read
@@ -11,7 +11,9 @@ brain.
 
 ## Read
 
-The log's `outcome.sync` lines of the week (`apps/<slug>/production/log.jsonl`), the
+The current numbers of each post of the week: the last `outcome.current` line per post
+and platform in `apps/<slug>/production/log.jsonl` (the `outcome.sync` lines are the
+history of the fetches; do not pick among them), the
 plan's posts table and its judgement rules, the decks (the format and the arm of each
 post), and `niche/anatomy.md`'s post table for the source posts' numbers.
 

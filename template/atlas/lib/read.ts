@@ -1,7 +1,7 @@
 /**
- * The stats layer, as the reporting plan states it: every number is an
- * `outcome.sync` or `outcomes` line in the log, with its source and read
- * time. Nothing here adds a metric. The read of a period is the sum over the
+ * The stats layer, as the reporting plan states it: every number is the
+ * post's current record (`outcome.current`, lib/outcome.ts) or its typed
+ * `outcomes` line, with its source and read time. Nothing here adds a metric. The read of a period is the sum over the
  * posts posted in it; a post without a read counts as posted, unread.
  *
  * With two platforms, a post has one read per leg. The view is one platform, or
@@ -53,7 +53,7 @@ export function numbersIn(s: PostState, view: View): PostNumbers | null {
   return out;
 }
 
-/** One leg's numbers: the day-7 form (typed for the primary leg) when there is one, else the leg's last sync. */
+/** One leg's numbers: the day-7 form (typed for the primary leg) when there is one, else the leg's current record. */
 function legNumbers(s: PostState, p: Platform): PostNumbers | null {
   const primary = s.primary ?? "tiktok";
   if (p === primary) return primaryNumbers(s);
@@ -62,7 +62,7 @@ function legNumbers(s: PostState, p: Platform): PostNumbers | null {
   return { views: y.views, likes: y.likes, comments: y.comments, saves: y.saves ?? 0, shares: y.shares, source: y.source, at: y.syncedAt || y.at, legs: [p], savesKnown: y.saves !== null, savesViews: y.saves !== null ? y.views : 0 };
 }
 
-/** The primary leg's numbers: typed outcomes first, then the synced read. */
+/** The primary leg's numbers: typed outcomes first, then the current record. */
 function primaryNumbers(s: PostState): PostNumbers | null {
   if (s.outcomes) {
     const o = s.outcomes;
@@ -97,11 +97,11 @@ export function readOf(states: PostState[], view: View = "both"): Read {
   return out;
 }
 
-/** "Read through Monid, Post Bridge agrees · last Wed 17 Sep 05:26 UTC", or the zero sentence. */
+/** "Read through Monid and Post Bridge · last 2026-09-17 05:26 UTC", or the zero sentence. The sources are the views' sources of the posts read. */
 export function readSentence(r: Read): string {
   if (!r.posted) return "Nothing posted in this period.";
   if (!r.read) return `${r.posted} posted, no read yet. The numbers appear after the first sync.`;
-  const src = r.sources.length ? `Read through ${r.sources[0]}${r.sources.length > 1 ? `, ${r.sources.slice(1).join(" and ")} ${r.sources.length === 2 ? "agrees" : "agree"}` : ""}` : "Read";
+  const src = r.sources.length ? `Read through ${r.sources.length > 1 ? `${r.sources.slice(0, -1).join(", ")} and ${r.sources[r.sources.length - 1]}` : r.sources[0]}` : "Read";
   const when = r.lastAt ? ` · last ${r.lastAt.slice(0, 10)} ${r.lastAt.slice(11, 16)} UTC` : "";
   const partial = r.read < r.posted ? ` · ${r.read} of ${r.posted} read` : "";
   return `${src}${when}${partial}`;

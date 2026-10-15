@@ -8,7 +8,7 @@
  *   export async function send(slug, args)         the posts of --post/--date: upload the final slides, create the post
  *                                                  (draft by default, --direct --at-local for a scheduled one), append posting.sent
  *   export async function status(slug, args)       read the state of a sent post (scheduled, published, failed)
- *   export async function sync(slug, args)         the posted link and the outcomes -> posted.link, posted, outcome.sync
+ *   export async function sync(slug, args)         the posted link and the outcomes -> posted.link, posted, outcome.sync, outcome.current
  *   export async function reschedule(slug, args)   move a scheduled post, append posting.rescheduled
  *
  * Each takes the slug and the raw argument list, reads the key from the workspace .env

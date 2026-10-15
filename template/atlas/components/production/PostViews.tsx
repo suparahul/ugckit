@@ -15,6 +15,7 @@ import Link from "next/link";
 
 import { getPost } from "@/lib/data";
 import { formatText } from "@/lib/plan-parts";
+import { sourcesText } from "@/lib/outcome";
 import { dateParts, getProduction, outcomesOpenAt, postPath, type Deck, type DeckFile, type PostState, type SourceRef } from "@/lib/production";
 import { Deck as DeckView } from "./Deck";
 import { VideoView } from "./VideoView";
@@ -275,7 +276,7 @@ export function AnatomyRail({ state, src }: { state: PostState; src: ReturnType<
   const params = rows.filter((r) => !isOutcome(r.column));
   const outs = rows.filter((r) => isOutcome(r.column));
   const opens = outcomesOpenAt(state);
-  /* The day-7 numbers Rahul typed; before that, the last sync (Monid with saves, or Post Bridge without). */
+  /* The day-7 numbers Rahul typed; before that, the current record the sync keeps. */
   const o = state.outcomes ?? (state.synced ? { views: state.synced.views, shares: state.synced.shares, comments: state.synced.comments, ...(state.synced.saves != null ? { saves: state.synced.saves } : {}) } : null);
   const fromSync = !state.outcomes && !!state.synced;
   const pct = (a: unknown, b: unknown) => (Number(b) > 0 ? `${((Number(a) / Number(b)) * 100).toFixed(2)}%` : "—");
@@ -350,7 +351,7 @@ export function AnatomyRail({ state, src }: { state: PostState; src: ReturnType<
           <h2>Outcomes</h2>
           {o ? (
             <dl>
-              {fromSync && state.synced ? <div className="anatomy__row is-outcome"><dt>Source</dt><dd>{state.synced.source === "monid" ? "Monid" : "Post Bridge"} sync {state.synced.at.slice(0, 10)} · {state.synced.likes.toLocaleString("en-US")} likes{state.synced.source === "monid" ? "" : " · saves not in its analytics"}{state.link ? <> · <a href={state.link} target="_blank" rel="noreferrer">open on TikTok →</a></> : ""}{opens && !state.outcomes ? ` · the day-7 form opens ${opens}` : ""}</dd></div> : null}
+              {fromSync && state.synced ? <div className="anatomy__row is-outcome"><dt>Source</dt><dd>{sourcesText(state.synced.fields)} · {state.synced.likes.toLocaleString("en-US")} likes{state.synced.saves == null ? " · no source gave the saves" : ""}{state.link ? <> · <a href={state.link} target="_blank" rel="noreferrer">open on TikTok →</a></> : ""}{opens && !state.outcomes ? ` · the day-7 form opens ${opens}` : ""}</dd></div> : null}
               {outs.map((r) => (
                 <div key={r.column} className="anatomy__row is-outcome">
                   <dt>{r.column.replace(/\s*\(.*\)$/, "")}</dt>
