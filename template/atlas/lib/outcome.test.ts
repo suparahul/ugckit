@@ -136,3 +136,15 @@ test("a slot card nobody marked posted is read by the sync, linked from Monid, a
   assert.equal(legState(log(), "tiktok").synced?.views, 3400, "every sync updates the record");
   assert.equal(legState(log(), "tiktok").synced?.saves, 5);
 });
+
+test("a live post shows as posted, also when an approval gate is still open", () => {
+  const live = allStates(SLUG).find((s) => s.row.key === MID.key)!;
+  assert.equal(live.idea.status === "approved", false, "no gate was clicked for this card");
+  assert.equal(live.stage, "posted", "the `posted` line wins over the open idea gate");
+  assert.match(live.sentence, /^posted /);
+  const open = allStates(SLUG).find((s) => s.row.key === AM.key)!;
+  assert.equal(open.stage, "idea", "without a `posted` line the gates still decide");
+  appendEvent(SLUG, { post: AM.key, kind: "kill", note: "x" });
+  appendEvent(SLUG, { post: AM.key, kind: "posted", data: { time: "10:00", manual: true } as unknown as Event["data"] });
+  assert.equal(allStates(SLUG).find((s) => s.row.key === AM.key)!.stage, "killed", "a kill still wins over posted");
+});

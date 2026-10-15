@@ -797,15 +797,15 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
 
   let stage: Stage;
   if (killed) stage = "killed";
+  /* A live post is posted, whatever gate is still open: a post marked posted by hand or linked by the sync
+     (no approval clicked), or a deck edited after the fact, changes nothing on the phone.
+     Read: the day-7 numbers are typed, or a sync on or after day 7 brought them. */
+  else if (posted) stage = !outcomes && !(synced && synced.at.slice(0, 10) >= addDays(posted.at.slice(0, 10), 7)) ? "posted" : "read";
   else if (idea.status !== "approved") stage = "idea";
   else if (!hasPlan) stage = "planned";
   else if (plan.status !== "approved") stage = "plan";
-  /* A posted post is posted: a deck edit after the fact changes nothing on the phone, so the final gate is not reopened. */
-  else if (final.status !== "approved" && !(posted && final.status === "stale")) stage = "final";
-  else if (!posted) stage = "ready";
-  /* Read: the day-7 numbers are typed, or a sync on or after day 7 brought them. */
-  else if (!outcomes && !(synced && synced.at.slice(0, 10) >= addDays(posted.at.slice(0, 10), 7))) stage = "posted";
-  else stage = "read";
+  else if (final.status !== "approved") stage = "final";
+  else stage = "ready";
 
   const mode: Mode = hasPlan && plan.status === "approved" ? "produced" : "planning";
 
