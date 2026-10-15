@@ -35,6 +35,10 @@
  *   ... --refresh-stats                                    fetch every handle in scope from Monid on purpose, even one with nothing
  *                                                           unlinked, so an older post's numbers (saves included) get refreshed too —
  *                                                           the plan (maxItems and the cost estimate per handle) prints first
+ * Before any paid Monid fetch, a post with no link is looked for in the saved
+ * runs (apps/<slug>/production/monid/, where every fetch keeps Monid's raw
+ * output, and the runs `monid runs list` / `monid runs get` give, free).
+ *
  *   ... --monid-runs <id,id>                               no new paid Monid call: read each handle's posts from these saved runs
  *                                                           (`monid runs list`; `monid runs get` is free); a handle with no saved
  *                                                           run among them is reported as an error
@@ -48,7 +52,8 @@ process.chdir(ROOT);
 
 const { ENV_KEY, readKey } = await import("../lib/postbridge.ts");
 const { syncAll } = await import("../lib/postbridge-flow.ts");
-const { monidFetchPlan } = await import("../lib/tiktok-link.ts");
+const { monidFetchPlan, unplannedOf } = await import("../lib/tiktok-link.ts");
+const { readLog } = await import("../lib/production.ts");
 
 const key = readKey(process.env);
 if (key) process.env[ENV_KEY] = key;
@@ -75,7 +80,14 @@ else if (refreshStats && !noMonid) {
   console.log(`  total: ~$${total.toFixed(4)}`);
 }
 
+const startedAt = new Date().toISOString();
 const { links, refreshed, reports, postBridgeError } = await syncAll(SLUG, sel, { noMonid, refreshStats, monidRuns: runIds });
+/* The Monid posts no planned post claims: written as monid.unplanned lines, never dropped. */
+const unplanned = unplannedOf(readLog(SLUG));
+if (unplanned.length) {
+  console.log(`Monid — ${unplanned.length} post${unplanned.length === 1 ? "" : "s"} of the handles that no planned post claims (new in this run: ${unplanned.filter((e) => e.at >= startedAt).length}); add the row or paste the link on the post page:`);
+  for (const e of unplanned) console.log(`  ${String(e.handle).padEnd(22)} ${String(e.data.kind).padEnd(6)} ${String(e.data.uploadedAt).slice(0, 16)}  ${e.data.views} views  ${e.data.url}`);
+}
 if (!links.length) { console.log(post ? `${post}: not sent through Post Bridge nor posted on TikTok by hand` : date ? `${date}: no post sent through Post Bridge or posted on TikTok by hand` : "No post was sent through Post Bridge or posted on TikTok by hand yet."); process.exit(0); }
 
 console.log(noMonid ? "The link — Post Bridge only (--no-monid, no Monid call):" : "The link (Post Bridge for a direct send, Monid otherwise) and the Monid numbers:");

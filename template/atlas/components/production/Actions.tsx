@@ -72,6 +72,7 @@ const KIND_WORD: Record<string, string> = {
   "posted.link": "link found",
   "outcome.sync": "outcomes fetched",
   "outcome.current": "current numbers updated",
+  "monid.unplanned": "a post outside the plan, seen through Monid",
   export: "files exported",
   kill: "killed",
   unkill: "un-killed",

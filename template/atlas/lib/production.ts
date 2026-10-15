@@ -286,6 +286,8 @@ export type EventKind =
   | "outcome.sync"
   /* The current numbers of one leg, a full merged snapshot written by the sync: the one the Atlas reads. */
   | "outcome.current"
+  /* A post Monid returned for a handle that no planned post claims (data: id, url, kind, the numbers): kept, never dropped. */
+  | "monid.unplanned"
   /* One leg of a send failed on its platform (data.platform, data.error: the platform's words). */
   | "posting.failed"
   /* A leg taken off a post, or put back (data.platform, note). */

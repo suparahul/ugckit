@@ -122,7 +122,8 @@ test("a slot card nobody marked posted is read by the sync, linked from Monid, a
   const after = `${DATE}T15:00:00.000Z`;
   let records = [rec("111", after, 900, false), rec("222", after, 1200, true)];
   const fetch = async () => records;
-  const one = await findLinks(SLUG, { keys: [MID.key] }, fetch);
+  const noSaved = { savedRuns: async () => [] };
+  const one = await findLinks(SLUG, { keys: [MID.key] }, fetch, noSaved);
   assert.equal(one[0].status, "linked");
   assert.equal(one[0].tiktokId, "222", "the one video, not the slideshow");
   const log = () => readLog(SLUG).filter((e) => e.post === MID.key);
@@ -130,7 +131,7 @@ test("a slot card nobody marked posted is read by the sync, linked from Monid, a
   assert.equal(legState(log(), "tiktok").synced?.views, 1200);
 
   records = [rec("111", after, 950, false), rec("222", after, 3400, true)];
-  const two = await findLinks(SLUG, { keys: [MID.key] }, fetch);
+  const two = await findLinks(SLUG, { keys: [MID.key] }, fetch, noSaved);
   assert.equal(two[0].status, "known");
   assert.equal(legState(log(), "tiktok").synced?.views, 3400, "every sync updates the record");
   assert.equal(legState(log(), "tiktok").synced?.saves, 5);

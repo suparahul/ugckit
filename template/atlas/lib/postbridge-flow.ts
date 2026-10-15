@@ -37,6 +37,7 @@ import { allStates, appendEvent, filesRoot, fileKey, getProduction, isSent, legs
 import { checkVideoSend, directBlock, instagramBlock, videoReminders } from "./video-post.ts";
 import { finalFileOf } from "./video.ts";
 import { findLinks, monidRuns, savedRunsFetch, type LinkReport } from "./tiktok-link.ts";
+import { keepRun } from "./monid-archive.ts";
 import { fmtBoth, postingZone, zonedToUtc } from "./when.ts";
 
 const run = promisify(execFile);
@@ -545,7 +546,10 @@ export type SyncAll = { links: LinkReport[]; refreshed: boolean; reports: SyncRe
  * error, never fetched.
  */
 export async function syncAll(slug: string, sel: { date?: string; keys?: string[] } = {}, opts: { noMonid?: boolean; refreshStats?: boolean; monidRuns?: string[] } = {}): Promise<SyncAll> {
-  const fetch = opts.monidRuns?.length && !opts.noMonid ? savedRunsFetch(await monidRuns(opts.monidRuns)) : undefined;
+  const runs = opts.monidRuns?.length && !opts.noMonid ? await monidRuns(opts.monidRuns) : null;
+  /* The runs read again are kept in the Monid folder too, so the next sync finds them without a call. */
+  for (const r of runs ?? []) keepRun(slug, r);
+  const fetch = runs ? savedRunsFetch(runs) : undefined;
   const links = await findLinks(slug, sel, fetch, { refreshStats: opts.refreshStats && !opts.noMonid, noMonid: opts.noMonid });
   if (!hasKey()) return { links, refreshed: false, reports: [], postBridgeError: "POST_BRIDGE_API_KEY is not set" };
   try {

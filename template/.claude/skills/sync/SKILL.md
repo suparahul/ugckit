@@ -77,11 +77,25 @@ for a post still open, the one post left of the same shape (the slide count). Th
 second step finds a draft whose caption was rewritten on the phone; the report says
 "matched by kind, slide count and time" with the caption's score.
 
-## No new paid call
+## The saved runs first, and nothing dropped
 
-`--monid-runs <id,id>` reads each handle's posts from saved Monid runs (`monid runs
-list`; `monid runs get` is free) instead of a new fetch. Use it to repair or re-read a
-day the sync already paid for.
+Every paid Monid fetch keeps Monid's raw output in `apps/<slug>/production/monid/`
+(`<read time>-<username>.json`). Before the sync pays for a handle, each of its posts
+with no link is looked for in the saved runs: that folder, plus the runs `monid runs
+list` names, read with `monid runs get` (both free) and kept in the folder once. The
+caption match runs for every such post; the time and shape match only for a post with
+no send. A handle whose posts all settle there is not fetched; the report says "from a
+saved Monid run". `--no-monid` still reads the folder (no call at all).
+
+A Monid post of a handle that no planned post claims, uploaded since the handle's first
+plan date, is written once as a `monid.unplanned` line (the handle, the TikTok id and
+url, the kind, the numbers, the read time) and printed at the end of the sync. Tell the
+user: it is a post outside the plan, or one the match could not place. When it belongs
+to a slot card, paste its link on the post page; the next sync records its numbers.
+
+`--monid-runs <id,id>` reads each handle's posts from those saved runs only, instead of
+a new fetch, and keeps them in the folder. Use it to repair or re-read a day the sync
+already paid for.
 
 ## Where the caption match fails
 

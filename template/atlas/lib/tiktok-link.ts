@@ -44,6 +44,7 @@ import { promisify } from "node:util";
 
 import { allStates, appendEvent, getProduction, readLog, recordOutcome, type Event, type PostState } from "./production.ts";
 import { linePlatform } from "./platform.ts";
+import { archivedRuns, pullSavedRuns, rawFetchFile, recordsFor } from "./monid-archive.ts";
 import { hasKey, legStatusOf, postBridge, type Leg, type PBAnalytics, type PBPost, type PBPostResult, type PostBridgeClient } from "./postbridge.ts";
 
 const run = promisify(execFile);
@@ -163,16 +164,20 @@ export function maxItemsFor(sentTiktokCount: number): number {
   return Math.max(sentTiktokCount, 0) + MONID_MAX_ITEMS_MARGIN;
 }
 
-/** The handle's latest posts through Monid (paid: about $0.00045 per post; `maxItems` sized by the caller, see `maxItemsFor`). */
-export async function monidHandlePosts(handle: string, maxItems = 20): Promise<MonidPost[]> {
-  const dir = mkdtempSync(join(tmpdir(), "atlas-monid-"));
-  const out = join(dir, "posts.json");
+/**
+ * The handle's latest posts through Monid (paid: about $0.00045 per post; `maxItems` sized by the caller, see `maxItemsFor`).
+ * `keep`: the file Monid writes its raw output to, kept (lib/monid-archive.ts `rawFetchFile`); without it, a temporary file.
+ */
+export async function monidHandlePosts(handle: string, maxItems = 20, keep?: string): Promise<MonidPost[]> {
+  const dir = keep ? null : mkdtempSync(join(tmpdir(), "atlas-monid-"));
+  const out = keep ?? join(dir!, "posts.json");
+  const readAt = new Date().toISOString();
   try {
     await run("monid", ["run", "-p", "apify", "-e", "/apidojo/tiktok-profile-scraper", "-i", JSON.stringify({ usernames: [handle.replace(/^@/, "")], maxItems }), "-w", "120", "-o", out], { env: { ...process.env, NO_COLOR: "1" }, maxBuffer: 16 * 1024 * 1024 });
     const parsed = JSON.parse(readFileSync(out, "utf8")) as unknown;
-    return Array.isArray(parsed) ? (parsed as MonidPost[]) : [];
+    return Array.isArray(parsed) ? (parsed as MonidPost[]).map((p) => ({ ...p, readAt })) : [];
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    if (dir) rmSync(dir, { recursive: true, force: true });
   }
 }
 
@@ -346,6 +351,8 @@ export type FindLinksOpts = {
    * reported as skipped.
    */
   noMonid?: boolean;
+  /** The saved runs to look in before any paid fetch; default: the folder after `pullSavedRuns` (lib/monid-archive.ts). */
+  savedRuns?: () => Promise<MonidRun[]>;
 };
 
 /**
@@ -397,10 +404,17 @@ export function monidFetchPlan(slug: string, sel: { date?: string; keys?: string
  * left with no numbers. The match, per handle, in two passes (`pickRecord`):
  * the caption first for every post, then time and shape for the rest; a
  * record another post of the handle already links is never matched again.
+ * Before it pays, a post with no link is looked for in every saved Monid run
+ * of its handle (lib/monid-archive.ts: the raw output of each earlier fetch,
+ * kept in apps/<slug>/production/monid/, and the runs `monid runs list` and
+ * `monid runs get` give, free); a handle whose posts all settle there is not
+ * fetched. Each paid fetch writes Monid's raw output into that folder. A
+ * Monid post of the handle that no planned post claims is written once as a
+ * `monid.unplanned` line (`keepUnplanned`), never dropped.
  * `opts.refreshStats` fetches every handle on purpose, even one with nothing
- * unlinked. `fetch` is for tests.
+ * unlinked. `fetch` and `opts.savedRuns` are for tests and `--monid-runs`.
  */
-export async function findLinks(slug: string, sel: { date?: string; keys?: string[] } = {}, fetch: Fetch = monidHandlePosts, opts: FindLinksOpts = {}): Promise<LinkReport[]> {
+export async function findLinks(slug: string, sel: { date?: string; keys?: string[] } = {}, fetch?: Fetch, opts: FindLinksOpts = {}): Promise<LinkReport[]> {
   const wanted = sel.keys ?? (sel.date ? getProduction(slug).rows.filter((r) => r.date === sel.date).map((r) => r.key) : null);
   /* The TikTok posts, sent or published by hand: Monid reads TikTok only. An Instagram leg's link comes from Post Bridge (syncOutcomes). */
   const tiktokAll = allStates(slug).filter(syncsOnTiktok);
@@ -422,51 +436,107 @@ export async function findLinks(slug: string, sel: { date?: string; keys?: strin
     if (!needsMonidBatch(s)) { pending.set(s.row.key, linkViaPostBridge(s, pbLinkOf(s.log)!)); continue; }
     byHandleNeedsBatch.set(s.row.handle, [...(byHandleNeedsBatch.get(s.row.handle) ?? []), s]);
   }
-  if (opts.noMonid) {
-    for (const [handle, needsBatch] of byHandleNeedsBatch) {
-      for (const s of needsBatch) {
-        const known = linkOf(s.log);
-        pending.set(s.row.key, known
-          ? { post: s.row.key, handle, status: "known", url: known.url, tiktokId: known.id, candidates: [], outcome: null, written: false, note: "linked already; Monid skipped (--no-monid), so no numbers from Monid" }
-          : { post: s.row.key, handle, status: "none", url: null, tiktokId: null, candidates: [], outcome: null, written: false, note: `${s.sent ? "not published by Post Bridge" : "posted by hand"}, so only Monid can find its link; Monid skipped (--no-monid)` });
-      }
-    }
-    return states.map((s) => pending.get(s.row.key)!);
-  }
   const handlesToFetch = new Set(byHandleNeedsBatch.keys());
-  if (opts.refreshStats) for (const h of byHandleAll.keys()) handlesToFetch.add(h);
+  if (opts.refreshStats && !opts.noMonid) for (const h of byHandleAll.keys()) handlesToFetch.add(h);
+  /* The saved runs, read once and only when a post is still unlinked: the folder, plus the runs Monid holds (free). */
+  let saved: MonidRun[] | null = null;
+  const savedRuns = opts.savedRuns ?? (async () => { if (!opts.noMonid) await pullSavedRuns(slug); return archivedRuns(slug); });
+  const paid: Fetch = fetch ?? ((name, n) => monidHandlePosts(name, n, rawFetchFile(slug, name)));
   for (const handle of handlesToFetch) {
     const needsBatch = byHandleNeedsBatch.get(handle) ?? [];
     const all = byHandleAll.get(handle) ?? [];
-    const maxItems = maxItemsFor(all.length);
-    let records: MonidPost[];
-    try { records = await fetch(handle, maxItems); } catch (e) {
-      const note = `Monid: ${e instanceof Error ? e.message : String(e)}`;
-      for (const s of needsBatch) pending.set(s.row.key, { post: s.row.key, handle, status: "error", url: null, tiktokId: null, candidates: [], outcome: null, written: false, note });
-      continue;
-    }
     /* The TikTok ids this handle's posts already hold (every date, not only the selection), and the ones linked in this run. */
     const claimed = new Set<string>();
     for (const s of tiktokAll) if (s.row.handle === handle) for (const l of [linkOf(s.log), pbLinkOf(s.log)]) if (l) claimed.add(l.id);
     for (const r of pending.values()) if (r.handle === handle && r.tiktokId) claimed.add(r.tiktokId);
     const settle = (s: PostState, r: LinkReport) => { pending.set(s.row.key, r); if (r.tiktokId) claimed.add(r.tiktokId); };
-    const open: PostState[] = [];
-    for (const s of needsBatch) {
-      const r = linkOne(s, handle, records, claimed, "caption");
-      if (r) settle(s, r); else open.push(s);
+    const seen = new Map<string, MonidPost>();
+
+    /* 1. Before any paid fetch: the posts with no link, against every saved run of the handle (free).
+       The caption for every post; time and shape only for a post with no send (one posted by hand). */
+    const fromSaved = new Set<PostState>();
+    const unlinked = needsBatch.filter((s) => !linkOf(s.log));
+    if (unlinked.length) {
+      saved ??= await savedRuns();
+      const old = recordsFor(saved, handle);
+      for (const p of old) seen.set(p.id, p);
+      const take = (s: PostState, r: LinkReport | null) => {
+        if (r?.status !== "linked") return false;
+        settle(s, { ...r, note: `from a saved Monid run read ${at16(r.outcome?.syncedAt ?? "")} UTC, no paid call; ${r.note}` });
+        fromSaved.add(s);
+        return true;
+      };
+      const open = unlinked.filter((s) => !take(s, linkOne(s, handle, old, claimed, "caption")));
+      for (const s of open) if (!s.sent) take(s, linkOne(s, handle, old, claimed, "fallback"));
     }
-    for (const s of open) settle(s, linkOne(s, handle, records, claimed, "fallback")!);
-    /* Every OTHER post of this handle already in the fetch — a direct send,
-       or a draft already linked via Post Bridge's own analytics — gets its
-       numbers refreshed too, since the fetch is already paid for. A link
-       written earlier in this run counts: the states were read before it. */
-    for (const s of all) {
-      if (needsBatch.includes(s)) continue;
-      const refreshed = refreshStatsOnly(s, handle, records, pending.get(s.row.key));
-      if (refreshed) pending.set(s.row.key, refreshed);
+    const rest = needsBatch.filter((s) => !fromSaved.has(s));
+
+    /* 2. The paid fetch, only for what the saved runs did not settle (or a refresh asked for). */
+    if (opts.noMonid) {
+      for (const s of rest) {
+        const known = linkOf(s.log);
+        pending.set(s.row.key, known
+          ? { post: s.row.key, handle, status: "known", url: known.url, tiktokId: known.id, candidates: [], outcome: null, written: false, note: "linked already; Monid skipped (--no-monid), so no numbers from Monid" }
+          : { post: s.row.key, handle, status: "none", url: null, tiktokId: null, candidates: [], outcome: null, written: false, note: `${s.sent ? "not published by Post Bridge" : "posted by hand"}, so only Monid can find its link; not in the saved runs; Monid skipped (--no-monid)` });
+      }
+    } else if (rest.length || opts.refreshStats) {
+      let records: MonidPost[] | null = null;
+      try { records = await paid(handle, maxItemsFor(all.length)); } catch (e) {
+        const note = `Monid: ${e instanceof Error ? e.message : String(e)}`;
+        for (const s of rest) pending.set(s.row.key, { post: s.row.key, handle, status: "error", url: null, tiktokId: null, candidates: [], outcome: null, written: false, note });
+      }
+      if (records) {
+        for (const p of records) seen.set(p.id, p);
+        const open: PostState[] = [];
+        for (const s of rest) {
+          const r = linkOne(s, handle, records, claimed, "caption");
+          if (r) settle(s, r); else open.push(s);
+        }
+        for (const s of open) settle(s, linkOne(s, handle, records, claimed, "fallback")!);
+        /* Every OTHER post of this handle already in the fetch — a direct send,
+           a draft already linked via Post Bridge's own analytics, or one just
+           linked from a saved run — gets its numbers refreshed too, since the
+           fetch is already paid for. A link written earlier in this run counts:
+           the states were read before it. */
+        for (const s of all) {
+          if (rest.includes(s)) continue;
+          const refreshed = refreshStatsOnly(s, handle, records, pending.get(s.row.key));
+          if (refreshed) pending.set(s.row.key, refreshed);
+        }
+      }
     }
+
+    /* 3. Nothing Monid returned is dropped: a post of the handle no planned post claims is written once. */
+    keepUnplanned(slug, handle, [...seen.values()], claimed);
   }
   return states.map((s) => pending.get(s.row.key)!);
+}
+
+/**
+ * The posts of a handle that Monid returned and no planned post claims, as
+ * `monid.unplanned` lines (the handle's identity line: `handle`, no `post`),
+ * once per TikTok id: a video posted by hand outside the plan, or one the
+ * match could not place. Only posts uploaded on or after the handle's first
+ * plan date: older ones are from before the plan. The raw output stays in
+ * the Monid folder; this line is what the sync prints and the next one reads.
+ */
+export function keepUnplanned(slug: string, handle: string, seen: MonidPost[], claimed: Set<string>): MonidPost[] {
+  const first = getProduction(slug).rows.filter((r) => r.handle === handle).map((r) => r.date).sort()[0];
+  if (!first) return [];
+  const known = new Set(readLog(slug).filter((e) => e.kind === "monid.unplanned").map((e) => String(e.data?.id ?? "")));
+  const fresh = seen.filter((p) => !claimed.has(p.id) && !known.has(p.id) && p.uploadedAtFormatted.slice(0, 10) >= first);
+  for (const p of fresh) appendEvent(slug, { handle, kind: "monid.unplanned", actor: "sync", data: {
+    id: p.id, url: tiktokUrl(handle, p), kind: recordKindOf(p), uploadedAt: p.uploadedAtFormatted, title: (p.title ?? "").slice(0, 200),
+    views: p.views ?? 0, likes: p.likes ?? 0, comments: p.comments ?? 0, saves: p.bookmarks ?? 0, shares: p.shares ?? 0, readAt: p.readAt ?? new Date().toISOString(),
+  } });
+  return fresh;
+}
+
+/** The `monid.unplanned` lines no post has linked since: the Monid posts still waiting for a planned post. */
+export function unplannedOf(log: Event[]): Event[] {
+  const linked = new Set<string>();
+  for (const e of log) if (e.kind === "posted.link" && e.data?.url) { const id = tiktokIdOf(String(e.data.url)); if (id) linked.add(id); }
+  return log.filter((e) => e.kind === "monid.unplanned" && !linked.has(String(e.data?.id ?? "")));
 }
 
 const DIGITS = /^\d+$/;
