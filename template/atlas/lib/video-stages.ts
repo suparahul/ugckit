@@ -289,7 +289,7 @@ export function timeline({ plan, source, production: p, final }: TimelineInput):
     const ref = refs.get(b.reaction?.ref_id ?? "");
     const refUrl = ref ? mediaUrl(ref.video_path) : null;
     if (refUrl) pics.push({ kind: "video", url: refUrl, at: num(ref.start_s), label: `reference, ${ref.handle ? `@${String(ref.handle).replace(/^@/, "")} ` : ""}at ${secs(num(ref.start_s) ?? 0)} s` });
-    else if (seg?.faceReplace?.reference) pics.push({ kind: "video", url: seg.faceReplace.reference, at: 0, label: "reference clip" });
+    else if (seg?.motionCopy?.reference) pics.push({ kind: "video", url: seg.motionCopy.reference, at: 0, label: "reference clip" });
     if (b.screen_id && screens.get(b.screen_id)?.file) {
       const r = screens.get(b.screen_id);
       const u = mediaUrl(`apps/${slug}/screens/${r.file}`);

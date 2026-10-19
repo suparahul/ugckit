@@ -10,7 +10,7 @@
  *   generate     segments/<nn>-<type>/generated/*.mp4 (generate.sh, one run each)
  *   review       gate B: approval.json gate_b_segments; the Atlas `take.approve` and
  *                `take.reject` lines (a reject with `regenerate` is the yes to one more run).
- *                A face-replace take shows its identity gate (generated/qc/identity-*.json).
+ *                A motion-copy take shows its identity gate (generated/qc/identity-*.json).
  *   composite    a phone segment's composite/*.mp4 (composite.sh) and its gates; the Atlas
  *                `composite.approve` line
  *   assemble     assembly/assembly.json and its file (assemble.sh); gate C:
@@ -34,9 +34,21 @@ import { APPS_DIR, CHARACTER_DIR, ROOT } from "./root.ts";
 /* The segment types generate.sh makes; the phone plates among them get the app at P4. */
 const GENERATED = ["T", "O", "G", "S", "H", "F", "B", "X"];
 const PHONE = ["O", "G", "S", "H", "F"];
-/* review.py's required checks: a silent reaction (the written route), and a face-replace reaction. */
+/* review.py's required checks: a silent reaction on the written fallback, and a motion-copy reaction. */
 export const REACTION_CHECKS = ["identity", "hands", "silent", "performance"];
-export const FACE_REPLACE_CHECKS = ["identity", "no_source_identity", "silent"];
+export const MOTION_COPY_CHECKS = ["identity", "no_source_identity", "silent"];
+
+/* Motion copy, the one default of every reaction with a reference (founder, 2026-10-19). The
+   names before then are read, never rewritten: the shot's face_replace block, models.json
+   face_replace, and generation_input face_replace. A missing generation_input is motion copy. */
+export const motionBlock = (shot: any) => {
+  const fx = shot?.motion_copy ?? shot?.face_replace;
+  return fx && typeof fx === "object" && Object.keys(fx).length ? fx : null;
+};
+export const motionSpec = (spec: any) => spec?.motion_copy ?? spec?.face_replace ?? null;
+export const isMotionCopy = (ref: any) => !!ref && (ref.generation_input == null || ref.generation_input === "motion_copy" || ref.generation_input === "face_replace");
+/* The identity gate passes a take (review.py): PASS, or NO FACE (no frame shows a face; the eye check decides). */
+export const identityOk = (r: string | null | undefined) => r === "PASS" || r === "NO FACE";
 export const GUIDED_CHECKS = ["follows_reference"];
 
 export type Identity = { result: string; why: string | null; character: number | null; reference: number | null; closer: number | null };
@@ -66,7 +78,7 @@ export type Segment = {
   refCount: number;
   subjects: string[];
   expressionBeats: number;
-  /** A face-replace X's pose picture (source/first-frame.png); an H segment's end still. */
+  /** A motion-copy X's pose picture (source/first-frame.png); an H segment's end still. */
   poseFrame: string | null;
   endStill: string | null;
   /** The plate's insertion gates (generated/qc/gates.json), the flat-on check first. */
@@ -85,11 +97,11 @@ export type Segment = {
   /** A segment of another video (video.json project): shown, decided there. */
   sharedFrom: string | null;
   keyframe: { url: string; sha256: string; at: string } | null;
-  /** Starts from a keyframe approved at gate A: every generated segment but a face-replace X on a route with no first frame (replace, guided: the clip leads). */
+  /** Starts from a keyframe approved at gate A: every generated segment but a motion-copy X on a route with no first frame (replace, guided: the clip leads). */
   needsKeyframe: boolean;
   prompt: boolean;
-  /** An X shot in face-replace mode: its route (models.json face_replace.routes), and the reference clip. */
-  faceReplace: { route: string; model: string | null; reference: string | null } | null;
+  /** An X shot by motion copy: its route (models.json motion_copy.routes), and the reference clip. */
+  motionCopy: { route: string; model: string | null; reference: string | null } | null;
   continues: string | null;
   /** generate.sh's computed figure for one run, from models.json and the shot; null when unknown. */
   cost: number | null;
@@ -197,10 +209,10 @@ const decisionOf = (e: any): Decision | null =>
 
 /** The cost of one run of a segment, as generate.sh computes it (list price x seconds, or x source frames). */
 export function runCost(spec: any, state: any, shot: any, type: string, ref: any): { cost: number | null; route: string | null; model: string | null } {
-  const fx = type === "X" && shot?.face_replace && typeof shot.face_replace === "object" && Object.keys(shot.face_replace).length ? shot.face_replace : null;
-  if (fx && ref && ref.generation_input === "face_replace") {
-    const route = fx.route || spec?.face_replace?.default_route || null;
-    const rt = spec?.face_replace?.routes?.[route];
+  const fx = type === "X" ? motionBlock(shot) : null;
+  if (fx && isMotionCopy(ref)) {
+    const route = fx.route || motionSpec(spec)?.default_route || null;
+    const rt = motionSpec(spec)?.routes?.[route];
     const lim = rt ? spec?.known_model_limits?.[rt.model] : null;
     const clip = (num(ref.end_s) ?? 0) - (num(ref.start_s) ?? 0);
     if (!rt || !lim || clip <= 0) return { cost: null, route, model: rt?.model ?? null };
@@ -215,10 +227,10 @@ export function runCost(spec: any, state: any, shot: any, type: string, ref: any
 }
 
 /** The checks review.py requires before it approves a take of this segment. */
-export function checksOf(type: string, route: string | null, faceReplace: boolean): string[] {
+export function checksOf(type: string, route: string | null, motionCopy: boolean): string[] {
   if (type !== "X") return [];
-  if (!faceReplace) return REACTION_CHECKS;
-  return route === "guided" ? [...FACE_REPLACE_CHECKS, ...GUIDED_CHECKS] : FACE_REPLACE_CHECKS;
+  if (!motionCopy) return REACTION_CHECKS;
+  return route === "guided" ? [...MOTION_COPY_CHECKS, ...GUIDED_CHECKS] : MOTION_COPY_CHECKS;
 }
 
 const AUDIO = [".wav", ".mp3", ".m4a"];
@@ -266,10 +278,10 @@ export function readProduction(id: string, log: Pick<Event, "kind" | "at" | "not
     const generated = GENERATED.includes(type);
     const kfAbs = join(vd, "keyframes", `${name}.png`);
     const kfSha = generated && existsSync(kfAbs) ? sha256Of(kfAbs) : null;
-    const rxRef = refs.get(shot?.face_replace?.ref_id ?? shot?.reaction?.ref_id);
+    const rxRef = refs.get(motionBlock(shot)?.ref_id ?? shot?.reaction?.ref_id);
     const { cost, route, model } = generated ? runCost(spec, st, shot, type, rxRef) : { cost: null, route: null, model: null };
-    const needsKeyframe = generated && !(route && spec?.face_replace?.routes?.[route]?.first_frame !== "keyframe");
-    const fr = type === "X" && rxRef?.generation_input === "face_replace" && route ? { route, model, reference: existsSync(join(sd, "source", "reference.mp4")) ? media(id, `segments/${name}/source/reference.mp4`, sha256Of(join(sd, "source", "reference.mp4"))) : null } : null;
+    const needsKeyframe = generated && !(route && motionSpec(spec)?.routes?.[route]?.first_frame !== "keyframe");
+    const fr = type === "X" && isMotionCopy(rxRef) && route ? { route, model, reference: existsSync(join(sd, "source", "reference.mp4")) ? media(id, `segments/${name}/source/reference.mp4`, sha256Of(join(sd, "source", "reference.mp4"))) : null } : null;
     const takes = generated && !sharedFrom ? takesOf(id, name, sd) : [];
     const row = lastRow(project);
     const gateB = decisionOf(row);
@@ -336,7 +348,7 @@ export function readProduction(id: string, log: Pick<Event, "kind" | "at" | "not
       keyframe: kfSha ? { url: media(id, `keyframes/${name}.png`, kfSha), sha256: kfSha, at: mtimeIso(kfAbs) } : null,
       needsKeyframe,
       prompt: existsSync(join(sd, "prompt.txt")),
-      faceReplace: fr,
+      motionCopy: fr,
       continues: from,
       cost, takes, gateB, approved,
       checks: checksOf(type, route, !!fr),
@@ -450,7 +462,7 @@ export function readProduction(id: string, log: Pick<Event, "kind" | "at" | "not
   if (allB && stages.review && stages.review.status !== "done") notes.push(`state.json says review ${stages.review.status}${stages.review.note ? ` (${stages.review.note})` : ""}; every gate B item is approved in approval.json. The agent runs: state.py set ${id} review done`);
   for (const s of own) {
     const r = lastRow(`${id}.${s.name}`);
-    if (r?.decision === "approve" && !r.atlas_line_at && s.faceReplace && !String(r.checks?.identity_gate ?? "").startsWith("pass")) notes.push(`${s.name}: the approval in approval.json has no identity gate PASS (written by hand, not by review.py)`);
+    if (r?.decision === "approve" && !r.atlas_line_at && s.motionCopy && !/^(pass|no face)/.test(String(r.checks?.identity_gate ?? ""))) notes.push(`${s.name}: the approval in approval.json has no identity gate result (written by hand, not by review.py)`);
   }
 
   return {

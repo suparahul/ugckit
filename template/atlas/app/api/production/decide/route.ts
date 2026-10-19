@@ -38,6 +38,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { isPlatform } from "@/lib/platform";
 import { allStates, appendEvent, finalBlock, parseLayout, slideHashes, validSlug, type Event, type EventKind, type PostState } from "@/lib/production";
+import { identityOk } from "@/lib/video-production";
 
 const KINDS = new Set<EventKind>([
   "idea.approve", "idea.sendback", "plan.approve", "plan.sendback", "final.approve", "final.sendback",
@@ -207,10 +208,10 @@ function productionLine(state: PostState | undefined, kind: EventKind, sent: Rec
     const fix = typeof sent.fix === "string" ? sent.fix.trim().slice(0, 600) : "";
     return { data: { video, segment: seg.name, file: take.file, sha256: take.sha256, decision: sent.decision === "reject" ? "reject" : "regenerate", ...(fix ? { fix } : {}), cost_usd: seg.cost } };
   }
-  /* take.approve: the identity gate first on a face-replace take, then every check review.py needs. */
-  if (seg.faceReplace) {
+  /* take.approve: the identity gate first on a motion-copy take, then every check review.py needs. */
+  if (seg.motionCopy) {
     if (!take.identity) return { error: "The identity gate has not run on this take: the agent runs scripts/character/identity.py first." };
-    if (take.identity.result !== "PASS") return { error: `The identity gate says ${take.identity.result}${take.identity.why ? `: ${take.identity.why}` : ""}. Reject this take.` };
+    if (!identityOk(take.identity.result)) return { error: `The identity gate says ${take.identity.result}${take.identity.why ? `: ${take.identity.why}` : ""}. Reject this take.` };
   }
   const ticked = Array.isArray(sent.checks) ? sent.checks.map(String) : [];
   const miss = seg.checks.filter((c) => !ticked.includes(c));

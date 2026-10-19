@@ -55,7 +55,7 @@ export function VideoStages({ v, p, tl, base, stage, seg }: { v: StagesView; p: 
             const beats = tl?.checkpoints.filter((c) => c.segment === s.name) ?? [];
             return (
               <div key={s.name} role="row" className={`vst__row${seg === s.name ? " is-open" : ""}`}>
-                <span role="cell" data-label="Segment"><Link href={href(`stage=${stage}&seg=${s.name}`)}><b>{s.name}</b> {s.type}{s.faceReplace ? " face replace" : ""}</Link></span>
+                <span role="cell" data-label="Segment"><Link href={href(`stage=${stage}&seg=${s.name}`)}><b>{s.name}</b> {s.type}{s.motionCopy ? " motion copy" : ""}</Link></span>
                 <span role="cell" data-label="Beats" className="tabular">{beats.length ? beats.map((c) => <Link key={c.id} href={`${base}?stage=${stage}&seg=${s.name}#tl-${c.id}`}>{c.range}</Link>) : s.beatIds.join(", ") || "–"}</span>
                 <span role="cell" data-label="Keyframe">{key}</span>
                 <span role="cell" data-label="Take">{take}</span>

@@ -41,7 +41,7 @@ const locked = (id: string, extra: Partial<Parameters<typeof videoStages>[0]> = 
 const word = (v: ReturnType<typeof videoStages>, n: number) => v.stages[n - 1].state;
 const reset = () => rmSync(join(WS, "pipeline"), { recursive: true, force: true });
 
-test("the face-replace reaction of 2026-10-14: hand-written approvals, state.json behind, then the cut", () => {
+test("the motion-copy reaction of 2026-10-14, with the names before 2026-10-19: hand-written approvals, state.json behind, then the cut", () => {
   reset();
   const id = "rx-2026-10-14-reaction-x";
   const vd = `pipeline/character/${id}`;
@@ -67,7 +67,7 @@ test("the face-replace reaction of 2026-10-14: hand-written approvals, state.jso
   assert.equal(p.spent, 0.68);
   assert.ok(v.notes.some((n) => n.startsWith("state.json says shots pending")), "state.json is behind gate A");
   assert.ok(v.notes.some((n) => n.startsWith("state.json says review running")), "state.json is behind gate B");
-  assert.ok(v.notes.some((n) => n.includes("no identity gate PASS")), "a hand-written face-replace approval");
+  assert.ok(v.notes.some((n) => n.includes("no identity gate result")), "a hand-written motion-copy approval");
   /* The timeline: one checkpoint, the approved take as its picture, the keyframe and the reference one click away. */
   const tl = timeline({ plan: { ...JSON.parse(JSON.stringify({ app: "app", handle: "@rx", characters: ["nora@v1"], reaction_refs: [{ id: "r1", start_s: 0, end_s: 2, video_path: "research/app/x/1/video.mp4", handle: "creator" }], beats: [{ id: "b0", role: "hook", start_s: 0, end_s: 2, lines: [], action: "her face reacts, silent", performance: "silent_action", framing: "face", reaction: { ref_id: "r1" } }], overlays: [{ id: "o1", text: "I just found this??", start_s: 0, end_s: 2, placement: "top" }], format: { length_s: 2 } })) }, source: "plan.json", production: p, final: null });
   const c = tl.checkpoints[0];

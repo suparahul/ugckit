@@ -32,21 +32,25 @@ type Line = Parameters<typeof readProduction>[1][number];
 const ev = (kind: string, data: Record<string, unknown>, at = "2026-10-20T10:00:00.000Z", note?: string) =>
   ({ at, kind, post: "k", data: { video: ID, ...data }, ...(note ? { note } : {}) }) as unknown as Line;
 
-const REF = { id: "r1", generation_input: "face_replace", start_s: 1.0, end_s: 3.0 };
+const REF = { id: "r1", generation_input: "motion_copy", start_s: 1.0, end_s: 3.0 };
 const setup = (route?: string) => {
   rmSync(join(WS, "pipeline"), { recursive: true, force: true });
   w(`${VD}/plan.json`, { app: "app", reaction_refs: [REF] });
   w(`${VD}/video.json`, { segments: [{ n: 1, type: "X", beat_ids: ["b1"] }, { n: 2, type: "T", beat_ids: ["b2"] }, { n: 3, type: "R", beat_ids: ["b3"] }] });
-  w(`${VD}/shots/01-x.json`, { face_replace: { ref_id: "r1", ...(route ? { route } : {}) }, video: { duration_seconds: null } });
+  w(`${VD}/shots/01-x.json`, { motion_copy: { ref_id: "r1", ...(route ? { route } : {}) }, video: { duration_seconds: null } });
   w(`${VD}/shots/02-t.json`, { video: { duration_seconds: 5 } });
   w("pipeline/character/state.json", { model: { slug: "minimax-h3-max-reference-to-video", duration_s: 5, price_per_s: 0.08 }, videos: { [ID]: { costs: [{ usd: 0.5 }] } } });
 };
 
 test("the computed cost of one run: Kling on the padded clip, Wan per frame, the segment model per second", () => {
   const spec = JSON.parse(readFileSync(join(WS, "scripts", "character", "models.json"), "utf8"));
-  assert.equal(runCost(spec, null, { face_replace: { ref_id: "r1" } }, "X", REF).cost, 0.5, "motion: 2 s held to 3.0 s, 3 x $0.168");
-  assert.equal(runCost(spec, null, { face_replace: { ref_id: "r1" } }, "X", REF).route, "motion", "no route named: the default");
-  assert.equal(runCost(spec, null, { face_replace: { ref_id: "r1", route: "replace" } }, "X", REF).cost, 0.3, "replace: 60 frames x $0.005");
+  assert.equal(runCost(spec, null, { motion_copy: { ref_id: "r1" } }, "X", REF).cost, 0.5, "motion: 2 s held to 3.0 s, 3 x $0.168");
+  assert.equal(runCost(spec, null, { motion_copy: { ref_id: "r1" } }, "X", REF).route, "motion", "no route named: the default");
+  assert.equal(runCost(spec, null, { motion_copy: { ref_id: "r1", route: "replace" } }, "X", REF).cost, 0.3, "replace: 60 frames x $0.005");
+  const old = { ...REF, generation_input: "face_replace" };
+  assert.equal(runCost(spec, null, { face_replace: { ref_id: "r1" } }, "X", old).cost, 0.5, "the names before 2026-10-19 are read");
+  assert.equal(runCost(spec, null, { motion_copy: { ref_id: "r1" } }, "X", { ...REF, generation_input: null }).route, "motion", "no generation_input: motion copy");
+  assert.equal(runCost(spec, null, { motion_copy: { ref_id: "r1" } }, "X", { ...REF, generation_input: "written" }).route, null, "the written fallback has no route");
   assert.equal(runCost(spec, { model: { slug: "x", price_per_s: 0.08, duration_s: 5 } }, {}, "T", null).cost, 0.4);
 });
 
@@ -96,7 +100,7 @@ test("the takes: waiting for you, the identity gate shown, approved, rejected an
   w(`${VD}/segments/01-x/generated/qc/identity-a.json`, { result: "FAIL", why: "a face in 4 of 8 frames", median_character: 0.52 });
   let p = readProduction(ID, [], LOCK);
   const x = p.segments[0];
-  assert.equal(x.faceReplace?.route, "motion");
+  assert.equal(x.motionCopy?.route, "motion");
   assert.deepEqual(x.checks, ["identity", "no_source_identity", "silent"]);
   assert.equal(x.takes[0].identity?.result, "FAIL");
   assert.equal(productionStep(p).sentence, "take 01-x: waiting for you");

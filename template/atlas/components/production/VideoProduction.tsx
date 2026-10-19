@@ -16,13 +16,16 @@ import { useState } from "react";
 import type { Click, Narration, Production, Segment, Source, Take } from "@/lib/video-production";
 import { useDecide } from "./Actions";
 
+/* The identity gate passes a take: PASS, or NO FACE (no frame shows a face; the eye check decides). */
+const identityOk = (r: string | null | undefined) => r === "PASS" || r === "NO FACE";
+
 const usd = (n: number | null) => (n === null ? "cost unknown" : `$${n.toFixed(2)}`);
 const stamp = (iso: string) => `${iso.slice(0, 10)} ${iso.slice(11, 16)}`;
 const base = (f: string) => f.replace(/^.*\//, "");
 const at = (url: string, t: number | null | undefined) => (t ? `${url.split("#")[0]}#t=${t.toFixed(2)}` : url);
 
 const CHECK_WORDS: Record<string, string> = {
-  identity: "the face is the character's in every frame",
+  identity: "the person is the character; any face in view is the character's",
   no_source_identity: "nothing of the original creator: no face, hair, mark, handle or caption",
   silent: "no voice; no mouth that forms words",
   hands: "the hands are whole",
@@ -30,10 +33,10 @@ const CHECK_WORDS: Record<string, string> = {
   follows_reference: "the reaction follows the clip's beats in order and time",
 };
 const ROUTE_WORDS: Record<string, string> = {
-  motion: "face replace, motion route (Kling 3.0 Pro Motion Control)",
-  replace: "face replace, replace route (Wan 2.2 Animate replace, the backup)",
-  animate: "face replace, animate route (Wan 2.2 Animate move)",
-  guided: "face replace, guided route (MiniMax H3, untested)",
+  motion: "motion copy, motion route (Kling 3.0 Pro Motion Control)",
+  replace: "motion copy, replace route (Wan 2.2 Animate replace, the backup)",
+  animate: "motion copy, animate route (Wan 2.2 Animate move)",
+  guided: "motion copy, guided route (MiniMax H3, untested)",
 };
 /* What a type is, in words, for a segment that is not generated. */
 const BUILT: Record<string, string> = { C: "supplied media", M: "panels", R: "the screen recording", P: "the screen recording, picture in picture" };
@@ -86,7 +89,7 @@ export function StoryboardPanel({ post, p, live, seg }: { post: string; p: Produ
       <ul className="vprod__cards">
         {shown.map((s) => (
           <li key={s.name} className="vprod__card">
-            <p className="vprod__segh tabular"><b>{s.name}</b> · {s.type}{s.faceReplace ? ` · ${ROUTE_WORDS[s.faceReplace.route] ?? s.faceReplace.route}` : ""}{s.generated ? ` · ${usd(s.cost)} a run` : ""}</p>
+            <p className="vprod__segh tabular"><b>{s.name}</b> · {s.type}{s.motionCopy ? ` · ${ROUTE_WORDS[s.motionCopy.route] ?? s.motionCopy.route}` : ""}{s.generated ? ` · ${usd(s.cost)} a run` : ""}</p>
             <ShotFacts s={s} />
             <div className="vprod__media">
               {s.keyframe ? <figure><a href={s.keyframe.url} target="_blank" rel="noreferrer"><img src={s.keyframe.url} alt={`Keyframe ${s.name}`} /></a><figcaption>keyframe</figcaption></figure>
@@ -149,7 +152,7 @@ function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Produc
   const t = (pick ? s.takes.find((x) => x.file === pick) : null) ?? focusOf(s);
   const decided = !!t && ((t.file === s.gateB?.file && !pick) || (s.click?.current && s.click.file === t.file));
   const isApproved = !!t && s.approved?.file === t.file;
-  const idOk = !s.faceReplace || t?.identity?.result === "PASS";
+  const idOk = !s.motionCopy || identityOk(t?.identity?.result);
   const status = s.sharedFrom ? `shared: decided on ${s.sharedFrom}`
     : !s.generated ? `${BUILT[s.type] ?? s.type}: built at assembly`
     : s.approved ? `approved: ${base(s.approved.file)}`
@@ -163,7 +166,7 @@ function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Produc
   return (
     <li className="vprod__seg" id={`seg-${s.name}`}>
       <p className="vprod__segh tabular">
-        <b>{s.name}</b> · {s.type}{s.faceReplace ? ` · ${ROUTE_WORDS[s.faceReplace.route] ?? s.faceReplace.route}` : ""}{s.continues ? ` · continues ${s.continues}` : ""}{s.generated ? ` · ${usd(s.cost)} a run` : ""}
+        <b>{s.name}</b> · {s.type}{s.motionCopy ? ` · ${ROUTE_WORDS[s.motionCopy.route] ?? s.motionCopy.route}` : ""}{s.continues ? ` · continues ${s.continues}` : ""}{s.generated ? ` · ${usd(s.cost)} a run` : ""}
         <span className={`vprod__tag${s.approved ? " is-done" : status === "take waiting for you" ? " is-you" : ""}`}>{status}</span>
       </p>
       <ShotFacts s={s} />
@@ -176,7 +179,7 @@ function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Produc
             <video src={t.url} controls playsInline preload="metadata" aria-label={`Take ${base(t.file)}`} />
             <figcaption className="tabular">{base(t.file)} · {stamp(t.at)}{isApproved ? " · approved" : ""}</figcaption>
           </figure>
-          {s.faceReplace?.reference ? <figure><video src={s.faceReplace.reference} controls playsInline preload="metadata" muted aria-label="The reference clip" /><figcaption>the reference clip (the motion only)</figcaption></figure> : null}
+          {s.motionCopy?.reference ? <figure><video src={s.motionCopy.reference} controls playsInline preload="metadata" muted aria-label="The reference clip" /><figcaption>the reference clip (the motion only)</figcaption></figure> : null}
           {s.poseFrame ? <figure><img src={s.poseFrame} alt="The pose picture" /><figcaption>the pose picture</figcaption></figure> : null}
           {s.keyframe ? <figure><img src={s.keyframe.url} alt={`Keyframe ${s.name}`} /><figcaption>the approved keyframe</figcaption></figure> : null}
           {s.seam ? (
@@ -189,8 +192,8 @@ function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Produc
         </div>
       ) : null}
       {s.seam ? <p className="vprod__words">Continuity seam: {s.seam.seedDiff !== null ? `the first frame differs from the last frame of ${s.seam.from} by ${s.seam.seedDiff} (0 to 255)` : `measured at gate B (review.py: checks.seed_diff)`}{s.seam.verified ? "" : "; the model's continuity input is not verified by a paid run yet"}.</p> : null}
-      {t && s.faceReplace ? (
-        <p className={`vprod__id${t.identity?.result === "PASS" ? " is-ok" : t.identity ? " is-bad" : ""}`}>
+      {t && s.motionCopy ? (
+        <p className={`vprod__id${identityOk(t.identity?.result) ? " is-ok" : t.identity ? " is-bad" : ""}`}>
           Identity gate: {t.identity
             ? <>{t.identity.result}{t.identity.character !== null ? ` · median ${t.identity.character} to the character, ${t.identity.reference ?? "?"} to the reference` : ""}{t.identity.closer !== null ? ` · closer to the character in ${Math.round(t.identity.closer * 100)}% of frames` : ""}{t.identity.why ? ` · ${t.identity.why}` : ""}</>
             : "not run on this take yet (generate.sh runs identity.py after the download)"}
