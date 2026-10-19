@@ -17,16 +17,22 @@
     review.py narration <video> <take> --narrator <id> --lines l2,l3 --decision approve|reject
               --words "<the user's words>" [--check natural_voice=pass ...]
                                     gate B for a narrator's take, narration/<take>.wav|mp3
+    review.py motion <video> <seg> --decision approve|reject --words "<the user's words>"
+              [--check text=pass] [--check hero=pass]
+                                    gate B for a motion-designed screen (an R or P segment whose
+                                    beats have demo_source motion_design): this exact render
+                                    (its sha256), every gate of motion_design.py check passed;
+                                    a gate NOT RUN (no OCR engine) needs the user's eye check
     review.py storyboard <video> --decision approve|redo --words "<the user's words>"
                                     gate A (P1): the storyboard, every keyframe by its sha256
     review.py show <video>          every segment: generated, approved, composited
     review.py pending [<video>]     every Atlas click no file records yet, with the command
                                     that records it (run it first in every character-* skill)
 
-    --from-atlas, on storyboard, segment, composite, final, source and narration, in place
+    --from-atlas, on storyboard, segment, composite, final, source, narration and motion, in place
     of --decision and --words: the user's click in the Atlas (apps/<app>/production/log.jsonl,
     the last storyboard.*, take.*, composite.*, cut.*, source.* or narration.* line for this
-    video, by the user). The file the line names must still have the sha256 it recorded; the
+    video, by the user; motion.* for a render). The file the line names must still have the sha256 it recorded; the
     words are the click's note, or say what was clicked. Every gate runs as for words given
     here. A storyboard send-back that names segments is a redo of only those keyframes; a
     cut send-back that names a segment is "regenerate segment <n>" at gate C, the user's yes
@@ -220,6 +226,17 @@ def from_atlas(cmd, video, seg=None):
             return ["--decision", "reject", "--words", e.get("note") or "", "--atlas-at", e["at"]]
         return ["--decision", "approve", "--words", (e.get("note") or "").strip()
                 or f"Approve the source {seg} (clicked in the Atlas)", "--atlas-at", e["at"]]
+    if cmd == "motion":
+        e = atlas_line(video, ("motion.approve", "motion.reject"), seg)
+        dd = e.get("data") or {}
+        atlas_file(os.path.join(vdir(video), "segments", seg, dd.get("file") or "motion/render.mp4"), e, "the render")
+        if e["kind"] == "motion.reject":
+            return ["--decision", "reject", "--words", e.get("note") or "", "--atlas-at", e["at"]]
+        a = ["--decision", "approve", "--words", (e.get("note") or "").strip()
+             or f"Approve the motion design of {seg} (clicked in the Atlas)", "--atlas-at", e["at"]]
+        for k, v in (dd.get("checks") or {}).items():
+            a += ["--check", f"{k}={v}"]
+        return a
     if cmd == "narration":
         e = atlas_line(video, ("narration.approve", "narration.reject"), seg, key="take")
         dd = e.get("data") or {}
@@ -327,9 +344,21 @@ def latest_take(d, take):
     return rows[-1] if rows else None
 
 
+def motion_segments(video):
+    """The R and P segments whose beats are motion-designed: their render is approved at gate B."""
+    p = os.path.join(vdir(video), "plan.json")
+    if not os.path.exists(p):
+        return []
+    plan = json.load(open(p))
+    import demo
+    return [name for s, t, name, _ in video_segments(video)
+            if t in ("R", "P") and demo.segment_story(plan, s.get("beat_ids") or [])]
+
+
 def needs(video):
     """What gate B must approve before assembly: the generated segments (projects), the
-    supplied assets and the narration takes that video.json uses."""
+    supplied assets and the narration takes that video.json uses (the motion-designed
+    renders: motion_segments)."""
     projects, assets, takes = [], set(), set()
     for s, t, name, proj in video_segments(video):
         if t in GENERATED or (t == "C" and s.get("insert")):
@@ -355,7 +384,8 @@ def needs(video):
 def update_review_state(video):
     d = load_approval(video)
     projects, assets, takes = needs(video)
-    if not projects and not assets and not takes:
+    motions = motion_segments(video)
+    if not projects and not assets and not takes and not motions:
         return
     approved = []
     for proj in projects:
@@ -364,6 +394,9 @@ def update_review_state(video):
         approved.append(bool(e and e.get("decision") == "approve"))
     approved += [bool((latest_source(d, a) or {}).get("decision") == "approve") for a in assets]
     approved += [bool((latest_take(d, k) or {}).get("decision") == "approve") for k in takes]
+    if motions:
+        import motion_design
+        approved += [motion_design.approved(video, m)[0] is not None for m in motions]
     if all(approved):
         state_set(video, "review", "done", f"{len(approved)} item(s) approved at gate B")
         print(f"every segment, source and take of {video} is approved: P3 done")
@@ -603,6 +636,54 @@ def cmd_source(video, asset_id, a):
     update_review_state(video)
 
 
+def cmd_motion(video, seg, a):
+    """Gate B for a motion-designed screen: the user approves this exact render (its sha256)
+    after every gate of motion_design.py check passed. It is the app's real screens rebuilt in
+    code, never a video model's picture; a gate the machine could not run (OCR) is the user's
+    eye check, given as --check text=pass or hero=pass."""
+    import motion_design
+    o = opts(a)
+    dec = o.get("--decision")
+    if dec not in ("approve", "reject"):
+        sys.exit("--decision approve | reject")
+    words = o.get("--words", "").strip()
+    if not words:
+        sys.exit("a motion-design decision needs the user's words (--words)")
+    plan, s, st = motion_design.story_of(video, seg)
+    sha, g, _ = motion_design.state(video, seg)
+    if not sha:
+        sys.exit(f"no segments/{seg}/motion/render.mp4: motion_design.py render {video} {seg}")
+    eye = {}
+    for c in o.get("--check", []):
+        if "=" in c:
+            k, v = c.split("=", 1)
+            eye[k] = v
+    checks = {}
+    if dec == "approve":
+        if not g:
+            sys.exit(f"no gates for this render: motion_design.py check {video} {seg}")
+        failed = [r["gate"] for r in g["results"] if r["result"] == "FAIL"]
+        if failed:
+            sys.exit(f"cannot approve: the gates failed ({', '.join(failed)}); change the page, render and check again")
+        for r in g["results"]:
+            checks[r["gate"]] = r["result"].lower().replace(" ", "_")
+            if r["result"] == "NOT RUN":
+                k = {"text_read": "text", "hero": "hero"}.get(r["gate"], r["gate"])
+                if eye.get(k) != "pass":
+                    sys.exit(f"cannot approve: {r['gate']} was not run ({r['detail']}); the user reads the stills "
+                             f"and says so: --check {k}=pass")
+    checks.update(eye)
+    d = load_approval(video)
+    d.setdefault("gate_b_motion", []).append({
+        "segment": seg, "screen_id": st.get("screen_id"), "file": "motion/render.mp4", "sha256": sha,
+        "story_sha256": motion_design.sha256_json(st), "decision": dec, "words": words, "date": today(),
+        "checks": checks, "hero": (g or {}).get("hero"),
+        **({"atlas_line_at": o["--atlas-at"]} if o.get("--atlas-at") else {})})
+    save_approval(video, d)
+    print(f"gate B motion design: {seg} {dec} (motion/render.mp4, sha256 {sha[:12]})")
+    update_review_state(video)
+
+
 def cmd_narration(video, take, a):
     """Gate B for one take of a narrator: the voice of an original synthetic narrator (or
     the user's own recorded take), made outside the kit from the approved narrator voice.
@@ -773,6 +854,14 @@ def cmd_show(video):
         elif t == "M":
             print(f"  {name:<8} M  panels {', '.join(str(p.get('id')) for p in s.get('panels') or [])}")
             continue
+        elif t in ("R", "P") and name in motion_segments(video):
+            import motion_design
+            sha, g, e = motion_design.state(video, name)
+            print(f"  {name:<8} {t}  motion design: " + ("not rendered" if not sha else
+                  ("rendered, " + ("checked" if g else "not checked") + "; " +
+                   (f"{e['decision']} {e['date']}" + ("" if e.get("sha256") == sha else " (another render)")
+                    if e else "not reviewed"))))
+            continue
         elif t not in GENERATED:
             print(f"  {name:<8} {t}  not generated (built at assembly)")
             continue
@@ -799,6 +888,7 @@ RECORDS = {
     "cut.approve": "final", "cut.sendback": "final",
     "source.approve": "source", "source.reject": "source",
     "narration.approve": "narration", "narration.reject": "narration",
+    "motion.approve": "motion", "motion.reject": "motion",
 }
 
 
@@ -828,6 +918,10 @@ def recorded(video, e, d):
     if k.startswith("narration."):
         r = latest_take(d, dd.get("take"))
         return after(r) and (r.get("decision") == "approve") == (k == "narration.approve")
+    if k.startswith("motion."):
+        rows = [x for x in d.get("gate_b_motion") or [] if x.get("segment") == dd.get("segment")]
+        r = rows[-1] if rows else None
+        return after(r) and (r.get("decision") == "approve") == (k == "motion.approve")
     return True
 
 
@@ -858,7 +952,7 @@ def cmd_pending(only=None):
                 print(f"{video}  {e['at'][:16]}  {e['kind']} {what}{note}\n"
                       f"    scripts/character/state.py note {video} \"{what} composite: {e.get('note') or ''}\", then composite.sh")
                 continue
-            arg = f" {what}" if cmd in ("segment", "composite", "source", "narration") else ""
+            arg = f" {what}" if cmd in ("segment", "composite", "source", "narration", "motion") else ""
             print(f"{video}  {e['at'][:16]}  {e['kind']}{' ' + what if what else ''}{note}\n"
                   f"    .venv/bin/python3 scripts/character/review.py {cmd} {video}{arg} --from-atlas")
     if not n:
@@ -895,7 +989,7 @@ def main():
     c = a[0]
     if "--from-atlas" in a:
         a = [x for x in a if x != "--from-atlas"]
-        if c in ("segment", "composite", "source", "narration") and len(a) >= 3:
+        if c in ("segment", "composite", "source", "narration", "motion") and len(a) >= 3:
             a = a[:3] + from_atlas(c, a[1], a[2]) + a[3:]
         elif c in ("final", "storyboard") and len(a) >= 2:
             a = a[:2] + from_atlas(c, a[1]) + a[2:]
@@ -911,6 +1005,8 @@ def main():
         cmd_source(a[1], a[2], a[3:])
     elif c == "narration" and len(a) >= 3:
         cmd_narration(a[1], a[2], a[3:])
+    elif c == "motion" and len(a) >= 3:
+        cmd_motion(a[1], a[2], a[3:])
     elif c == "storyboard" and len(a) >= 2:
         cmd_storyboard(a[1], a[2:])
     elif c == "pending" and len(a) <= 2:

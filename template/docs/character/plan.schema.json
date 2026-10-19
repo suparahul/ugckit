@@ -500,7 +500,7 @@
               "hands_only",
               "subject_only"
             ],
-            "description": "Who or what fills the frame. app_screen: the real app full frame (an R or P segment), app_on_screen true, layout sequence."
+            "description": "Who or what fills the frame. app_screen: the real app full frame (an R or P segment: a real recording, a real still or motion design, demo_source), app_on_screen true, layout sequence."
           },
           "layout": {
             "enum": [
@@ -600,6 +600,120 @@
               },
               {
                 "type": "null"
+              }
+            ]
+          },
+          "demo_source": {
+            "description": "Which picture of the app a full-screen app beat shows (founder, 2026-10-19; scripts/character/demo.py): recording (a real screen recording of the screen library), still (a real still of the library, held) or motion_design (the app's real screens rebuilt in code from PRODUCT-SCREENS.md and the app's own code and in-app text, animated and rendered locally at 1080x1920 by motion_design.py; never a video model). Absent: the library row's kind. A real recording is preferred; motion design only on framing app_screen, with demo_source_reason and screen_story.",
+            "anyOf": [
+              {
+                "enum": [
+                  "recording",
+                  "still",
+                  "motion_design"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "demo_source_reason": {
+            "description": "Why this demo source: required for motion_design (why no real recording shows this screen).",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "screen_story": {
+            "description": "motion_design only: what the rendered screen shows, and nothing else. screens: headings of apps/<slug>/PRODUCT-SCREENS.md, exactly; rebuilt_from: the app's code paths or screenshots; steps: at_s (seconds from the beat's start, the first at 0), the screen, the action, its target, and every in-app string visible at that step, word for word; fit pad (the default: the whole screen at the frame's height) or crop.",
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "screens",
+                  "rebuilt_from",
+                  "steps"
+                ],
+                "properties": {
+                  "screens": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "rebuilt_from": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "steps": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "at_s",
+                        "screen",
+                        "action",
+                        "shows"
+                      ],
+                      "properties": {
+                        "at_s": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "screen": {
+                          "type": "string"
+                        },
+                        "action": {
+                          "enum": [
+                            "appear",
+                            "tap",
+                            "scroll",
+                            "swipe",
+                            "type",
+                            "result",
+                            "hold"
+                          ]
+                        },
+                        "target": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "shows": {
+                          "type": "array",
+                          "minItems": 1,
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "fit": {
+                    "enum": [
+                      "pad",
+                      "crop"
+                    ]
+                  }
+                }
               }
             ]
           },

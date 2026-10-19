@@ -24,10 +24,16 @@ reference is a motion copy (founder, 2026-10-19): the character's approved first
 moved by the reference clip, trimmed and masked by shots.py reference. The written
 performance (the expression beats, no clip) is only a fallback the user names after a
 failed motion take. The research file itself is never attached.
+
+A full-screen app beat (R or P) shows a real recording, a real still, or a motion-designed
+rebuild of the app's real screens (demo_source, founder 2026-10-19: demo.py), rendered
+locally by motion_design.py and never by a video model.
 """
 import hashlib, json, os, re, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import demo  # noqa: E402
 
 # The controlled values of the plan (research/ai-ugc/VIDEO-PLANNING-PLAN.md § 2 and § 5).
 EDITORIAL = {
@@ -467,6 +473,8 @@ def check_beats(plan, beats, lines, length, pins, subjects, sets, assets, narrat
     ids, carried, t = set(), {}, 0.0
     ins = plan.get("app_insertion") is True
     cast = ed.get("cast_kind")
+    rows = screen_rows(plan)
+    screens = demo.product_screens(ROOT, plan.get("app"))
     for i, b in enumerate(beats, 1):
         bid = b.get("id")
         tag = f"beat {bid or i}"
@@ -575,6 +583,8 @@ def check_beats(plan, beats, lines, length, pins, subjects, sets, assets, narrat
         elif on and framing == "subject_only" and layout == "sequence" and \
                 all((assets.get(a) or {}).get("kind") == "screen" for a in src):
             out.note(f"{tag}: a full-screen app beat is framing app_screen (subject_only is read as it)")
+        # Which picture of the app: a real recording, a real still, or motion design (demo.py).
+        demo.check_beat(ROOT, plan, b, rows, out.bad, out.note, screens)
         if is_reaction(plan, b, i == 1):
             check_reaction(plan, tag, b, i == 1, perf, framing, layout, src, cast, plan.get("overlays") or [],
                            ed, out)
@@ -988,6 +998,9 @@ def planned_length(s, shot, plan, assets, rows):
     if t in ("R", "P"):
         if s.get("trim"):
             return float(s["trim"][1] - s["trim"][0])
+        story = demo.segment_story(plan, s.get("beat_ids") or [])
+        if story:
+            return story["seconds"]
         return (rows.get(s.get("screen_id")) or {}).get("duration_s")
     sv = (shot or {}).get("video") or {}
     tt = sv.get("trim_to_seconds")
@@ -1240,6 +1253,17 @@ def check_segment_against_beats(plan, it, bmap, lines, assets, narrators, subjec
     if ty in ("R", "P"):
         if not app_beats or s.get("screen_id") not in {b.get("screen_id") for b in app_beats}:
             out.bad(f"{name}: screen {s.get('screen_id')!r} is not the screen of its app beat(s)")
+        kinds = {demo.source_of(b, rows) for b in app_beats}
+        if "motion_design" in kinds and len(kinds) > 1:
+            out.bad(f"{name}: one segment, one demo source; its beats are {sorted(kinds)}")
+        elif "motion_design" in kinds:
+            if s.get("trim"):
+                out.bad(f"{name}: a motion-designed screen is rendered to its beats' length; no trim")
+            if len({b.get("screen_id") for b in app_beats}) > 1:
+                out.bad(f"{name}: one motion-designed screen_id per segment")
+    for b in app_beats:
+        if demo.is_motion(b) and ty not in ("R", "P"):
+            out.bad(f"{name}: beat {b.get('id')} is motion-designed, rendered full screen: an R or P segment")
     if ty in ("O", "G", "S", "H", "F") and app_beats:
         sid = (shot.get("phone") or {}).get("screen_id")
         if sid not in {b.get("screen_id") for b in app_beats}:
@@ -1400,6 +1424,8 @@ def check_video_live(plan, timeline, assets, out):
                     "video.json, or in one M segment")
             continue
         c, r = cs[0], rs[0]
+        if any(demo.is_motion(b) for b in plan.get("beats") or [] if b.get("id") in r["beats"]):
+            out.bad(f"{r['name']}: a live result is the real recording, never motion design")
         rng = c["seg"].get("source_range_s") or [0, 0]
         if not (rng[0] - 0.01 <= pr["input_t_s"] <= rng[1] + 0.01):
             out.bad(f"{c['name']}: the clip's range {rng} does not show the input at {pr['input_t_s']} s")

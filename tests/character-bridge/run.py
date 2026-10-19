@@ -8,7 +8,7 @@ Builds a scratch workspace from template/ (scripts/character, docs/character, th
 link for the caption renderer), a handle with its world, a human character, a mascot and a
 synthetic narrator, a screen library, and synthetic media made locally with ffmpeg, cv2
 and macOS `say`. The "generated" segments are ffmpeg test pictures standing in for
-approved generations. Then, for every fixture plan in fixtures/ (two v1, eleven v2):
+approved generations. Then, for every fixture plan in fixtures/ (two v1, twelve v2):
 
   - shots.py check, the bridge plan check, shots.py validate and the bridge video check pass;
   - the B prompt passes the lint;
@@ -1242,6 +1242,140 @@ def mutate(name, label, plan_fn=None, video_fn=None, cmd="validate", contains=No
             open(os.path.join(vd, "shots", f), "w").write(t)
 
 
+MD_PAGE = """<!doctype html><html><head><meta charset="utf-8"><style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 390px; height: 844px; overflow: hidden; background: #FFF8F0; font-family: -apple-system, system-ui, sans-serif; }
+.l { position: absolute; inset: 0; }
+h1 { position: absolute; left: 24px; top: 80px; font: 700 30px/1.2 -apple-system, system-ui; color: #222; }
+#up { position: absolute; left: 24px; right: 24px; top: 160px; padding: 18px; border-radius: 16px; background: #FF9F89;
+  color: #fff; font: 700 22px/1.2 -apple-system, system-ui; text-align: center; }
+#res { position: absolute; left: 24px; right: 24px; top: 160px; padding: 22px; border-radius: 18px; background: #fff;
+  border: 1px solid #eee; }
+#res h2 { font: 800 34px/1.2 -apple-system, system-ui; color: #222; }
+#res p { margin-top: 10px; font: 500 22px/1.4 -apple-system, system-ui; color: #444; }
+#clock { position: absolute; left: 30px; top: 16px; font: 600 17px/22px -apple-system; }
+</style></head><body>
+<div id="clock">9:41</div>
+<h1>Tail reading</h1>
+<div class="l" id="a"><div id="up">Upload a clip</div></div>
+<div class="l" id="b" style="visibility:hidden"><div id="res"><h2 data-hero>Relaxed tail</h2><p>Held high, a slow sway.</p></div></div>
+EXTRA
+<script>
+window.SCREEN_PT = [390, 844];
+function seek(t) {
+  const press = t >= 1500 && t < 1650;
+  document.getElementById("up").style.transform = press ? "scale(0.96)" : "none";
+  document.getElementById("a").style.visibility = t < 2500 ? "visible" : "hidden";
+  const b = document.getElementById("b");
+  b.style.visibility = t >= 2500 ? "visible" : "hidden";
+  b.style.opacity = Math.min(1, Math.max(0, (t - 2500) / 300));
+}
+window.seek = seek; window.DURATION = 5000; seek(0);
+</script></body></html>
+"""
+
+
+def motion_design_test(assemble_on):
+    """Motion design (founder, 2026-10-19): an R segment rebuilt from the app's real screens,
+    rendered locally, gated, approved at gate B, laid in at assembly; and every refusal."""
+    v = "v2-motion-design"
+    open(p("apps", "catapp", "PRODUCT-SCREENS.md"), "w").write(
+        "# catapp — product screens\n\n## How to choose\n\nMatch the story.\n\n## Tail Reading\n\n"
+        "**Kind:** screen\n**Shows:** the owner's clip, then the reading: \"Tail reading\", \"Upload a clip\", the "
+        "posture in one or two words (\"Relaxed tail\") and one line on what it means.\n"
+        "**Source:** code `src/screens/TailReading.tsx`.\n")
+    pl = lock(fixture(v))
+    checks(v)
+    video_json(pl, [{"n": 1, "type": "C", "asset_id": "milo-clip", "source_range_s": [1, 5], "beat_ids": ["b1"],
+                     "script_lines": []},
+                    {"n": 2, "type": "R", "screen_id": "tail-reading", "beat_ids": ["b2"], "script_lines": []}])
+    validate(v)
+    expect(f"{v}: the plan check notes the library's recordings and the reason",
+           [PY, f"{SC}/bridge.py", "plan", v], contains="motion design, while the screen library holds scan-result")
+    mutate(v, "motion design with no reason", plan_fn=lambda q: q["beats"][1].update(demo_source_reason=None),
+           cmd="plan", contains="needs demo_source_reason")
+    mutate(v, "motion design of a screen the library records",
+           plan_fn=lambda q: (q["beats"][1].update(screen_id="scan-result"),
+                              q["hero_strings"].update({"scan-result": "Relaxed tail"})),
+           cmd="plan", contains="real recording in the screen library")
+    mutate(v, "a screen that PRODUCT-SCREENS.md does not describe",
+           plan_fn=lambda q: q["beats"][1]["screen_story"].update(screens=["Tail Scanner"]),
+           cmd="plan", contains="is not a heading of PRODUCT-SCREENS.md")
+    mutate(v, "a hero string the story does not show",
+           plan_fn=lambda q: q["hero_strings"].update({"tail-reading": "Happy cat"}),
+           cmd="plan", contains="is not one of the strings its screen_story shows")
+    mutate(v, "a tap with no target",
+           plan_fn=lambda q: q["beats"][1]["screen_story"]["steps"][1].update(target=None),
+           cmd="plan", contains="names its target")
+    mutate(v, "motion design on a phone plate",
+           plan_fn=lambda q: q["beats"][1].update(framing="hands_only"), cmd="plan",
+           contains="rendered full screen")
+    mutate(v, "a motion-designed beat in a generated segment",
+           video_fn=lambda x: x["segments"][1].update(type="B", project=f"{v}.02-b"), contains="R or P segment")
+    expect(f"{v}: generate.sh refuses the app screen", ["bash", f"{SC}/generate.sh", v, "02-r"], ok=False,
+           contains="a video model never generates an app screen")
+    expect(f"{v}: motion_design.py start", [PY, f"{SC}/motion_design.py", "start", v, "02-r"],
+           contains="Tail Reading")
+    md = p("pipeline", "character", v, "segments", "02-r", "motion")
+    have_browser = subprocess.run(["node", "-e", "1"], capture_output=True).returncode == 0
+    if not have_browser:
+        print("SKIP  the render needs node, playwright-core and Chrome")
+        return
+    # A page with an interface line the story does not hold: the story-text gate refuses it.
+    open(os.path.join(md, "index.html"), "w").write(MD_PAGE.replace("EXTRA", '<div style="position:absolute;bottom:60px;left:24px">Try premium free</div>'))
+    out = expect(f"{v}: render (an invented line)", [PY, f"{SC}/motion_design.py", "render", v, "02-r"])
+    if "no playwright-core" in out or "no Chrome" in out:
+        print("SKIP  the render needs playwright-core and Chrome")
+        return
+    expect(f"{v}: the gates refuse an invented interface line", [PY, f"{SC}/motion_design.py", "check", v, "02-r"],
+           ok=False, contains="not in the story: ")
+    expect(f"{v}: gate B refuses the failed render", [PY, f"{SC}/review.py", "motion", v, "02-r", "--decision", "approve",
+                                                       "--words", "Looks good."], ok=False, contains="gates failed")
+    # The page of the story, word for word.
+    open(os.path.join(md, "index.html"), "w").write(MD_PAGE.replace("EXTRA", ""))
+    expect(f"{v}: render", [PY, f"{SC}/motion_design.py", "render", v, "02-r"])
+    out = expect(f"{v}: every gate passes", [PY, f"{SC}/motion_design.py", "check", v, "02-r"], contains="no gate failed")
+    g = rj(os.path.join(md, "gates.json"))
+    ok = all(r["result"] in ("PASS", "NOT RUN") for r in g["results"]) and g.get("hero") and g["hero"]["rect"][2] > 0
+    RESULTS.append((f"{v}: the gates record the hero's place", bool(ok)))
+    print(f"{'PASS' if ok else 'FAIL'}  {v}: the gates record the hero's place {g.get('hero')}")
+    pr = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+                         "-of", "csv=p=0", os.path.join(md, "render.mp4")], capture_output=True, text=True).stdout.strip()
+    RESULTS.append((f"{v}: the render is 1080x1920", pr == "1080,1920"))
+    print(f"{'PASS' if pr == '1080,1920' else 'FAIL'}  {v}: the render is 1080x1920 ({pr})")
+    # A web address and an unlisted picture: refused without a new render.
+    keep = open(os.path.join(md, "index.html")).read()
+    open(os.path.join(md, "index.html"), "w").write(keep.replace("</body>", '<img src="https://cdn.example.com/x.png"></body>'))
+    picture(os.path.join(md, "assets", "stray.png"), "red", "64x64")
+    out = expect(f"{v}: the gates refuse a web address and an unlisted picture",
+                 [PY, f"{SC}/motion_design.py", "check", v, "02-r"], ok=False, contains="local_only")
+    ok = "stray.png is not in assets.json" in out and "changed since the render" in out
+    RESULTS.append((f"{v}: ... and name the picture and the stale render", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  {v}: ... and name the picture and the stale render")
+    open(os.path.join(md, "index.html"), "w").write(keep)
+    os.remove(os.path.join(md, "assets", "stray.png"))
+    expect(f"{v}: the gates pass again", [PY, f"{SC}/motion_design.py", "check", v, "02-r"])
+    words = ["--decision", "approve", "--words", "Yes, that is the app's tail reading."]
+    if any(r["result"] == "NOT RUN" for r in g["results"]):
+        words += ["--check", "text=pass", "--check", "hero=pass"]
+    approve_sources(v, pl)
+    expect(f"{v}: gate B approves the render", [PY, f"{SC}/review.py", "motion", v, "02-r"] + words,
+           contains="gate B motion design: 02-r approve")
+    expect(f"{v}: review.py show names it", [PY, f"{SC}/review.py", "show", v], contains="motion design: rendered")
+    out = assemble(v, assemble_on)
+    if assemble_on:
+        a = rj(p("pipeline", "character", v, "assembly", "assembly.json"))
+        seg = next((e for e in a.get("timeline") or a.get("segments") or [] if e.get("name") == "02-r"), {})
+        ok = seg.get("demo_source") == "motion_design" and (seg.get("hero") or {}).get("text") == "Relaxed tail"
+        RESULTS.append((f"{v}: assembly lays in the approved render, with its hero", ok))
+        print(f"{'PASS' if ok else 'FAIL'}  {v}: assembly lays in the approved render, with its hero")
+    # The render changes after the approval: assembly refuses it.
+    with open(os.path.join(md, "render.mp4"), "ab") as f:
+        f.write(b"\0")
+    expect(f"{v}: assembly refuses a render that is not the approved one", ["bash", f"{SC}/assemble.sh", v], ok=False,
+           contains="the approved render is not the one on disk")
+
+
 def main():
     assemble_on = "--no-assemble" not in sys.argv
     print(f"workspace: {WS}")
@@ -1566,6 +1700,7 @@ def main():
     motion_copy(assemble_on)
     # ---- v2: one take over two clips: 02-b opens on the last frame of 01-b
     continuity_test(assemble_on)
+    motion_design_test(assemble_on)
 
     print()
     bad = [l for l, ok in RESULTS if not ok]

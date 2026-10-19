@@ -20,6 +20,10 @@ For every segment of pipeline/character/<video>/video.json, in order:
                                 0.3 px blur
   P                             the R base and her demo performance in a round bubble,
                                 28% of the width, in the top corner away from the hero
+  R or P by motion design       a beat with demo_source motion_design: the render approved at
+                                gate B (motion_design.py, review.py motion), by its checksum,
+                                laid in as it is (already 1080x1920, no crop, no punch-in), for
+                                the beats' seconds; P adds the bubble the same way
 Then: trim (a talking segment from 0.15 s before its first word to 0.2 s after its last,
 by faster-whisper word times; otherwise `trim`, or the shot's trim_to_seconds), upscale
 once with lanczos to 1080x1920 (a composite is already there), `punch_in`, one loudness
@@ -58,6 +62,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import bridge
 import continuity
+import demo
+import motion_design
 CH = os.path.join(ROOT, "pipeline", "character")
 W, H, FPS = 1080, 1920, 30
 GENERATED = ("T", "O", "G", "S", "H", "F", "B", "X")
@@ -443,23 +449,30 @@ def panel_hero(p, row, t0):
     return {"t": round(t0 + float(p.get("sync") or 0) + ht - p["range"][0], 3), "rect": rect, "text": hero.get("text")}
 
 
-def build_r(seg, row, rec, out, dur, audio, fade, bubble=None):
+def build_r(seg, row, rec, out, dur, audio, fade, bubble=None, designed=False):
     """R: the recording, 9:16 around the hero, a slow punch-in, a light blur. P adds the
     bubble: the demo performance in a circle, 28% of the width, in the top corner away
-    from the hero."""
-    size = row.get("size") or [0, 0]
-    hero = (row.get("hero") or {}).get("rect_source_px")
-    geo = r_geometry(size, hero)
-    x, y, cw, ch, hx, hy = geo
-    zmax = float(seg.get("punch_in_to_hero") or 1.25)
-    n = max(1, int(round(dur * FPS)))
-    tin = float(seg["trim"][0]) if seg.get("trim") else 0.0
+    from the hero. designed: the approved motion-design render (row: its gate B row), already
+    1080x1920 and moving by itself: laid in as it is, its last frame held if it is short."""
+    tin = float(seg["trim"][0]) if seg.get("trim") and not designed else 0.0
     rlen = duration(rec) - tin
     pad = max(0.0, dur - rlen + 0.1)
-    vf = (f"[0:v]fps={FPS},tpad=stop_mode=clone:stop_duration={pad:.3f},crop={cw}:{ch}:{x}:{y},"
-          f"zoompan=z='min(1+{zmax - 1:.4f}*on/{n},{zmax})':d=1:fps={FPS}:s={W}x{H}"
-          f":x='max(0,min(iw-iw/zoom,{hx:.1f}-iw/zoom/2))':y='max(0,min(ih-ih/zoom,{hy:.1f}-ih/zoom/2))',"
-          f"gblur=sigma=0.3,setsar=1,format=yuv420p")
+    if designed:
+        size, hero = [W, H], (row.get("hero") or {}).get("rect")
+        geo, zmax = None, 1.0
+        vf = (f"[0:v]fps={FPS},tpad=stop_mode=clone:stop_duration={pad:.3f},scale={W}:{H},"
+              f"setsar=1,format=yuv420p")
+    else:
+        size = row.get("size") or [0, 0]
+        hero = (row.get("hero") or {}).get("rect_source_px")
+        geo = r_geometry(size, hero)
+        x, y, cw, ch, hx, hy = geo
+        zmax = float(seg.get("punch_in_to_hero") or 1.25)
+        n = max(1, int(round(dur * FPS)))
+        vf = (f"[0:v]fps={FPS},tpad=stop_mode=clone:stop_duration={pad:.3f},crop={cw}:{ch}:{x}:{y},"
+              f"zoompan=z='min(1+{zmax - 1:.4f}*on/{n},{zmax})':d=1:fps={FPS}:s={W}x{H}"
+              f":x='max(0,min(iw-iw/zoom,{hx:.1f}-iw/zoom/2))':y='max(0,min(ih-ih/zoom,{hy:.1f}-ih/zoom/2))',"
+              f"gblur=sigma=0.3,setsar=1,format=yuv420p")
     ain = ["-i", audio[0]] + [] if audio else None
     if audio:
         ain = ["-ss", f"{audio[1]:.3f}", "-to", f"{audio[2]:.3f}", "-i", audio[0]]
@@ -470,7 +483,7 @@ def build_r(seg, row, rec, out, dur, audio, fade, bubble=None):
         encode_segment(out, vin, None, ain, None, dur, fc=fc)
     else:
         bw = int(0.28 * W) // 2 * 2
-        left = hero is None or (hero[0] + hero[2] / 2) / max(1, size[0]) >= 0.5
+        left = not hero or (hero[0] + hero[2] / 2) / max(1, size[0]) >= 0.5
         bx = 40 if left else W - bw - 40
         by = int(0.08 * H)
         r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
@@ -555,6 +568,14 @@ def main():
                     continue
                 item["continues"] = {"from": cprev, "info": info}
                 plan_segs[-1]["continued"] = {"by": name, "info": info}
+        elif t in ("R", "P") and demo.segment_story(plan, s.get("beat_ids") or []):
+            # Motion design (demo.py): the render approved at gate B, by its checksum.
+            rec, row = motion_design.approved(video, name)
+            if not rec:
+                bad(f"{name}: motion design: {row}")
+                continue
+            item["row"], item["rec"], item["designed"] = row, rec, True
+            item["story_s"] = demo.segment_story(plan, s.get("beat_ids") or [])["seconds"]
         elif t in ("R", "P"):
             row, rec = screen_row(plan["app"], s.get("screen_id"))
             if not row or not rec or not os.path.exists(rec):
@@ -759,20 +780,32 @@ def main():
                 audio = (it["audio_src"], aw[0], aw[1])
                 dur = aw[1] - aw[0]
                 words_src, words_off = it["audio_src"], aw[0]
+            elif it.get("designed"):
+                dur = float(it["story_s"])
             else:
                 dur = float(s["trim"][1] - s["trim"][0]) if s.get("trim") else duration(rec)
             bubble = (it["audio_src"], 0.0) if t == "P" else None
-            geo, zmax = build_r(s, row, rec, out, dur, audio, fade, bubble)
+            designed = bool(it.get("designed"))
+            geo, zmax = build_r(s, row, rec, out, dur, audio, fade, bubble, designed)
             hero = row.get("hero") or {}
-            entry.update({"src": os.path.relpath(rec, ROOT), "in": 0.0, "out": round(dur, 3),
-                          "crop": list(geo[:4]), "punch_in_to_hero": zmax})
-            if hero.get("rect_source_px") and any(hero["rect_source_px"]):
+            entry.update({"src": os.path.relpath(rec, ROOT), "in": 0.0, "out": round(dur, 3)})
+            if designed:
+                entry["demo_source"] = "motion_design"
+                if hero.get("rect") and hero.get("t") is not None and float(hero["t"]) < dur:
+                    entry["hero"] = {"t": round(t_final + float(hero["t"]), 3), "rect": list(hero["rect"]),
+                                     "text": hero.get("text")}
+                print(f"  {name}: motion design {os.path.relpath(rec, ROOT)}, as rendered, {dur:.2f}s"
+                      + (", her demo performance in the bubble" if t == "P" else ""))
+            else:
+                entry.update({"crop": list(geo[:4]), "punch_in_to_hero": zmax})
+            if not designed and hero.get("rect_source_px") and any(hero["rect_source_px"]):
                 zt = max(0.0, dur - 0.3)
                 z = min(1 + (zmax - 1) * zt / dur, zmax)
                 entry["hero"] = {"t": round(t_final + zt, 3), "rect": r_final_rect(geo, hero["rect_source_px"], z),
                                  "text": hero.get("text")}
-            print(f"  {name}: {os.path.basename(rec)} 9:16 around the hero, punch-in to {zmax}, {dur:.2f}s"
-                  + (", her demo performance in the bubble" if t == "P" else ""))
+            if not designed:
+                print(f"  {name}: {os.path.basename(rec)} 9:16 around the hero, punch-in to {zmax}, {dur:.2f}s"
+                      + (", her demo performance in the bubble" if t == "P" else ""))
         d = duration(out)
         entry.update({"final_start": round(t_final, 3), "final_end": round(t_final + d, 3)})
         # The captions of this segment: the frozen script's words, timed by the words heard.

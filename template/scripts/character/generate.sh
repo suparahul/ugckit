@@ -49,6 +49,11 @@ set -euo pipefail
 [ $# -ge 2 ] || { echo "usage: $0 <video> <segment> [template_slug] [prompt_file]" >&2; exit 2; }
 VIDEO=$1
 SEG=$2
+# An app screen is never generated: R and P are the real recording, or the app's real screens
+# rebuilt in code and rendered locally (motion_design.py). Refused first, before any file.
+case "${SEG##*-}" in
+  r|p|R|P) echo "FATAL: $SEG is not generated (R and P are the real recording, or a motion-designed screen rendered locally by motion_design.py: a video model never generates an app screen)" >&2; exit 1 ;;
+esac
 NAME="$VIDEO.$SEG"
 SLUG=${3:-ugc-character}
 PROJ="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -131,9 +136,11 @@ for pin in plan.get("characters") or []:
     if c.get("status") != "live":
         sys.exit(f"FATAL: {pin} is not live (status {c.get('status')!r}) -- the video half, the "
                  "voice reference and the twenty-generation gate come first (persona-identity)")
-# C and M are supplied or composed at assembly; R and P are the real recording.
+# C and M are supplied or composed at assembly; R and P are the real recording, or the app's
+# real screens rebuilt in code (motion_design.py). A video model never generates an app screen.
 if seg.split("-")[-1].upper() in ("C", "M", "R", "P"):
-    sys.exit(f"FATAL: {seg} is not generated (C, M, R and P are built at assembly)")
+    sys.exit(f"FATAL: {seg} is not generated (C, M, R and P are built at assembly; a motion-designed "
+             "screen is rendered locally by motion_design.py: a video model never generates an app screen)")
 # The active Supagen version has one length; the segment must be planned at that length.
 # A motion-copy shot runs on its route's own template and model, not on state.json's.
 shot = os.path.join(vd, "shots", f"{seg}.json")

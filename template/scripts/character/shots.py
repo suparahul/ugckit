@@ -72,6 +72,7 @@ PROBLEMS, NOTES = [], []
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge
 import continuity
+import demo
 
 
 def bad(msg):
@@ -224,6 +225,8 @@ def cmd_check(video):
             sid = b.get("screen_id")
             if placeholder(sid):
                 bad(f"beat {i} shows the app but names no screen_id")
+            elif b.get("demo_source") == "motion_design":
+                pass    # rebuilt from PRODUCT-SCREENS.md and rendered, not a library row (bridge.py checks it)
             else:
                 screens = os.path.join(ROOT, "apps", plan["app"], "screens", "SCREENS.md")
                 if not os.path.exists(screens):
@@ -510,7 +513,11 @@ def cmd_validate(video):
         if t in ("R", "P"):
             if placeholder(seg.get("screen_id")):
                 bad(f"{name}: an {t} segment needs a screen_id")
-            note(f"{name}: {t} is not generated; its length comes from the recording")
+            if demo.segment_story(plan, seg.get("beat_ids") or []):
+                note(f"{name}: {t} by motion design: rendered locally (motion_design.py start, render, check), "
+                     "approved at gate B (review.py motion), never generated")
+            else:
+                note(f"{name}: {t} is not generated; its length comes from the recording")
             continue
         if t == "C":
             if placeholder(seg.get("asset_id")):

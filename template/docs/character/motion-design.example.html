@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=403, initial-scale=1">
+<title>Motion design: the page contract</title>
+<!--
+  A motion-designed app screen (scripts/character/motion_design.py start copies this file to
+  pipeline/character/<video>/segments/<seg>/motion/index.html; the agent rewrites it).
+
+  The method of the first two motion-designed posts (organic-factory, 2026-10-14): the app's
+  real screens rebuilt in HTML and CSS from the app's own code (sizes in the app's logical
+  points, its colours, fonts and icons), and every movement computed from one clock.
+
+  The contract (scripts/character/motion_render.mjs reads it):
+    window.SCREEN_PT = [w, h]   the phone screen in points; html and body are exactly that size
+    window.seek(ms)             draws the frame at ms; nothing else moves the page (no CSS
+                                transitions, no setTimeout, no requestAnimationFrame while ?record=1)
+    window.DURATION             the length in ms
+    data-hero                   on the element that holds the hero string, when the viewer reads one
+  Only local files: fonts and pictures in assets/, each listed in assets.json with where it
+  comes from (app:<path in the app's code or its screenshot>, plan:<asset id>, world:<subject id>).
+  No web font, no CDN, no picture made by a model. The words on the page are the screen
+  story's `shows` strings, word for word, and nothing else: motion_design.py check reads the
+  page's text at every step and refuses any other line.
+-->
+<style>
+/* @font-face { font-family: AppFont; src: url(assets/<the app's font>.ttf); } */
+:root { --bg: #FFFFFF; --ink: #1C1C1E; --muted: #8E8E93; --accent: #0A84FF; --line: #E5E5EA; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 393px; height: 852px; overflow: hidden; background: var(--bg); }
+body { font-family: -apple-system, system-ui, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+#stage { position: absolute; inset: 0; overflow: hidden; }
+.layer { position: absolute; inset: 0; }
+#status { position: absolute; left: 0; right: 0; top: 0; height: 54px; z-index: 50; }
+#clock { position: absolute; left: 32px; width: 58px; top: 19px; text-align: center; font: 600 17px/22px -apple-system, system-ui; }
+#island { position: absolute; left: 50%; top: 11px; width: 125px; height: 37px; margin-left: -62.5px; border-radius: 20px; background: #000; }
+#home { position: absolute; left: 50%; bottom: 8px; width: 140px; height: 5px; margin-left: -70px; border-radius: 3px; background: #000; z-index: 50; }
+.title { position: absolute; left: 20px; right: 20px; top: 70px; font: 700 28px/1.2 -apple-system, system-ui; }
+.list { position: absolute; left: 16px; right: 16px; top: 124px; }
+.row { padding: 16px; margin-bottom: 10px; border-radius: 14px; background: #F2F2F7; font: 600 17px/1.3 -apple-system, system-ui; }
+.card { position: absolute; left: 16px; right: 16px; top: 124px; padding: 20px; border-radius: 18px; background: #fff;
+  border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+.card h2 { font: 700 22px/1.25 -apple-system, system-ui; }
+.card p { margin-top: 8px; font: 400 16px/1.45 -apple-system, system-ui; color: #3A3A3C; }
+/* the touch: a soft dot and a ripple where the thumb lands */
+#touch { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%;
+  background: rgba(0,0,0,.18); z-index: 60; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="layer" id="s1">
+    <div class="title">Screen title</div>
+    <div class="list" id="list">
+      <div class="row" id="row1">First row</div>
+      <div class="row">Second row</div>
+    </div>
+  </div>
+  <div class="layer" id="s2" style="visibility:hidden">
+    <div class="title">Screen title</div>
+    <div class="card" id="card"><h2 data-hero>The result the viewer reads</h2><p id="body">One short line the app writes.</p></div>
+  </div>
+  <div id="touch" style="opacity:0"></div>
+  <div id="status"><div id="clock">9:41</div><div id="island"></div></div>
+  <div id="home"></div>
+</div>
+<script>
+window.SCREEN_PT = [393, 852];
+
+// Easing: write the app's own curves here (the posts used the app's shared entrance curve).
+function bezier(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx, cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  const X = (t) => ((ax * t + bx) * t + cx) * t, Y = (t) => ((ay * t + by) * t + cy) * t, dX = (t) => (3 * ax * t + 2 * bx) * t + cx;
+  return (x) => { if (x <= 0) return 0; if (x >= 1) return 1; let t = x;
+    for (let i = 0; i < 8; i++) { const e = X(t) - x, d = dX(t); if (Math.abs(e) < 1e-6 || Math.abs(d) < 1e-6) break; t -= e / d; }
+    return Y(t); };
+}
+const E = { rise: bezier(.2, .9, .25, 1), easeOut: bezier(0, 0, .58, 1), easeInOut: bezier(.645, .045, .355, 1) };
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const prog = (t, start, dur) => clamp((t - start) / dur);
+const $ = (id) => document.getElementById(id);
+
+// A tap: the dot comes in, presses, and leaves; returns the press (0..1) for the button's own state.
+function touch(t, at, x, y) {
+  const k = t - at, el = $("touch");
+  if (k < -250 || k > 450) return 0;
+  el.style.left = x + "px"; el.style.top = y + "px";
+  el.style.opacity = k < 0 ? E.easeOut(prog(k, -250, 250)) : 1 - prog(k, 150, 300);
+  el.style.transform = `scale(${k < 0 ? 1 : 1 - .2 * Math.sin(Math.PI * prog(k, 0, 150))})`;
+  return k >= 0 && k < 150 ? 1 : 0;
+}
+
+// The timeline, in ms from the start: one line per step of the screen story.
+const T_TAP = 1200, T_RESULT = 1500, END = 4000;
+
+function seek(t) {
+  const pressed = touch(t, T_TAP, 196, 160);
+  $("row1").style.background = pressed ? "#E5E5EA" : "";
+  const r = E.rise(prog(t, T_RESULT, 500));
+  $("s1").style.visibility = t < T_RESULT + 200 ? "visible" : "hidden";
+  $("s1").style.opacity = 1 - E.easeOut(prog(t, T_RESULT, 200));
+  $("s2").style.visibility = t >= T_RESULT ? "visible" : "hidden";
+  $("card").style.opacity = r;
+  $("card").style.transform = `translateY(${24 * (1 - r)}px)`;
+}
+window.seek = seek;
+window.DURATION = END;
+
+if (!location.search.includes("record=1")) {
+  const t0 = performance.now();
+  const loop = () => { seek((performance.now() - t0) % END); requestAnimationFrame(loop); };
+  document.fonts.ready.then(loop);
+} else {
+  seek(0);
+}
+</script>
+</body>
+</html>

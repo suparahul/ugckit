@@ -45,6 +45,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 PATTERNS = os.path.join(ROOT, "brain", "video-patterns.json")
 SCHEMA = os.path.join(ROOT, "docs", "character", "plan.schema.json")
 CAPS = os.path.join(ROOT, "scripts", "character", "capabilities.json")
+sys.path.insert(0, os.path.join(ROOT, "scripts", "character"))
+try:
+    import demo  # the demo source of an app beat (scripts/character/demo.py)
+except ImportError:  # the character pipeline is not installed: its check runs there
+    demo = None
 
 MAX_WORDS_PER_S = 15 / 4        # the speech ceiling
 READ_WORDS_PER_S = 3.0          # an overlay stays up words / 3 s
@@ -253,6 +258,19 @@ def check_brief(b, out):
     for m in b.get("missing_inputs") or []:
         if not (m.get("id") and m.get("what") and m.get("owner")):
             out.no(f"missing input {m!r} needs id, what and owner")
+    rows = demo.screen_rows(ROOT, b.get("app")) if demo else {}
+    for sn in b.get("screens_needed") or []:
+        ds, sid = sn.get("demo_source"), sn.get("screen_id")
+        if ds is None:
+            continue
+        if ds not in ("recording", "still", "motion_design"):
+            out.no(f"screen {sid}: demo_source {ds!r}; recording, still or motion_design")
+        elif ds == "motion_design":
+            if not str(sn.get("demo_source_reason") or "").strip():
+                out.no(f"screen {sid}: motion design needs demo_source_reason (why no real recording)")
+            if sid in rows:
+                out.no(f"screen {sid} is a real {rows[sid].get('kind') or 'recording'} in the library: use it, "
+                       "not motion design")
     tv, cd = catalogue(b.get("app"))
     if b.get("taxonomy_version") != tv or b.get("catalogue_digest") != cd:
         out.no(f"the brief pins taxonomy {b.get('taxonomy_version')} / {str(b.get('catalogue_digest'))[:19]}…; "
@@ -504,6 +522,8 @@ def check_contract(plan, out, brief=None):
             if b.get("viewer_must") == "read" and b.get("screen_id") not in heroes:
                 out.no(f"beat {bid}: the viewer reads screen {b.get('screen_id')}; hero_strings has no entry "
                        "(null until the real screen is indexed)")
+        if demo and (b.get("app_on_screen") or b.get("demo_source") or b.get("screen_story")):
+            demo.check_beat(ROOT, plan, b, demo.screen_rows(ROOT, plan.get("app")), out.no, out.note)
         texts = [lines[l]["line"] for l in bl if l in lines]
         if any(re.search(r"\d", x) for x in texts) and not b.get("fact_refs") and not b.get("app_on_screen"):
             out.no(f"beat {bid}: a number is said; it needs fact_refs or the real screen")
@@ -798,6 +818,9 @@ def capabilities_needed(plan):
         add("bridge.composition", f"{len(plan['overlays'])} timed overlay(s)")
     if ed.get("filming_format") == "live_use" or any(a.get("paired_input_ref") for a in assets.values()):
         add("bridge.live", "a real input paired with its app recording")
+    for b in plan.get("beats") or []:
+        if b.get("demo_source") == "motion_design":
+            add("bridge.motion_design", f"beat {b.get('id')}: the app's real screens rebuilt in code and rendered")
     return need
 
 
@@ -808,11 +831,15 @@ def readiness(plan, plan_path):
     # Real screens and their hero strings.
     sp = os.path.join(ROOT, "apps", str(plan.get("app")), "screens", "screens.json")
     rows = {r.get("id"): r for r in (load(sp).get("screens") or [])} if os.path.exists(sp) else {}
+    designed = {b.get("screen_id") for b in plan.get("beats") or [] if b.get("demo_source") == "motion_design"}
     for b in plan.get("beats") or []:
         sid = b.get("screen_id")
-        if b.get("app_on_screen") and sid and sid not in rows:
-            block.append(f"screen {sid}: not in apps/{plan.get('app')}/screens/screens.json (record it, then `screens`)")
+        if b.get("app_on_screen") and sid and sid not in rows and sid not in designed:
+            block.append(f"screen {sid}: not in apps/{plan.get('app')}/screens/screens.json (record it, then `screens`; "
+                         "or, with no recording, motion design: demo_source motion_design and its screen_story)")
     for sid, h in (plan.get("hero_strings") or {}).items():
+        if sid in designed:
+            continue
         if not h:
             block.append(f"hero string of {sid}: copied from the real screen once it is indexed")
         elif sid in rows and norm((rows[sid].get("hero") or {}).get("text")) != norm(h):
@@ -1113,12 +1140,41 @@ def write_review(draft_path):
     for b in plan.get("beats") or []:
         app = "—"
         if b.get("app_on_screen"):
-            app = f"`{b.get('screen_id')}`, viewer must {b.get('viewer_must')}"
+            ds = b.get("demo_source") or "from the library"
+            app = f"`{b.get('screen_id')}` ({ds.replace('_', ' ')}), viewer must {b.get('viewer_must')}"
         bind = ", ".join(filter(None, [", ".join(b.get("subject_ids") or []), b.get("set_id") or "",
                                        ", ".join(b.get("source_asset_ids") or [])])) or "—"
         w(f"| {b.get('id')} | {b.get('role')} | {fmt_t(b['start_s'], b['end_s'])} | {b.get('performance')} | "
           f"{b.get('framing')} / {b.get('layout')} | {b.get('action')} | {app} | {bind} | {', '.join(b.get('fact_refs') or []) or '—'} |")
     w("")
+    app_bs = [b for b in plan.get("beats") or [] if b.get("app_on_screen")]
+    if app_bs:
+        w("## The app demo")
+        w("")
+        for b in app_bs:
+            ds = b.get("demo_source")
+            if ds == "motion_design":
+                st = b.get("screen_story") or {}
+                w(f"Beat {b.get('id')} ({fmt_t(b['start_s'], b['end_s'])}), screen `{b.get('screen_id')}`: **motion design**. "
+                  "The app's real screens rebuilt in code and animated, rendered full screen at 1080x1920 "
+                  "(`scripts/character/motion_design.py`); no video model, no recording. It fills the frame and looks more "
+                  f"like a promotion than a hand holding a phone. Why not a real recording: {b.get('demo_source_reason')}")
+                w("")
+                w(f"- Screens (PRODUCT-SCREENS.md): {', '.join(st.get('screens') or []) or '—'}. Rebuilt from: "
+                  f"{'; '.join(st.get('rebuilt_from') or []) or '—'}. Fit: {st.get('fit') or 'pad'}.")
+                w("")
+                w("| At | Screen | Action | Target | The screen shows, word for word |")
+                w("|---|---|---|---|---|")
+                for x in st.get("steps") or []:
+                    at = x.get("at_s")
+                    w(f"| {at:g} s | {x.get('screen')} | {x.get('action')} | {x.get('target') or '—'} | "
+                      f"{' / '.join(x.get('shows') or [])} |" if num(at) else
+                      f"| ? | {x.get('screen')} | {x.get('action')} | {x.get('target') or '—'} | {' / '.join(x.get('shows') or [])} |")
+            else:
+                w(f"Beat {b.get('id')} ({fmt_t(b['start_s'], b['end_s'])}), screen `{b.get('screen_id')}`: "
+                  f"**{(ds or 'from the screen library').replace('_', ' ')}**, the real app"
+                  + (f" ({b.get('demo_source_reason')})" if b.get("demo_source_reason") else "") + ".")
+            w("")
     w("## Overlays")
     w("")
     if plan.get("overlays"):
