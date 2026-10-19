@@ -30,6 +30,7 @@ import { PLATFORMS, PLATFORM_NAME, linePlatform, platformOf, primaryOf, slideLim
 import { directBlock } from "./video-post.ts";
 import { shownCards } from "./callout.ts";
 import { readVideo, videoPlanPoint, type VideoState } from "./video.ts";
+import { productionStep, readProduction } from "./video-production.ts";
 import type { Kind, VideoIdea } from "./video-row.ts";
 import { backfillOutcome, currentOfLine, mergeOutcome, sameOutcome, type CurrentOutcome, type Fetched, type OutcomeMarks } from "./outcome.ts";
 
@@ -262,6 +263,15 @@ export type EventKind =
   | "images.sendback"
   | "final.approve"
   | "final.sendback"
+  /* A locked video's production (lib/video-production.ts): gate A, gate B per take, the composite, gate C.
+   * data.video names the video; the agent records each line with review.py ... --from-atlas. */
+  | "storyboard.approve"
+  | "storyboard.sendback"
+  | "take.approve"
+  | "take.reject"
+  | "composite.approve"
+  | "cut.approve"
+  | "cut.sendback"
   | "slide.upload"
   | "slide.choose"
   | "slide.approve"
@@ -763,6 +773,8 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
   const primary = primaryOf(platforms);
 
   const video = isVideo(row) ? readVideo(row) : null;
+  /* After the lock: the storyboard, the takes and the cut, each with the user's decision (lib/video-production.ts). */
+  if (video?.lock && video.id) video.production = readProduction(video.id, log, video.lock.digest);
 
   const killEv = last(log.filter((e) => e.kind === "kill" || e.kind === "unkill"));
   const killed = killEv && killEv.kind === "kill" ? { at: killEv.at, note: killEv.note ?? "" } : null;
@@ -850,7 +862,11 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
         if (final.status === "sentback") sentence = `final: sent back${q(final.note)}`;
         else if (final.status === "stale") { sentence = "changed after approval: waiting for you"; waiting = true; }
         else if (!video.lock) sentence = "plan approved: lock being written";
-        else if (!video.final) sentence = "in production";
+        else if (!video.final) {
+          const step = video.production ? productionStep(video.production) : null;
+          sentence = step?.sentence ?? "in production";
+          waiting = step?.who === "you";
+        }
         else { sentence = "final: waiting for you"; waiting = true; }
         break;
       }
@@ -1010,7 +1026,10 @@ export function nextStep(s: PostState): { who: "you" | "agent" | "nobody"; text:
       if (s.video) {
         if (s.final.status === "sentback") return say("agent", "Sent back with your note. It comes back here when the video is delivered again.");
         if (!s.video.lock) return say("agent", "The plan is approved. The agent locks it with video-lock; production starts from the lock.");
-        if (!s.video.final) return say("agent", "The plan is locked. The video is in production; it shows here when it is delivered.");
+        if (!s.video.final) {
+          const step = s.video.production ? productionStep(s.video.production) : null;
+          return step ? say(step.who, step.text) : say("agent", "The plan is locked. The video is in production; it shows here when it is delivered.");
+        }
         if (s.final.status === "stale") return say("you", "A new file was delivered after you approved the post. Watch it again, then approve for posting.");
         return say("you", "Watch the video. Approve it for posting, or send it back with a note.");
       }

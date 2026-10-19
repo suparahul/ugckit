@@ -179,7 +179,7 @@ test("each state of a video post, through the slideshow's gates", () => {
   lock(1);
   s = state([]);
   assert.equal(s.stage, "final", "plan approved by the lock");
-  assert.equal(s.sentence, "in production");
+  assert.equal(s.sentence, "shots being written", "locked, no video.json yet: production's first step (lib/video-production.ts)");
   assert.equal(finalBlock(s), "the video is not delivered yet");
 
   deliver();

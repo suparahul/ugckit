@@ -23,10 +23,20 @@ const MEDIA_ROOT = resolve(RESEARCH_DIR);
  * batches. Only those folders. */
 const APPS_ROOT = resolve(APPS_DIR);
 const APP_SERVED = /^[^/]+\/(icon\.(jpg|jpeg|png|webp)$|handles\/[^/]+\/references\/|niche\/(covers|batches|instagram\/covers)\/)/;
-/* pipeline/character/<video>/final/<video>.mp4 is served too: a video post's delivered file, and nothing
- * else of the pipeline (no plan, no approval, no segment). */
+/* pipeline/character/<video>/… serves only the pictures and the files the user judges in the
+ * Atlas: the delivered file; the keyframes and the storyboard (gate A); each segment's takes,
+ * its reference clip and its composites (gate B); the assembled cut (gate C). No plan, no
+ * approval, no shot, no prompt, no JSON. */
 const CHARACTER_ROOT = resolve(CHARACTER_DIR);
-const FINAL_SERVED = /^([a-z0-9][a-z0-9-]*)\/final\/\1\.mp4$/;
+const FINAL_SERVED = new RegExp(
+  "^([a-z0-9][a-z0-9-]*)/(" +
+    "final/\\1\\.mp4" +
+    "|keyframes/(\\d\\d-[a-z]\\.png|storyboard\\.jpg)" +
+    "|segments/\\d\\d-[a-z]/(generated|composite)/[\\w.-]+\\.mp4" +
+    "|segments/\\d\\d-[a-z]/source/reference\\.mp4" +
+    "|assembly/[\\w.-]+\\.mp4" +
+    ")$",
+);
 
 const TYPES: Record<string, string> = {
   jpg: "image/jpeg",

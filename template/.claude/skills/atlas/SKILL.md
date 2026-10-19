@@ -45,7 +45,9 @@ The slideshow path's pages, the rest of the Organic Factory UI, read `apps/<slug
 
 7. `http://localhost:3210/` — the apps; `/app/<slug>` — the home base of one app: the
    canvas of the eight phases, what waits for whom, the read.
-8. `/app/<slug>/niche` — the searches' spread and the scrolled batches (phase 4).
+8. `/app/<slug>/niche` — one explorer over the searched posts, the batches and the scroll,
+   with the edit mode that marks a post Rule out or Study (`niche/marks.json`, the
+   `niche-curate` skill), then the findings (phase 4).
 9. `/app/<slug>/strategy` — the account set and the app fit (phases 5 and 7).
 10. `/app/<slug>/handles`, `/app/<slug>/handle/<handle>` — the identities and their
     steps (phase 6); the ticks and approvals are made here.
@@ -55,7 +57,14 @@ The slideshow path's pages, the rest of the Organic Factory UI, read `apps/<slug
     `REVIEW.md` (Approve plan, or Send back), then the locked plan's beats and prompts beside
     the 9:16 frame, which plays `pipeline/character/<video>/final/<video>.mp4` once it is
     delivered (Approve for posting, then Send to TikTok drafts, Schedule direct post, or Mark
-    as manually posted, as for a slideshow; no Export). No slide navigator.
+    as manually posted, as for a slideshow; no Export). No slide navigator. Between the lock
+    and the delivered file, the production is under the frame: the storyboard and its
+    computed cost (Approve storyboard, Send back: gate A), each segment's takes with the
+    reference clip, the keyframe and the identity gate (Approve this take with its checks,
+    Reject with what failed and "Generate it again": gate B), each phone segment's
+    composite (Approve composite) and the cut (Approve the cut, Send back: gate C). Each
+    click is a line in the log; the agent records it with `review.py ... --from-atlas` and
+    takes the next step. The sentence under the title says whose turn it is.
 
 Say which page to open after each phase: the home base after `product`, the niche page
 after `niche-search` and `niche-read`, the strategy page after `account-architecture`

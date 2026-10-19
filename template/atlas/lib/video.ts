@@ -11,15 +11,17 @@
  *     video.json, segments/<nn>-<type>/prompt.txt   character-shots (the per-shot prompts)
  *     final/<video>.mp4, final/delivery.json        character-deliver (after gate C)
  *
- * Nothing here writes, and nothing here reads a storyboard, a gate, a cost or
- * a generation: only what the post page shows. The gates are the slideshow's
- * (idea, plan, final); videoPlanPoint() says where the plan gate comes from.
+ * Nothing here writes. The gates are the slideshow's (idea, plan, final);
+ * videoPlanPoint() says where the plan gate comes from. What happens between
+ * the lock and the delivered file (the storyboard, the takes, the cut) is read
+ * by lib/video-production.ts.
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { PlanRow, PointState } from "./production.ts";
+import type { Production } from "./video-production.ts";
 import { appDir, CHARACTER_DIR } from "./root.ts";
 
 /** A video id: lowercase, digits and hyphens (video-plan's rule). Anything else never reaches a path. */
@@ -52,6 +54,8 @@ export type VideoState = {
   plan: { lengthS: number | null; caption: string | null; music: string | null; beats: Beat[] } | null;
   /** The delivered file, after gate C. */
   final: { url: string; sha256: string; duration: number | null; delivered: string | null } | null;
+  /** After the lock: the storyboard, the segments and their takes, the cut (lib/video-production.ts; postState fills it). */
+  production?: Production | null;
 };
 
 const readJson = (p: string): any => {

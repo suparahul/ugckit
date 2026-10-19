@@ -1146,3 +1146,44 @@
 .vreview th, .vreview td { border: 1px solid var(--rule); padding: 4px 8px; text-align: left; vertical-align: top; }
 .vreview code { font-family: var(--mono); font-size: 0.9em; }
 @media (max-width: 720px) { .rep__body:has(.vframe) { grid-template-columns: 1fr; } }
+
+/* A locked video's production (VideoProduction): the storyboard, the takes, the cut. */
+.vprod { margin-top: 22px; display: flex; flex-direction: column; gap: 22px; }
+.vprod__record { margin-top: 18px; }
+.vprod__record > summary { cursor: pointer; font-size: 13px; color: var(--ink-2); }
+.vprod__stage { padding-top: 14px; border-top: 1px solid var(--rule); min-width: 0; }
+.vprod__h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0 0 10px; font-size: 15px; font-weight: 600; color: var(--ink); }
+.vprod__h small { font-size: 12px; font-weight: 400; color: var(--ink-3); }
+.vprod__n { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--rule-2); border-radius: 50%; font-size: 11px; color: var(--ink-2); }
+.vprod__tag { margin-left: auto; padding: 2px 9px; border: 1px solid var(--rule-2); border-radius: 999px; font-size: 11.5px; font-weight: 400; color: var(--ink-3); white-space: nowrap; }
+.vprod__tag.is-done { border-color: #2f6b3a; color: #2f6b3a; }
+.vprod__tag.is-you { border-color: var(--ember); color: var(--ink); }
+.vprod__words, .vprod__click, .vprod__cost { margin: 4px 0; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); }
+.vprod__click { color: var(--ink-3); }
+.vprod__board { display: block; max-width: 100%; max-height: 360px; margin: 6px 0; border: 1px solid var(--rule); }
+.vprod__keys { list-style: none; margin: 6px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.vprod__keys li { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--ink-3); }
+.vprod__keys img { display: block; width: 72px; aspect-ratio: 9 / 16; object-fit: cover; border: 1px solid var(--rule); }
+.vprod__nokey { display: grid; place-items: center; width: 72px; aspect-ratio: 9 / 16; border: 1px dashed var(--rule-2); font-size: 10.5px; text-align: center; }
+.vprod__segs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.vprod__seg { padding: 10px 0 0; border-top: 1px dashed var(--rule); min-width: 0; }
+.vprod__seg:first-child { border-top: 0; padding-top: 0; }
+.vprod__segh { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 0 0 6px; font-size: 13px; color: var(--ink-2); }
+.vprod__segh b { color: var(--ink); }
+.vprod__media { display: flex; flex-wrap: wrap; gap: 12px; margin: 6px 0; }
+.vprod__media figure { margin: 0; display: flex; flex-direction: column; gap: 4px; width: 160px; max-width: 100%; }
+.vprod__media figure.is-wide { width: 220px; }
+.vprod__media video, .vprod__media img { display: block; width: 100%; aspect-ratio: 9 / 16; object-fit: contain; background: #000; border: 1px solid var(--rule); }
+.vprod__media figcaption { font-size: 11px; line-height: 1.4; color: var(--ink-3); overflow-wrap: anywhere; }
+.vprod__id { margin: 4px 0; font-size: 12.5px; color: var(--ink-2); }
+.vprod__id.is-ok { color: #2f6b3a; }
+.vprod__id.is-bad { color: var(--ember); }
+.vprod__older { margin: 4px 0; font-size: 12px; color: var(--ink-3); }
+.vprod__older summary { cursor: pointer; }
+.vprod__older ul { margin: 4px 0 0; padding-left: 18px; }
+.vprod__checks { margin: 8px 0; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 4px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--ink-2); }
+.vprod__checks legend { padding: 0 4px; font-size: 11.5px; color: var(--ink-3); }
+.vprod__form { display: inline-flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; }
+.vprod__form--col { display: flex; flex-direction: column; align-items: stretch; margin-top: 8px; max-width: 520px; }
+.vprod__again { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
+.vprod__comp { margin-top: 10px; padding-left: 12px; border-left: 2px solid var(--rule); }

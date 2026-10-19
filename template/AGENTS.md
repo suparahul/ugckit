@@ -397,7 +397,13 @@ what is missing (`ready`) and writes the lock. Free.
   idea (`Video type`; optional `Hook`, `Hook job`, `Length`, each a user decision when filled;
   the `plan` skill, "A video row"). The Atlas shows the video post through the slideshow's
   gates: idea, plan (REVIEW.md; its **Approve plan** click is taken by `video-lock
-  --from-atlas`), final (the delivered file, **Approve for posting**), then the slideshow's
+  --from-atlas`), production (between the lock and the delivered file: the storyboard and
+  its computed cost, gate A; each take with its identity gate, gate B; each composite; the
+  cut, gate C; each click is recorded by `scripts/character/review.py storyboard|segment|
+  composite|final ... --from-atlas`, which checks the file's sha256 against the click and
+  runs every gate; a storyboard approval, or a reject with "Generate it again", is the
+  user's yes to the computed cost of those runs), final (the delivered file, **Approve for
+  posting**), then the slideshow's
   send (the `post` skill, "A video post": the one file, its checksum, `publishing_note.caption`
   and the row's tags) or Mark posted. Every video is sent with the AI-generated label on
   (TikTok's `is_aigc`; the page reminds for a draft and for Instagram); a plan with a music

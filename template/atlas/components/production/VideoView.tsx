@@ -8,13 +8,17 @@
  *              plan's beats in order (time, the words or the action, the
  *              on-screen text) with each beat's production prompt once
  *              character-shots wrote it, then the caption as a slideshow shows
- *              its caption. No storyboard, gate, cost or generation progress.
+ *              its caption. Under them, until the file is delivered, the
+ *              production: the storyboard (gate A), the takes (gate B), the
+ *              composites and the cut (gate C), each with its decision
+ *              (VideoProduction); after delivery, the same, folded, as the record.
  */
 
 import Markdown from "@/components/Markdown";
 import type { PostState } from "@/lib/production";
 import { frameStyle } from "./Frame";
 import { SoundIcon } from "./Marks";
+import { VideoProduction } from "./VideoProduction";
 
 const secs = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
@@ -52,7 +56,7 @@ export function VideoView({ state, mode }: { state: PostState; mode: "plan" | "p
             {v.final ? (
               <video className="vframe__video" src={v.final.url} controls playsInline preload="metadata" aria-label={`The video ${v.id}`} />
             ) : (
-              <p className="vframe__empty">The video is in production. It shows here when it is delivered.<small>pipeline/character/{v.id}/final/{v.id}.mp4</small></p>
+              <p className="vframe__empty">The video is in production: the storyboard, the takes and the cut are below. It shows here when it is delivered.<small>pipeline/character/{v.id}/final/{v.id}.mp4</small></p>
             )}
           </div>
           {v.final ? <p className="rep__textflag"><strong>File:</strong> pipeline/character/{v.id}/final/{v.id}.mp4{v.final.duration ? ` · ${secs(v.final.duration)} s` : ""} · sha256 {v.final.sha256.slice(0, 12)}</p> : null}
@@ -90,6 +94,13 @@ export function VideoView({ state, mode }: { state: PostState; mode: "plan" | "p
           </div>
         </div>
       </div>
+      {v.production && !v.final ? <VideoProduction post={row.key} p={v.production} live={!state.killed} /> : null}
+      {v.production && v.final ? (
+        <details className="vprod__record">
+          <summary>Production record: the storyboard, the takes and the cut</summary>
+          <VideoProduction post={row.key} p={v.production} live={false} />
+        </details>
+      ) : null}
     </section>
   );
 }

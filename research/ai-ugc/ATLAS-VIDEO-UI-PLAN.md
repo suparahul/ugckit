@@ -113,8 +113,8 @@ one brief for the row's handle and date.
 - Lock end to end (scratch copy of the harness workspace): a send-back line, then a line with
   another digest, are refused; the real line locks, and `bridge.py plan` accepts the approval.
 - Slideshow regression: the real catwise plan builds identical data.
-- In a browser (headless Chrome screenshots; the gstack `/browse` skill is not installed on this
-  machine): the studio day grid, a plan waiting (REVIEW.md, Approve plan), plan approved (lock
+- In a browser (headless Chrome screenshots): the studio day grid, a plan waiting (REVIEW.md,
+  Approve plan), plan approved (lock
   being written), in production (empty frame, beats, prompts, caption), ready for posting (the
   player plays the file, Approve for posting), approved for posting (Mark posted only). The
   decide route, the send and export refusals and the media route (200, 206 on a range, 403 on
@@ -220,6 +220,62 @@ limits hold, and how Post Bridge encodes the file.
 | `template/atlas/components/production/Bridge.tsx`, `Legs.tsx`, the post page | The slideshow's send buttons for a video, no Export; the video's words. |
 | `template/.claude/skills/post`, `character-deliver`, `atlas`; `template/AGENTS.md` | "A video post"; the hand-over from `final/`. The recreation `deliver` skill is unchanged: recreation rows stay out of the studio. |
 | `template/atlas/lib/video-post.test.ts` (new), `package.json` | 12 tests: the rules and the founder's decisions, the request shapes, the selection, the preview, the mocked send in both modes, the music-note refusal, the Instagram drop, the dry run, the export refusal. |
+
+## Production in the Atlas (built 2026-10-19)
+
+The first build left production out (storyboards, segments, gates A and B, spend). It is now
+on the post page, between the lock and the delivered file, so a video goes from the
+approved plan to the delivered file with the Atlas as the place the user reviews and
+approves. Nothing was generated and nothing was spent.
+
+### The stages, before and after
+
+| Stage | Before | Now |
+|---|---|---|
+| Video plan | shown (REVIEW.md) | unchanged |
+| Plan approval | Approve plan, Send back; `video-lock --from-atlas` | unchanged |
+| Shots and keyframes, gate A | not shown; the agent asked in the chat | the storyboard, every keyframe, the computed cost per segment and in total; **Approve storyboard and $x**, **Send back**; `review.py storyboard --from-atlas` pins every keyframe by its sha256 |
+| Generate | not shown; a yes in the chat per run | each segment's computed cost; the storyboard approval is the yes to each first run, and a reject with "Generate it again" the yes to one more run (`character-generate`); the Atlas never runs or spends |
+| Review, gate B | not shown | every take of every segment, the reference clip and the keyframe beside it, the identity gate of a face-replace take; the checks review.py needs as boxes; **Approve this take**, **Reject…** (what failed, the fix, generate again); `review.py segment --from-atlas` |
+| Composite | not shown | a phone segment's composite and its gates; **Approve composite**; `review.py composite --from-atlas` |
+| Assemble, gate C | not shown | the cut, its failed checks, stale when assembled from another revision; **Approve the cut** (and the grain export, when made), **Send back**; `review.py final --from-atlas`, then `deliver.sh` |
+| Deliver | the player, Approve for posting | unchanged; the production stays below, folded, as the record |
+
+The sentence under the title says the first stage that is not done and whose turn it is
+(`productionStep`): "storyboard: waiting for you", "generating 01-x", "take 01-x: waiting
+for you", "cut approved: being recorded", and so on.
+
+### How a click becomes a record
+
+The Atlas writes only log lines (`storyboard.approve|sendback`, `take.approve|reject`,
+`composite.approve`, `cut.approve|sendback`), each with `data.video`. The server reads every
+sha256 and cost from the files, never from the browser, and refuses early what review.py
+would refuse (a missing check, a face-replace take without an identity PASS, a stale cut, a
+cut while a segment is open). The agent records the line with `review.py ... --from-atlas`:
+the file must still have the sha256 of the click, an agent's line (an `actor`) is never a
+decision, and every gate runs as for words given in the chat. The record names the click
+(`atlas_line_at`). The media route serves, besides the delivered file, only the keyframes,
+the storyboard, the takes, the reference clips, the composites and the cut: never a plan,
+an approval, a shot or a prompt.
+
+### Files
+
+| File | Change |
+|---|---|
+| `template/atlas/lib/video-production.ts` (new) | Reads the production; `productionStep`; the cost of one run (`runCost`, as generate.sh computes it). |
+| `template/atlas/components/production/VideoProduction.tsx` (new), `VideoView.tsx`, `Actions.tsx`, `app/production.css` | The production panel; the log words. |
+| `template/atlas/lib/production.ts`, `lib/video.ts` | The event kinds; `video.production`; the stage sentence and the next step. |
+| `template/atlas/app/api/production/decide/route.ts` | The seven lines and their checks. |
+| `template/atlas/app/media/[...path]/route.ts` | The production files. |
+| `template/scripts/character/review.py` | `storyboard`, `--from-atlas` on storyboard, segment, composite and final; the sha256 of each recorded file. |
+| `template/.claude/skills/character-shots`, `-generate`, `-review`, `-composite`, `-deliver`, `atlas`; `template/AGENTS.md` | The Atlas flow at each gate. |
+| `template/atlas/lib/video-production.test.ts` (new), `lib/video.test.ts`; `tests/character-bridge/run.py` | 5 Atlas tests (175 in all); the harness records gate A and gate B from Atlas lines (277 expectations). |
+
+### Still open here
+
+- Approve and reject happen per take; there is no side-by-side compare of two takes.
+- Shared segments (a `project` of another video) are shown and decided on their own video.
+- A narrator's take and a supplied asset (gate B `narration`, `source`) are not on the page yet.
 
 ## Still open
 
