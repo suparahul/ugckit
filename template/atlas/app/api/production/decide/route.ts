@@ -30,6 +30,9 @@
  *   source.approve       gate B for a supplied file (data.asset_id), by its sha256; source.reject
  *   narration.approve    gate B for a narration take (data.take), with the natural-voice
  *                        check, its narrator and lines; narration.reject
+ *   motion.approve       gate B for a motion-designed screen (data.segment): its render by its
+ *                        sha256, every gate of motion_design.py check passed, a gate not run
+ *                        (OCR) ticked by eye; motion.reject
  * The server reads every hash and cost from the files, never from the client
  * (research/ai-ugc/ATLAS-VIDEO-STAGES-PLAN.md § 7).
  */
@@ -43,7 +46,7 @@ import { identityOk } from "@/lib/video-production";
 const KINDS = new Set<EventKind>([
   "idea.approve", "idea.sendback", "plan.approve", "plan.sendback", "final.approve", "final.sendback",
   "storyboard.approve", "storyboard.sendback", "take.approve", "take.reject", "composite.approve", "cut.approve", "cut.sendback",
-  "composite.sendback", "source.approve", "source.reject", "narration.approve", "narration.reject",
+  "composite.sendback", "source.approve", "source.reject", "narration.approve", "narration.reject", "motion.approve", "motion.reject",
   "slide.choose", "slide.approve", "slide.reject", "slide.note", "slide.text", "slide.layout", "slide.unlock", "posted", "outcomes", "kill", "unkill", "task.tick", "task.untick",
   /* One leg of a post taken off, or put back: data.platform names it. */
   "leg.drop", "leg.add",
@@ -54,7 +57,7 @@ const IDENTITY = new Set<EventKind>(["persona.approve", "persona.sendback", "ref
 /* The kinds whose data.platform must name a platform: required on a leg line, optional on account.connect. */
 const LEG = new Set<EventKind>(["leg.drop", "leg.add"]);
 
-const NEEDS_NOTE = new Set<EventKind>(["idea.sendback", "plan.sendback", "final.sendback", "storyboard.sendback", "take.reject", "cut.sendback", "composite.sendback", "source.reject", "narration.reject", "slide.reject", "slide.note", "kill", "persona.sendback", "reference.reject"]);
+const NEEDS_NOTE = new Set<EventKind>(["idea.sendback", "plan.sendback", "final.sendback", "storyboard.sendback", "take.reject", "cut.sendback", "composite.sendback", "source.reject", "narration.reject", "motion.reject", "slide.reject", "slide.note", "kill", "persona.sendback", "reference.reject"]);
 
 export async function POST(request: NextRequest) {
   let body: Partial<Event> & { app?: string };
@@ -142,7 +145,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ ok: true, event: e });
 }
 
-const PRODUCTION = new Set<EventKind>(["storyboard.approve", "storyboard.sendback", "take.approve", "take.reject", "composite.approve", "cut.approve", "cut.sendback", "composite.sendback", "source.approve", "source.reject", "narration.approve", "narration.reject"]);
+const PRODUCTION = new Set<EventKind>(["storyboard.approve", "storyboard.sendback", "take.approve", "take.reject", "composite.approve", "cut.approve", "cut.sendback", "composite.sendback", "source.approve", "source.reject", "narration.approve", "narration.reject", "motion.approve", "motion.reject"]);
 /* review.py final refuses an approval when one of these failed on the assembled file. */
 const BLOCKS_CUT = (k: string) => k.startsWith("overlays") || k.startsWith("supplied");
 
@@ -183,7 +186,7 @@ function productionLine(state: PostState | undefined, kind: EventKind, sent: Rec
     const a = p.assembly;
     if (!a) return { error: "No assembled file yet." };
     if (kind === "cut.approve") {
-      const open = p.segments.filter((s) => s.generated && !s.sharedFrom && !s.approved).map((s) => s.name);
+      const open = p.segments.filter((s) => (s.generated && !s.sharedFrom && !s.approved) || (s.motion && !s.motion.approved)).map((s) => s.name);
       if (open.length) return { error: `Not every segment is approved: ${open.join(", ")}.` };
       if (a.stale) return { error: "The cut was assembled from another revision of the plan: the agent assembles again first." };
       const blocks = a.failed.filter(BLOCKS_CUT);
@@ -198,6 +201,19 @@ function productionLine(state: PostState | undefined, kind: EventKind, sent: Rec
   const seg = p.segments.find((s) => s.name === sent.segment);
   if (!seg) return { error: "No such segment." };
   if (seg.sharedFrom) return { error: `${seg.name} is ${seg.sharedFrom}'s segment: decide it on that video.` };
+  if (kind === "motion.approve" || kind === "motion.reject") {
+    const m = seg.motion;
+    if (!m) return { error: `${seg.name} is not a motion-designed screen.` };
+    if (!m.render) return { error: `No render of ${seg.name} yet: the agent runs motion_design.py render.` };
+    if (kind === "motion.reject") return { data: { video, segment: seg.name, file: "motion/render.mp4", sha256: m.render.sha256 } };
+    if (!m.gates) return { error: "The gates have not run on this render: the agent runs motion_design.py check." };
+    if (m.failed.length) return { error: `Failed gates: ${m.failed.join(", ")}. Reject it, or the agent fixes the page first.` };
+    const ticked = Array.isArray(sent.checks) ? sent.checks.map(String) : [];
+    const need = m.notRun.map((g) => (g === "text_read" ? "text" : g));
+    const miss = need.filter((c) => !ticked.includes(c));
+    if (miss.length) return { error: `Read the stills and tick: ${miss.join(", ")}.` };
+    return { data: { video, segment: seg.name, file: "motion/render.mp4", sha256: m.render.sha256, ...(need.length ? { checks: Object.fromEntries(need.map((c) => [c, "pass"])) } : {}) } };
+  }
   if (kind === "composite.approve" || kind === "composite.sendback") {
     if (!seg.composite) return { error: `No composite of ${seg.name} yet.` };
     return { data: { video, segment: seg.name, file: seg.composite.file, sha256: seg.composite.sha256 } };

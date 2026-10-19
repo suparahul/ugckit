@@ -11,6 +11,9 @@
  *   review       gate B: approval.json gate_b_segments; the Atlas `take.approve` and
  *                `take.reject` lines (a reject with `regenerate` is the yes to one more run).
  *                A motion-copy take shows its identity gate (generated/qc/identity-*.json).
+ *                A motion-designed R or P (demo_source motion_design): its render,
+ *                motion/render.mp4 (motion_design.py), its gates and stills, approved in
+ *                gate_b_motion; the Atlas `motion.approve` and `motion.reject` lines
  *   composite    a phone segment's composite/*.mp4 (composite.sh) and its gates; the Atlas
  *                `composite.approve` line
  *   assemble     assembly/assembly.json and its file (assemble.sh); gate C:
@@ -61,6 +64,23 @@ export type Click = { kind: string; at: string; note: string | null; file: strin
 export type Source = { id: string; kind: string | null; origin: string | null; file: string | null; url: string | null; sha256: string | null; range: number[] | null; still: number | null; segments: string[]; decision: Decision | null; approved: boolean; click: Click | null };
 /** A narrator's take that gate B approves after the natural-voice check (review.py narration). */
 export type Narration = { take: string; file: string | null; url: string | null; sha256: string | null; narrator: string | null; lines: string[]; words: string[]; segments: string[]; decision: Decision | null; approved: boolean; click: Click | null };
+/** One step of a motion-designed screen (the plan's screen_story), in seconds from the segment's start. */
+export type MotionStep = { at: number; screen: string; action: string; target: string | null; shows: string[] };
+/** A motion-designed R or P (demo_source motion_design, scripts/character/demo.py): the app's real screens rebuilt in code and rendered locally. */
+export type Motion = {
+  screenId: string | null; reason: string | null; screens: string[]; rebuiltFrom: string[]; steps: MotionStep[]; fit: string; seconds: number; hero: string | null;
+  /** motion/render.mp4, when rendered; its stills at the end of each step. */
+  render: { url: string; sha256: string; at: string } | null;
+  stills: { url: string; at: number }[];
+  /** motion/gates.json of this render; null when not checked (or checked on another render). */
+  gates: { gate: string; result: string; detail: string | null }[] | null;
+  failed: string[];
+  notRun: string[];
+  decision: Decision | null;
+  /** The last gate B row approves this render (its sha256). */
+  approved: boolean;
+  click: Click | null;
+};
 /** A clip that continues from the one before it: that clip's last frame, and how far the take's first frame is from it. */
 export type Seam = { from: string; lastFrame: string | null; seedDiff: number | null; verified: boolean };
 
@@ -88,8 +108,10 @@ export type Segment = {
   asset: { id: string; file: string | null; url: string | null; range: number[] | null; still: number | null } | null;
   /** M: each panel, its place in the frame and its source. */
   panels: { id: string; rect: number[] | null; what: string; url: string | null }[];
-  /** R, P: the screen recording and its hero string. */
-  screen: { id: string; url: string | null; hero: string | null } | null;
+  /** R, P: the screen and its hero string; source is the beat's demo_source (a real recording, a real still, or motion design). */
+  screen: { id: string; url: string | null; hero: string | null; source: "recording" | "still" | "motion_design" } | null;
+  /** R, P by motion design: the story, the render, its gates and gate B. */
+  motion: Motion | null;
   /** Another approved segment's voice, a supplied sound or a narration take under this one (video.json audio_from). */
   audioFrom: string | null;
   /** Made by generate.sh (a take, gate B); else built at assembly (C, M, R, P). */
@@ -233,6 +255,30 @@ export function checksOf(type: string, route: string | null, motionCopy: boolean
   return route === "guided" ? [...MOTION_COPY_CHECKS, ...GUIDED_CHECKS] : MOTION_COPY_CHECKS;
 }
 
+/** The screen story of a segment: every motion-designed beat it carries, steps in seconds from the segment's start (demo.py segment_story). */
+export function segmentStory(plan: any, beatIds: string[]): Omit<Motion, "render" | "stills" | "gates" | "failed" | "notRun" | "decision" | "approved" | "click"> | null {
+  const bm = new Map<string, any>((plan?.beats ?? []).map((b: any) => [String(b.id), b]));
+  const bb = beatIds.map((b) => bm.get(String(b))).filter(Boolean);
+  const mb = bb.filter((b: any) => b.demo_source === "motion_design");
+  if (!mb.length) return null;
+  const t0 = num(bb[0].start_s) ?? 0;
+  const steps: MotionStep[] = [];
+  const screens: string[] = [], rebuiltFrom: string[] = [];
+  for (const b of mb) {
+    const st = b.screen_story ?? {};
+    const off = (num(b.start_s) ?? 0) - t0;
+    for (const x of st.steps ?? []) steps.push({ at: Math.round((off + (num(x.at_s) ?? 0)) * 1000) / 1000, screen: String(x.screen ?? ""), action: String(x.action ?? ""), target: typeof x.target === "string" ? x.target : null, shows: Array.isArray(x.shows) ? x.shows.map(String) : [] });
+    for (const x of st.screens ?? []) if (!screens.includes(x)) screens.push(String(x));
+    for (const x of st.rebuilt_from ?? []) if (!rebuiltFrom.includes(x)) rebuiltFrom.push(String(x));
+  }
+  const sid = mb[0].screen_id ?? null;
+  return {
+    screenId: sid, reason: mb.map((b: any) => b.demo_source_reason).filter(Boolean).join(" ") || null, screens, rebuiltFrom, steps,
+    fit: mb[0].screen_story?.fit ?? "pad", seconds: Math.round(bb.reduce((a: number, b: any) => a + ((num(b.end_s) ?? 0) - (num(b.start_s) ?? 0)), 0) * 1000) / 1000,
+    hero: sid ? plan?.hero_strings?.[sid] ?? null : null,
+  };
+}
+
 const AUDIO = [".wav", ".mp3", ".m4a"];
 const clickOf = (c: Pick<Event, "kind" | "at" | "note" | "data"> | null, recorded: boolean, current: boolean): Click | null => {
   if (!c) return null;
@@ -319,12 +365,38 @@ export function readProduction(id: string, log: Pick<Event, "kind" | "at" | "not
     const lf = from ? join(vd, "segments", from, "last-frame.png") : null;
     const seed = approved ? num(row?.checks?.seed_diff) : null;
     const a = type === "C" && s.asset_id ? assets.get(s.asset_id) : null;
+    const story = type === "R" || type === "P" ? segmentStory(plan, (s.beat_ids ?? []).map(String)) : null;
+    let motion: Motion | null = null;
+    if (story) {
+      const md = join(sd, "motion");
+      const rAbs = join(md, "render.mp4");
+      const rSha = existsSync(rAbs) ? sha256Of(rAbs) : null;
+      const rj = readJson(join(md, "render.json"));
+      const gj = readJson(join(md, "gates.json"));
+      const gates = gj && rSha && gj.sha256 === rSha ? (gj.results ?? []).map((r: any) => ({ gate: String(r.gate), result: String(r.result), detail: typeof r.detail === "string" ? r.detail : null })) : null;
+      const mrow = [...(ap.gate_b_motion ?? [])].reverse().find((e: any) => e?.segment === name) ?? null;
+      const mc = lastClick(log, ["motion.approve", "motion.reject"], id, name);
+      const mcData = (mc?.data ?? {}) as Record<string, any>;
+      motion = {
+        ...story,
+        render: rSha ? { url: media(id, `segments/${name}/motion/render.mp4`, rSha), sha256: rSha, at: mtimeIso(rAbs) } : null,
+        stills: rSha && rj?.sha256 === rSha ? Object.entries(rj.stills ?? {}).filter(([f]) => existsSync(join(md, f))).map(([f, t]) => ({ url: media(id, `segments/${name}/motion/${f}`, String(statSafe(join(md, f)))), at: num(t) ?? 0 })) : [],
+        gates, failed: (gates ?? []).filter((r: any) => r.result === "FAIL").map((r: any) => r.gate), notRun: (gates ?? []).filter((r: any) => r.result === "NOT RUN").map((r: any) => r.gate),
+        decision: decisionOf(mrow), approved: !!rSha && mrow?.decision === "approve" && mrow.sha256 === rSha,
+        click: clickOf(mc, !!mc && !!mrow && recordedAt(mrow, mc.at) && (mc.kind === "motion.approve") === (mrow.decision === "approve"), !!rSha && mcData.sha256 === rSha),
+      };
+    }
+    const beatSource = (() => {
+      const b = beatRows.find((x: any) => x.app_on_screen);
+      return b?.demo_source === "motion_design" || b?.demo_source === "still" || b?.demo_source === "recording" ? b.demo_source
+        : screens.get(String(s.screen_id))?.kind === "still" ? "still" : "recording";
+    })();
     return {
       name, type, beatIds: (s.beat_ids ?? []).map(String), generated, sharedFrom,
       start: starts.length ? Math.min(...starts) : null,
       end: ends.length ? Math.max(...ends) : null,
       framing: shot?.framing_kind ?? beatRows[0]?.framing ?? null,
-      seconds: num(shot?.video?.trim_to_seconds) ?? num(shot?.video?.duration_seconds) ?? num(s.planned_s),
+      seconds: num(shot?.video?.trim_to_seconds) ?? num(shot?.video?.duration_seconds) ?? num(s.planned_s) ?? story?.seconds ?? null,
       lines: beatRows.flatMap((b: any) => (b.lines ?? []).map((l: string) => lines.get(l)).filter(Boolean).map((l: any) => String(l.line ?? ""))),
       refCount: Array.isArray(shot?.references) ? shot.references.length : Array.isArray(shot?.generation_references) ? shot.generation_references.length : 0,
       subjects: (shot?.fixed_subjects_in_shot ?? beatRows.flatMap((b: any) => b.subject_ids ?? [])).map(String),
@@ -343,7 +415,8 @@ export function readProduction(id: string, log: Pick<Event, "kind" | "at" | "not
           url: pa ? mediaUrl(pa.path, pa.sha256) : pv ?? (pn.screen_id ? screenUrl(pn.screen_id) : null),
         };
       }),
-      screen: (type === "R" || type === "P") && s.screen_id ? { id: String(s.screen_id), url: screenUrl(s.screen_id), hero: plan?.hero_strings?.[s.screen_id] ?? screens.get(s.screen_id)?.hero?.text ?? null } : null,
+      screen: (type === "R" || type === "P") && s.screen_id ? { id: String(s.screen_id), url: story ? motion?.render?.url ?? null : screenUrl(s.screen_id), hero: plan?.hero_strings?.[s.screen_id] ?? screens.get(s.screen_id)?.hero?.text ?? null, source: beatSource } : null,
+      motion,
       audioFrom: typeof s.audio_from === "string" ? s.audio_from : null,
       keyframe: kfSha ? { url: media(id, `keyframes/${name}.png`, kfSha), sha256: kfSha, at: mtimeIso(kfAbs) } : null,
       needsKeyframe,

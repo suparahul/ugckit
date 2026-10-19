@@ -9,7 +9,8 @@
  *   pipeline/character/<video>/ the pictures and the files the user judges in the Atlas:
  *                               the delivered file; the keyframes, an H end still and the
  *                               storyboard (gate A); each segment's pose picture, plate,
- *                               takes, qc pictures, last frame and composites (gate B); the
+ *                               takes, qc pictures, last frame and composites, a motion-designed
+ *                               screen's render and its step stills (gate B); the
  *                               narration takes; the supplied files; the cut and its contact
  *                               sheet (gate C). No plan, no approval, no shot, no prompt, no JSON.
  */
@@ -24,6 +25,7 @@ export const FINAL_SERVED = new RegExp(
     "|segments/\\d\\d-[a-z]/(generated|composite)/qc/[\\w.-]+\\.png" +
     "|segments/\\d\\d-[a-z]/source/(reference\\.mp4|plate\\.mp4|first-frame\\.png)" +
     "|segments/\\d\\d-[a-z]/last-frame\\.png" +
+    "|segments/\\d\\d-[a-z]/motion/(render\\.mp4|stills/step-\\d\\d\\.png)" +
     "|narration/[\\w-][\\w.-]*\\.(wav|mp3|m4a)" +
     "|supplied/([\\w-][\\w.-]*/)*[\\w-][\\w.-]*\\.(mp4|mov|png|jpe?g|wav|mp3|m4a)" +
     "|assembly/([\\w.-]+\\.mp4|contact-sheet\\.png)" +

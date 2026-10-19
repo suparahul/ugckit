@@ -131,19 +131,23 @@ export function videoStages(x: StagesInput): StagesView {
     /* 4 Generate: a take for every generated segment (an approved one, or one gate B has not decided). */
     const caps = (x.ready?.dependencies ?? []).filter((d) => d.includes("not runnable yet"));
     const toMake = own.filter((s) => !s.approved && !undecidedTake(s));
-    out.generate = !own.length ? st("n/a", "no generated segment (supplied media, panels, recordings)")
+    out.generate = !own.length ? st("n/a", "no generated segment (supplied media, panels, recordings, motion design)")
       : !gateADone ? st("not reached", "gate A first")
       : !toMake.length ? st("done", `${own.length} segment${own.length === 1 ? "" : "s"} with a take`)
       : failed("generate") ?? (caps.length ? st("blocked", caps[0])
       : st("agent", running("generate") ? `running: ${running("generate")}` : `generating ${toMake.map((s) => s.name).join(", ")} (${usd(toMake.reduce((a, s) => a + (s.cost ?? 0), 0))} computed)`));
 
-    /* 5 Review takes, gate B: every segment, source and narration take review.py needs(). */
-    const items = own.length + p.sources.length + p.narration.length;
-    const okItems = own.filter((s) => s.approved).length + p.sources.filter((s) => s.approved).length + p.narration.filter((s) => s.approved).length;
-    const clicked = own.some((s) => s.click?.current && !s.click.recorded) || [...p.sources, ...p.narration].some((s) => s.click?.current && !s.click.recorded);
+    /* 5 Review takes, gate B: every segment, source and narration take review.py needs(), and each motion-designed render. */
+    const motions = p.segments.filter((s) => s.motion && !s.sharedFrom);
+    const items = own.length + p.sources.length + p.narration.length + motions.length;
+    const okItems = own.filter((s) => s.approved).length + p.sources.filter((s) => s.approved).length + p.narration.filter((s) => s.approved).length
+      + motions.filter((s) => s.motion!.approved).length;
+    const clicked = own.some((s) => s.click?.current && !s.click.recorded) || [...p.sources, ...p.narration].some((s) => s.click?.current && !s.click.recorded)
+      || motions.some((s) => s.motion!.click?.current && !s.motion!.click.recorded);
     const waiting = own.filter((s) => !s.approved && undecidedTake(s)).map((s) => s.name)
       .concat(p.sources.filter((s) => !s.approved && s.sha256 && !s.click?.current).map((s) => s.id))
-      .concat(p.narration.filter((s) => !s.approved && s.sha256 && !s.click?.current).map((s) => s.take));
+      .concat(p.narration.filter((s) => !s.approved && s.sha256 && !s.click?.current).map((s) => s.take))
+      .concat(motions.filter((s) => !s.motion!.approved && s.motion!.gates && !s.motion!.failed.length && !s.motion!.click?.current).map((s) => `${s.name} (motion design)`));
     const lastReject = own.find((s) => !s.approved && s.gateB && s.gateB.decision !== "approve" && !undecidedTake(s));
     out.review = !items ? st("n/a", "nothing for gate B")
       : okItems === items ? st("done", `${items} item${items === 1 ? "" : "s"} approved`)
@@ -271,7 +275,8 @@ export function timeline({ plan, source, production: p, final }: TimelineInput):
     const sound = [...said, under, !said.length && !under ? (b.performance === "silent_action" || seg?.type === "X" ? "silent" : "no line") : null, i === 0 && music ? `music: ${music}` : null].filter(Boolean).join(" · ");
     /* app: the screen and its hero string, a supplied clip, or not on screen. */
     const hero = b.screen_id ? plan?.hero_strings?.[b.screen_id] ?? screens.get(b.screen_id)?.hero?.text ?? null : null;
-    const app = b.app_on_screen && b.screen_id ? `screen ${b.screen_id}${hero ? `, “${hero}”` : ""}`
+    const how = b.demo_source === "motion_design" ? " by motion design" : b.demo_source === "still" ? ", a real still" : b.app_on_screen && b.framing === "app_screen" ? ", a real recording" : "";
+    const app = b.app_on_screen && b.screen_id ? `screen ${b.screen_id}${how}${hero ? `, “${hero}”` : ""}`
       : (b.source_asset_ids ?? []).length ? `supplied ${(b.source_asset_ids as string[]).join(", ")}`
       : b.app_on_screen ? "on screen (no screen named)" : "not on screen";
 
@@ -284,6 +289,12 @@ export function timeline({ plan, source, production: p, final }: TimelineInput):
       pics.push({ kind: "video", url: seg.approved.url, at, label: `take ${n}, approved${stale}` });
     } else if (seg && seg.takes[0]) {
       pics.push({ kind: "video", url: seg.takes[0].url, at, label: `take ${seg.takes.length}, not decided` });
+    }
+    if (seg?.motion?.render) {
+      const m = seg.motion;
+      pics.push({ kind: "video", url: seg.motion.render.url, at, label: m.approved ? "motion design, approved" : m.failed.length ? `motion design, gates failed: ${m.failed.join(", ")}` : "motion design, not approved yet" });
+      const still = [...m.stills].reverse().find((x) => x.at <= at + (end - start)) ?? m.stills[0];
+      if (still) pics.push({ kind: "image", url: still.url, at: null, label: `motion design at ${secs(still.at)} s` });
     }
     if (seg?.keyframe && seg.needsKeyframe) pics.push({ kind: "image", url: seg.keyframe.url, at: null, label: p?.gateA?.decision === "approve" && p.gateA.current ? "keyframe, approved" : "keyframe, not approved yet" });
     const ref = refs.get(b.reaction?.ref_id ?? "");
@@ -309,6 +320,7 @@ export function timeline({ plan, source, production: p, final }: TimelineInput):
     if (!faceless && (plan?.characters ?? []).length && slug && hdir && has(heroRel)) pics.push({ kind: "image", url: mediaUrl(heroRel)!, at: null, label: "hero, the character" });
 
     const noPicture = pics.length ? null
+      : seg?.motion ? "no picture yet: the app's screens are rebuilt in code and rendered locally (motion_design.py), then approved at gate B"
       : seg && (seg.type === "R" || seg.type === "P") ? "no picture yet: the screen recording is laid in at assembly"
       : seg?.type === "C" || (b.source_asset_ids ?? []).length ? "no picture: the supplied file is not on disk or not served"
       : "no picture: text only, or nothing on disk yet";

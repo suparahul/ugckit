@@ -176,6 +176,62 @@ test("supplied media and panels: no generation, stage 4 n/a, the source waits at
   assert.equal(p.segments[1].panels[0].what, "supplied a1");
 });
 
+test("motion design: no generation; the render, its gates and gate B at stage 5; the timeline says how the app is shown", () => {
+  reset();
+  const id = "md-2026-10-23-tail";
+  const vd = `pipeline/character/${id}`;
+  const story = { screens: ["Tail Reading"], rebuilt_from: ["code src/screens/TailReading.tsx"], fit: "pad",
+    steps: [{ at_s: 0, screen: "Tail Reading", action: "appear", target: null, shows: ["Tail reading", "Upload a clip"] },
+      { at_s: 1.5, screen: "Tail Reading", action: "tap", target: "Upload a clip", shows: ["Tail reading", "Upload a clip"] },
+      { at_s: 2.5, screen: "Tail Reading", action: "result", target: null, shows: ["Tail reading", "Relaxed tail"] }] };
+  const plan = { app: "app", handle: "@md", format: { length_s: 7 }, hero_strings: { "tail-reading": "Relaxed tail" },
+    beats: [{ id: "b1", role: "hook", start_s: 0, end_s: 2, framing: "subject_only", source_asset_ids: [] },
+      { id: "b2", role: "result", start_s: 2, end_s: 7, framing: "app_screen", app_on_screen: true, screen_id: "tail-reading", viewer_must: "read",
+        demo_source: "motion_design", demo_source_reason: "no recording of the reading yet", screen_story: story }] };
+  w(`${vd}/plan.json`, plan);
+  w(`${vd}/video.json`, { segments: [{ n: 1, type: "R", beat_ids: ["b2"], screen_id: "tail-reading" }] });
+  let { p, v } = locked(id);
+  const m = p.segments[0].motion;
+  assert.ok(m, "an R segment of a motion-designed beat");
+  assert.equal(m!.seconds, 5);
+  assert.deepEqual(m!.steps.map((x) => x.at), [0, 1.5, 2.5]);
+  assert.equal(p.segments[0].screen?.source, "motion_design");
+  assert.equal(p.segments[0].seconds, 5);
+  assert.equal(word(v, 4), "n/a", "nothing is generated");
+  assert.equal(word(v, 5), "agent", "the render is not made yet");
+  /* The render and its stills; gates of another render do not count. */
+  w(`${vd}/segments/01-r/motion/render.mp4`, "render");
+  const sha = sha256Of(join(WS, vd, "segments/01-r/motion/render.mp4"))!;
+  w(`${vd}/segments/01-r/motion/stills/step-01.png`, "s1");
+  w(`${vd}/segments/01-r/motion/render.json`, { sha256: sha, stills: { "stills/step-01.png": 1.4 } });
+  w(`${vd}/segments/01-r/motion/gates.json`, { sha256: "0".repeat(64), results: [{ gate: "format", result: "PASS" }] });
+  ({ p, v } = locked(id));
+  assert.equal(p.segments[0].motion!.gates, null, "gates.json is of another render");
+  assert.equal(word(v, 5), "agent");
+  w(`${vd}/segments/01-r/motion/gates.json`, { sha256: sha, results: [{ gate: "format", result: "PASS", detail: "1080x1920" }, { gate: "text_read", result: "NOT RUN", detail: "no OCR" }] });
+  ({ p, v } = locked(id));
+  assert.deepEqual(p.segments[0].motion!.notRun, ["text_read"]);
+  assert.equal(p.segments[0].motion!.stills.length, 1);
+  assert.equal(word(v, 5), "you");
+  assert.equal(v.now, "Review: waiting for you: 01-r (motion design).");
+  assert.ok(served(`${vd}/segments/01-r/motion/render.mp4`) && served(`${vd}/segments/01-r/motion/stills/step-01.png`));
+  assert.ok(!served(`${vd}/segments/01-r/motion/index.html`) && !served(`${vd}/segments/01-r/motion/gates.json`), "never the page or a JSON file");
+  /* Gate B approves this render by its sha256; a changed render is not approved. */
+  w(`${vd}/approval.json`, { gate_b_motion: [{ segment: "01-r", sha256: sha, decision: "approve", words: "Yes.", date: "2026-10-23" }] });
+  ({ p, v } = locked(id));
+  assert.equal(p.segments[0].motion!.approved, true);
+  assert.equal(word(v, 5), "done");
+  const tl = timeline({ plan, source: "plan.json", production: p, final: null });
+  assert.equal(tl.checkpoints[1].app, "screen tail-reading by motion design, “Relaxed tail”");
+  assert.equal(tl.checkpoints[1].picture?.label, "motion design, approved");
+  w(`${vd}/segments/01-r/motion/render.mp4`, "render 2");
+  ({ p } = locked(id));
+  assert.equal(p.segments[0].motion!.approved, false, "the approval is of another render");
+  /* Before the render: the timeline says how the picture will come. */
+  const tl0 = timeline({ plan, source: "plan.draft.json", production: null, final: null });
+  assert.equal(tl0.checkpoints[1].app, "screen tail-reading by motion design, “Relaxed tail”");
+});
+
 test("a continuous take: the seam names the clip it opens on", () => {
   reset();
   const id = "cont-2026-10-23-two";

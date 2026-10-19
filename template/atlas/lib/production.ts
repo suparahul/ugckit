@@ -279,6 +279,9 @@ export type EventKind =
   | "source.reject"
   | "narration.approve"
   | "narration.reject"
+  /* Gate B for a motion-designed screen (data.segment), its render by its sha256 (review.py motion). */
+  | "motion.approve"
+  | "motion.reject"
   | "composite.sendback"
   | "slide.upload"
   | "slide.choose"

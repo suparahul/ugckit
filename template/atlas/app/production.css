@@ -1237,6 +1237,11 @@
 .vprod__frame916 { position: relative; width: 120px; aspect-ratio: 9 / 16; border: 1px solid var(--rule-2); background: var(--paper-hi); }
 .vprod__rect { position: absolute; display: grid; place-items: center; border: 1px solid var(--ink-3); font-size: 10.5px; color: var(--ink-2); }
 .vprod__plist { margin: 0; padding-left: 16px; font-size: 12.5px; color: var(--ink-2); }
+/* A motion-designed screen: the story's steps and the render's gates (motion_design.py). */
+.vprod__steps, .vprod__gates { margin: 4px 0; padding-left: 18px; font-size: 12.5px; color: var(--ink-2); }
+.vprod__gates { list-style: none; padding-left: 0; }
+.vprod__gates .is-ok b { color: #2f6b3a; }
+.vprod__gates .is-bad b { color: var(--ember); }
 
 /* The timeline (Timeline, § 4.1): no colour code; words say everything, the open segment has a plain border. */
 .tl { display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; color: var(--ink-2); }

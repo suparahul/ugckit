@@ -13,7 +13,7 @@
 
 import { useState } from "react";
 
-import type { Click, Narration, Production, Segment, Source, Take } from "@/lib/video-production";
+import type { Click, Motion, Narration, Production, Segment, Source, Take } from "@/lib/video-production";
 import { useDecide } from "./Actions";
 
 /* The identity gate passes a take: PASS, or NO FACE (no frame shows a face; the eye check decides). */
@@ -154,6 +154,8 @@ function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Produc
   const isApproved = !!t && s.approved?.file === t.file;
   const idOk = !s.motionCopy || identityOk(t?.identity?.result);
   const status = s.sharedFrom ? `shared: decided on ${s.sharedFrom}`
+    : s.motion ? (s.motion.approved ? "motion design approved" : !s.motion.render ? "motion design: not rendered yet"
+      : !s.motion.gates ? "motion design: gates not run" : s.motion.failed.length ? `motion design: gates failed` : "motion design waiting for you")
     : !s.generated ? `${BUILT[s.type] ?? s.type}: built at assembly`
     : s.approved ? `approved: ${base(s.approved.file)}`
     : !s.takes.length ? "no take yet"
@@ -167,7 +169,7 @@ function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Produc
     <li className="vprod__seg" id={`seg-${s.name}`}>
       <p className="vprod__segh tabular">
         <b>{s.name}</b> · {s.type}{s.motionCopy ? ` · ${ROUTE_WORDS[s.motionCopy.route] ?? s.motionCopy.route}` : ""}{s.continues ? ` · continues ${s.continues}` : ""}{s.generated ? ` · ${usd(s.cost)} a run` : ""}
-        <span className={`vprod__tag${s.approved ? " is-done" : status === "take waiting for you" ? " is-you" : ""}`}>{status}</span>
+        <span className={`vprod__tag${s.approved || s.motion?.approved ? " is-done" : status === "take waiting for you" || status === "motion design waiting for you" ? " is-you" : ""}`}>{status}</span>
       </p>
       <ShotFacts s={s} />
       {s.gateB?.words ? <p className="vprod__words">Gate B ({s.gateB.decision}{s.gateB.file ? `, ${base(s.gateB.file)}` : ""}): “{s.gateB.words}”{s.gateB.failure ? ` · failed: ${s.gateB.failure}` : ""}</p> : null}
@@ -211,7 +213,7 @@ function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Produc
           <ul className="vprod__plist">{s.panels.map((pn) => <li key={pn.id}><b>{pn.id}</b> · {pn.what}{pn.url ? <> · <a href={pn.url} target="_blank" rel="noreferrer">open</a></> : " · not served"}</li>)}</ul>
         </div>
       ) : null}
-      {s.screen ? (
+      {s.motion ? <MotionDesign post={post} s={s} m={s.motion} live={live} /> : s.screen ? (
         <div className="vprod__media">
           {s.screen.url ? <figure><video src={s.screen.url} controls playsInline preload="metadata" muted aria-label={`Screen ${s.screen.id}`} /><figcaption>screen {s.screen.id}{s.screen.hero ? ` · hero “${s.screen.hero}”` : ""}</figcaption></figure> : <p className="sr__hint">Screen {s.screen.id}: not in the screen library yet.</p>}
           <p className="sr__hint">Nothing to approve before the cut: the recording is checked at gate C.</p>
@@ -261,6 +263,67 @@ function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Produc
       ) : null}
       <Err e={err} />
     </li>
+  );
+}
+
+const GATE_WORDS: Record<string, string> = {
+  current: "the render is of the page, the assets and the story now",
+  format: "1080x1920, 30 fps, the story's length",
+  local_only: "only local files: no web address, no request out",
+  assets: "every picture from the app, the plan or the world; none from a model",
+  story_text: "every line of text is a string of the story: no invented words",
+  text_read: "OCR reads each step's strings on its still",
+  hero: "the hero string is on the hero element, and readable",
+  page: "the page ran with no error",
+};
+
+/** A motion-designed screen (demo_source motion_design): the story, the render, its gates, and gate B. */
+function MotionDesign({ post, s, m, live }: { post: string; s: Segment; m: Motion; live: boolean }) {
+  const [decide, busy] = useDecide();
+  const [err, setErr] = useState<string | null>(null);
+  const [eye, setEye] = useState<string[]>([]);
+  const pending = m.click?.current && !m.click.recorded;
+  const need = m.notRun.map((g) => (g === "text_read" ? "text" : g));
+  const run = (kind: "motion.approve" | "motion.reject", note?: string) =>
+    decide({ post, kind, ...(note ? { note } : {}), data: { segment: s.name, ...(kind === "motion.approve" ? { checks: eye } : {}) } as any }).then((r) => { setErr(r); return r; });
+  return (
+    <div className="vprod__motion">
+      <p className="vprod__words">
+        Motion design: the app&apos;s real screens rebuilt in code and animated, rendered here at 1080x1920 (motion_design.py), never by a video model.
+        It fills the frame, so it looks more like a promotion than a hand holding a phone.{m.reason ? <> Why not a real recording: <em>{m.reason}</em></> : null}
+      </p>
+      <p className="sr__hint">Screens: {m.screens.join(", ") || "none named"} · rebuilt from {m.rebuiltFrom.join("; ") || "nothing named"} · fit {m.fit} · {m.seconds} s{m.hero ? ` · hero “${m.hero}”` : ""}</p>
+      <ol className="vprod__steps tabular" aria-label="The screen story">
+        {m.steps.map((x, i) => <li key={i}><b>{x.at.toFixed(1)} s</b> · {x.action}{x.target ? ` ${x.target}` : ""} · {x.screen}: {x.shows.map((w) => `“${w}”`).join(" ")}</li>)}
+      </ol>
+      {m.render ? (
+        <div className="vprod__media">
+          <figure><video src={m.render.url} controls playsInline preload="metadata" muted aria-label={`Motion design of ${s.name}`} /><figcaption className="tabular">motion/render.mp4 · {stamp(m.render.at)}{m.approved ? " · approved" : ""}</figcaption></figure>
+          {m.stills.map((x, i) => <figure key={x.url}><img src={x.url} alt={`Step ${i + 1}`} /><figcaption className="tabular">step {i + 1} · {x.at.toFixed(1)} s</figcaption></figure>)}
+        </div>
+      ) : <p className="sr__hint">Not rendered yet: the agent writes the page from the app&apos;s real screens (character-motion), then runs motion_design.py render and check.</p>}
+      {m.gates ? (
+        <ul className="vprod__gates">{m.gates.map((g) => <li key={g.gate} className={g.result === "PASS" ? "is-ok" : g.result === "FAIL" ? "is-bad" : ""}><b>{g.result}</b> · {GATE_WORDS[g.gate] ?? g.gate}{g.detail ? ` — ${g.detail}` : ""}</li>)}</ul>
+      ) : m.render ? <p className="sr__hint">The gates have not run on this render (motion_design.py check).</p> : null}
+      {m.decision?.words ? <p className="vprod__words">Gate B ({m.decision.decision}): “{m.decision.words}”</p> : null}
+      <ClickLine c={m.click} what={`the motion design of ${s.name}`} />
+      {live && m.render && m.gates && !m.approved && !pending ? (
+        <>
+          {need.length ? (
+            <fieldset className="vprod__checks">
+              <legend>No OCR engine ran: read the stills yourself</legend>
+              {need.map((c) => <label key={c}><input type="checkbox" checked={eye.includes(c)} onChange={(e) => setEye(e.target.checked ? [...eye, c] : eye.filter((x) => x !== c))} /> {c === "text" ? "every step shows its strings, readable" : "the hero string is readable"}</label>)}
+            </fieldset>
+          ) : null}
+          <div className="sr__actions">
+            <button type="button" className="pill pill--go" disabled={busy || !!m.failed.length || need.some((c) => !eye.includes(c))} onClick={() => run("motion.approve")}>Approve this motion design</button>
+            <SendBack label="Reject…" busy={busy} placeholder="What is wrong: a screen, a word, the timing." onSend={(n) => run("motion.reject", n)} />
+            {m.failed.length ? <span className="rail__why">failed gates: {m.failed.join(", ")}</span> : null}
+          </div>
+        </>
+      ) : null}
+      <Err e={err} />
+    </div>
   );
 }
 
