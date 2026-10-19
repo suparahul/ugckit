@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The identity gate of a face-replace reaction (P3, before gate B). Free, local.
+"""The identity gate of a motion-copy reaction (P3, before gate B). Free, local.
 
     .venv/bin/python3 scripts/character/identity.py <video> <segment> [generated/<x>.mp4]
 
@@ -11,16 +11,18 @@ three-quarter anchors of creator.json) and against the same moment of the refere
 (segments/<seg>/source/reference.mp4). Scores are cosine similarities; 0.363 is SFace's
 "same person" threshold.
 
-PASS needs all three:
-  - a face in at least 6 of the 8 frames;
+Only the frames that show a face are measured; a visible face is not a requirement of
+motion copy (founder, 2026-10-19: a reaction from a back view or a hand over the face is
+fine). PASS needs both:
   - the median similarity to the character at or above 0.363;
   - in at least 75% of the frames with both faces, the face is closer to the character
     than to the reference clip's person.
-A file that still shows the reference's person fails the third rule even when the two
-people look alike.
+A file that still shows the reference's person fails the second rule even when the two
+people look alike. NO FACE: no frame shows a face, so there is nothing to measure and the
+eye check at gate B decides alone.
 
 Writes generated/qc/identity-<file>.json beside the file; review.py reads it at gate B
-and refuses a face-replace approval without a PASS. Exit 0 PASS, 1 FAIL, 2 not run.
+and refuses a motion-copy approval on a FAIL. Exit 0 PASS or NO FACE, 1 FAIL, 2 not run.
 The model files (about 39 MB, from github.com/opencv/opencv_zoo) are fetched once into
 scripts/character/face-models/. The eye check at gate B still decides; this gate only
 stops a file that is clearly not the character.
@@ -39,7 +41,6 @@ WEIGHTS = {
 }
 SAME_PERSON = 0.363          # SFace cosine threshold (OpenCV)
 FRAMES = 8
-MIN_FACES = 6
 CLOSER_SHARE = 0.75
 ANCHORS = ("front", "three_quarter_left", "three_quarter_right")
 
@@ -137,8 +138,7 @@ def check(video, seg, rel=None):
     faces = Faces()
     pics = character_pictures(video)
     feats = [x for x in (faces.feature(cv2.imread(p)) for p in pics) if x is not None]
-    rec = {"file": rel, "frames": [], "thresholds": {"same_person": SAME_PERSON, "min_faces": MIN_FACES,
-                                                     "closer_share": CLOSER_SHARE},
+    rec = {"file": rel, "frames": [], "thresholds": {"same_person": SAME_PERSON, "closer_share": CLOSER_SHARE},
            "character_pictures": [os.path.relpath(p, ROOT) for p in pics], "character_faces": len(feats)}
     if not feats:
         rec.update(result="NOT RUN", why="no face found in the character's pictures")
@@ -169,15 +169,13 @@ def check(video, seg, rel=None):
                median_reference=round(statistics.median([r["reference"] for r in both]), 3) if both else None,
                closer_to_character=round(closer, 2) if closer is not None else None)
     why = []
-    if len(found) < MIN_FACES:
-        why.append(f"a face in {len(found)} of {FRAMES} frames (needs {MIN_FACES})")
-    if med < SAME_PERSON:
+    if found and med < SAME_PERSON:
         why.append(f"median similarity to the character {med:.3f} (needs {SAME_PERSON})")
     if closer is not None and closer < CLOSER_SHARE:
         why.append(f"closer to the character in {closer:.0%} of frames (needs {CLOSER_SHARE:.0%}): "
                    "the face is still the reference's")
-    rec["result"] = "FAIL" if why else "PASS"
-    rec["why"] = "; ".join(why) or None
+    rec["result"] = "FAIL" if why else "PASS" if found else "NO FACE"
+    rec["why"] = "; ".join(why) or (None if found else f"no face in the {FRAMES} frames: nothing to measure")
     out = os.path.join(os.path.dirname(f), "qc", f"identity-{os.path.splitext(os.path.basename(f))[0]}.json")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     json.dump(rec, open(out, "w"), indent=2)
@@ -193,7 +191,7 @@ def show(rec):
         else:
             ref = f"   reference {r['reference']:.3f}" if "reference" in r else ""
             print(f"  {r['t']:5.2f}s  character {r['character']:.3f}{ref}")
-    if rec["result"] != "NOT RUN":
+    if rec["result"] not in ("NOT RUN", "NO FACE"):
         print(f"  median: character {rec['median_character']}, reference {rec['median_reference']}; "
               f"closer to the character in {rec['closer_to_character']} of frames")
     print(f"{rec['result']}" + (f": {rec['why']}" if rec.get("why") else ""))
@@ -205,7 +203,7 @@ def main():
         sys.exit(__doc__)
     rec = check(a[0], a[1], a[2] if len(a) > 2 else None)
     show(rec)
-    sys.exit({"PASS": 0, "FAIL": 1}.get(rec["result"], 2))
+    sys.exit({"PASS": 0, "NO FACE": 0, "FAIL": 1}.get(rec["result"], 2))
 
 
 if __name__ == "__main__":

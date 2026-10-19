@@ -20,9 +20,9 @@ take (<take>.seed.json); review.py approves a continuing take only when that fra
 current one; assemble.py cuts the previous clip at that frame and drops the first frame of
 the continuing clip, so no frame shows twice at the cut.
 
-Only T, B and X by the written route continue or are continued: a phone plate (O, G, S, H,
+Only T, B and X by the written fallback continue or are continued: a phone plate (O, G, S, H,
 F) gets the app at P4, supplied media (C) is never conditioning, M, R and P are not
-generated, and a face-replace X is made of its reference clip's frames. Exit 1 when a check
+generated, and a motion-copy X takes its motion from its reference clip. Exit 1 when a check
 fails.
 """
 import json, os, subprocess, sys
@@ -247,10 +247,10 @@ def rules(video, v, shots, model, lim):
         pt = prev.split("-")[-1].upper()
         for who, ty, sh in ((name, t, shot), (prev, pt, shots.get(prev) or {})):
             if ty not in CONTINUES:
-                out.append(("bad", f"{name}: {who} is {ty}; only T, B and X (the written route) continue or are "
+                out.append(("bad", f"{name}: {who} is {ty}; only T, B and X (the written fallback) continue or are "
                                    "continued (a phone plate gets the app at P4; C, M, R and P are not generated)"))
-            elif ty == "X" and isinstance(sh.get("face_replace"), dict):
-                out.append(("bad", f"{name}: {who} is a face-replace reaction: its frames are the reference "
+            elif ty == "X" and isinstance(sh.get("motion_copy", sh.get("face_replace")), dict):
+                out.append(("bad", f"{name}: {who} is a motion-copy reaction: its motion is the reference "
                                    "clip's, so it neither continues nor is continued"))
         ps = shots.get(prev) or {}
         if shot.get("set_ref") and ps.get("set_ref") and shot["set_ref"] != ps["set_ref"]:

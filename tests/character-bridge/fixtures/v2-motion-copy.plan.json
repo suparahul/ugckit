@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "revision": 1,
-  "video_id": "v2-face-replace",
+  "video_id": "v2-motion-copy",
   "app": "catapp",
   "handle": "nora",
   "characters": [
@@ -172,7 +172,7 @@
       "start_s": 0.0,
       "end_s": 2.9,
       "notes_ref": null,
-      "generation_input": "face_replace",
+      "generation_input": "motion_copy",
       "burned_in_text": "'4 YEARS AT THE GYM' across the chest in every frame; '@somecreator' at the bottom edge",
       "permission_ref": null
     }

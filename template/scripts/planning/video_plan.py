@@ -618,14 +618,26 @@ def check_contract(plan, out, brief=None):
                f"{len(assets)} asset(s); {rp['id'] if rp else '?'} in order")
 
 
-# A reaction hook (user decision, 2026-10-03): never spoken, never invented. Face replace
-# (user decision, 2026-10-04): production gives the reference clip, trimmed to its range,
-# to the video model, which replaces the face with the handle's approved character; the
-# written expression beats are the fallback and the review checklist.
+# A reaction hook (user decision, 2026-10-03): never spoken, never invented. Motion copy, the
+# one default of every reaction with a reference (founder, 2026-10-19): the handle's approved
+# character, in a first frame made from the clip's, is moved by the reference clip, trimmed to
+# its range. The written expression beats are the review checklist; the written route (no
+# clip) is only a fallback the user names after a failed motion take.
 RX_REF_KEYS = ["id", "post_id", "platform", "handle", "post_dir", "video_path", "video_sha256",
                "start_s", "end_s", "notes_ref", "generation_input", "burned_in_text"]
 # permission_ref is optional and never required (founder, 2026-10-04).
-RX_INPUT = ("face_replace", "none")
+RX_INPUT = ("motion_copy", "written")
+# The names before 2026-10-19, read and never rewritten (a locked plan keeps its digest).
+RX_OLD = {"face_replace": "motion_copy", "none": "written"}
+
+
+def rx_mode(r):
+    """motion_copy or written (scripts/character/bridge.py ref_mode): a missing or null
+    generation_input is motion_copy; false and the old names are read as before."""
+    g = (r or {}).get("generation_input")
+    if g is False:
+        return "written"
+    return "motion_copy" if g is None else RX_OLD.get(g, g)
 RX_KEYS = ["ref_id", "framing", "camera_distance", "expression_beats"]
 RX_STEP_KEYS = ["start_s", "end_s", "ref_s", "face", "eyes", "head"]
 
@@ -684,17 +696,22 @@ def check_reaction(plan, beats, hook, ck, out):
             out.no(f"reaction ref {rid}: paths are relative to the workspace")
         if not (num(r.get("start_s")) and num(r.get("end_s")) and 0 <= r["start_s"] < r["end_s"]):
             out.no(f"reaction ref {rid}: start_s and end_s are the exact range of the reaction in the post")
-        if r.get("generation_input") not in RX_INPUT:
-            out.no(f"reaction ref {rid}: generation_input is \"face_replace\" (the default, founder "
-                   "2026-10-04) or \"none\"")
+        if rx_mode(r) not in RX_INPUT:
+            out.no(f"reaction ref {rid}: generation_input is \"motion_copy\" (the default, founder "
+                   "2026-10-19) or \"written\"")
+        elif r.get("generation_input") == "written" and not r.get("written_reason"):
+            out.no(f"reaction ref {rid}: \"written\" is only the user's fallback after a failed motion take; "
+                   "written_reason holds the user's words. Motion copy is the default")
         check_library_ref(f"reaction ref {rid}", r, r.get("video_path"), out)
     if hook.get("channel") == "reaction" and beats:
         b0 = beats[0]
         if b0.get("lines") or b0.get("performance") != "silent_action":
             out.no(f"beat {b0.get('id')}: a reaction hook is never spoken; the first beat is a silent_action "
                    "with no line and no voice-over, the hook is a text overlay")
-        if b0.get("framing") != "face":
-            out.no(f"beat {b0.get('id')}: a reaction hook shows the reacting face")
+        r0 = refs.get((b0.get("reaction") or {}).get("ref_id")) if isinstance(b0.get("reaction"), dict) else None
+        # A motion copy takes the clip's framing; a visible face is not needed (founder, 2026-10-19).
+        if b0.get("framing") != "face" and not (r0 and rx_mode(r0) == "motion_copy"):
+            out.no(f"beat {b0.get('id')}: a written reaction hook shows the reacting face")
         if ck not in ("human", "mascot"):
             out.no("a reaction hook needs a pinned cast; the face is the handle's approved character")
         if "reaction" not in b0:
@@ -719,13 +736,13 @@ def check_reaction(plan, beats, hook, ck, out):
                    "real reference post is made up, and is never written")
             continue
         used.add(r["id"])
-        if r.get("generation_input") == "face_replace":
+        if rx_mode(r) == "motion_copy":
             rng = (r.get("end_s") or 0) - (r.get("start_s") or 0)
             if num(b.get("start_s")) and num(b.get("end_s")) and abs((b["end_s"] - b["start_s"]) - rng) > TOL:
-                out.no(f"beat {bid}: {b['end_s'] - b['start_s']:g} s; a face-replace beat lasts its clip, "
+                out.no(f"beat {bid}: {b['end_s'] - b['start_s']:g} s; a motion-copy beat lasts its clip, "
                        f"{rng:g} s ({r['id']} {r.get('start_s')}–{r.get('end_s')} s), at normal speed")
             if b.get("set_id"):
-                out.no(f"beat {bid}: a face-replace beat has no set_id; its room, clothes and camera are the clip's")
+                out.no(f"beat {bid}: a motion-copy beat has no set_id; its first frame is made from the clip's")
         steps = rx.get("expression_beats") or []
         t = b.get("start_s")
         for j, st in enumerate(steps, 1):
@@ -772,11 +789,11 @@ def capabilities_needed(plan):
             add("bridge.narration", f"beat {b.get('id')}: voiceover")
         if b.get("layout") != "sequence":
             add("bridge.composition", f"beat {b.get('id')}: {b.get('layout')}")
-    rx_in = {r.get("id"): r.get("generation_input") for r in plan.get("reaction_refs") or []}
+    rx_in = {r.get("id"): rx_mode(r) for r in plan.get("reaction_refs") or []}
     for b in reaction_beats(plan):
-        add("bridge.reaction", f"beat {b.get('id')}: a silent face performed from a reference reaction")
-        if rx_in.get((b.get("reaction") or {}).get("ref_id")) == "face_replace":
-            add("bridge.face_replace", f"beat {b.get('id')}: the reference clip with the face replaced")
+        add("bridge.reaction", f"beat {b.get('id')}: a silent reaction from a reference reaction")
+        if rx_in.get((b.get("reaction") or {}).get("ref_id")) == "motion_copy":
+            add("bridge.motion_copy", f"beat {b.get('id')}: the character moved by the reference clip")
     if plan.get("overlays"):
         add("bridge.composition", f"{len(plan['overlays'])} timed overlay(s)")
     if ed.get("filming_format") == "live_use" or any(a.get("paired_input_ref") for a in assets.values()):
@@ -834,7 +851,7 @@ def readiness(plan, plan_path):
             block.append(f"reaction ref {rid}: no video_sha256 (video_plan.py pin, then review again)")
         elif r["video_sha256"] != sha256_file(os.path.join(ROOT, vp)):
             block.append(f"reaction ref {rid}: {vp} changed since it was pinned")
-        if r.get("generation_input") == "face_replace" and r.get("burned_in_text"):
+        if rx_mode(r) == "motion_copy" and r.get("burned_in_text"):
             dep.append(f"reaction ref {rid}: burned-in text in the clip ({r['burned_in_text']}). Production crops "
                        "text at an edge; text mid-frame is blurred and a soft patch stays. Or choose a clean clip")
     # Facts, against the brief.
@@ -877,6 +894,8 @@ def readiness(plan, plan_path):
                            "(character-voice, narrator mode)")
     # Production capabilities.
     caps = load(CAPS) if os.path.exists(CAPS) else None
+    if caps is not None and "bridge.motion_copy" not in caps:
+        caps["bridge.motion_copy"] = caps.get("bridge.face_replace")   # its name before 2026-10-19
     for k, why in sorted(capabilities_needed(plan).items()):
         if caps is None:
             dep.append(f"{k}: production has not declared it (scripts/character/capabilities.json is absent); "
@@ -1074,16 +1093,18 @@ def write_review(draft_path):
                   f"{st.get('head')} | {st.get('hands') or '—'} |")
             w("")
         for r in refs.values():
-            if r.get("generation_input") == "face_replace":
-                w(f"**Face replace** (founder, 2026-10-04): production gives `{r.get('video_path')}`, "
-                  f"{fmt_t(r.get('start_s', 0), r.get('end_s', 0))} only, to the video model, which replaces the face "
-                  "with the handle's approved character. The clip's room, clothes, hands and camera stay; its sound "
-                  "is not used, and nothing is said. The steps above are the fallback and the review checklist."
+            if rx_mode(r) == "motion_copy":
+                w(f"**Motion copy** (founder, 2026-10-19): production gives `{r.get('video_path')}`, "
+                  f"{fmt_t(r.get('start_s', 0), r.get('end_s', 0))} only, to the video model with the handle's approved "
+                  "character in a first frame made from the clip's. The clip gives the motion and the timing; its "
+                  "sound is not used, and nothing is said. The steps above are the review checklist."
                   + (f" Burned-in text in the clip: {r['burned_in_text']}." if r.get("burned_in_text") else
                      " The clip has no burned-in text."))
             else:
-                w("The reference clip is not a generation input: production performs the steps above with the "
-                  "handle's approved character. Nothing of the reference creator is copied.")
+                w("**Written fallback** (the user's choice after a failed motion take"
+                  + (f": {r['written_reason']}" if r.get("written_reason") else "") + "): the reference clip is not "
+                  "a generation input; production performs the steps above with the handle's approved character. "
+                  "Nothing of the reference creator is copied.")
         w("")
     w("## Beat timeline")
     w("")
@@ -1353,7 +1374,6 @@ def reactions(slug, grep=None, limit=30, job=None):
           + (f" for hook job {job}" if job else "") + (f", matching {grep!r}" if grep else ""))
     for e in entries[:limit]:
         print(f"- {e['id']} · {e['status']} · {e['length_s']:g} s · {', '.join(e.get('tags') or []) or 'no tags'}"
-              f" · face replace {rx.fit_word((e.get('fit') or {}).get('face_replace') or {'ok': None})}"
               f"\n    {e['source']['video']} {e['start_s']:g}–{e['end_s']:g} s · "
               f"{len(e.get('expression_beats') or [])} beat(s)" + (f" · note: {e['note']}" if e.get("note") else ""))
     in_lib = {e["source"].get("post_dir") for e in lib["entries"].values()}

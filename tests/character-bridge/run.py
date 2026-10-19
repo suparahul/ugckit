@@ -431,9 +431,11 @@ def reaction(assemble_on):
            cmd="plan", contains="never spoken")
     mutate(v_, "a reaction that talks on camera",
            plan_fn=lambda q: q["beats"][0].update(performance="on_camera"), cmd="plan", contains="a reaction is silent")
-    mutate(v_, "a generation_input that is not face_replace or none",
+    mutate(v_, "a generation_input that is not motion_copy or written",
            plan_fn=lambda q: q["reaction_refs"][0].update(generation_input=True), cmd="plan",
-           contains="'face_replace' or 'none'")
+           contains="'motion_copy' (the default) or 'written'")
+    mutate(v_, "the written fallback without the user's reason",
+           plan_fn=lambda q: q["reaction_refs"][0].pop("written_reason"), cmd="plan", contains="written_reason")
     mutate(v_, "a reaction with no reference post",
            plan_fn=lambda q: q["beats"][0]["reaction"].update(ref_id="r9"), cmd="plan", contains="not in reaction_refs")
     mutate(v_, "a reaction not found yet (null)", plan_fn=lambda q: q["beats"][0].update(reaction=None),
@@ -557,12 +559,12 @@ def stub_identity(result):
         "def show(rec):\n    print(rec['result'])\n")
 
 
-def face_replace(assemble_on):
+def motion_copy(assemble_on):
     """The default route (motion: Kling 3.0 Pro Motion Control), offline: the original clip
     padded to 3.0 s, the character's first frame made from the hero and the clip's first frame
     and approved at gate A by its checksum, the short prompt, the request, gate B with the
     identity gate. Then the backup route (replace) and the untested guided route."""
-    v_ = "v2-face-replace"
+    v_ = "v2-motion-copy"
     fx = fixture(v_)
     ref = fx["reaction_refs"][0]
     src = p(ref["video_path"])
@@ -578,15 +580,15 @@ def face_replace(assemble_on):
     band = bridge_band(masks)
     sh = shot(v_, "01-x", "X", [], pl["beats"][0]["action"])
     sh["video"].update(duration_seconds=None, trim_to_seconds=2.9,
-                       references=[{"file": clip_rel, "kind": "face_replace_clip", "role": "the motion and timing"},
+                       references=[{"file": clip_rel, "kind": "motion_clip", "role": "the motion and timing"},
                                    {"file": "keyframes/01-x.png", "kind": "keyframe",
                                     "role": "the subject and the room"}])
     sh["keyframe_prompt"] = FR_KEYFRAME.replace("{band}", band)
     sh["keyframe_references"] = [{"file": "references/face.png", "kind": "hero", "role": "her face"},
-                                 {"file": frame_rel, "kind": "face_replace_frame", "role": "the pose and the room"}]
+                                 {"file": frame_rel, "kind": "pose_frame", "role": "the pose and the room"}]
     sh["reaction"] = copy.deepcopy(pl["beats"][0]["reaction"])
-    # No route named: the shot takes models.json face_replace.default_route (motion).
-    sh["face_replace"] = {"ref_id": "r1", "clip": clip_rel, "range_s": [0.0, 2.9], "masks": masks}
+    # No route named: the shot takes models.json motion_copy.default_route (motion).
+    sh["motion_copy"] = {"ref_id": "r1", "clip": clip_rel, "range_s": [0.0, 2.9], "masks": masks}
     shp = p("pipeline", "character", v_, "shots", "01-x.json")
     wj(shp, sh)
     video_json(pl, [{"n": 1, "type": "X", "project": f"{v_}.01-x", "beat_ids": ["b1"], "script_lines": []},
@@ -648,7 +650,7 @@ def face_replace(assemble_on):
     request_shape(v_, sd, sh, shp, clip_rel)
     refs = os.path.join(sd, "refs.json")
     keep_refs = open(refs).read()
-    wj(refs, {"references": [{"kind": "face_replace_clip", "file": ref["video_path"]},
+    wj(refs, {"references": [{"kind": "motion_clip", "file": ref["video_path"]},
                              {"kind": "keyframe", "file": f"pipeline/character/{v_}/keyframes/01-x.png"}]})
     expect(f"{v_}: generate.sh refuses the raw research file as the clip", gen, ok=False,
            contains="Research footage is never an input", env={"ALLOW_REFS": "1"})
@@ -656,9 +658,9 @@ def face_replace(assemble_on):
     wsd = p("pipeline", "character", "v2-reaction", "segments", "01-x")
     wrefs = os.path.join(wsd, "refs.json")
     keep_w = open(wrefs).read()
-    wj(wrefs, {"references": [{"kind": "face_replace_clip", "file": f"pipeline/character/{v_}/{clip_rel}"}]})
-    expect("v2-reaction: generate.sh refuses a clip on the written route",
-           ["bash", f"{SC}/generate.sh", "v2-reaction", "01-x"], ok=False, contains="is a face-replace clip",
+    wj(wrefs, {"references": [{"kind": "motion_clip", "file": f"pipeline/character/{v_}/{clip_rel}"}]})
+    expect("v2-reaction: generate.sh refuses a clip on the written fallback",
+           ["bash", f"{SC}/generate.sh", "v2-reaction", "01-x"], ok=False, contains="is a motion-copy clip",
            env={"ALLOW_REFS": "1"})
     open(wrefs, "w").write(keep_w)
     # Gate B: the checks, the identity gate, the padded length, no text.
@@ -668,15 +670,21 @@ def face_replace(assemble_on):
     rv = [PY, f"{SC}/review.py", "segment", v_, "01-x", "--decision", "approve", "--file",
           "generated/01-x-take1.mp4", "--words", "Keep it."]
     ok_checks = ["--check", "identity=pass", "--check", "no_source_identity=pass", "--check", "silent=pass"]
-    expect(f"{v_}: gate B refuses a face replace without the no-trace check",
+    expect(f"{v_}: gate B refuses a motion copy without the no-trace check",
            rv + ["--check", "identity=pass", "--check", "silent=pass"], ok=False, contains="no_source_identity")
-    expect(f"{v_}: gate B refuses a face replace the identity gate did not pass (no face in the fixture)",
-           rv + ok_checks, ok=False, contains="identity gate")
+    dirty = os.path.join(sd, "generated", "01-x-dirty.mp4")
+    ff("-ss", "0", "-to", "2.95", "-i", src, "-c:v", "libx264", "-pix_fmt", "yuv420p", dirty)
+    # The fixture's character pictures show no face: the real gate cannot run, and that refuses.
+    expect(f"{v_}: gate B refuses a take the identity gate could not run (no face in the fixture's pictures)",
+           rv + ok_checks, ok=False, contains="identity gate NOT RUN")
+    # A take whose frames show no face: NO FACE lets the eye check decide (a visible face is
+    # not a requirement of motion copy), so the next gate, OCR, refuses this file.
+    stub_identity("NO FACE")
+    expect(f"{v_}: gate B passes a take with no face to the next check (identity NO FACE)",
+           rv[:8] + ["generated/01-x-dirty.mp4"] + rv[9:] + ok_checks, ok=False, contains="OCR reads text")
     stub_identity("FAIL")
     expect(f"{v_}: gate B refuses an identity FAIL", rv + ok_checks, ok=False, contains="identity gate FAIL")
     stub_identity("PASS")
-    dirty = os.path.join(sd, "generated", "01-x-dirty.mp4")
-    ff("-ss", "0", "-to", "2.95", "-i", src, "-c:v", "libx264", "-pix_fmt", "yuv420p", dirty)
     expect(f"{v_}: gate B refuses a file with the creator's caption and handle",
            rv[:8] + ["generated/01-x-dirty.mp4"] + rv[9:] + ok_checks, ok=False, contains="OCR reads text")
     os.remove(dirty)
@@ -706,11 +714,11 @@ def face_replace(assemble_on):
     guided_gate_b(v_, sd, sh, shp)
     stub_identity(None)
     # The plan and the shot.
-    mutate(v_, "a face-replace beat that is not the clip's length",
+    mutate(v_, "a motion-copy beat that is not the clip's length",
            plan_fn=lambda q: q["reaction_refs"][0].update(end_s=3.5), cmd="plan", contains="lasts its clip's range")
-    mutate(v_, "a set on a face-replace beat", plan_fn=lambda q: q["beats"][0].update(set_id="kitchen"),
+    mutate(v_, "a set on a motion-copy beat", plan_fn=lambda q: q["beats"][0].update(set_id="kitchen"),
            cmd="plan", contains="has no set_id")
-    mutate(v_, "a face-replace clip with no checksum",
+    mutate(v_, "a motion-copy clip with no checksum",
            plan_fn=lambda q: q["reaction_refs"][0].update(video_sha256=None), cmd="plan", contains="video_sha256")
     keep_src = open(src, "rb").read()
     open(src, "ab").write(b"\0")
@@ -718,13 +726,13 @@ def face_replace(assemble_on):
            ok=False, contains="does not match its video_sha256")
     open(src, "wb").write(keep_src)
     mutate(v_, "burned-in text with no mask",
-           video_fn=lambda v: wj(shp, {**sh, "face_replace": {**sh["face_replace"], "masks": []}}),
+           video_fn=lambda v: wj(shp, {**sh, "motion_copy": {**sh["motion_copy"], "masks": []}}),
            contains="masks it before generation")
     mutate(v_, "a shot range that is not the reference range",
-           video_fn=lambda v: wj(shp, {**sh, "face_replace": {**sh["face_replace"], "range_s": [0.5, 3.4]}}),
-           contains="face_replace.range_s")
+           video_fn=lambda v: wj(shp, {**sh, "motion_copy": {**sh["motion_copy"], "range_s": [0.5, 3.4]}}),
+           contains="motion_copy.range_s")
     mutate(v_, "a crop mask in the middle of the frame",
-           video_fn=lambda v: wj(shp, {**sh, "face_replace": {**sh["face_replace"], "masks": [
+           video_fn=lambda v: wj(shp, {**sh, "motion_copy": {**sh["motion_copy"], "masks": [
                {"rect": [0.02, 0.52, 0.96, 0.07], "how": "crop", "text": "x"}]}}), contains="lies at an edge")
     mutate(v_, "a motion shot without its keyframe",
            video_fn=lambda v: wj(shp, {**sh, "video": {**sh["video"], "references": sh["video"]["references"][:1]}}),
@@ -733,16 +741,63 @@ def face_replace(assemble_on):
            video_fn=lambda v: wj(shp, {**sh, "keyframe_references": sh["keyframe_references"][:1]}),
            contains="the clip's first frame")
     mutate(v_, "the retired edit route",
-           video_fn=lambda v: wj(shp, {**sh, "face_replace": {**sh["face_replace"], "route": "edit"}}),
+           video_fn=lambda v: wj(shp, {**sh, "motion_copy": {**sh["motion_copy"], "route": "edit"}}),
            contains="is retired")
-    mutate(v_, "a face-replace length that is not the clip's",
+    mutate(v_, "a motion-copy length that is not the clip's",
            video_fn=lambda v: wj(shp, {**sh, "video": {**sh["video"], "trim_to_seconds": 3}}),
            contains="its clip's 2.9 s")
-    mutate(v_, "a clip on the written route (generation_input none)",
-           plan_fn=lambda q: q["reaction_refs"][0].update(generation_input="none"), contains="written performance route")
-    mutate(v_, "a clip on a segment that is not face replace",
+    mutate(v_, "a clip on the written fallback",
+           plan_fn=lambda q: q["reaction_refs"][0].update(generation_input="written", written_reason="the take failed"),
+           contains="the user's fallback, no clip")
+    mutate(v_, "a clip on the written fallback by its old name (none)",
            plan_fn=lambda q: q["reaction_refs"][0].update(generation_input="none"),
-           contains="only an X segment in face-replace mode")
+           contains="only an X segment by motion copy")
+    old_names(v_, sh, shp)
+
+
+def old_names(v_, sh, shp):
+    """A video made before 2026-10-19 keeps its names: generation_input face_replace in the
+    locked plan, the shot's face_replace block, the kinds face_replace_clip and
+    face_replace_frame, and capabilities.json bridge.face_replace. Nothing rewrites them."""
+    vd = p("pipeline", "character", v_)
+    keep = {f: open(os.path.join(vd, f)).read() for f in ("plan.json", "planning-approval.json")}
+    pl = rj(os.path.join(vd, "plan.json"))
+    pl["reaction_refs"][0]["generation_input"] = "face_replace"
+    lock(pl)
+    old_kind = {"motion_clip": "face_replace_clip", "pose_frame": "face_replace_frame"}
+    old = {k: v for k, v in sh.items() if k != "motion_copy"}
+    old["face_replace"] = sh["motion_copy"]
+    old["video"] = {**sh["video"], "references": [{**r, "kind": old_kind.get(r["kind"], r["kind"])}
+                                                  for r in sh["video"]["references"]]}
+    old["keyframe_references"] = [{**r, "kind": old_kind.get(r["kind"], r["kind"])} for r in sh["keyframe_references"]]
+    wj(shp, old)
+    refs = os.path.join(vd, "segments", "01-x", "refs.json")
+    keep_refs = open(refs).read()
+    wj(refs, {**rj(refs), "references": [{**r, "kind": old_kind.get(r["kind"], r["kind"])}
+                                         for r in rj(refs)["references"]]})
+    cp = os.path.join(WS, "scripts", "character", "capabilities.json")
+    keep_c = open(cp).read()
+    c = json.loads(keep_c)
+    c["bridge.face_replace"] = c.pop("bridge.motion_copy")
+    wj(cp, c)
+    try:
+        expect(f"{v_}: the old names: bridge.py plan", [PY, f"{SC}/bridge.py", "plan", v_])
+        expect(f"{v_}: the old names: shots.py validate", [PY, f"{SC}/shots.py", "validate", v_])
+        expect(f"{v_}: the old names: lint_prompt.py", [PY, f"{SC}/lint_prompt.py", v_, "01-x"])
+        expect(f"{v_}: the old names: generate.sh REQUEST_ONLY on the motion route",
+               ["bash", f"{SC}/generate.sh", v_, "01-x"], contains="MOTION COPY, motion route",
+               env={"ALLOW_REFS": "1", "REQUEST_ONLY": "1"})
+        c["bridge.face_replace"] = False
+        wj(cp, c)
+        expect(f"{v_}: the old names: bridge.face_replace false still stops a live run",
+               ["bash", f"{SC}/generate.sh", v_, "01-x"], ok=False, contains="bridge.motion_copy is false",
+               env={"ALLOW_REFS": "1", "CONFIRM": "1"})
+    finally:
+        for f, t in keep.items():
+            open(os.path.join(vd, f), "w").write(t)
+        open(refs, "w").write(keep_refs)
+        open(cp, "w").write(keep_c)
+        wj(shp, sh)
 
 
 def bridge_band(masks):
@@ -783,14 +838,14 @@ def request_shape(v_, sd, sh, shp, clip_rel):
     # The live stops: capabilities.json false refuses; true reaches the cost prompt and stops without CONFIRM.
     cp = os.path.join(WS, "scripts", "character", "capabilities.json")
     keep_c = open(cp).read()
-    wj(cp, {**json.loads(keep_c), "bridge.face_replace": False})
-    expect(f"{v_}: generate.sh stops before any cost when face replace is switched off", gen, ok=False,
-           contains="bridge.face_replace is false", env={"ALLOW_REFS": "1", "CONFIRM": "1"})
+    wj(cp, {**json.loads(keep_c), "bridge.motion_copy": False})
+    expect(f"{v_}: generate.sh stops before any cost when motion copy is switched off", gen, ok=False,
+           contains="bridge.motion_copy is false", env={"ALLOW_REFS": "1", "CONFIRM": "1"})
     open(cp, "w").write(keep_c)
     expect(f"{v_}: the motion route stops at the cost prompt without CONFIRM", gen, ok=False,
            contains="This would spend $0.50", env={"ALLOW_REFS": "1"})
     # replace (the backup): the original clip, unpadded, then one face picture; no prompt; per frame.
-    rep = {**sh, "face_replace": {**sh["face_replace"], "route": "replace"},
+    rep = {**sh, "motion_copy": {**sh["motion_copy"], "route": "replace"},
            "video": {**sh["video"], "references": [sh["video"]["references"][0],
                                                    {"file": "references/face.png", "kind": "hero", "role": "her face"}]}}
     wj(shp, rep)
@@ -808,7 +863,7 @@ def request_shape(v_, sd, sh, shp, clip_rel):
         expect(f"{v_}: shots.py validate refuses {label}", [PY, f"{SC}/shots.py", "validate", v_], ok=False, contains=why)
         expect(f"{v_}: generate.sh refuses {label}", gen, ok=False, contains=why,
                env={"ALLOW_REFS": "1", "REQUEST_ONLY": "1"})
-    wj(shp, {**sh, "face_replace": {**sh["face_replace"], "route": "edit"}})
+    wj(shp, {**sh, "motion_copy": {**sh["motion_copy"], "route": "edit"}})
     expect(f"{v_}: generate.sh refuses the retired edit route", gen, ok=False, contains="is retired",
            env={"ALLOW_REFS": "1", "REQUEST_ONLY": "1"})
     two = {**sh, "video": {**sh["video"], "references": sh["video"]["references"] + [
@@ -825,7 +880,7 @@ def request_shape(v_, sd, sh, shp, clip_rel):
 def guided_gate_b(v_, sd, sh, shp):
     """Gate B on the guided route (untested with a paid run): a new clip of 5 s, at least the
     clip's length, trimmed at assembly, with the check that the reaction follows the clip."""
-    wj(shp, {**sh, "face_replace": {**sh["face_replace"], "route": "guided"}, "video": {**sh["video"], "duration_seconds": 5}})
+    wj(shp, {**sh, "motion_copy": {**sh["motion_copy"], "route": "guided"}, "video": {**sh["video"], "duration_seconds": 5}})
     rv = [PY, f"{SC}/review.py", "segment", v_, "01-x", "--decision", "approve", "--words", "Keep it.",
           "--check", "identity=pass", "--check", "no_source_identity=pass", "--check", "silent=pass"]
     g5 = os.path.join(sd, "generated", "01-x-guided.mp4")
@@ -1057,8 +1112,8 @@ def continuity_test(assemble_on):
     mutate(v_, "continues_previous after supplied media",
            plan_fn=lambda q: q["beats"][0].update(source_asset_ids=["milo-clip"]), cmd="plan",
            contains="joins two generated clips")
-    # A face-replace reaction neither continues nor is continued.
-    fv = "v2-face-replace"
+    # A motion-copy reaction neither continues nor is continued.
+    fv = "v2-motion-copy"
     fsp = p("pipeline", "character", fv, "shots", "01-x.json")
     keep_f = open(fsp).read()
     vj = p("pipeline", "character", fv, "video.json")
@@ -1067,8 +1122,8 @@ def continuity_test(assemble_on):
     v2["segments"].insert(0, {"n": 0, "type": "T", "project": f"{fv}.00-t", "beat_ids": ["b1"], "script_lines": []})
     wj(vj, v2)
     wj(fsp, {**json.loads(keep_f), "continuity": {"from": "00-t"}})
-    expect(f"{fv}: shots.py validate refuses a face-replace reaction that continues a clip",
-           [PY, f"{SC}/shots.py", "validate", fv], ok=False, contains="is a face-replace reaction: its frames")
+    expect(f"{fv}: shots.py validate refuses a motion-copy reaction that continues a clip",
+           [PY, f"{SC}/shots.py", "validate", fv], ok=False, contains="is a motion-copy reaction: its motion")
     open(fsp, "w").write(keep_f)
     open(vj, "w").write(keep_v)
 
@@ -1507,8 +1562,8 @@ def main():
 
     # ---- v2: a silent reaction hook (X), then the real app full frame (app_screen, R)
     reaction(assemble_on)
-    # ---- v2: the same hook in face-replace mode: the reference clip, trimmed and masked
-    face_replace(assemble_on)
+    # ---- v2: the same hook by motion copy: the reference clip, trimmed and masked
+    motion_copy(assemble_on)
     # ---- v2: one take over two clips: 02-b opens on the last frame of 01-b
     continuity_test(assemble_on)
 

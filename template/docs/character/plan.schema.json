@@ -618,7 +618,7 @@
             ]
           },
           "reaction": {
-            "description": "A silent reaction (segment X): the handle's approved generated face performs the written expression beats of a real reference reaction; no line, no voice, no lip sync. null while no reference is found (production waits). Founder, 2026-10-03: a reaction hook is never spoken.",
+            "description": "A silent reaction (segment X) from a real reference reaction: by motion copy, the one default (founder, 2026-10-19), the handle's approved character in a first frame made from the clip's is moved by the trimmed reference clip, and the written expression beats are the review checklist; by the written fallback (generation_input written) the character performs the expression beats with no clip. No line, no voice, no lip sync. null while no reference is found (production waits). Founder, 2026-10-03: a reaction hook is never spoken.",
             "anyOf": [
               {
                 "type": "null"
@@ -697,7 +697,7 @@
           },
           "continues_previous": {
             "type": "boolean",
-            "description": "Optional. true: this beat's picture continues the previous beat's in one take, across the join (a beat longer than one clip, or one movement over two beats). Production seeds this beat's first clip with the last frame of the previous beat's clip (scripts/character/continuity.py) and cuts the two without a repeated frame. Both beats are generated (no source asset, layout sequence, not the app, not a face-replace reaction) in the same set. Absent or false: an ordinary cut."
+            "description": "Optional. true: this beat's picture continues the previous beat's in one take, across the join (a beat longer than one clip, or one movement over two beats). Production seeds this beat's first clip with the last frame of the previous beat's clip (scripts/character/continuity.py) and cuts the two without a repeated frame. Both beats are generated (no source asset, layout sequence, not the app, not a motion-copy reaction) in the same set. Absent or false: an ordinary cut."
           }
         }
       }
@@ -1044,7 +1044,7 @@
       }
     },
     "reaction_refs": {
-      "description": "The real reference reactions from the user's research, named by post and range. generation_input face_replace (founder, 2026-10-04): production trims the range, masks its burned-in text, and gives that copy to the video model, which keeps the motion and timing and replaces the face with the character's (an X segment). none: the written expression beats only (the fallback). null and false are read as none. The research file itself is never attached to a generation.",
+      "description": "The real reference reactions from the user's research, named by post and range. generation_input motion_copy, the one default of every reaction with a reference (founder, 2026-10-19): production trims the range, masks its burned-in text, and gives that copy to the video model with the character's approved first frame; the clip gives the motion and the timing (an X segment). A visible face is not required. written: the written expression beats only, with no clip; only the user names it, after a failed motion take, and written_reason holds the user's words. A missing or null generation_input is motion_copy. The names before 2026-10-19 are read and never rewritten: face_replace is motion_copy, none and false are written. The research file itself is never attached to a generation.",
       "type": "array",
       "items": {
         "type": "object",
@@ -1093,7 +1093,7 @@
                 "type": "null"
               }
             ],
-            "description": "required for face_replace"
+            "description": "required for motion_copy"
           },
           "start_s": {
             "type": "number",
@@ -1111,11 +1111,21 @@
           },
           "generation_input": {
             "enum": [
+              "motion_copy",
+              "written",
               "face_replace",
               "none",
               null,
               false
-            ]
+            ],
+            "description": "motion_copy (the default) or written (the user's fallback after a failed motion take). face_replace, none, null and false: the names before 2026-10-19, still read"
+          },
+          "written_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "with generation_input written: the user's words that name the written fallback after a failed motion take; required then"
           },
           "burned_in_text": {
             "type": [

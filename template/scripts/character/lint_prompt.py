@@ -19,7 +19,7 @@ no app, every expression beat of the written performance (its face, eyes and hea
 word with its time from the segment's start, and no copy of the reference (its post id,
 its creator's handle, its file, or words that ask the model to copy a clip).
 
-X in face-replace mode (the reference's generation_input face_replace) has two kinds of
+X by motion copy (the reference's generation_input motion_copy, the default) has two kinds of
 prompt:
   - the replace route sends no prompt and has no keyframe: nothing to lint (a prompt.txt
     left in the segment is reported as not sent).
@@ -39,7 +39,7 @@ prompt:
     (bridge.band_sentence, "video"). The written beats are the gate B checklist.
 
 A continuing segment (its refs.json opens on the previous clip's last-frame.png): that
-line of REFERENCES binds it as the first frame. A face-replace X never continues.
+line of REFERENCES binds it as the first frame. A motion-copy X never continues.
 """
 import json, os, re, sys
 
@@ -75,7 +75,7 @@ APP_WORDS = [r"green screen", r"phone screen", r"\bthe app\b", r"app screen", r"
 COUNT_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
 COPY_WORDS = [r"reference (video|clip|reaction)", r"\bcopy\b", r"\brecreate\b", r"\breplicate\b",
               r"\bmimic\b", r"same as the (video|clip)"]
-# Editing models (face replace): an instruction to keep the clip as it is wins over the edit.
+# Editing models (the retired edit route of motion copy): an instruction to keep the clip as it is wins over the edit.
 EDIT_MAX_CHARS = 1500
 FILE_NAME = r"\b[\w-]+\.(mp4|mov|png|jpe?g|webp)\b"
 KEEP_AS_IS = [r"keep (its|the) frames", r"(follow|match)\w* (the )?(input video|clip|reference)[^.]{0,40}\bexactly",
@@ -83,10 +83,10 @@ KEEP_AS_IS = [r"keep (its|the) frames", r"(follow|match)\w* (the )?(input video|
 
 
 def face_route_of(shot):
-    """(route name, route record) of a face-replace shot, from models.json."""
+    """(route name, route record) of a motion-copy shot, from models.json."""
     spec = json.load(open(os.path.join(ROOT, "scripts", "character", "models.json")))
-    route = bridge.face_route_name(shot.get("face_replace") or {})
-    return route, ((spec.get("face_replace") or {}).get("routes") or {}).get(route) or {}
+    route = bridge.motion_route_name(bridge.motion_block(shot))
+    return route, (bridge.motion_spec(spec).get("routes") or {}).get(route) or {}
 
 
 def norm(x):
@@ -114,7 +114,7 @@ def lint_first_frame(video, seg, shot, plan, ref):
     miss = [k for k in ("face", "hair") if not lock.get(k) or norm(lock[k]).lower() not in low]
     check("the identity lock's face and hair, word for word", not miss,
           ("missing: " + ", ".join(miss)) if miss else "")
-    bands = bridge.band_sentence((shot.get("face_replace") or {}).get("masks"), "picture")
+    bands = bridge.band_sentence(bridge.motion_block(shot).get("masks"), "picture")
     gone = [b for b in bands if norm(b) not in flat]
     check("the band sentence of every blur or box mask", not gone,
           ("paste, word for word: " + " | ".join(gone)) if gone else f"{len(bands)} band(s)")
@@ -167,7 +167,7 @@ def lint(video, seg):
     t = str(shot.get("segment_type", "")).upper()
     rx0 = shot.get("reaction") or {}
     ref0 = next((r for r in plan.get("reaction_refs") or [] if r.get("id") == rx0.get("ref_id")), {})
-    fr0 = t == "X" and ref0.get("generation_input") == "face_replace" and isinstance(shot.get("face_replace"), dict)
+    fr0 = t == "X" and bool(ref0) and bridge.ref_mode(ref0) == bridge.MOTION_COPY and bool(bridge.motion_block(shot))
     if fr0 and face_route_of(shot)[1].get("first_frame") == "keyframe":
         res = lint_first_frame(video, seg, shot, plan, ref0)
         if face_route_of(shot)[1].get("prompt") is True:
@@ -318,7 +318,7 @@ def lint(video, seg):
         flat = " ".join(tl.split())
         rx = shot.get("reaction") or {}
         ref = next((r for r in plan.get("reaction_refs") or [] if r.get("id") == rx.get("ref_id")), {})
-        fr_mode = ref.get("generation_input") == "face_replace" and isinstance(shot.get("face_replace"), dict)
+        fr_mode = bool(ref) and bridge.ref_mode(ref) == bridge.MOTION_COPY and bool(bridge.motion_block(shot))
         check("no lip sync", re.search(r"\bno lip[- ]?sync\b", tl) is not None and "voice-over" not in
               allb("PERFORMANCE").lower(),
               "say 'No lip sync: her mouth does not form words'; a reaction hook is never spoken")
@@ -365,7 +365,7 @@ def lint(video, seg):
             trace = re.search(r"\b(nothing|no trace) of the (original|source) (person|creator|face)", flat)
             check("no trace of the original person", trace is not None,
                   "say 'Nothing of the original person's face, hair or identity remains'")
-            bands = bridge.band_sentence(shot["face_replace"].get("masks"), "video")
+            bands = bridge.band_sentence(bridge.motion_block(shot).get("masks"), "video")
             gone = [b for b in bands if " ".join(b.lower().split()) not in flat]
             check("the band sentence of every blur or box mask", not gone,
                   ("paste, word for word: " + " | ".join(gone)) if gone else f"{len(bands)} band(s)")
@@ -390,12 +390,12 @@ def lint(video, seg):
         st = os.path.join(ROOT, "pipeline", "character", "state.json")
         slug = (json.load(open(st)).get("model") or {}).get("slug") if os.path.exists(st) else None
         lim = spec["known_model_limits"].get(slug or spec["default"], {})
-        rt = ((spec.get("face_replace") or {}).get("routes") or {}).get(bridge.face_route_name(shot.get("face_replace") or {}))
+        rt = (bridge.motion_spec(spec).get("routes") or {}).get(bridge.motion_route_name(bridge.motion_block(shot)))
         if t == "X" and rt:
             lim = spec["known_model_limits"].get(rt["model"], {})
     except Exception:
         lim = {}
-    imgs = sum(1 for r in refs if r.get("kind") not in ("voice", "face_replace_clip"))
+    imgs = sum(1 for r in refs if bridge.ref_kind(r.get("kind")) not in ("voice", "motion_clip"))
     mx = lim.get("max_reference_images")
     check("reference pictures within the limit", not mx or imgs <= mx, f"{imgs} of at most {mx}")
     return results

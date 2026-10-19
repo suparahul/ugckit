@@ -78,7 +78,7 @@
       "performance": "silent_action",
       "source_asset_ids": [],
       "subject_ids": [],
-      "set_id": "<null for face_replace (the room is the clip's); the set for none>",
+      "set_id": "<null for motion_copy (the first frame is made from the clip's); the set for written>",
       "framing": "face",
       "layout": "sequence",
       "panels": [],
@@ -219,7 +219,7 @@
   ],
   "reaction_refs": [
     {
-      "_comment": "A real reference reaction from the user's research. face_replace: production trims this range, masks its burned-in text and gives the copy to the video model with the character's face (segment X); none: the written expression beats only.",
+      "_comment": "A real reference reaction from the user's research. motion_copy, the one default (founder, 2026-10-19): production trims this range, masks its burned-in text and gives the copy to the video model with the character's approved first frame; the clip gives the motion and the timing (segment X). written: the written expression beats only, with no clip; only the user names it after a failed motion take, with written_reason. Plans before 2026-10-19 say face_replace and none; they are read the same way.",
       "id": "<ref>",
       "post_id": "<post id>",
       "platform": "tiktok",
@@ -230,7 +230,8 @@
       "start_s": "<in>",
       "end_s": "<out>",
       "notes_ref": "<the notes that describe it, or null>",
-      "generation_input": "face_replace | none",
+      "generation_input": "motion_copy | written",
+      "written_reason": "<with written only: the user's words after a failed motion take; else null>",
       "burned_in_text": "<the visible text and where it is, or null>",
       "permission_ref": "<optional, or null; never required>"
     }

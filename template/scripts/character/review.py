@@ -39,11 +39,11 @@ adds a row to the model's table in pipeline/character/model-failures.md (the use
 the table is made at the model's first reject); --fixed-by on a later approve fills the
 "Prompt change that fixed it" column of that segment's open rows. Nothing is approved
 without the user's words. Gate C refuses an approval when the file is stale (the plan
-changed after assembly) or its overlays are not the plan's. An X segment in face-replace
-mode is approved only with --check identity=pass, no_source_identity=pass and silent=pass,
-a PASS of the identity gate (identity.py) on the file, a length within 0.25 s of its
-reference clip, and no text read by OCR. An X segment by the
-written route (a silent reaction) is approved only with --check identity=pass, hands=pass, silent=pass and
+changed after assembly) or its overlays are not the plan's. An X segment by motion
+copy is approved only with --check identity=pass, no_source_identity=pass and silent=pass,
+a PASS or NO FACE of the identity gate (identity.py) on the file, a length within 0.25 s of
+its reference clip, and no text read by OCR. An X segment by the written fallback (a silent
+reaction the user named after a failed motion take) is approved only with --check identity=pass, hands=pass, silent=pass and
 performance=pass, and only when the file is as long as the shot plans.
 
 Continuity (scripts/character/continuity.py): an approval of a segment that the next one
@@ -65,12 +65,12 @@ GENERATED = ("T", "O", "G", "S", "H", "F", "B", "X")
 # X, a silent reaction: approved only with these checks passed by eye, and its length
 # measured against the shot's planned length.
 REACTION_CHECKS = ("identity", "hands", "silent", "performance")
-# X in face-replace mode (founder, 2026-10-04): the motion is the reference clip's, so the
-# checks are the face: the character's identity, and no trace of the original creator
+# X by motion copy (founder, 2026-10-04; renamed 2026-10-19): the motion is the reference clip's,
+# so the checks are the person: the character's identity, and no trace of the original creator
 # (face, hair, identity marks, a handle or watermark); silent; the clip's length on the edit
 # route, at least it on the guided route (trimmed at assembly, plus follows_reference); and
 # OCR reads no text on the file.
-FACE_REPLACE_CHECKS = ("identity", "no_source_identity", "silent")
+MOTION_COPY_CHECKS = ("identity", "no_source_identity", "silent")
 GUIDED_CHECKS = ("follows_reference",)    # the guided route makes a new clip, not the clip's frames
 AUDIO_EXT = (".wav", ".mp3", ".m4a", ".aac")
 PHONE = ("O", "G", "S", "H", "F")
@@ -236,17 +236,17 @@ def from_atlas(cmd, video, seg=None):
 
 def keyframes_of(video):
     """{segment: sha256 of keyframes/<seg>.png} for every generated segment of this video that
-    starts from a keyframe; a missing one is None. A face-replace X on a route with no first
+    starts from a keyframe; a missing one is None. A motion-copy X on a route with no first
     frame (replace, guided) has none: the clip leads."""
     spec = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "models.json")))
     out = {}
     for s, t, name, proj in video_segments(video):
         if t not in GENERATED or not proj.startswith(video + "."):
             continue
-        if t == "X" and face_replace_of(video, name):
+        if t == "X" and motion_copy_of(video, name):
             sp = os.path.join(vdir(video), "shots", f"{name}.json")
-            route = bridge.face_route_name((json.load(open(sp)) if os.path.exists(sp) else {}).get("face_replace") or {})
-            if (((spec.get("face_replace") or {}).get("routes") or {}).get(route) or {}).get("first_frame") != "keyframe":
+            route = bridge.motion_route_name(bridge.motion_block(json.load(open(sp)) if os.path.exists(sp) else {}))
+            if ((bridge.motion_spec(spec).get("routes") or {}).get(route) or {}).get("first_frame") != "keyframe":
                 continue
         kf = os.path.join(vdir(video), "keyframes", f"{name}.png")
         out[name] = bridge.sha256_file(kf) if os.path.exists(kf) else None
@@ -400,15 +400,15 @@ def cmd_segment(video, seg, a):
     if o.get("--atlas-at"):
         entry["atlas_line_at"] = o["--atlas-at"]
     entry["sha256"] = bridge.sha256_file(os.path.join(sdir, f))
-    fr = face_replace_of(video, seg) if t == "X" else None
+    fr = motion_copy_of(video, seg) if t == "X" else None
     if fr and dec == "approve":
         sp = os.path.join(vdir(video), "shots", f"{seg}.json")
         shot = json.load(open(sp)) if os.path.exists(sp) else {}
-        route = bridge.face_route_name(shot.get("face_replace") or {})
-        need = FACE_REPLACE_CHECKS + (GUIDED_CHECKS if route == "guided" else ())
+        route = bridge.motion_route_name(bridge.motion_block(shot))
+        need = MOTION_COPY_CHECKS + (GUIDED_CHECKS if route == "guided" else ())
         miss = [k for k in need if entry["checks"].get(k) != "pass"]
         if miss:
-            sys.exit(f"a face-replace reaction is approved with {' '.join(f'--check {k}=pass' for k in miss)}: "
+            sys.exit(f"a motion-copy reaction is approved with {' '.join(f'--check {k}=pass' for k in miss)}: "
                      "the face is the character's in every frame (identity), nothing of the original creator's "
                      "face, hair or identity remains (no_source_identity), and no voice is heard (silent)"
                      + ("; on the guided route the reaction follows the clip's expression beats in order and "
@@ -424,8 +424,8 @@ def cmd_segment(video, seg, a):
         else:
             # A route with pad_to_s (motion: Kling takes 3 s or more) gets the clip held on its
             # last frame to that length; the take is that long and is trimmed to the clip at assembly.
-            pad = (((json.load(open(os.path.join(ROOT, "scripts", "character", "models.json"))).get("face_replace")
-                     or {}).get("routes") or {}).get(route) or {}).get("pad_to_s") or 0
+            pad = ((bridge.motion_spec(json.load(open(os.path.join(ROOT, "scripts", "character", "models.json"))))
+                    .get("routes") or {}).get(route) or {}).get("pad_to_s") or 0
             sent = max(want, pad)
             if not got or abs(got - sent) > 0.25:
                 sys.exit(f"the file is {got or 0:.2f} s; the input clip is {sent:g} s"
@@ -438,17 +438,20 @@ def cmd_segment(video, seg, a):
             idr = identity.check(video, seg, f)
         except ImportError as e:
             sys.exit(f"the identity gate needs opencv ({e}): run review.py with .venv/bin/python3")
-        if idr["result"] != "PASS":
-            sys.exit(f"identity gate {idr['result']}: {idr.get('why')} (qc/identity-*.json). A face-replace reaction "
-                     "is approved only when the face is measured as the character's")
-        entry["checks"]["identity_gate"] = (f"pass: median {idr['median_character']} to the character, "
-                                            f"{idr['median_reference']} to the reference")
+        # NO FACE: no frame shows a face, so nothing is measured and the eye check decides
+        # (founder, 2026-10-19: a visible face is not a requirement of motion copy).
+        if idr["result"] not in ("PASS", "NO FACE"):
+            sys.exit(f"identity gate {idr['result']}: {idr.get('why')} (qc/identity-*.json). A motion-copy reaction "
+                     "is not approved when a face it shows is measured as not the character's")
+        entry["checks"]["identity_gate"] = ("no face to measure: the eye check decides" if idr["result"] == "NO FACE"
+                                            else f"pass: median {idr['median_character']} to the character, "
+                                                 f"{idr['median_reference']} to the reference")
         left = text_on(os.path.join(sdir, f), os.path.join(sdir, os.path.dirname(f), "qc"))
         if left:
             sys.exit(f"OCR reads text on the file: {left} -- a burned-in caption, handle or watermark of the "
                      "reference is left (a trace of the original creator)")
         entry["checks"]["text_left"] = "none" if left is not None else "not read (no OCR engine)"
-        entry["face_replace"] = {"ref_id": fr["id"], "post_id": fr.get("post_id"), "route": route}
+        entry["motion_copy"] = {"ref_id": fr["id"], "post_id": fr.get("post_id"), "route": route}
     elif t == "X" and dec == "approve":
         miss = [k for k in REACTION_CHECKS if entry["checks"].get(k) != "pass"]
         if miss:
@@ -508,8 +511,8 @@ def cmd_segment(video, seg, a):
     update_review_state(video)
 
 
-def face_replace_of(video, seg):
-    """The reaction_refs row of an X segment in face-replace mode, else None."""
+def motion_copy_of(video, seg):
+    """The reaction_refs row of an X segment by motion copy, else None."""
     vp = os.path.join(vdir(video), "video.json")
     if not os.path.exists(vp):
         return None
@@ -519,7 +522,7 @@ def face_replace_of(video, seg):
         if f"{int(s.get('n')):02d}-{str(s.get('type', '')).lower()}" == seg:
             for b in s.get("beat_ids") or []:
                 if b in bmap and "reaction" in bmap[b]:
-                    return bridge.face_replace_ref(plan, bmap[b])
+                    return bridge.motion_copy_ref(plan, bmap[b])
     return None
 
 
@@ -718,7 +721,7 @@ def cmd_final(video, a):
 
 def cmd_storyboard(video, a):
     """Gate A: the user's decision on the storyboard. An approval pins every keyframe by its
-    sha256 (generate.sh runs a face-replace X only from that very keyframe) and records the
+    sha256 (generate.sh runs a motion-copy X only from that very keyframe) and records the
     computed cost the user approved for the first runs. The checks the agent made at gate A
     (character-shots) stay in the record."""
     o = opts(a)

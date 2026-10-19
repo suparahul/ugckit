@@ -172,7 +172,8 @@
       "start_s": 1.0,
       "end_s": 4.0,
       "notes_ref": null,
-      "generation_input": null
+      "generation_input": "written",
+      "written_reason": "the founder's fallback after a failed motion take (a test fixture of the written route)"
     }
   ]
 }

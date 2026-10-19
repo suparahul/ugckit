@@ -19,10 +19,11 @@ an approved mascot); C is supplied media (a clip or a still, never generated, ne
 reference of a generation); M lays panels side by side or one inside another. A narrator
 speaks over a beat where no generated face talks. X is a silent reaction: the handle's own
 generated face reacts, with no voice and no lip sync, while the hook runs as a timed text
-overlay (founder, 2026-10-03: a reaction hook is never spoken). In face-replace mode
-(founder, 2026-10-04) the reference clip, trimmed and masked by shots.py reference, is
-the motion input and the character's face goes in; otherwise the written performance
-taken from the reference drives it. The research file itself is never attached.
+overlay (founder, 2026-10-03: a reaction hook is never spoken). Every reaction with a
+reference is a motion copy (founder, 2026-10-19): the character's approved first frame is
+moved by the reference clip, trimmed and masked by shots.py reference. The written
+performance (the expression beats, no clip) is only a fallback the user names after a
+failed motion take. The research file itself is never attached.
 """
 import hashlib, json, os, re, subprocess, sys
 
@@ -513,8 +514,8 @@ def check_beats(plan, beats, lines, length, pins, subjects, sets, assets, narrat
                 if pb is not None and (not gen_x or x.get("app_on_screen") or x.get("framing") == "app_screen"):
                     out.bad(f"{tag}: continues_previous joins two generated clips; {who} is supplied, panels or "
                             "the app (a phone plate gets the app at P4)")
-                if pb is not None and face_replace_ref(plan, x):
-                    out.bad(f"{tag}: continues_previous: {who} is a face-replace reaction, made of its clip's frames")
+                if pb is not None and motion_copy_ref(plan, x):
+                    out.bad(f"{tag}: continues_previous: {who} is a motion-copy reaction, moved by its clip")
             if pb is not None and b.get("set_id") != pb.get("set_id"):
                 out.bad(f"{tag}: continues_previous stays in the set of the beat before ({pb.get('set_id')!r}, "
                         f"not {b.get('set_id')!r})")
@@ -631,26 +632,55 @@ def is_reaction(plan, b, first):
     return "reaction" in b or (first and ch == "reaction")
 
 
+MOTION_COPY, WRITTEN = "motion_copy", "written"
+# The names before 2026-10-19. Plans locked with them keep their digest, so they are read,
+# never rewritten: face_replace is motion_copy, none and false are written.
+OLD_INPUT = {"face_replace": MOTION_COPY, "none": WRITTEN}
+# Reference kinds of refs.json, the same way: the old names are read as the new ones.
+OLD_KIND = {"face_replace_clip": "motion_clip", "face_replace_frame": "pose_frame"}
+
+
+def ref_kind(k):
+    return OLD_KIND.get(k, k)
+
+
 def ref_mode(r):
-    """How a reference reaction is used. face_replace: its trimmed clip is the input of an
-    X generation, which keeps the motion and timing and replaces the face with the
-    character's (founder, 2026-10-04). none: the written expression beats only (the
-    fallback). The first plans wrote null or false for none."""
+    """How a reference reaction is used (founder, 2026-10-19). motion_copy, the one default:
+    the character's approved first frame is moved by the trimmed reference clip, which gives
+    the motion and the timing. written: the expression beats only, with no clip; only the
+    user names it, after a failed motion take. A missing or null generation_input is
+    motion_copy."""
     g = (r or {}).get("generation_input")
-    return "none" if g in (None, False) else g
+    if g is False:
+        return WRITTEN
+    return MOTION_COPY if g is None else OLD_INPUT.get(g, g)
 
 
-def face_replace_ref(plan, b):
-    """The reaction_refs row of a face-replace beat, else None."""
+def motion_copy_ref(plan, b):
+    """The reaction_refs row of a motion-copy beat, else None."""
     rx = b.get("reaction") if isinstance(b.get("reaction"), dict) else {}
     r = reaction_refs(plan).get(rx.get("ref_id"))
-    return r if r and ref_mode(r) == "face_replace" else None
+    return r if r and ref_mode(r) == MOTION_COPY else None
+
+
+def motion_block(shot):
+    """The motion-copy block of an X shot: motion_copy, or face_replace in a shot written
+    before 2026-10-19. {} when it has none."""
+    fx = (shot or {}).get("motion_copy")
+    if fx is None:
+        fx = (shot or {}).get("face_replace")
+    return fx if isinstance(fx, dict) else {}
+
+
+def motion_spec(spec):
+    """models.json motion_copy (face_replace in a workspace not updated yet)."""
+    return (spec or {}).get("motion_copy") or (spec or {}).get("face_replace") or {}
 
 
 def check_reaction_refs(plan, out, verify_files=False):
     """The real reference reactions, from the user's research, named by post and range.
-    In face_replace mode the trimmed clip is the motion input of the X generation, pinned
-    by its checksum; in none mode it gives the written performance only. Either way the
+    In motion copy the trimmed clip is the motion input of the X generation, pinned by its
+    checksum; in the written fallback it gives the written performance only. Either way the
     research file itself is never attached to a generation: production trims and masks a
     copy (shots.py reference)."""
     seen = set()
@@ -670,17 +700,20 @@ def check_reaction_refs(plan, out, verify_files=False):
         if not (num(r.get("start_s")) and num(r.get("end_s")) and 0 <= r["start_s"] < r["end_s"]):
             out.bad(f"reaction ref {rid}: start_s and end_s are the exact range of the reaction in the post")
         g = r.get("generation_input")
-        if g in (None, False):
-            out.note(f"reaction ref {rid}: generation_input {g!r} is read as 'none' (the written performance only)")
-        elif g not in ("face_replace", "none"):
-            out.bad(f"reaction ref {rid}: generation_input is 'face_replace' or 'none', not {g!r}")
+        if g in OLD_INPUT or g is False:
+            out.note(f"reaction ref {rid}: generation_input {g!r} is the old name of {ref_mode(r)!r}")
+        elif g not in (None, MOTION_COPY, WRITTEN):
+            out.bad(f"reaction ref {rid}: generation_input is 'motion_copy' (the default) or 'written', not {g!r}")
+        if g == WRITTEN and placeholder(r.get("written_reason")):
+            out.bad(f"reaction ref {rid}: 'written' is the user's fallback after a failed motion take; "
+                    "written_reason holds the user's words (motion copy is the default)")
         if not (r.get("burned_in_text") is None or isinstance(r.get("burned_in_text"), str)):
             out.bad(f"reaction ref {rid}: burned_in_text is the visible text and where it is, or null")
-        if ref_mode(r) != "face_replace":
+        if ref_mode(r) != MOTION_COPY:
             continue
         sha = r.get("video_sha256")
         if not (isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{64}", sha)):
-            out.bad(f"reaction ref {rid}: face_replace pins the clip: video_sha256 is its 64-hex checksum")
+            out.bad(f"reaction ref {rid}: motion copy pins the clip: video_sha256 is its 64-hex checksum")
         elif verify_files:
             fp = os.path.join(ROOT, str(r.get("video_path")))
             if not os.path.exists(fp):
@@ -703,8 +736,9 @@ def check_reaction(plan, tag, b, first, perf, framing, layout, src, cast, ovs, e
         out.bad(f"{tag}: a reaction is silent (silent_action, no line); a reaction hook is never spoken")
     if not placeholder(b.get("narrator_ref")):
         out.bad(f"{tag}: a reaction has no voice and no narrator")
-    if framing != "face":
-        out.bad(f"{tag}: a reaction shows the face (framing face)")
+    # A motion copy takes the clip's framing; a visible face is not needed (founder, 2026-10-19).
+    if framing != "face" and not (isinstance(rx, dict) and motion_copy_ref(plan, b)):
+        out.bad(f"{tag}: a written reaction shows the face (framing face)")
     if layout != "sequence" or src or b.get("app_on_screen"):
         out.bad(f"{tag}: a reaction is the generated face alone: no source asset, no panel, no app")
     if cast not in ("human", "mascot"):
@@ -722,15 +756,15 @@ def check_reaction(plan, tag, b, first, perf, framing, layout, src, cast, ovs, e
         r = reaction_refs(plan).get(rx.get("ref_id"))
         if not r and rx.get("ref_id"):
             out.bad(f"{tag}: reaction {rx.get('ref_id')!r} is not in reaction_refs")
-        if r and ref_mode(r) == "face_replace":
-            # The clip plays at 1x: no hold, no speed change. The room, clothes, hands and
-            # camera are the clip's; only the face changes.
+        if r and ref_mode(r) == MOTION_COPY:
+            # The clip plays at 1x: no hold, no speed change. The motion, the timing and the
+            # camera are the clip's; the person, the clothes and the room are the first frame's.
             if num(r.get("start_s")) and num(r.get("end_s")) and \
                     abs((b["end_s"] - b["start_s"]) - (r["end_s"] - r["start_s"])) > BEAT_TOL_S:
-                out.bad(f"{tag}: a face-replace beat lasts its clip's range, {r['end_s'] - r['start_s']:g} s "
+                out.bad(f"{tag}: a motion-copy beat lasts its clip's range, {r['end_s'] - r['start_s']:g} s "
                         f"(the beat is {b['end_s'] - b['start_s']:g} s)")
             if not placeholder(b.get("set_id")):
-                out.bad(f"{tag}: a face-replace beat has no set_id: the room is the clip's")
+                out.bad(f"{tag}: a motion-copy beat has no set_id: its first frame is made from the clip's")
         t = b["start_s"]
         for j, st in enumerate(rx.get("expression_beats") or [], 1):
             st = st if isinstance(st, dict) else {}
@@ -1110,18 +1144,18 @@ def check_segment_against_beats(plan, it, bmap, lines, assets, narrators, subjec
             out.bad(f"{name}: an X segment carries exactly one reaction beat")
         if sl or af:
             out.bad(f"{name}: a reaction is never spoken: no line, no audio_from, no voice")
-        if shot.get("framing_kind") != "face":
-            out.bad(f"{name}: a reaction shows the face (framing_kind face)")
+        if shot.get("framing_kind") != "face" and not (rx_beats and motion_copy_ref(plan, rx_beats[0])):
+            out.bad(f"{name}: a written reaction shows the face (framing_kind face)")
         if rx_beats and shot.get("reaction") != rx_beats[0]["reaction"]:
             out.bad(f"{name}: the shot's reaction is not beat {rx_beats[0].get('id')}'s reaction, copied exactly "
                     "(the written performance)")
-        fr = face_replace_ref(plan, rx_beats[0]) if rx_beats else None
-        fx = shot.get("face_replace")
+        fr = motion_copy_ref(plan, rx_beats[0]) if rx_beats else None
+        fx = shot.get("motion_copy", shot.get("face_replace"))
         if fr:
-            check_face_replace_shot(name, fr, fx, out)
+            check_motion_copy_shot(name, fr, fx, out)
         elif fx:
-            out.bad(f"{name}: the reference's generation_input is none: the written performance route, no clip "
-                    "(no face_replace block)")
+            out.bad(f"{name}: the reference's generation_input is written: the user's fallback, no clip "
+                    "(no motion_copy block)")
     elif rx_beats:
         out.bad(f"{name}: beat {rx_beats[0].get('id')} is a silent reaction; it is an X segment, not {ty}")
     if ty != "X" and it.get("first") and ((plan.get("editorial") or {}).get("hook") or {}).get("channel") == "reaction":
@@ -1237,19 +1271,19 @@ def check_segment_against_beats(plan, it, bmap, lines, assets, narrators, subjec
 
 
 MASK_HOW = {"crop", "blur", "box"}
-FR_ROUTES = ("motion", "animate", "replace", "guided")   # models.json face_replace.routes, without the retired ones
+FR_ROUTES = ("motion", "animate", "replace", "guided")   # models.json motion_copy.routes, without the retired ones
 
 
-def face_route_name(fx):
-    """The face-replace route of a shot: its face_replace.route, or models.json
-    face_replace.default_route when the shot names none (founder, 2026-10-07: motion). A shot
-    with no face_replace block has no route (None): it is not a face-replace shot."""
+def motion_route_name(fx):
+    """The motion-copy route of a shot: its motion_copy.route, or models.json
+    motion_copy.default_route when the shot names none (founder, 2026-10-07: motion). A shot
+    with no motion_copy block has no route (None): it is not a motion-copy shot."""
     if not isinstance(fx, dict) or not fx:
         return None
     if fx.get("route"):
         return fx["route"]
     spec = json.load(open(os.path.join(ROOT, "scripts", "character", "models.json")))
-    return (spec.get("face_replace") or {}).get("default_route")
+    return motion_spec(spec).get("default_route")
 FR_RETIRED = ("edit",)
 
 
@@ -1279,31 +1313,31 @@ def band_sentence(masks, medium="video"):
     return out
 
 
-def check_face_replace_shot(name, r, fx, out):
-    """The X shot of a face-replace reaction: its route, the trimmed, masked copy of the
+def check_motion_copy_shot(name, r, fx, out):
+    """The X shot of a motion-copy reaction: its route, the trimmed, masked copy of the
     reference clip that shots.py reference writes, and the masks over its burned-in text."""
     if not isinstance(fx, dict):
-        out.bad(f"{name}: a face-replace reaction names its clip: face_replace {{ref_id, route, clip, range_s, masks}}")
+        out.bad(f"{name}: a motion-copy reaction names its clip: motion_copy {{ref_id, route, clip, range_s, masks}}")
         return
-    route = face_route_name(fx)
+    route = motion_route_name(fx)
     if route in FR_RETIRED:
-        out.bad(f"{name}: face_replace.route {route!r} is retired (models.json face_replace.routes."
+        out.bad(f"{name}: motion_copy.route {route!r} is retired (models.json motion_copy.routes."
                 f"{route}.retired); use motion")
     elif route not in FR_ROUTES:
-        out.bad(f"{name}: face_replace.route {route!r}; it is motion (the default: Kling 3.0 Pro Motion Control, the "
+        out.bad(f"{name}: motion_copy.route {route!r}; it is motion (the default: Kling 3.0 Pro Motion Control, the "
                 "approved first frame moved by the original clip), animate (Wan 2.2 Animate move; fallback), replace "
                 "(Wan 2.2 Animate replace; fallback) or guided (MiniMax H3; untested)")
     if fx.get("ref_id") != r.get("id"):
-        out.bad(f"{name}: face_replace.ref_id {fx.get('ref_id')!r}; the beat's reference is {r.get('id')}")
+        out.bad(f"{name}: motion_copy.ref_id {fx.get('ref_id')!r}; the beat's reference is {r.get('id')}")
     if fx.get("range_s") != [r.get("start_s"), r.get("end_s")]:
-        out.bad(f"{name}: face_replace.range_s {fx.get('range_s')}; the reference range is "
+        out.bad(f"{name}: motion_copy.range_s {fx.get('range_s')}; the reference range is "
                 f"[{r.get('start_s')}, {r.get('end_s')}]")
     if fx.get("clip") != f"segments/{name}/source/reference.mp4":
-        out.bad(f"{name}: face_replace.clip is segments/{name}/source/reference.mp4 (shots.py reference), "
+        out.bad(f"{name}: motion_copy.clip is segments/{name}/source/reference.mp4 (shots.py reference), "
                 "never the research file")
     masks = fx.get("masks")
     if not isinstance(masks, list):
-        out.bad(f"{name}: face_replace.masks is a list (empty when the range has no burned-in text)")
+        out.bad(f"{name}: motion_copy.masks is a list (empty when the range has no burned-in text)")
         masks = []
     for m in masks:
         rc = m.get("rect") if isinstance(m, dict) else None
@@ -1322,7 +1356,7 @@ def check_face_replace_shot(name, r, fx, out):
     # The replace route sends the original clip, text and all (founder, 2026-10-06): no mask is applied.
     if not placeholder(r.get("burned_in_text")) and not masks and route != "replace":
         out.bad(f"{name}: the reference carries burned-in text ({r['burned_in_text']!r}); the shot masks it "
-                "before generation (face_replace.masks)")
+                "before generation (motion_copy.masks)")
 
 
 def check_video_overlays(plan, v, out):
