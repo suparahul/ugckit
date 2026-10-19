@@ -31,7 +31,8 @@ user's approval, then stop).
 Character videos, a separate pipeline (AGENTS.md § Character videos), from a locked,
 approved plan: part A once per character (`persona-identity` video half,
 `character-voice`), then per video `character-shots` (the storyboard, gate A),
-`character-generate` (one segment per run), `character-review` (gate B),
+`character-generate` (one segment per run), `character-motion` (a motion-designed app
+screen, rendered locally), `character-review` (gate B),
 `character-composite` with `screens` (only with app insertion), `character-assemble` and
 `character-deliver` (gate C, the finished file).
 

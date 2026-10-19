@@ -1,6 +1,6 @@
 ---
 name: character-assemble
-description: P5 of the character pipeline — one finished 1080x1920 file from video.json: trim each segment, upscale once, join with hard cuts, level the sound, lay the room tone, build the R and P segments from the screen library, the supplied C segments and the M panels, lay narration, burn the captions from the frozen script and the plan's timed overlays, run the export pass, and check the final file (OCR of every hero element and overlay, no green left, overlays as planned and clear). Local ffmpeg, free.
+description: P5 of the character pipeline — one finished 1080x1920 file from video.json: trim each segment, upscale once, join with hard cuts, level the sound, lay the room tone, build the R and P segments from the screen library (or the approved motion-design render), the supplied C segments and the M panels, lay narration, burn the captions from the frozen script and the plan's timed overlays, run the export pass, and check the final file (OCR of every hero element and overlay, no green left, overlays as planned and clear). Local ffmpeg, free.
 ---
 
 # P5 — assemble
@@ -33,6 +33,11 @@ file.
    element, a slow punch-in to `punch_in_to_hero` (1.25), a 0.3 px blur. **P**: the same
    base with her demo performance in a round bubble, 28% of the width, in the top corner
    away from the hero element; its audio is not trimmed (her lips are visible).
+   **R or P by motion design** (the beats' `demo_source` `motion_design`): the render
+   approved at gate B (`review.py motion`), by its sha256, laid in as it is: already
+   1080x1920, no crop, no punch-in, no blur, for its beats' seconds (its last frame held if
+   a voice runs longer); P adds the same bubble. A render that is not the approved one
+   stops the assembly.
    **C**: the supplied clip cut to `source_range_s` (a still held for `still_s`), scaled
    to cover 9:16 (`fit: pad` keeps the whole picture on black); a filmed phone uses its
    approved composite. **B**: the approved generation, like T, silent. **X**: the approved

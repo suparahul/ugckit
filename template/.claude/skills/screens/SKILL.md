@@ -5,9 +5,12 @@ description: The screen library of an app for character videos with app insertio
 
 # The screen library
 
-Every app pixel of a character video comes from `apps/<slug>/screens/`. **No UI pixel is
-generated, and the app is never a reference**: the model draws a phone with a flat green
-screen, or no phone at all, and the real app is put on it at P4. **The user provides the
+Every app pixel of a character video comes from `apps/<slug>/screens/`, or, for a
+full-screen app beat with no recording, from the app's real screens rebuilt in code
+(`demo_source` `motion_design`, `character-motion`; the plan prefers a recording and says
+why when it does not). **No UI pixel is generated, and the app is never a reference**: the
+model draws a phone with a flat green screen, or no phone at all, and the real app is put
+on it at P4. **The user provides the
 recordings.** Who records them, on which phone and with which account is not the
 pipeline's concern; this skill only checks and indexes what the user gives.
 

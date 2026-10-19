@@ -384,6 +384,12 @@ what is missing (`ready`) and writes the lock. Free.
 - **Real or missing.** Real screens, real footage of a real pet, measured live timings and
   verified facts are inputs; until they exist, `ready` lists them and the lock refuses.
   A character not `live` is a part-A dependency; planning never starts casting.
+- **The app demo has three sources** (founder, 2026-10-19): a real recording, a real still,
+  or motion design (the app's real screens rebuilt in code and rendered). `video-plan`
+  chooses one per screen, a real recording first; motion design only for a full-screen app
+  beat whose screen `PRODUCT-SCREENS.md` describes and no recording shows, with the reason.
+  `video-script` writes its `screen_story`: every step and every in-app string, word for
+  word, which is all the render may show.
 - **A reaction is silent and real** (user decision, 2026-10-03). A reaction hook is never
   spoken: a silent face, the hook as text. Its performance is copied from a real reference
   reaction in the workspace's downloaded research (post id and time range, in
@@ -432,7 +438,8 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
 | | D2 voice | `character-voice` | the approved voice reference |
 | B, per video | P1 shots | `character-shots` | segments, shot files, `video.json`, keyframes, prompts, `refs.json`; **gate A**, the storyboard the user approves |
 | | P2 generate | `character-generate` | one segment per run, after the user's yes to its computed cost; a continuing segment opens on the previous clip's approved last frame |
-| | P3 review | `character-review` | keep, reject or regenerate one segment; **gate B**; a reject adds a ledger row; each supplied file and narrator take approved; an approval takes the last frame the next clip continues from |
+| | P2 motion design | `character-motion` | a motion-designed R or P: the app's real screens rebuilt in code from PRODUCT-SCREENS.md, animated and rendered locally at 1080x1920, its gates; free, no model |
+| | P3 review | `character-review` | keep, reject or regenerate one segment; **gate B**; a reject adds a ledger row; each supplied file, narrator take and motion-designed render approved; an approval takes the last frame the next clip continues from |
 | | P4 composite | `character-composite` (with `screens`, the screen library) | the real app on the green phone, at 1080x1920, and its insertion gates; **skipped when `app_insertion` is false** |
 | | P5 assemble | `character-assemble` | one 1080x1920 file from `video.json`: trims, R and P, supplied C and panels M, narration, sound, captions, the plan's overlays, the export pass |
 | | P6 deliver | `character-deliver` | **gate C**, then the finished file in `final/`; the pipeline ends here |
@@ -452,7 +459,20 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
   panels (split screen, picture in picture); and **X**, a silent reaction (the handle's
   approved character, no voice and no lip sync, from a real reference reaction in
   `reaction_refs`, under the timed hook overlay; founder, 2026-10-03: a reaction hook is
-  never spoken). A full-screen app beat has framing `app_screen` (R or P). Every X with a
+  never spoken). A full-screen app beat has framing `app_screen` (R or P). **Its picture is
+  one of three demo sources** (the beat's `demo_source`, founder 2026-10-19;
+  `scripts/character/demo.py`): a real `recording` or a real `still` of the screen library,
+  or `motion_design`: the app's real screens rebuilt in code from `PRODUCT-SCREENS.md` and
+  the app's own code and in-app text, animated (taps, scrolls, the result appearing) and
+  rendered locally at 1080x1920 (`motion_design.py`, `character-motion`), the method of the
+  first two motion-designed posts (2026-10-14). It is never a video model, and it shows only
+  the plan's `screen_story`: the screens it names, the strings it lists, nothing invented.
+  A real recording is preferred: motion design fills the frame and looks more like a
+  promotion than a hand holding a phone, so the plan picks it only where no recording
+  shows the screen and says why (`demo_source_reason`); the bridge refuses it for a
+  screen the library records, on a phone plate or a panel, and for a live result. Its
+  render passes its gates and is approved at gate B (`review.py motion`) by its sha256;
+  assembly lays it in as it is. Every X with a
   reference is a **motion copy** (founder, 2026-10-19): the reference clip, trimmed to its
   range with its burned-in text masked (`shots.py reference`), is the motion input of the
   X generation; research footage is never an input anywhere else. The shot's
@@ -492,7 +512,9 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
   (`scripts/character/continuity.py`), never on a frame picked by hand; assembly cuts the
   two with no frame shown twice. How the frame reaches each model is in `models.json`
   (`continuity`); on every model it is unverified until a paid run measures it. **Never an app UI, a screenshot or a screen recording as a
-  reference**: reference conditioning cannot reproduce text; the app is inserted at P4.
+  reference**: reference conditioning cannot reproduce text; the app is inserted at P4, or
+  laid in at assembly (R and P: a real recording, or the motion-designed render). No video
+  model ever generates an app screen: `generate.sh` refuses R and P first.
   `scripts/character/generate.sh` refuses any other kind, refuses more pictures than the
   model takes (4 on the default), and asks for an explicit opt-in (`ALLOW_REFS=1`) on
   each referenced run.

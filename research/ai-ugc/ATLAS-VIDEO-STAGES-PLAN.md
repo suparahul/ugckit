@@ -10,6 +10,14 @@ Status: **built 2026-10-19** on branch `atlas-niche-video-player`, in the order 
 > (`generation_input`, the shot block, `models.json`), the kinds `motion_clip` and
 > `pose_frame`, and `bridge.motion_copy`, and the scripts still read the old names. The
 > written route is only a fallback the user names after a failed motion take.
+>
+> **Change, 2026-10-19 (founder):** the app demo has a third source, **motion design**: the
+> app's real screens rebuilt in code and animated, rendered locally at 1080x1920
+> (`motion_design.py`, the method of the two motion-designed posts of 2026-10-14). The plan
+> picks it per full-screen app beat (`demo_source`, with its reason and `screen_story`), a
+> real recording first. At stage 5 its segment card shows the story's steps, the render,
+> its stills and its gates, and takes `motion.approve` and `motion.reject`; the timeline
+> names how each app beat is shown ("by motion design", "a real recording").
 > Where the text below says face replace, read motion copy.
 
 The goal: at each stage of the character video pipeline, the user studies what the stage

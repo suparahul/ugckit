@@ -21,7 +21,9 @@ pinned character's `creator.json`, the handle's `world.json` and `HANDLE.md`,
     scripts/character/shots.py check <video>
 
 It refuses a plan that is not approved, a plan whose beats show the app when
-`app_insertion` is false, a screen that is not in `apps/<slug>/screens/SCREENS.md`, a pin
+`app_insertion` is false, a screen that is not in `apps/<slug>/screens/SCREENS.md` (a
+motion-designed screen is not: it is rebuilt from PRODUCT-SCREENS.md, and the bridge checks
+its story), a pin
 that is not `<character>@v<n>`, a character with no creator file, a status other than
 `video-setup` or `live`, a set or an outfit that is not locked, and a missing hero, set
 plate or outfit anchor. **Casting never runs here.** A missing character, anchors or set
@@ -136,7 +138,15 @@ Mark the cut points on the frozen script first, then give each segment its lines
   post, its creator or its file in the prompt, and never attach the clip or a frame of it. A motion-copy X neither continues a clip nor is
   continued (`continuity.py`). The failures of each model are in
   `docs/character-model-known.md`.
-- **A full-screen app beat** has framing `app_screen`: it is R or P, never generated.
+- **A full-screen app beat** has framing `app_screen`: it is R or P, never generated. Its
+  beat's `demo_source` says which picture: a real `recording` or `still` of the screen
+  library, laid in at assembly, or `motion_design` (founder, 2026-10-19): the app's real
+  screens rebuilt in code and rendered locally from the beat's `screen_story`. A
+  motion-designed R or P has no trim (it is rendered to its beats' seconds), one
+  `screen_id`, and one demo source for all its beats. After `shots.py validate`, run
+  `motion_design.py start <video> <seg>` for it and hand it to `character-motion`; it
+  needs no keyframe, no prompt and no cost, and it is approved at gate B with
+  `review.py motion`, not at gate A.
 - **C, supplied media** (v2): the plan's clip (`source_range_s`, inside the asset's
   approved `trim_s`) or still (`still_s`). No casting, no keyframe, no prompt, no
   generation. Its own sound plays unless `audio` is `mute` or `audio_from` lays another.
@@ -187,7 +197,7 @@ Under `pipeline/character/<video>/`:
   earned ones only from the ledger, at most five), and the `video` block with its
   references and their `kind`.
 - `video.json` from `video.example.json`: the plan's pins, `app_insertion`, the outfit,
-  and the segments in order with their lines (R and P carry a `screen_id`). For a v2
+  and the segments in order with their lines (R and P carry a `screen_id`, the beat's). For a v2
   plan also: `plan_revision` and `plan_sha256` (`bridge.py digest`), `beat_ids` on every
   segment, the plan's `overlays` copied exactly, `audio_from` for every narrated segment
   (`narration:<take>` for an original synthetic narrator, `asset:<id>` for a supplied

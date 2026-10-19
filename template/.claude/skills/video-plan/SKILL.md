@@ -78,7 +78,8 @@ Lowercase, digits and hyphens. It is the folder name here and under `pipeline/ch
                              "why": "...", "candidates_seen": []},
                             (only with hook channel "reaction"; null when none is found)
       "facts": [{"id": "f1", "claim": "...", "source": "<title, url or section>", "verified": false}],
-      "screens_needed": [{"screen_id": "...", "job": "...", "hero_proposed": "...", "status": "indexed|missing"}],
+      "screens_needed": [{"screen_id": "...", "job": "...", "hero_proposed": "...", "status": "indexed|missing",
+                          "demo_source": "recording|still|motion_design", "demo_source_reason": "<why>"}],
       "assets_needed": [{"id": "...", "kind": "clip|still|screen|audio", "origin": "...", "what": "...",
                          "path": null, "status": "present|missing"}],
       "missing_inputs": [{"id": "...", "what": "...", "owner": "founder|part_a|capture|production",
@@ -105,6 +106,25 @@ Lowercase, digits and hyphens. It is the folder name here and under `pipeline/ch
 - **Real or missing.** A screen not in the library is `missing` with the hero text the plan
   proposes, marked proposed. A real cat with no footage yet is a missing `capture`. A
   character not `live` is a `part_a` dependency; planning never starts casting.
+- **The demo source of each app screen** (founder, 2026-10-19), chosen here for every
+  screen the video shows, in this order:
+  1. **`recording`**: a real screen recording of the screen library
+     (`apps/<slug>/screens/`) that shows the screen and its event. Always first: it is the
+     real app, and it can sit on a phone in a hand.
+  2. **`still`**: a real still of the library, when nothing on the screen needs to move.
+  3. **`motion_design`**: no recording or still shows it. The app's real screens are rebuilt
+     in code from `PRODUCT-SCREENS.md` and the app's code and in-app text, animated and
+     rendered full screen at 1080x1920 (`character-motion`). It needs no recording, so it is
+     the least effort for the user, but it fills the frame and looks more like a promotion
+     than a hand holding a phone. Only for a full-screen app beat (framing `app_screen`,
+     an R or P segment); only for a screen `PRODUCT-SCREENS.md` describes; never on a phone
+     plate, in a panel, or for a live result (that is a real recording).
+  Write the choice in `screens_needed` (`demo_source`), and for motion design the reason in
+  the user's terms in `demo_source_reason` ("no recording of the reveal flow yet; recording
+  it needs a real upload"). A missing recording that the user could make is still listed
+  under missing inputs (owner `capture`), so the user can choose to record it instead.
+  `video_plan.py brief` refuses motion design without a reason, or for a screen the library
+  already has.
 - **Founder questions stay the founder's.** Where the plan leaves a decision open (face or
   hands, which cat, an identity), choose the option that needs the fewest new inputs, mark
   the choice `experiment` or `user`-pending with the recommendation, and list it under

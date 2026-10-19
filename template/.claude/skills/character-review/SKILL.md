@@ -1,6 +1,6 @@
 ---
 name: character-review
-description: P3 of the character pipeline, gate B — measure one generated segment with qc.py (and its phone screen's insertion gates), look at it against the character's anchors and the frozen script, and record keep, reject or regenerate in approval.json with the user's words; approve each supplied file (its checksum, permission and range) and each narrator take (after the natural-voice check). A reject adds a row to the user's failure ledger. Free.
+description: P3 of the character pipeline, gate B — measure one generated segment with qc.py (and its phone screen's insertion gates), look at it against the character's anchors and the frozen script, and record keep, reject or regenerate in approval.json with the user's words; approve each supplied file (its checksum, permission and range), each narrator take (after the natural-voice check) and each motion-designed screen's render (after its gates). A reject adds a row to the user's failure ledger. Free.
 ---
 
 # P3 — review one segment (gate B)
@@ -141,7 +141,8 @@ phone segment's composite: `review.py composite <video> <nn>-<type> --from-atlas
 the user picked from the older takes is approved the same way: the line names its file.
 The supplied sources and the narration takes have their own cards and lines:
 `review.py source <video> <asset-id> --from-atlas` and `review.py narration <video> <take>
---from-atlas` (the natural-voice check ticked). First, every session: `scripts/character/review.py pending <video>` lists each Atlas click
+--from-atlas` (the natural-voice check ticked); a motion-designed screen's render,
+`review.py motion <video> <nn>-<r|p> --from-atlas`. First, every session: `scripts/character/review.py pending <video>` lists each Atlas click
 that no file records yet, with the command that records it. Record those before you ask
 the user again.
 
@@ -178,8 +179,19 @@ A narrator's take (`character-voice`, narrator mode):
     scripts/character/review.py narration <video> <take> --narrator <id> --lines l2,l3 \
         --decision approve --words "<the user's words>" --check natural_voice=pass
 
-When every generated segment, supplied source and narrator take that `video.json` uses is
-approved, `review.py` marks P3 done. For a
+A motion-designed screen (an R or P whose beats have `demo_source` `motion_design`,
+`character-motion`): no take and no model, a render of the app's real screens. Its gates
+come first (`motion_design.py check`: no FAIL); then show the user the render and its
+stills beside the story's steps, and record their words:
+
+    scripts/character/review.py motion <video> <nn>-<r|p> --decision approve --words "<the user's words>"
+
+With no OCR engine the text gates are NOT RUN: the user reads the stills, and the approval
+carries `--check text=pass --check hero=pass`. The approval is of this render's sha256. A
+reject says what to change in the page; the story stays the plan's.
+
+When every generated segment, supplied source, narrator take and motion-designed render
+that `video.json` uses is approved, `review.py` marks P3 done. For a
 plan with app insertion, the next stage is `character-composite` for each phone segment;
 without it, `character-assemble`.
 

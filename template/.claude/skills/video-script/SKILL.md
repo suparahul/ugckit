@@ -21,7 +21,10 @@ script, never by hand).
 3. The character's voice profile (`creator.json` `voice_profile`: one opener, the words she
    never says) or the narrator's profile; the handle's `HANDLE.md` voice.
 4. The real screens in `apps/<slug>/screens/screens.json`: the job, the events, the hero
-   text exactly as the app shows it. Supplied clips: their source metadata and ranges.
+   text exactly as the app shows it. For a screen the brief gives `demo_source`
+   `motion_design`: its section of `apps/<slug>/PRODUCT-SCREENS.md` (**Shows**, **Source**,
+   **In-app text**, **Corrections**) and the app code it names. Supplied clips: their source
+   metadata and ranges.
 
 ## Write `plan.draft.json` — the v2 contract
 
@@ -43,6 +46,7 @@ fields. Production's check is `scripts/character/bridge.py`; the schema, when sh
                  "framing": "face|hands_only|subject_only|app_screen", "layout": "sequence|split_screen|picture_in_picture",
                  "media_origin": "generated|supplied|mixed",
                  "app_on_screen": false, "screen_id": null, "viewer_must": null,
+                 "demo_source": null, "demo_source_reason": null, "screen_story": null,
                  "fact_refs": [], "source_asset_ids": [], "subject_ids": [], "set_id": null}],
       "set": {"<character>": "<set-id>"}, "outfit": {"<character>": "<outfit-id>"},
       "hero_strings": {"<screen id>": "<exact string, or null until the real screen is indexed>"},
@@ -84,6 +88,37 @@ reports every one.
 - **The app is real.** An app beat names its `screen_id` and `viewer_must`; the hero string
   is copied from the real screen, never from the plan's proposal. No overlay carries the
   app's words.
+- **The demo source is the brief's** (`screens_needed` `demo_source`, `video-plan`): a real
+  `recording` or `still` of the screen library, or `motion_design`. Write it on each app
+  beat as `demo_source`, with the brief's `demo_source_reason` word for word for motion
+  design. A real recording is always preferred; never change the brief's choice to motion
+  design here.
+- **A motion-designed beat** is framing `app_screen` (an R or P segment), with no source
+  asset, and a `screen_id` of its own (never a library row's: `screens_needed` names it).
+  Its `screen_story` is the whole screen, step by step; production renders exactly it and
+  nothing else (`character-motion`):
+
+      "screen_story": {"screens": ["<a ## heading of PRODUCT-SCREENS.md, exactly>"],
+                       "rebuilt_from": ["code <path>", "screenshot <file>"],
+                       "steps": [{"at_s": 0, "screen": "<one of screens>", "action": "appear",
+                                  "target": null, "shows": ["<every string on screen, word for word>"]},
+                                 {"at_s": 1.5, "screen": "...", "action": "tap", "target": "Continue",
+                                  "shows": ["..."]},
+                                 {"at_s": 2.4, "screen": "...", "action": "result", "target": null,
+                                  "shows": ["..."]}],
+                       "fit": "pad"}
+
+  `at_s` is seconds from the beat's start; the first step is at 0 and each one after the
+  step before. `action` is appear, tap, scroll, swipe, type, result or hold; a tap, a
+  scroll, a swipe and typing name their `target`. `shows` lists every in-app string the
+  screen shows at that step, within the screen's **In-app text** rule: what the app really
+  shows for this post (the subject's own name and data), never a new label, button or
+  line. Give each step time to be read (about 3 words a second), and the result the
+  longest. The hero string (`hero_strings`, when the viewer must read) is one of the
+  strings of a step. `fit` pad (the default) keeps the whole phone screen at the frame's
+  height; crop fills the width. `video_plan.py check` refuses a screen that
+  PRODUCT-SCREENS.md does not describe, a library screen, a missing reason, an empty
+  step, a tap without its target, and a hero string the story does not show.
 - **The name**: count the lines that say it; `speech_count` and `name_locations` agree with
   the words. The first beat does not name the app unless product timing is `opening`.
 - **Numbers and claims** carry `fact_refs` to the brief's facts, or come from the real screen.
