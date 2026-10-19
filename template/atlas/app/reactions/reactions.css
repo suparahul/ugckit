@@ -69,3 +69,24 @@
 }
 .rx-entry__detail .post__section { margin-top: 18px; }
 .rx-entry__detail .post__section .eyebrow { margin: 0 0 6px; }
+
+/* The reaction card of a video's plan (components/reactions/ReactionCardView): stage 1, stage 2 and the timeline. */
+.rxc { margin: 10px 0; padding: 10px; border: 1px solid var(--rule-2); border-radius: 6px; background: var(--paper-hi); display: grid; grid-template-columns: minmax(140px, 220px) minmax(0, 1fr); gap: 12px; }
+.rxc__label { grid-column: 1 / -1; margin: 0; font: 600 0.72rem var(--sans); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ember-deep); }
+.rxc__media { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.rxc__player { width: 100%; max-height: 320px; display: block; background: #171612; border-radius: 3px; }
+.rxc__sheet { width: 100%; height: auto; display: block; border: 1px solid var(--rule); border-radius: 3px; }
+.rxc__body { min-width: 0; display: flex; flex-direction: column; gap: 5px; font: 400 0.86rem var(--sans); color: var(--ink); }
+.rxc__body p { margin: 0; }
+.rxc__head a, .rxc__links a, .rxc__hint a { color: var(--ink); text-decoration: underline; }
+.rxc__tags, .rxc__fit, .rxc__text, .rxc__hint, .rxc__none { color: var(--ink-2); }
+.rxc__more summary { cursor: pointer; color: var(--ink-2); }
+.rxc--compact { grid-template-columns: minmax(0, 1fr); padding: 8px; margin: 0; }
+.rxc--compact .rxc__player { max-height: 220px; }
+.rxc--compact .rxc__sheet { display: none; }
+.rxc--compact .rxc__body { font-size: 0.8rem; }
+@media (max-width: 600px) { .rxc { grid-template-columns: minmax(0, 1fr); } }
+.rxc__sheet { max-height: 240px; object-fit: cover; object-position: top; }
+.rxc--compact { margin-top: 8px; grid-template-columns: minmax(96px, 140px) minmax(0, 1fr); }
+.rxc--compact .rxc__label { grid-column: 1 / -1; }
+.vst__slot a.rx-btn, .rxc a.rx-btn { display: inline-block; color: var(--paper-hi); text-decoration: none; }

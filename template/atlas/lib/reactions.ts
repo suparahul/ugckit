@@ -371,3 +371,108 @@ export function entriesOfPost(platform: string, postId: string): { id: string; s
     .filter((e) => e.source.platform === platform && e.source.post_id === postId)
     .map((e) => ({ id: e.id, start: e.start_s, end: e.end_s, status: e.status }));
 }
+
+/* ------------------------------------------------------- the reaction card */
+
+/** One reaction as the stage panels and the timeline show it: a library entry, or a plan's reference with no entry. */
+export type ReactionCard = {
+  /** The library entry, or null for a reference that is not in the library. */
+  entryId: string | null;
+  status: Entry["status"] | null;
+  handle: string;
+  start: number;
+  end: number;
+  /** The post's video, served (/media/…); the card plays start–end of it in a loop. */
+  video: string | null;
+  /** The entry's preview sheet, or a sheet or the cover in the post's folder. */
+  preview: string | null;
+  tags: string[];
+  beats: { start_s: number; end_s: number; face: string; eyes: string; head: string }[];
+  burnedIn: string[];
+  faceReplace: Fit | null;
+  written: Fit | null;
+  /** generation_input of the plan's reaction_refs item, when the card comes from a plan. */
+  planRoute: string | null;
+  /** The post in the Atlas, and the post on its platform. */
+  postHref: string | null;
+  url: string | null;
+  /** For a reference with no library_id: an entry of the same post, if the library has one. */
+  sameIn: string | null;
+};
+
+/** Where a post is in the Atlas: a niche batch post has its niche page; a research post has /post/<id>. */
+export function atlasPostHref(dir: string, platform: string, id: string): string | null {
+  const m = dir.match(/^apps\/([^/]+)\/niche\/batches\//);
+  if (m) return `/app/${encodeURIComponent(m[1])}/niche/post/${platform}/${encodeURIComponent(id)}`;
+  return dir.startsWith("research/") ? `/post/${encodeURIComponent(id)}` : null;
+}
+
+const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+const text = (v: unknown): string | null => (typeof v === "string" && v.trim() && !/^<.*>$/.test(v.trim()) ? v : null);
+
+export function cardOfEntry(e: Entry): ReactionCard {
+  const s = e.source;
+  return {
+    entryId: e.id, status: e.status, handle: s.handle, start: e.start_s, end: e.end_s, video: mediaUrl(s.video),
+    preview: e.preview ? `/api/reactions/preview/${e.id}` : null, tags: e.tags ?? [], beats: e.expression_beats ?? [],
+    burnedIn: (e.burned_in_text ?? []).map((b) => `“${b.text}”${b.where ? `, ${b.where}` : ""}`),
+    faceReplace: e.fit?.face_replace ?? null, written: e.fit?.written ?? null, planRoute: null,
+    postHref: atlasPostHref(s.post_dir, s.platform, s.post_id), url: s.url, sameIn: null,
+  };
+}
+
+/** A picture of the post already on disk: a contact sheet, else the cover. */
+function postPicture(dir: string): string | null {
+  if (!servedPostPath(dir)) return null;
+  for (const f of ["sheet-1.jpg", "sheet_01.png", "sheet_01.jpg", "sheet-1.png", "cover.jpg", "cover.png", "thumbnail.jpg"]) {
+    if (existsSync(join(ROOT, dir, f))) return mediaUrl(`${dir}/${f}`);
+  }
+  return null;
+}
+
+/**
+ * The card of a brief's reaction_reference or a plan's reaction_refs item. With a
+ * library_id the library entry gives it (the reference's range when the plan has
+ * library_differs); else the reference's own fields, the post's video and a picture from
+ * its folder. `beats` are the plan's expression beats for it, when the caller has them.
+ */
+export function reactionCardOf(r: any, beats: ReactionCard["beats"] = [], lib: Library = readLibrary()): ReactionCard | null {
+  if (!r || typeof r !== "object") return null;
+  const e = validEntryId(r.library_id) ? lib.entries[r.library_id] : undefined;
+  const route = text(r.generation_input);
+  if (e) {
+    const c = cardOfEntry(e);
+    const s = num(r.start_s), z = num(r.end_s);
+    return { ...c, planRoute: route, ...(r.library_differs && s !== null && z !== null ? { start: s, end: z } : {}) };
+  }
+  const dir = String(r.post_dir ?? "");
+  const video = text(r.video) ?? text(r.video_path);
+  const platform = String(r.platform ?? "tiktok");
+  const postId = String(r.post_id ?? "");
+  const start = num(r.start_s) ?? 0;
+  const end = num(r.end_s) ?? start;
+  const same = Object.values(lib.entries).find((x) => x.source.platform === platform && x.source.post_id === postId && x.start_s < end && x.end_s > start);
+  const bt = text(r.burned_in_text);
+  return {
+    entryId: null, status: null, handle: String(r.handle ?? "?"), start, end, video: video ? mediaUrl(video) : null,
+    preview: dir ? postPicture(dir) : null, tags: same?.tags ?? [], beats, burnedIn: bt ? [bt] : [],
+    faceReplace: same?.fit?.face_replace ?? null, written: same?.fit?.written ?? null, planRoute: route,
+    postHref: dir && postId ? atlasPostHref(dir, platform, postId) : null,
+    url: postId && r.handle ? `https://www.tiktok.com/@${String(r.handle).replace(/^@/, "")}/video/${postId}` : null, sameIn: same?.id ?? null,
+  };
+}
+
+/** A plan's expression beats for one reference (beats[].reaction with that ref_id), timed from the reference's start (ref_s). */
+export function planBeatsOf(plan: any, refId: string, refStart: number): ReactionCard["beats"] {
+  const out: ReactionCard["beats"] = [];
+  for (const b of plan?.beats ?? []) {
+    if (b?.reaction?.ref_id !== refId) continue;
+    for (const x of b.reaction.expression_beats ?? []) {
+      const at = Array.isArray(x?.ref_s) ? x.ref_s.map((t: unknown) => (num(t) === null ? null : (t as number) - refStart)) : [num(x?.start_s), num(x?.end_s)];
+      const [s, z] = [at[0] === null ? null : Math.round(at[0] * 100) / 100, at[1] === null ? null : Math.round(at[1] * 100) / 100];
+      if (s === null || z === null) continue;
+      out.push({ start_s: s, end_s: z, face: String(x.face ?? ""), eyes: String(x.eyes ?? ""), head: String(x.head ?? "") });
+    }
+  }
+  return out;
+}

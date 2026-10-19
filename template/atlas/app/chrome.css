@@ -375,7 +375,9 @@ body {
 .pbar__app a { color: var(--ink-3); }
 .pbar__app a:hover { color: var(--ember-deep); }
 .pbar__app b { font-weight: 600; color: var(--ink); }
-.pbar__links { display: flex; gap: 14px; }
+/* The sections wrap under the wordmark when the bar is too narrow, so every one (Reactions too) stays in view on every page. */
+.pbar { flex-wrap: wrap; row-gap: 6px; }
+.pbar__links { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-left: auto; min-width: 0; }
 .pbar__links a { font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; }
 .pbar__links a:hover { color: var(--ember-deep); }
 @media (max-width: 600px) {

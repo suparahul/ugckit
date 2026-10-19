@@ -23,6 +23,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { mediaUrl } from "./media-paths.ts";
+import { planBeatsOf, reactionCardOf, type ReactionCard } from "./reactions.ts";
 import type { PointState } from "./production.ts";
 import { APPS_DIR, ROOT } from "./root.ts";
 import type { Production, Segment } from "./video-production.ts";
@@ -210,6 +211,8 @@ export type Checkpoint = {
   earlier: Picture[];
   /** Why there is no picture, in words. */
   noPicture: string | null;
+  /** The reaction of a beat with a reaction reference, as its card (lib/reactions.ts). */
+  reaction: ReactionCard | null;
 };
 export type Timeline = { length: number; checkpoints: Checkpoint[]; player: { url: string; label: string } | null; source: "plan.json" | "plan.draft.json" | null };
 
@@ -309,7 +312,8 @@ export function timeline({ plan, source, production: p, final }: TimelineInput):
       : seg && (seg.type === "R" || seg.type === "P") ? "no picture yet: the screen recording is laid in at assembly"
       : seg?.type === "C" || (b.source_asset_ids ?? []).length ? "no picture: the supplied file is not on disk or not served"
       : "no picture: text only, or nothing on disk yet";
-    return { id, start, end, range: rangeOf(start, end), role: b.role && !/^<.*>$/.test(b.role) ? String(b.role) : null, segment: seg?.name ?? null, sees, text, sound, app, picture: pics[0] ?? null, earlier: pics.slice(1), noPicture };
+    return { id, start, end, range: rangeOf(start, end), role: b.role && !/^<.*>$/.test(b.role) ? String(b.role) : null, segment: seg?.name ?? null, sees, text, sound, app, picture: pics[0] ?? null, earlier: pics.slice(1), noPicture,
+      reaction: ref ? reactionCardOf(ref, planBeatsOf(plan, String(ref.id), num(ref.start_s) ?? 0)) : null };
   });
 
   /* Gate C and after: the whole strip plays the cut. */

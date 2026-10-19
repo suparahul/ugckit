@@ -25,6 +25,7 @@ import type { PlanRow, PointState } from "./production.ts";
 import type { Production } from "./video-production.ts";
 import type { Ready, StagesView, Timeline } from "./video-stages.ts";
 import { mediaUrl } from "./media-paths.ts";
+import { planBeatsOf, reactionCardOf, type ReactionCard } from "./reactions.ts";
 import { appDir, CHARACTER_DIR } from "./root.ts";
 
 /** A video id: lowercase, digits and hyphens (video-plan's rule). Anything else never reaches a path. */
@@ -58,7 +59,8 @@ export type BriefSummary = {
   assets: { id: string; what: string | null; status: string | null }[];
   /** Founder first. */
   missing: { what: string; owner: string | null; blocks: string | null }[];
-  reaction: { post: string | null; handle: string | null; start: number | null; end: number | null; burnedInText: string | null; url: string | null } | null;
+  /** The brief's reaction_reference; card: the library entry it names (library_id), else the reference itself (lib/reactions.ts). */
+  reaction: { post: string | null; handle: string | null; start: number | null; end: number | null; burnedInText: string | null; url: string | null; libraryId: string | null; card: ReactionCard | null } | null;
   limitations: string[];
 };
 
@@ -153,12 +155,13 @@ function segmentsOf(vd: string): { name: string; beatIds: string[]; prompt: stri
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() && !/^<.*>$/.test(v.trim()) ? v : null);
 const KEY_SLOTS = new Set(["recipe_id", "cast_kind", "narrator_ref", "hook_channel", "hook_job"]);
 
-/** Stage 1: the brief in a few lists, from brief.json (video-plan). */
-export function briefSummaryOf(b: any): BriefSummary | null {
+/** Stage 1: the brief in a few lists, from brief.json (video-plan); plan (the draft or the locked plan) gives the reaction's expression beats. */
+export function briefSummaryOf(b: any, plan: any = null): BriefSummary | null {
   if (!b || typeof b !== "object" || b.manual_display_entry) return null;
   const rr = b.reaction_reference;
   const rv = rr ? str(rr.video) ?? str(rr.video_path) : null;
   const owner = (m: any) => (m.owner === "founder" ? 0 : 1);
+  const pref = rr ? (plan?.reaction_refs ?? []).find((x: any) => x && (x.library_id && x.library_id === rr.library_id || x.post_id === rr.post_id)) : null;
   return {
     idea: str(b.idea), viewerMoment: str(b.viewer_moment), topic: str(b.topic),
     hooks: (b.hook_alternatives ?? []).map((h: any) => ({ id: String(h.id ?? ""), text: String(h.text ?? ""), note: str(h.note), selected: h.id === b.selected_hook })),
@@ -167,7 +170,7 @@ export function briefSummaryOf(b: any): BriefSummary | null {
     screens: (b.screens_needed ?? []).map((s: any) => ({ id: String(s.screen_id ?? s.id ?? ""), job: str(s.job), status: str(s.status) })),
     assets: (b.assets_needed ?? []).map((a: any) => ({ id: String(a.id ?? ""), what: str(a.what), status: str(a.status) ?? (a.path ? "present" : "missing") })),
     missing: [...(b.missing_inputs ?? [])].sort((x, y) => owner(x) - owner(y)).map((m: any) => ({ what: String(m.what ?? m.id ?? ""), owner: m.owner ?? null, blocks: m.blocks ?? null })),
-    reaction: rr ? { post: rr.post_id ?? null, handle: rr.handle ?? null, start: num(rr.start_s), end: num(rr.end_s), burnedInText: str(rr.burned_in_text), url: rv ? mediaUrl(rv) : null } : null,
+    reaction: rr ? { post: rr.post_id ?? null, handle: rr.handle ?? null, start: num(rr.start_s), end: num(rr.end_s), burnedInText: str(rr.burned_in_text), url: rv ? mediaUrl(rv) : null, libraryId: str(rr.library_id), card: reactionCardOf(rr, pref ? planBeatsOf(plan, String(pref.id), num(pref.start_s) ?? 0) : []) } : null,
     limitations: (b.limitations ?? []).map(String),
   };
 }
@@ -206,7 +209,7 @@ export function readVideo(row: Pick<PlanRow, "slug" | "key" | "handle" | "date">
   return {
     id,
     brief: !!briefJ,
-    briefSummary: briefSummaryOf(briefJ),
+    briefSummary: briefSummaryOf(briefJ, planJ ?? draftJ),
     manual,
     draft: draftJ ? { revision: Number(draftJ.revision ?? 0) } : null,
     ready: readyOf(pd, head?.digest ?? null),

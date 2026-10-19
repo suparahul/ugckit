@@ -15,6 +15,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 
+import { ReactionCardView } from "@/components/reactions/ReactionCardView";
 import type { Checkpoint, Picture, Timeline as TL } from "@/lib/video-stages";
 
 /* A checkpoint is as tall as its length, and never too short to read. */
@@ -57,6 +58,8 @@ function Point({ c, open, href, onTime }: { c: Checkpoint; open: boolean; href: 
           <div><dt>app</dt><dd>{c.app}</dd></div>
         </dl>
       </div>
+      {/* The reaction checkpoint: the reaction itself, under the stage's picture, the width of the strip. */}
+      {c.reaction ? <ReactionCardView c={c.reaction} label={c.reaction.entryId ? "The reaction · from the library" : "The reaction · not from the library"} compact /> : null}
     </li>
   );
 }

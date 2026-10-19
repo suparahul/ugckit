@@ -21,6 +21,33 @@ const TAGS = ["surprise", "regret", "shock"];
 const src = rx.sourceOf("research/demo/brand/some.handle/7600000000000000001/video.mp4", "- URL: https://www.tiktok.com/@some.handle/video/7600000000000000001\n- Views: 1,234\n- Posted: 2026-04-08\n", null);
 const described = (e: ReturnType<typeof rx.newEntry>) => ({ ...e, speech: "none" as const, framing: { people: 1, cuts: 0, face_hidden_s: 0 }, expression_beats: [{ start_s: 0, end_s: 1, face: "brows up", eyes: "at the phone", head: "back" }] });
 
+test("the reaction card: a library entry by library_id, else the reference, the post's picture and the plan's beats", () => {
+  const e = { ...described(rx.newEntry(src, 0.5, 2.5, ["regret"], "", AT)), id: "rx-tiktok-7600000000000000001-5", preview: "library/reactions/previews/x.jpg" };
+  const lib = { version: 1 as const, entries: { [e.id]: { ...e, fit: rx.computeFit({ ...e, length_s: 2 }) } } };
+  const fromLib = rx.reactionCardOf({ library_id: e.id, generation_input: "face_replace" }, [], lib)!;
+  assert.equal(fromLib.entryId, e.id);
+  assert.equal(fromLib.preview, `/api/reactions/preview/${e.id}`);
+  assert.equal(fromLib.video, "/media/demo/brand/some.handle/7600000000000000001/video.mp4");
+  assert.deepEqual([fromLib.start, fromLib.end, fromLib.planRoute, fromLib.faceReplace?.ok], [0.5, 2.5, "face_replace", true]);
+  assert.equal(fromLib.postHref, "/post/7600000000000000001");
+  const differs = rx.reactionCardOf({ library_id: e.id, library_differs: "a shorter range", start_s: 1, end_s: 2 }, [], lib)!;
+  assert.deepEqual([differs.start, differs.end], [1, 2]);
+
+  const dir = "research/demo/brand/some.handle/7600000000000000001";
+  mkdirSync(join(WS, dir), { recursive: true });
+  writeFileSync(join(WS, dir, "sheet_01.png"), "png");
+  const plan = { reaction_refs: [{ id: "rx1", start_s: 1 }], beats: [{ id: "b1", reaction: { ref_id: "rx1", expression_beats: [{ start_s: 0, end_s: 0.5, ref_s: [1, 1.5], face: "mouth open", eyes: "wide", head: "back" }] } }] };
+  const beats = rx.planBeatsOf(plan, "rx1", 1);
+  assert.deepEqual(beats.map((b) => [b.start_s, b.end_s]), [[0, 0.5]]);
+  const ref = rx.reactionCardOf({ post_id: "7600000000000000001", platform: "tiktok", handle: "@some.handle", post_dir: dir, video: `${dir}/video.mp4`, start_s: 1, end_s: 2, burned_in_text: "\"NOW?\", top" }, beats, lib)!;
+  assert.equal(ref.entryId, null);
+  assert.equal(ref.sameIn, e.id, "the library has the same post over the range");
+  assert.equal(ref.preview, `/media/${dir.slice("research/".length)}/sheet_01.png`);
+  assert.deepEqual(ref.burnedIn, ['"NOW?", top']);
+  assert.equal(ref.beats.length, 1);
+  assert.equal(rx.reactionCardOf(null), null);
+});
+
 test("sourceOf reads the post folder and its notes", () => {
   assert.equal(src.post_id, "7600000000000000001");
   assert.equal(src.handle, "@some.handle");

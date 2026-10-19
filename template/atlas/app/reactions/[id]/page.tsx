@@ -9,7 +9,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 
-import { fitWord, mediaUrl, planningVideos, readLibrary, readTags, usesOf, validEntryId } from "@/lib/reactions";
+import { atlasPostHref, fitWord, mediaUrl, planningVideos, readLibrary, readTags, usesOf, validEntryId } from "@/lib/reactions";
 import { EntryEditor } from "@/components/reactions/EntryEditor";
 import "@/app/post/[id]/post.css";
 import "../reactions.css";
@@ -28,13 +28,6 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return { title: e ? `${e.source.handle} · ${e.start_s}–${e.end_s} s — Reactions` : "Not found" };
 }
 
-/** Where the post is in the Atlas: a niche batch post has its niche page; a research post has /post/<id>. */
-function atlasPost(dir: string, platform: string, id: string): string | null {
-  const m = dir.match(/^apps\/([^/]+)\/niche\/batches\//);
-  if (m) return `/app/${encodeURIComponent(m[1])}/niche/post/${platform}/${encodeURIComponent(id)}`;
-  return dir.startsWith("research/") ? `/post/${encodeURIComponent(id)}` : null;
-}
-
 export default async function ReactionPage({ params }: { params: Params }) {
   const { id } = await params;
   const e = load(id);
@@ -43,7 +36,7 @@ export default async function ReactionPage({ params }: { params: Params }) {
   const videos = planningVideos();
   const picked = Object.fromEntries(videos.map((v) => [`${v.app}/${v.video}`, v.picked]));
   const s = e.source;
-  const post = atlasPost(s.post_dir, s.platform, s.post_id);
+  const post = atlasPostHref(s.post_dir, s.platform, s.post_id);
   const fr = e.framing ?? {};
 
   return (
