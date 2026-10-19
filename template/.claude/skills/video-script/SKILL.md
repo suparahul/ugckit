@@ -58,7 +58,7 @@ fields. Production's check is `scripts/character/bridge.py`; the schema, when sh
       "overlays": [{"id", "role", "text", "start_s", "end_s", "placement", "panel_id", "fact_refs"}],
       "reaction_refs": [{"id": "rx1", "post_id", "platform", "handle", "post_dir", "video_path",
                          "video_sha256": null, "start_s", "end_s", "notes_ref",
-                         "generation_input": "face_replace", "burned_in_text": null,
+                         "generation_input": "motion_copy", "burned_in_text": null,
                          "library_id": null, "library_differs": null,
                          "permission_ref": null}],   (permission_ref optional; never required)
       "assets": [{"id", "kind", "origin", "path", "sha256", "source_url", "permission_ref",
@@ -103,20 +103,21 @@ reports every one.
   copies one stretch of it (`ref_s`, in the post's time) into video time; together they
   cover the beat. Describe movement and expression only, never the reference creator's
   face, hair, clothes or room: the face is the handle's character. `reaction_refs` records
-  the post. `generation_input` is `"face_replace"` (founder, 2026-10-04): production gives
-  the clip range to the video model, which replaces the face; the expression beats are the
-  fallback (`"none"`) and the gate-B checklist. A face-replace beat lasts exactly
-  `end_s - start_s`, has `set_id` null (the room and clothes are the clip's), and its
-  `framing`, `camera_distance` and `camera` describe the clip as it is. With no reference, `reaction` is null and `ready` blocks the lock.
+  the post. `generation_input` is always `"motion_copy"` (founder, 2026-10-19): production
+  gives the clip range to the video model with the character's approved first frame, and
+  the clip gives the motion and the timing. The expression beats are the gate-B checklist.
+  A motion-copy beat lasts exactly `end_s - start_s`, has `set_id` null (its first frame is
+  made from the clip's), and its `framing`, `camera_distance` and `camera` describe the clip
+  as it is. A visible face is not needed. Never write `"written"`: only the user names that
+  fallback, after a failed motion take, with their words in `written_reason`. With no reference, `reaction` is null and `ready` blocks the lock.
 - **A reference from the reaction library** (the brief's `reaction_reference.library_id`):
   copy the entry (`library/reactions/reactions.json`) into `reaction_refs` with the same
   `library_id`, post, range and `video_sha256`; `library_differs` only when the brief has
   it. Its `expression_beats` are already timed from the range's start: each becomes a
   beat's expression beat with `ref_s` = [entry `start_s` + its `start_s`, entry `start_s` +
   its `end_s`], and its face, eyes and head as written; check them against the preview
-  sheet. `generation_input` is `"face_replace"` when the entry's `fit.face_replace.ok` is
-  true; else `"none"` (the written route), and REVIEW.md says why in one line (the fit's
-  reason). An entry with no expression beats yet: watch the range and write them, then
+  sheet. `generation_input` is `"motion_copy"`, the same as for every reference. An entry
+  with no expression beats yet: watch the range and write them, then
   `reactions.py describe` the entry with the same beats.
 - **Full-screen app beats** are framing `app_screen`.
 - **Cast and world**: the exact fixed subjects of each beat, by id; one set and one outfit

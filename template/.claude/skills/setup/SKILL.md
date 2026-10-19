@@ -239,9 +239,9 @@ templates in their workspace; running setup again must create nothing that exist
    `ugc-character` template keeps it: create only the versions that are missing by
    name, and never a second template. There is no model question here: activate the
    version marked `"activate": true` only when the template has no active version; an
-   active version is the user's choice and stays. The face-replace templates in the
+   active version is the user's choice and stays. The motion-copy templates in the
    same file (`"required": false`) are not created here: `ugc-character-face-kling-motion`
-   (the default route) is created at the first face-replace reaction, and the others only
+   (the default route) is created at the first motion-copy reaction, and the others only
    when a shot names their route. Each is created with its version from `templates.json`,
    and that version is activated.
 

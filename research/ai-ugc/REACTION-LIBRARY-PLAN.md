@@ -8,6 +8,16 @@ A reaction hook takes its performance from one entry. The rules stay as they are
 decisions, 2026-10-03 and 2026-10-04): a reaction hook is never spoken, it is performed from
 a real reference and never invented, and face replace is the default route.
 
+> **Change, 2026-10-19 (founder):** every reaction shot is a **motion copy**: the character's
+> approved first frame (made from the hero and the clip's first frame) is moved by the
+> reference clip (Kling 3.0 Pro Motion Control). Nothing replaces a face, and a visible face
+> is not required. The name "face replace" is retired; the data names are `motion_copy`
+> (`generation_input`, the shot block, `models.json`), the kinds `motion_clip` and
+> `pose_frame`, and `bridge.motion_copy`, and the scripts still read the old names. The
+> written route is only a fallback the user names after a failed motion take. The route
+> **fit is removed** from the library: no `fit` field, no `--fit` filter, no fit on the cards.
+> Where the text below says face replace or fit, read it in this light.
+
 ## 1. What exists today
 
 Read for this plan: `scripts/planning/video_plan.py` (`reactions`, the brief check of

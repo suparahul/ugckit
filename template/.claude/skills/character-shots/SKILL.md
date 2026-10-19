@@ -67,36 +67,34 @@ Mark the cut points on the frozen script first, then give each segment its lines
   narration is laid at assembly (`audio_from`). **Never the app**: a beat that shows the
   app is O, G, S, H, F, R or P.
 - **X, a silent reaction** (v2, a beat with `reaction`; founder, 2026-10-03: a reaction
-  hook is never spoken): the handle's approved generated face reacts, framing_kind
-  `face`, with no line, no `audio_from`, no voice reference and no lip sync; the hook is
-  the plan's timed text overlay over it. One reaction beat per X segment. The shot
-  copies the beat's `reaction` exactly. The prompt's PERFORMANCE writes each expression
-  beat's face, eyes and head word for word, with its time from the segment's start ("At
-  0.8 s, ..."), and says "No lip sync" and "She does not speak". The reference reaction
-  (`reaction_refs`) gives the performance only: never name its post, its creator or its
-  file in the prompt, and never attach the clip or a frame of it to a keyframe or a
-  generation; the face stays the handle's own. A beat with `reaction: null` has no
-  reference yet: stop and send it back to planning. This is the written route, used
-  when the reference's `generation_input` is `none`.
-- **X in face-replace mode** (the reference's `generation_input` is `face_replace`): the
-  reference clip drives the motion and timing, and the face is the character's. The beat
+  hook is never spoken): the handle's approved character reacts, with no line, no
+  `audio_from`, no voice reference and no lip sync; the hook is the plan's timed text
+  overlay over it. One reaction beat per X segment. The shot copies the beat's `reaction`
+  exactly. A beat with `reaction: null` has no reference yet: stop and send it back to
+  planning.
+- **Every X with a reference is a motion copy** (founder, 2026-10-19; the reference's
+  `generation_input` is `motion_copy`, or `face_replace` in a plan from before 2026-10-19): the
+  character's approved first frame is moved by the reference clip, which gives the motion
+  and the timing. A visible face is not needed: `framing_kind` is the clip's. The beat
   lasts the clip's range and has no set. Look at the range for burned-in text (the
   reference's `burned_in_text`, a handle, a watermark, a caption) and write
-  `face_replace` in the shot: `{ref_id, route, clip: "segments/<nn>-x/source/reference.mp4",
+  `motion_copy` in the shot: `{ref_id, route, clip: "segments/<nn>-x/source/reference.mp4",
   range_s, masks: [{rect, how, text, behind}]}`; a mask is `crop` at an edge, else `blur`
   or `box`, and a `blur` or `box` mask says in `behind` what the band hides ("the chin,
   the neck and the top of the shirt"). Then run
   `scripts/character/shots.py reference <video> <nn>-x`: it checks the post against its
   checksum, cuts the range, and writes the clip's first frame, `source/first-frame.png`.
   `trim_to_seconds` is the clip's length; `duration_seconds` is null. Never attach the
-  research file itself.
+  research file itself. A shot from before 2026-10-19 says `face_replace` and the kinds
+  `motion_clip` and `pose_frame`; the scripts read them as `motion_copy`,
+  `motion_clip` and `pose_frame`. Do not rewrite an old shot only to rename it.
 
-  **The route is `motion`** (`models.json` `face_replace.default_route`, the founder's
+  **The route is `motion`** (`models.json` `motion_copy.default_route`, the founder's
   final decision after the paid tests): Kling 3.0 Pro Motion Control on Supagen. Write
   `"route": "motion"` (a shot that names no route takes it). Two steps:
   1. **The character's first frame** is the shot's keyframe (`keyframes/<nn>-x.png`),
      made by Codex like any keyframe, from the hero (kind `hero`) and the pose picture
-     `segments/<nn>-x/source/first-frame.png` (kind `face_replace_frame`). Kling takes
+     `segments/<nn>-x/source/first-frame.png` (kind `pose_frame`). Kling takes
      the room, the light and the camera of this picture, so copy the clip's first frame:
      its room and light, the camera height and angle, the clothes, the pose mid-motion and
      the mouth as it starts. A cropped portrait (a front anchor as it is) gave a still
@@ -106,7 +104,7 @@ Mark the cut points on the frozen script first, then give each segment its lines
      name), and pastes, word for word, the band sentence of every `blur` or `box` mask
      (`bridge.band_sentence(masks, "picture")`): no band in the still. The user approves
      this still at gate A, and its checksum goes into `approval.json` (step 6).
-  2. **The motion**: the generation references are the clip (kind `face_replace_clip`)
+  2. **The motion**: the generation references are the clip (kind `motion_clip`)
      and the keyframe (kind `keyframe`), in that order, nothing else. `shots.py reference`
      writes the ORIGINAL clip (no mask; Kling removes the text), held on its last frame to
      3.0 s (Kling takes 3 s or more; the take is trimmed to the range at assembly).
@@ -117,7 +115,7 @@ Mark the cut points on the frozen script first, then give each segment its lines
 
   **The backup is `replace`** (Wan 2.2 Animate, replace mode, on Supagen), only when the
   user names it after a failed motion take. Its generation references are the clip (kind
-  `face_replace_clip`), then one picture of the character's face (kind `hero` or
+  `motion_clip`), then one picture of the character's face (kind `hero` or
   `anchor`, the one that shows the face and hair most clearly), nothing else. `shots.py
   reference` writes the original clip, unpadded and unmasked (the masks stay in the shot
   as a record of the text). No keyframe, no `keyframe_prompt`, no `prompt.txt`. In the paid
@@ -127,7 +125,15 @@ Mark the cut points on the frozen script first, then give each segment its lines
   out on Supagen; `guided` (MiniMax H3 reference-to-video, a new clip guided by the masked
   clip, `duration_seconds` 5, trimmed to the clip) is untested. `edit` (Wan 2.7 Edit Video)
   is **retired**: it kept the reference person's face in every frame, and `shots.py
-  validate` and `generate.sh` refuse it. A face-replace X neither continues a clip nor is
+  validate` and `generate.sh` refuse it.
+
+  **The written fallback** (`generation_input` `written`) only when the user names it
+  after a failed motion take, with their words in the plan's `written_reason`; never
+  choose it yourself. There is no clip and no `motion_copy` block: framing_kind `face`,
+  and the prompt's PERFORMANCE writes each expression beat's face, eyes and head word for
+  word, with its time from the segment's start ("At 0.8 s, ..."), and says "No lip sync"
+  and "She does not speak". The reference gives the performance only: never name its
+  post, its creator or its file in the prompt, and never attach the clip or a frame of it. A motion-copy X neither continues a clip nor is
   continued (`continuity.py`). The failures of each model are in
   `docs/character-model-known.md`.
 - **A full-screen app beat** has framing `app_screen`: it is R or P, never generated.
@@ -151,7 +157,7 @@ Mark the cut points on the frozen script first, then give each segment its lines
   not list a `neighbour-frame` yourself: `shots.py refs` puts the frame in the keyframe's
   place, first. Write the shot's keyframe as usual: it is the storyboard's picture of the
   opening, and the generation does not carry it. Both clips are T, B or X by the written
-  route (never a phone plate, C, M, R, P or a face-replace X), in one set, with the same
+  fallback (never a phone plate, C, M, R, P or a motion-copy X), in one set, with the same
   `punch_in`, and the continuing one has no `trim` in `video.json` (`trim_to_seconds`
   sets its end). The cut of the first clip is fixed when its frame is taken: set its
   `trim` or `trim_to_seconds` before gate B; a talking clip that is continued is not
@@ -346,7 +352,7 @@ step 4 makes only those again (`keyframes.sh --only <nn>-<type>`). By word, the 
 On approval, write `approval.json` from `approval.example.json`: `gate_a_storyboard` with
 each check you made (true or false), `prompt_lint` true, `decision` `approve`, and the
 user's words quoted with the date. Copy the words into each shot's `keyframe_approved`.
-For a face-replace X on the motion or animate route, `gate_a_storyboard.keyframes_sha256`
+For a motion-copy X on the motion or animate route, `gate_a_storyboard.keyframes_sha256`
 must hold `{"<nn>-x": "<sha256 of keyframes/<nn>-x.png>"}`: `generate.sh` runs only the
 keyframe the user approved, byte for byte. `review.py storyboard` writes it for every
 keyframe.

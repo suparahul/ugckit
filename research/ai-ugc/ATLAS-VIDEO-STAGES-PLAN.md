@@ -3,6 +3,15 @@
 Status: **built 2026-10-19** on branch `atlas-niche-video-player`, in the order of § 10
 (§ 11 says what was built and what is still open). Nothing spent, no paid API called.
 
+> **Change, 2026-10-19 (founder):** every reaction shot is a **motion copy**: the character's
+> approved first frame (made from the hero and the clip's first frame) is moved by the
+> reference clip (Kling 3.0 Pro Motion Control). Nothing replaces a face, and a visible face
+> is not required. The name "face replace" is retired; the data names are `motion_copy`
+> (`generation_input`, the shot block, `models.json`), the kinds `motion_clip` and
+> `pose_frame`, and `bridge.motion_copy`, and the scripts still read the old names. The
+> written route is only a fallback the user names after a failed motion take.
+> Where the text below says face replace, read motion copy.
+
 The goal: at each stage of the character video pipeline, the user studies what the stage
 made, approves it (or rejects it with a note), and the video moves on to the next stage. One
 stage model and one set of screens for every video type. A type changes only which segments

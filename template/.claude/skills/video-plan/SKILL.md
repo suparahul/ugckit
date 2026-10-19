@@ -123,7 +123,7 @@ Lowercase, digits and hyphens. It is the folder name here and under `pipeline/ch
   2. **The reaction library.** Run `video_plan.py reactions <slug> --job <hook job>` (add
      `--grep` with the hook's words). It lists `library/reactions/reactions.json` first:
      `kept` entries (the user kept them), then `proposed` ones (an agent added them), with
-     the length, the tags, the expression beats and whether face replace fits. Open the
+     the length, the tags and the expression beats. Open the
      preview sheet of the best ones and play the range.
   3. **The research.** The same command then lists downloaded posts in
      `research/<project>/…/<post>/` and `apps/<slug>/niche/batches/<date>/<handle>/<post>/`
@@ -145,11 +145,12 @@ Lowercase, digits and hyphens. It is the folder name here and under `pipeline/ch
   the missing input `{"id": "reaction_reference", "owner": "founder", "blocks": "lock"}`
   says what to download. Never describe a made-up reaction.
 - **The reference gives the performance, never the identity.** The face is the handle's
-  approved character. **Face replace is the default** (founder, 2026-10-04): production
-  gives the exact clip range to the video model, which replaces the face. So the clip's
-  room, clothes, hands and camera are in the video: choose a range that suits the handle,
-  with one person, no speech, and no burned-in text if possible (production crops text at
-  an edge; text mid-frame can only be blurred). Write the visible text and where it is in
+  approved character. **Every reaction is a motion copy** (founder, 2026-10-19): production
+  makes the character's first frame from the hero and the clip's first frame, and the video
+  model moves it with the exact clip range. So the clip's pose, motion, timing and camera
+  are in the video: choose a range that suits the handle, with no speech, and no burned-in
+  text if possible (production crops text at an edge; text mid-frame can only be blurred).
+  A visible face is not needed. Write the visible text and where it is in
   `burned_in_text`, or null. It is not a question to ask.
 - Pin `taxonomy_version` and `catalogue_digest` from `video_plan.py catalogue <slug>`.
 

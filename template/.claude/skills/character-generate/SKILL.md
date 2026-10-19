@@ -57,10 +57,10 @@ notification. Do not poll with sleep.
 - The storyboard approval, the character's `live` status, the reference kinds (never an
   app screen: the app is inserted at P4), and never supplied media (a plan asset or a
   file under `supplied/`), research footage or a reference reaction's post. C, M, R and P
-  are never generated. An X segment (a silent reaction) carries no voice clip. An X segment
-  in face-replace mode runs on its route (the shot's `face_replace.route`; a shot that
-  names none takes `models.json` `face_replace.default_route`), with the route's model and
-  template. The clip is the one video part of the request, before the picture:
+  are never generated. An X segment (a silent reaction) carries no voice clip. Every X segment
+  with a reference is a motion copy and runs on its route (the shot's `motion_copy.route`;
+  a shot that names none takes `models.json` `motion_copy.default_route`), with the route's
+  model and template. The clip is the one video part of the request, before the picture:
   - `motion`, **the default** (the founder's final decision, after the paid tests): Kling
     3.0 Pro Motion Control on Supagen, template `ugc-character-face-kling-motion`. It sends
     `prompt.txt` as the text part, the original clip (`shots.py reference`, padded to 3.0 s
@@ -75,13 +75,13 @@ notification. Do not poll with sleep.
   - `animate` (Wan 2.2 Animate move: it timed out on Supagen) and `guided` (MiniMax H3
     reference-to-video, untested) are fallbacks. `edit` (Wan 2.7 Edit Video) is retired and
     refused: it kept the reference person's face.
-  The route's template must exist in Supagen: at the first face-replace reaction, create
+  The route's template must exist in Supagen: at the first motion-copy reaction, create
   it from `scripts/character/templates.json` with its version and activate that version,
   as the `setup` skill does for `ugc-character` (free; no generation). After the download
   the script runs the identity gate (`identity.py`, with the `.venv` Python) and prints
-  whose face is in the file. `capabilities.json` `bridge.face_replace`
+  whose face is in the file. `capabilities.json` `bridge.motion_copy`
   is true: the founder approved the paid tests. Set it to false to stop every live
-  face-replace run. `REQUEST_ONLY=1` writes the request it would send, with placeholder
+  motion-copy run. `REQUEST_ONLY=1` writes the request it would send, with placeholder
   file ids, and spends nothing.
 - At most `max_reference_images` pictures (4 on the default model); the voice clip does
   not count.

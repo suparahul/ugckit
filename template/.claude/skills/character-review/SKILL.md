@@ -61,14 +61,15 @@ it.** The checklist (the user sees the same list):
   cats as two. The set as planned. No phone and no screen. No mouth moving as if
   speaking. A mascot: its style lock in every second. The face, voice and mouth checks do
   not apply; the hands, the set and the motion do.
-- **X segments** (a silent reaction): the face is the character's (the anchors, every
-  second), the hands are whole, the mouth never forms words and no voice is heard, and
+- **X segments on the written fallback** (a silent reaction the user named after a failed
+  motion take): the face is the character's (the anchors, every second), the hands are whole, the mouth never forms words and no voice is heard, and
   the reaction follows the written expression beats at their times. The face is never
   the reference creator's. `review.py` approves an X only with
   `--check identity=pass --check hands=pass --check silent=pass --check performance=pass`,
   and only when the file is as long as the shot plans (the duration gate).
-- **X segments in face-replace mode**: the motion is the clip's; look at the face. The
-  character's face in every frame; nothing of the original creator's face, hair or marks;
+- **X segments by motion copy** (every X with a reference): the motion is the clip's; look
+  at the person. The character's face wherever a face is in view (a visible face is not
+  needed); nothing of the original creator's face, hair or marks;
   no handle, watermark or caption of the reference (OCR reads the file and refuses any
   text); no band, blur or box left from a mask; no voice. Check the hair, the clothes and
   the room against the approved keyframe (motion route). First the identity gate,
@@ -78,13 +79,14 @@ it.** The checklist (the user sees the same list):
 
   It compares eight frames inside the reaction's range (not the motion route's padding)
   with the character's hero and anchors, and with the same moments of the reference clip
-  (OpenCV YuNet and SFace; 0.363 is "same person"). PASS needs a face in 6 of the 8
-  frames, a median similarity to the character of 0.363 or more, and the face closer to
-  the character than to the clip's person in 75% of the frames. A FAIL is a reject,
+  (OpenCV YuNet and SFace; 0.363 is "same person"). Only the frames that show a face are
+  measured. PASS needs a median similarity to the character of 0.363 or more and the face
+  closer to the character than to the clip's person in 75% of those frames. NO FACE (no
+  frame shows a face) measures nothing: your eye check decides alone. A FAIL is a reject,
   whatever the face looks like at a glance: the retired edit route scored 0.18 to the
   character and 0.90 to the reference. The face models (about 39 MB) are fetched once into
   `scripts/character/face-models/` and checked by sha256. `qc.py` prints the same gate, and
-  `review.py` runs it again and refuses an approval without a PASS. Then `review.py`
+  `review.py` runs it again and refuses an approval on a FAIL (or when it could not run). Then `review.py`
   approves it only with
   `--check identity=pass --check no_source_identity=pass --check silent=pass`. On the
   `motion`, `replace` and `animate` routes the file is within 0.25 s of the clip the model

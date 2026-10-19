@@ -388,9 +388,11 @@ what is missing (`ready`) and writes the lock. Free.
   spoken: a silent face, the hook as text. Its performance is copied from a real reference
   reaction in the workspace's downloaded research (post id and time range, in
   `reaction_refs`); with no reference the plan is blocked. The face stays the handle's
-  approved character. Face replace is the default (founder, 2026-10-04): production
-  gives the exact clip range to the video model, which replaces the face; the written
-  expression beats are the fallback and the review checklist.
+  approved character. Every reaction with a reference is a motion copy (founder,
+  2026-10-19): production gives the exact clip range to the video model with the
+  character's approved first frame, and the clip gives the motion and the timing. A
+  visible face is not needed. The written expression beats are the review checklist; the
+  written route (no clip) is only a fallback the user names after a failed motion take.
 - **No planning state store.** The files say where a video is: a brief, a draft in review, a
   locked plan. Locking never runs `shots.py check` (it starts production state).
 - **The studio carries video ideas.** A `Kind: video` row of `production/PLAN.md` holds the
@@ -448,14 +450,14 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
   only, or an approved mascot; never the app); **C**, supplied media (a clip or a still of
   the plan's assets: never generated, approved at gate B with `review.py source`); **M**,
   panels (split screen, picture in picture); and **X**, a silent reaction (the handle's
-  approved generated face, no voice and no lip sync, performed from the written
-  expression beats of a real reference reaction in `reaction_refs`, under the timed hook
-  overlay; founder, 2026-10-03: a reaction hook is never spoken). A full-screen app beat
-  has framing `app_screen` (R or P). In face-replace mode (founder, 2026-10-04) the
-  reference clip, trimmed to its range with its burned-in text masked (`shots.py
-  reference`), is the motion input of the X generation; research footage is never an
-  input anywhere else. The shot's `face_replace.route` picks the model; a shot that names
-  none takes `models.json` `face_replace.default_route`. **`motion`, the default** (the
+  approved character, no voice and no lip sync, from a real reference reaction in
+  `reaction_refs`, under the timed hook overlay; founder, 2026-10-03: a reaction hook is
+  never spoken). A full-screen app beat has framing `app_screen` (R or P). Every X with a
+  reference is a **motion copy** (founder, 2026-10-19): the reference clip, trimmed to its
+  range with its burned-in text masked (`shots.py reference`), is the motion input of the
+  X generation; research footage is never an input anywhere else. The shot's
+  `motion_copy.route` picks the model; a shot that names none takes `models.json`
+  `motion_copy.default_route`. **`motion`, the default** (the
   founder's final decision after the paid tests): Kling 3.0 Pro Motion Control on Supagen
   (template `ugc-character-face-kling-motion`); the picture is the character's first
   frame, a keyframe made from the hero and the clip's first frame and approved at gate A
@@ -463,8 +465,12 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
   assembly. **`replace`, the backup**: Wan 2.2 Animate replace on Supagen, the original
   clip and one face picture. `animate` (Wan 2.2 Animate move) and `guided` (MiniMax H3)
   are fallbacks; `edit` (Wan 2.7 Edit Video) is retired. Every take passes the identity
-  gate (`identity.py`) before gate B approves it. `capabilities.json`
-  `bridge.face_replace` is true; the written expression beats stay the other route. Production refuses a dry-run planning approval, a
+  gate (`identity.py`: it measures the frames that show a face; a visible face is not
+  needed) before gate B approves it. `capabilities.json` `bridge.motion_copy` is true. The
+  written route (the expression beats, no clip) is only a fallback the user names after a
+  failed motion take (`generation_input` `written`, with `written_reason`). The names before
+  2026-10-19 (`face_replace`, `none`, the kinds `face_replace_clip` and
+  `face_replace_frame`, `bridge.face_replace`) are still read, and never rewritten. Production refuses a dry-run planning approval, a
   number on an overlay without `fact_refs`, and research footage attached to a generation.
   A narrator speaks where no generated face
   talks: the character's approved performance, a supplied voice, or an original synthetic
