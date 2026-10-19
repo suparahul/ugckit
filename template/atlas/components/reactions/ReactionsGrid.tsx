@@ -4,57 +4,67 @@
  * The Reactions page's grid: one card per library entry, the filters above it,
  * and, when the page was opened from a video ("Choose a reaction"), a "Use for
  * <video>" button on each card. The filters live in the URL, so a filtered
- * view can be shared and the back button works. A card shows the preview sheet;
- * ▶ plays the range from the post itself.
+ * view can be shared and the back button works. Each option says how many
+ * entries it would show (the server's facetCounts), the active filters are
+ * listed above the grid with a way to remove each one, and the grid dims while
+ * the server sends the new set: the first cards often stay the same, since the
+ * best entries match most filters. A card shows the preview sheet; ▶ plays the
+ * range from the post itself.
  */
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 
+import type { FacetCounts, GridCard } from "@/lib/reactions";
 import { RangePlayer } from "./RangePlayer";
 
-export type Card = {
-  id: string;
-  status: "proposed" | "kept" | "retired";
-  start: number;
-  end: number;
-  length: number;
-  tags: string[];
-  faceReplace: { ok: boolean | null; why: string } | null;
-  written: { ok: boolean | null; why: string } | null;
-  preview: string | null;
-  video: string | null;
-  handle: string;
-  views: number | null;
-  app: string;
-  beats: number;
-  hookText: string | null;
-  note: string;
-  uses: string[];
-  by: "you" | "agent";
-};
+export type Card = GridCard;
 
 export type PickFor = { app: string; video: string; job: string | null; picked: string | null } | null;
 
 const fitText = (f: Card["faceReplace"]) => (f?.ok === true ? "face replace: fits" : f?.ok === false ? `face replace: no — ${f.why}` : "face replace: not known yet");
 
-export function ReactionsGrid({ cards, total, tags, jobs, apps, pick }: { cards: Card[]; total: number; tags: string[]; jobs: string[]; apps: string[]; pick: PickFor }) {
+const STATUS_WORD: Record<string, string> = { kept: "kept", proposed: "proposed", retired: "retired" };
+
+export function ReactionsGrid({ cards, total, tags, jobs, apps, pick, counts }: { cards: Card[]; total: number; tags: string[]; jobs: string[]; apps: string[]; pick: PickFor; counts: FacetCounts }) {
   const router = useRouter();
   const pathname = usePathname() ?? "/reactions";
   const params = useSearchParams();
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(pick?.picked ?? null);
+  const [pending, start] = useTransition();
 
+  const go = (q: URLSearchParams) => start(() => router.replace(`${pathname}${q.size ? `?${q.toString()}` : ""}`, { scroll: false }));
   const set = (k: string, v: string) => {
     const q = new URLSearchParams(params?.toString() ?? "");
     /* Opened for a video, the hook job filter starts on its job: "any" is kept as job= so it stays off. */
     if (v || (k === "job" && pick)) q.set(k, v);
     else q.delete(k);
-    router.replace(`${pathname}?${q.toString()}`, { scroll: false });
+    go(q);
   };
   const val = (k: string) => params?.get(k) ?? "";
+  const jobNow = params?.has("job") ? val("job") : pick?.job ?? "";
+  const c = (n: number | undefined) => ` (${n ?? 0})`;
+  /* The filters in force, in words, each with the count it would give back when removed. */
+  const active: { k: string; words: string; back: number }[] = [
+    ...(val("q") ? [{ k: "q", words: `search “${val("q")}”`, back: counts.any.q }] : []),
+    ...(val("tag") ? [{ k: "tag", words: `tag ${val("tag")}`, back: counts.any.tag }] : []),
+    ...(jobNow ? [{ k: "job", words: `hook job ${jobNow.replace(/_/g, " ")}`, back: counts.any.job }] : []),
+    ...(val("fit") ? [{ k: "fit", words: val("fit") === "face_replace" ? "face replace fits" : "written route fits", back: counts.any.fit }] : []),
+    ...(val("max") ? [{ k: "max", words: `${val("max")} s or shorter`, back: counts.any.max }] : []),
+    ...(val("status") ? [{ k: "status", words: STATUS_WORD[val("status")] ?? val("status"), back: counts.any.status }] : []),
+    ...(val("from") ? [{ k: "from", words: `from ${val("from")}`, back: counts.any.app }] : []),
+    ...(val("unused") === "1" ? [{ k: "unused", words: "not used", back: counts.any.unused }] : []),
+  ];
+  const clearAll = () => {
+    const q = new URLSearchParams();
+    if (params?.get("pick")) q.set("pick", params.get("pick")!);
+    if (params?.get("app")) q.set("app", params.get("app")!);
+    if (pick) q.set("job", "");
+    go(q);
+  };
 
   async function use(id: string) {
     if (!pick) return;
@@ -81,41 +91,45 @@ export function ReactionsGrid({ cards, total, tags, jobs, apps, pick }: { cards:
 
       <div className="niche-filters rx-filters">
         <label>
+          Search
+          <input key={val("q")} type="search" defaultValue={val("q")} placeholder="handle, tag, text; Enter" onKeyDown={(e) => { if (e.key === "Enter") set("q", e.currentTarget.value.trim()); }} onBlur={(e) => { if (e.currentTarget.value.trim() !== val("q")) set("q", e.currentTarget.value.trim()); }} />
+        </label>
+        <label>
           Tag
           <select value={val("tag")} onChange={(e) => set("tag", e.target.value)}>
             <option value="">any</option>
-            {tags.map((t) => <option key={t} value={t}>{t}</option>)}
+            {tags.map((t) => <option key={t} value={t}>{t}{c(counts.tag[t])}</option>)}
           </select>
         </label>
         <label>
           Hook job
-          <select value={params?.has("job") ? val("job") : pick?.job ?? ""} onChange={(e) => set("job", e.target.value)}>
+          <select value={jobNow} onChange={(e) => set("job", e.target.value)}>
             <option value="">any</option>
-            {jobs.map((j) => <option key={j} value={j}>{j.replace(/_/g, " ")}</option>)}
+            {jobs.map((j) => <option key={j} value={j}>{j.replace(/_/g, " ")}{c(counts.job[j])}</option>)}
           </select>
         </label>
         <label>
           Route
           <select value={val("fit")} onChange={(e) => set("fit", e.target.value)}>
             <option value="">any</option>
-            <option value="face_replace">face replace fits</option>
-            <option value="written">written route fits</option>
+            <option value="face_replace">face replace fits{c(counts.fit.face_replace)}</option>
+            <option value="written">written route fits{c(counts.fit.written)}</option>
           </select>
         </label>
         <label>
           Longest
           <select value={val("max")} onChange={(e) => set("max", e.target.value)}>
             <option value="">any length</option>
-            {[2, 3, 5, 10].map((n) => <option key={n} value={String(n)}>{n} s</option>)}
+            {[2, 3, 5, 10].map((n) => <option key={n} value={String(n)}>{n} s or shorter{c(counts.max[String(n)])}</option>)}
           </select>
         </label>
         <label>
           Status
           <select value={val("status")} onChange={(e) => set("status", e.target.value)}>
             <option value="">kept and proposed</option>
-            <option value="kept">kept</option>
-            <option value="proposed">proposed</option>
-            <option value="retired">retired</option>
+            <option value="kept">kept{c(counts.status.kept)}</option>
+            <option value="proposed">proposed{c(counts.status.proposed)}</option>
+            <option value="retired">retired{c(counts.status.retired)}</option>
           </select>
         </label>
         {apps.length > 1 ? (
@@ -123,21 +137,29 @@ export function ReactionsGrid({ cards, total, tags, jobs, apps, pick }: { cards:
             From
             <select value={val("from")} onChange={(e) => set("from", e.target.value)}>
               <option value="">every app</option>
-              {apps.map((a) => <option key={a} value={a}>{a}</option>)}
+              {apps.map((a) => <option key={a} value={a}>{a}{c(counts.app[a])}</option>)}
             </select>
           </label>
         ) : null}
         <label className="rx-filters__check">
-          <span>Not used</span>
+          <span>Not used{c(counts.unused)}</span>
           <input type="checkbox" checked={val("unused") === "1"} onChange={(e) => set("unused", e.target.checked ? "1" : "")} />
         </label>
-        <span className="niche-filters__count">{cards.length} of {total}</span>
       </div>
+
+      <p className="rx-active" role="status" aria-live="polite">
+        <b className="tabular">{pending ? "Updating…" : `${cards.length} of ${total}`}</b>{pending ? null : " shown"}
+        {active.map((a) => (
+          <button key={a.k} type="button" className="rx-chip" onClick={() => set(a.k, "")} aria-label={`Remove the filter: ${a.words} (${a.back} shown without it)`}>{a.words} ×</button>
+        ))}
+        {active.length > 1 ? <button type="button" className="rx-chip rx-chip--clear" onClick={clearAll}>Clear all</button> : null}
+        {!active.length ? <span className="rx-active__none"> · no filter</span> : null}
+      </p>
 
       {!cards.length ? (
         <p className="niche-empty">{total ? "No entry matches these filters." : "The library is empty. Add a reaction from a post page (Add to reactions), or ask the agent to scan the research (reactions.py scan)."}</p>
       ) : (
-        <ul className="rx-grid">
+        <ul className={`rx-grid${pending ? " is-pending" : ""}`} aria-busy={pending}>
           {cards.map((c) => (
             <li key={c.id} className={`rx-card rx-card--${c.status}`}>
               <CardMedia c={c} />

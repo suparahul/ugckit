@@ -48,6 +48,22 @@ test("the reaction card: a library entry by library_id, else the reference, the 
   assert.equal(rx.reactionCardOf(null), null);
 });
 
+test("the search and the counts beside each filter option", () => {
+  const mk = (id: string, tags: string[], fr: boolean, len: number, handle: string, note = "") => ({ ...described(rx.newEntry({ ...src, handle }, 0, len, tags, note, AT)), id, length_s: len, fit: { face_replace: { ok: fr, why: "" }, written: { ok: true, why: "" } } });
+  const es = [mk("rx-tiktok-1-0", ["shock"], true, 2, "@a.one", "kitten hisses"), mk("rx-tiktok-2-0", ["regret"], false, 4, "@b.two"), mk("rx-tiktok-3-0", ["shock", "regret"], true, 3, "@c.three")];
+  const jobs = { discovery_regret: ["regret"] };
+  assert.deepEqual(rx.filterEntries(es, { q: "KITTEN" }, jobs).map((e) => e.id), ["rx-tiktok-1-0"], "the note, any case");
+  assert.deepEqual(rx.filterEntries(es, { q: "c.three regret" }, jobs).map((e) => e.id), ["rx-tiktok-3-0"], "every word must match");
+  const n = rx.facetCounts(es, { fit: "face_replace" }, jobs, ["shock", "regret"], ["demo"]);
+  assert.deepEqual(n.tag, { shock: 2, regret: 1 }, "a tag counts with the route filter in force");
+  assert.deepEqual(n.fit, { face_replace: 2, written: 3 });
+  assert.equal(n.job.discovery_regret, 1);
+  assert.deepEqual(n.max, { "2": 1, "3": 2, "5": 2, "10": 2 });
+  assert.equal(n.any.fit, 3, "removing the route filter gives all three back");
+  assert.equal(n.status.kept, 2, "an entry added from a post page is kept");
+  assert.deepEqual(rx.filterEntries(es, { q: '"kitten hisses"' }, jobs).map((e) => e.id), ["rx-tiktok-1-0"], "a quoted phrase");
+});
+
 test("sourceOf reads the post folder and its notes", () => {
   assert.equal(src.post_id, "7600000000000000001");
   assert.equal(src.handle, "@some.handle");

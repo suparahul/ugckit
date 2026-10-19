@@ -4,13 +4,24 @@
  *        video is the post's /media URL; the entry is kept, by you
  *   {action: "change", id, change: {status?, start_s?, end_s?, tags?, note?}}
  *        Keep, Retire, the range, the tags, the note, on the Reactions page
+ * GET: the library as grid cards (not retired, best first), the tags and the hook
+ * jobs, for the Switch reaction panel of a video's post page.
  * The library file is read again just before each write, so an entry the agent
  * wrote in the meantime stays. Nothing is generated and nothing is copied.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 
-import { addFromPost, changeEntry, STATUSES, validEntryId, workspacePathOf, type Change } from "@/lib/reactions";
+import { addFromPost, changeEntry, filterEntries, gridCardOf, readLibrary, readTags, STATUSES, usesOf, validEntryId, workspacePathOf, type Change } from "@/lib/reactions";
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const { tags, hook_jobs } = readTags();
+  const uses = usesOf();
+  const cards = filterEntries(Object.values(readLibrary().entries), {}, hook_jobs, uses).map((e) => gridCardOf(e, uses));
+  return NextResponse.json({ cards, tags, hook_jobs });
+}
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 const tagsOf = (v: unknown) => (Array.isArray(v) && v.every((t) => typeof t === "string") ? (v as string[]) : undefined);

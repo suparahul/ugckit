@@ -37,6 +37,10 @@ const secs = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 /** A video whose hook is a reaction: the brief has a reference, the hook channel is reaction, or a segment is an X. */
 const hasReactionHook = (v: NonNullable<PostState["video"]>) => !!v.briefSummary?.reaction || !!v.briefSummary?.choices.some((c) => c.slot === "hook_channel" && c.value === "reaction") || !!v.timeline?.checkpoints.some((c) => c.segment?.endsWith("-x"));
 
+/** The plan is approved or locked: a new reaction sends it back (app/api/reactions/pick). */
+const planGated = (state: PostState) => !!state.video?.lock || state.plan.status === "approved" || state.plan.status === "stale";
+const hookJobOf = (b: NonNullable<NonNullable<PostState["video"]>["briefSummary"]>) => b.choices.find((c) => c.slot === "hook_job")?.value ?? null;
+
 /** Stage 1: the brief in lists, and the place for the reaction pick. */
 function PlanStage({ state }: { state: PostState }) {
   const v = state.video!;
@@ -53,7 +57,7 @@ function PlanStage({ state }: { state: PostState }) {
       {b.screens.length || b.assets.length ? <><h4 className="vprod__sub">Screens and assets</h4><ul>{b.screens.map((s) => <li key={`s${s.id}`}>screen {s.id}{s.job ? ` · ${s.job}` : ""} · {s.status ?? "?"}</li>)}{b.assets.map((a) => <li key={`a${a.id}`}>{a.id}{a.what ? ` · ${a.what}` : ""} · {a.status ?? "?"}</li>)}</ul></> : null}
       {b.missing.length ? <><h4 className="vprod__sub">Missing inputs</h4><ul>{b.missing.map((m, i) => <li key={i}><b>{m.owner ?? "?"}</b>: {m.what}{m.blocks ? ` (blocks ${m.blocks})` : ""}</li>)}</ul></> : null}
       {reactionHook && v.id ? (
-        <ReactionPickSlot video={v.id} app={state.row.slug} post={state.row.key} current={b.reaction} locked={!!v.lock}>
+        <ReactionPickSlot video={v.id} app={state.row.slug} post={state.row.key} current={b.reaction} locked={planGated(state)} job={hookJobOf(b)}>
           {b.reaction?.url ? <video className="vst__ref" src={`${b.reaction.url}#t=${(b.reaction.start ?? 0).toFixed(2)}`} controls preload="metadata" muted playsInline aria-label="The reaction reference" /> : undefined}
         </ReactionPickSlot>
       ) : null}
@@ -79,7 +83,7 @@ function ApprovalStage({ state }: { state: PostState }) {
           {r.dependencies.length ? <ul>{r.dependencies.map((x, i) => <li key={i}>{x}</li>)}</ul> : <p className="sr__hint">none.</p>}
         </>
       )}
-      {hasReactionHook(v) && v.id ? <ReactionPickSlot video={v.id} app={state.row.slug} post={state.row.key} current={v.briefSummary?.reaction ?? null} locked={!!v.lock} /> : null}
+      {hasReactionHook(v) && v.id ? <ReactionPickSlot video={v.id} app={state.row.slug} post={state.row.key} current={v.briefSummary?.reaction ?? null} locked={planGated(state)} job={v.briefSummary ? hookJobOf(v.briefSummary) : null} /> : null}
       <p className="sr__hint">Approve plan and Send back are in the decision bar at the top of the page.</p>
     </div>
   );

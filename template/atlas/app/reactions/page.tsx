@@ -8,7 +8,7 @@
 
 import type { Metadata } from "next";
 
-import { appOfPost, filterEntries, mediaUrl, planningVideos, readLibrary, readTags, usesOf, type Entry } from "@/lib/reactions";
+import { appOfPost, facetCounts, filterEntries, gridCardOf, planningVideos, readLibrary, readTags, usesOf, type Filter } from "@/lib/reactions";
 import { ReactionsGrid, type Card, type PickFor } from "@/components/reactions/ReactionsGrid";
 import "./reactions.css";
 
@@ -17,16 +17,6 @@ export const metadata: Metadata = { title: "Reactions — Organic Factory" };
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
-
-function cardOf(e: Entry, uses: Record<string, string[]>): Card {
-  return {
-    id: e.id, status: e.status, start: e.start_s, end: e.end_s, length: e.length_s, tags: e.tags ?? [],
-    faceReplace: e.fit?.face_replace ?? null, written: e.fit?.written ?? null,
-    preview: e.preview ? `/api/reactions/preview/${e.id}` : null, video: mediaUrl(e.source.video),
-    handle: e.source.handle, views: e.source.views, app: appOfPost(e.source.post_dir),
-    beats: e.expression_beats?.length ?? 0, hookText: e.hook_text, note: e.note ?? "", uses: uses[e.id] ?? [], by: e.added?.by ?? "agent",
-  };
-}
 
 export default async function ReactionsPage({ searchParams }: { searchParams: Search }) {
   const q = await searchParams;
@@ -42,8 +32,10 @@ export default async function ReactionsPage({ searchParams }: { searchParams: Se
   const job = q.job !== undefined ? one(q.job) : pick?.job ?? "";
 
   const max = Number(one(q.max));
-  const shown = filterEntries(entries, { tag: one(q.tag), job, fit: one(q.fit) as "face_replace" | "written" | "", maxS: Number.isFinite(max) && max > 0 ? max : null, status: one(q.status), app: one(q.from), unused: one(q.unused) === "1" }, hook_jobs, uses);
+  const filter: Filter = { tag: one(q.tag), job, fit: one(q.fit) as "face_replace" | "written" | "", maxS: Number.isFinite(max) && max > 0 ? max : null, status: one(q.status), app: one(q.from), unused: one(q.unused) === "1", q: one(q.q) };
+  const shown = filterEntries(entries, filter, hook_jobs, uses);
   const apps = [...new Set(entries.map((e) => appOfPost(e.source.post_dir)))].sort();
+  const counts = facetCounts(entries, filter, hook_jobs, tags, apps, uses);
   const kept = entries.filter((e) => e.status === "kept").length;
   const proposed = entries.filter((e) => e.status === "proposed").length;
 
@@ -56,7 +48,7 @@ export default async function ReactionsPage({ searchParams }: { searchParams: Se
         </p>
         <p className="rx-hint">A reaction hook is never spoken and never invented: video-plan takes its performance from one of these. Keep the good ones; retire the rest.</p>
       </header>
-      <ReactionsGrid cards={shown.map((e) => cardOf(e, uses))} total={entries.length} tags={tags} jobs={Object.keys(hook_jobs)} apps={apps} pick={pick} />
+      <ReactionsGrid cards={shown.map((e) => gridCardOf(e, uses))} total={entries.length} tags={tags} jobs={Object.keys(hook_jobs)} apps={apps} pick={pick} counts={counts} />
     </div>
   );
 }

@@ -22,7 +22,8 @@ export const RangePlayer = forwardRef<RangePlayerHandle, { src: string; start: n
     <video
       ref={v}
       className={className}
-      src={`${src}#t=${start},${end}`}
+      /* Only the start in the fragment: with an end, the browser pauses there by itself and the loop stops. */
+      src={`${src}#t=${start}`}
       poster={poster ?? undefined}
       muted
       playsInline
@@ -39,6 +40,12 @@ export const RangePlayer = forwardRef<RangePlayerHandle, { src: string; start: n
           el.currentTime = start;
           if (!el.paused) void el.play().catch(() => undefined);
         }
+      }}
+      onEnded={(e) => {
+        /* A range that runs to the end of the file. */
+        if (free) return;
+        e.currentTarget.currentTime = start;
+        void e.currentTarget.play().catch(() => undefined);
       }}
     >
       Your browser cannot play this mp4. It is at <a href={src}>{src}</a>.

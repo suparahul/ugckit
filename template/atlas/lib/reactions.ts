@@ -32,6 +32,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renam
 import { basename, dirname, join, normalize, sep } from "node:path";
 
 import { APPS_DIR, CHARACTER_DIR, ROOT, readJson, readText } from "./root.ts";
+import { matches, terms } from "./search.ts";
 
 export type Fit = { ok: boolean | null; why: string };
 export type ExpressionBeat = { start_s: number; end_s: number; face: string; eyes: string; head: string };
@@ -123,7 +124,14 @@ export const servedPostPath = (p: string) => (p.startsWith("research/") || /^app
 /** The app a post belongs to: research/<slug>/… or apps/<slug>/…. */
 export const appOfPost = (postDir: string) => postDir.split("/")[1] ?? "";
 
-export type Filter = { tag?: string; job?: string; fit?: "face_replace" | "written" | ""; maxS?: number | null; status?: string; app?: string; unused?: boolean };
+export type Filter = { tag?: string; job?: string; fit?: "face_replace" | "written" | ""; maxS?: number | null; status?: string; app?: string; unused?: boolean; q?: string };
+
+/** The words a search looks in: the handle, the tags, the note, the hook and the burned-in text, the beats. */
+export const searchText = (e: Pick<Entry, "id" | "source" | "tags" | "note" | "hook_text" | "burned_in_text" | "expression_beats">) =>
+  [e.id, e.source.handle, ...(e.tags ?? []), e.note ?? "", e.hook_text ?? "", ...(e.burned_in_text ?? []).map((b) => b.text), ...(e.expression_beats ?? []).map((b) => `${b.face} ${b.eyes} ${b.head}`)].join(" ").toLowerCase();
+
+/** The Atlas's search (lib/search.ts): every word, and every "quoted phrase", somewhere in the entry's text. */
+export const matchesSearch = (text: string, q: string | undefined) => !q || matches(terms(q), [text]);
 
 /** The entries a filter keeps, best first: kept, then the tags matched, then face replace fits, then views (reactions.py ranked). */
 export function filterEntries(entries: Entry[], f: Filter, jobs: Record<string, string[]>, uses: Record<string, string[]> = {}): Entry[] {
@@ -135,6 +143,7 @@ export function filterEntries(entries: Entry[], f: Filter, jobs: Record<string, 
     if (f.maxS && e.length_s > f.maxS) return false;
     if (f.app && appOfPost(e.source.post_dir) !== f.app) return false;
     if (f.unused && (uses[e.id]?.length ?? 0) > 0) return false;
+    if (f.q && !matchesSearch(searchText(e), f.q)) return false;
     return true;
   });
   const score = (e: Entry): number[] => [e.status === "kept" ? 1 : 0, e.tags.filter((t) => want.has(t)).length, e.fit?.face_replace?.ok === true ? 1 : 0, e.source.views ?? 0];
@@ -372,6 +381,24 @@ export function entriesOfPost(platform: string, postId: string): { id: string; s
     .map((e) => ({ id: e.id, start: e.start_s, end: e.end_s, status: e.status }));
 }
 
+/** How many entries each option of each filter would show, the other filters as they are: the counts beside the options. */
+export type FacetCounts = { tag: Record<string, number>; job: Record<string, number>; fit: Record<string, number>; max: Record<string, number>; status: Record<string, number>; app: Record<string, number>; unused: number; any: Record<string, number> };
+
+export function facetCounts(entries: Entry[], f: Filter, jobs: Record<string, string[]>, tags: string[], apps: string[], uses: Record<string, string[]> = {}): FacetCounts {
+  const n = (patch: Filter) => filterEntries(entries, { ...f, ...patch }, jobs, uses).length;
+  return {
+    tag: Object.fromEntries(tags.map((t) => [t, n({ tag: t })])),
+    job: Object.fromEntries(Object.keys(jobs).map((j) => [j, n({ job: j })])),
+    fit: { face_replace: n({ fit: "face_replace" }), written: n({ fit: "written" }) },
+    max: Object.fromEntries([2, 3, 5, 10].map((m) => [String(m), n({ maxS: m })])),
+    status: Object.fromEntries(STATUSES.map((s) => [s, n({ status: s })])),
+    app: Object.fromEntries(apps.map((a) => [a, n({ app: a })])),
+    unused: n({ unused: true }),
+    /* Each filter set back to "any": what removing it would show. */
+    any: { tag: n({ tag: "" }), job: n({ job: "" }), fit: n({ fit: "" }), max: n({ maxS: null }), status: n({ status: "" }), app: n({ app: "" }), unused: n({ unused: false }), q: n({ q: "" }) },
+  };
+}
+
 /* ------------------------------------------------------- the reaction card */
 
 /** One reaction as the stage panels and the timeline show it: a library entry, or a plan's reference with no entry. */
@@ -475,4 +502,39 @@ export function planBeatsOf(plan: any, refId: string, refStart: number): Reactio
     }
   }
   return out;
+}
+
+/** One card of the library grid: the Reactions page and the Switch reaction panel of a post page. */
+export type GridCard = {
+  id: string;
+  status: Entry["status"];
+  start: number;
+  end: number;
+  length: number;
+  tags: string[];
+  faceReplace: Fit | null;
+  written: Fit | null;
+  preview: string | null;
+  video: string | null;
+  handle: string;
+  views: number | null;
+  app: string;
+  beats: number;
+  hookText: string | null;
+  note: string;
+  uses: string[];
+  by: "you" | "agent";
+  /** searchText(), for a search in the browser. */
+  text: string;
+};
+
+export function gridCardOf(e: Entry, uses: Record<string, string[]>): GridCard {
+  return {
+    id: e.id, status: e.status, start: e.start_s, end: e.end_s, length: e.length_s, tags: e.tags ?? [],
+    faceReplace: e.fit?.face_replace ?? null, written: e.fit?.written ?? null,
+    preview: e.preview ? `/api/reactions/preview/${e.id}` : null, video: mediaUrl(e.source.video),
+    handle: e.source.handle, views: e.source.views, app: appOfPost(e.source.post_dir),
+    beats: e.expression_beats?.length ?? 0, hookText: e.hook_text, note: e.note ?? "", uses: uses[e.id] ?? [], by: e.added?.by ?? "agent",
+    text: searchText(e),
+  };
 }

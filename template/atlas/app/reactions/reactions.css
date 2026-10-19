@@ -90,3 +90,38 @@
 .rxc--compact { margin-top: 8px; grid-template-columns: minmax(96px, 140px) minmax(0, 1fr); }
 .rxc--compact .rxc__label { grid-column: 1 / -1; }
 .vst__slot a.rx-btn, .rxc a.rx-btn { display: inline-block; color: var(--paper-hi); text-decoration: none; }
+
+/* Switch reaction (components/reactions/SwitchReaction): the library in a panel at the right of a post page. */
+.rxd { margin: 0 0 0 auto; padding: 0; border: 0; width: min(620px, 100vw); max-width: 100vw; height: 100dvh; max-height: 100dvh; background: transparent; overflow: hidden; }
+.rxd::backdrop { background: rgba(23, 22, 18, 0.32); }
+.rxd__panel { box-sizing: border-box; width: 100%; height: 100%; overflow-y: auto; background: var(--paper); border-left: 1px solid var(--rule-2); box-shadow: -8px 0 24px rgba(23, 22, 18, 0.18); padding: 14px 16px 32px; display: flex; flex-direction: column; gap: 10px; }
+.rxd__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; position: sticky; top: -14px; margin: -14px -16px 0; padding: 14px 16px 8px; background: var(--paper); z-index: 2; border-bottom: 1px solid var(--rule); }
+.rxd__head h2 { margin: 0; font: 600 1rem var(--sans); color: var(--ink); }
+.rxd__head small { font-weight: 400; color: var(--ink-3); }
+.rxd__close { font: 400 1.4rem var(--sans); line-height: 1; background: none; border: 0; color: var(--ink-2); cursor: pointer; padding: 2px 6px; }
+.rxd__warn { margin: 0; padding: 10px 12px; border: 1px solid var(--ember); border-radius: 4px; background: var(--paper-hi); font: 400 0.88rem var(--sans); color: var(--ink); }
+.rxd__hint { margin: 0; font: 400 0.85rem var(--sans); color: var(--ink-3); }
+.rxd__filters { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; }
+.rxd__filters label { display: flex; flex-direction: column; gap: 3px; font: 500 0.72rem var(--sans); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+.rxd__filters input, .rxd__filters select { font: 400 0.88rem var(--sans); text-transform: none; letter-spacing: 0; color: var(--ink); background: var(--paper-hi); border: 1px solid var(--rule-2); border-radius: 4px; padding: 4px 7px; min-width: 0; }
+.rxd__filters input { width: 12em; }
+.rxd__count { color: var(--ink); }
+.rxd__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.rxd__card { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding: 10px; background: var(--paper-hi); border: 1px solid var(--rule); border-radius: 6px; }
+.rxd__media { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.rxd__clip { width: 100%; aspect-ratio: 9 / 16; max-height: 240px; object-fit: cover; background: #171612; border-radius: 3px; display: block; }
+.rxd__sheet { width: 100%; height: auto; max-height: 120px; object-fit: cover; object-position: top; border: 1px solid var(--rule); border-radius: 3px; }
+.rxd__body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rxd__body p { margin: 0; }
+.rxd__body .rx-btn { margin-top: 6px; align-self: flex-start; }
+.rxd__more { align-self: center; }
+@media (max-width: 520px) { .rxd__card { grid-template-columns: 110px minmax(0, 1fr); } }
+
+/* The filters in force above the grid, each removable; the grid dims while the server sends the new set. */
+.rx-active { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 10px 0 14px; font: 400 0.9rem var(--sans); color: var(--ink-2); }
+.rx-active b { color: var(--ink); font-size: 1rem; }
+.rx-active__none { color: var(--ink-3); }
+.rx-chip { font: 500 0.82rem var(--sans); color: var(--ink); background: var(--paper-hi); border: 1px solid var(--rule-2); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+.rx-chip:hover { border-color: var(--ink-3); }
+.rx-chip--clear { color: var(--ember-deep); border-color: var(--ember); }
+.rx-grid.is-pending { opacity: 0.45; transition: opacity 0.15s; }
