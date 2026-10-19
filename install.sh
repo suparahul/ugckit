@@ -203,9 +203,23 @@ copy_once() {
   cp "$SRC/$rel" "$DEST/$rel"
 }
 
+# A file the kit's git ignores is a build output of this clone (the Atlas index, the search
+# file, a tsbuildinfo), never part of the kit: copied, it would overwrite the workspace's own.
+# With git, check-ignore names them; without it (a tarball), the Atlas build outputs are known.
+not_ignored() {
+  if [ -n "$KITGIT" ]; then
+    list="$(mktemp)"; cat > "$list"
+    ( cd "$SRC" && git check-ignore --stdin < "$list" ) > "$list.ign" 2>/dev/null || true
+    grep -vxF -f "$list.ign" "$list" || true
+    rm -f "$list" "$list.ign"
+  else
+    grep -vE '^atlas/(data/(index|apps|niche-.*|production-.*|handles-.*)\.json|public/search\.json|tsconfig\.tsbuildinfo|next-env\.d\.ts)$' || true
+  fi
+}
+
 # -prune keeps a developer's local __pycache__ out of a fresh install.
 ( cd "$SRC" && find scripts .claude docs atlas \
-    \( -name __pycache__ -o -name .DS_Store -o -name node_modules -o -name .next \) -prune -o -type f -print ) | while read -r rel; do
+    \( -name __pycache__ -o -name .DS_Store -o -name node_modules -o -name .next \) -prune -o -type f -print ) | not_ignored | while read -r rel; do
   copy_managed "$rel"
 done
 ok "scripts, skills, docs and the atlas"
@@ -227,7 +241,7 @@ fi
 # The brain: the learnings files and the video taxonomy (video-patterns.json), replaced on
 # every upgrade and read-only on disk so nobody edits the copy the next upgrade overwrites.
 # The user's own findings go beside it, under apps/<slug>/niche/ (see apps/README.md).
-( cd "$SRC" && find brain -type f \( -name '*.md' -o -name '*.json' \) ) | while read -r rel; do
+( cd "$SRC" && find brain -type f \( -name '*.md' -o -name '*.json' \) ) | not_ignored | while read -r rel; do
   [ -e "$DEST/$rel" ] && chmod u+w "$DEST/$rel"
   copy_managed "$rel"
   chmod 444 "$DEST/$rel"
