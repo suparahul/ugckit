@@ -1,7 +1,7 @@
 # Atlas: every stage of a character video — plan
 
-Status: **plan, not built.** Written 2026-10-19 on branch `atlas-niche-video-player`. No code
-changed, nothing spent, no paid API called.
+Status: **built 2026-10-19** on branch `atlas-niche-video-player`, in the order of § 10
+(§ 11 says what was built and what is still open). Nothing spent, no paid API called.
 
 The goal: at each stage of the character video pipeline, the user studies what the stage
 made, approves it (or rejects it with a note), and the video moves on to the next stage. One
@@ -508,3 +508,28 @@ committed, on top of it.
 4. `review.py pending` and the skill lines.
 5. Tests with one fixture per video type, then a browser pass on latte (a face-replace
    reaction, no app) and on a plan with app insertion.
+
+## 11. What was built (2026-10-19)
+
+| Part | Where |
+|---|---|
+| The eight stage states, the "Now" sentence, the state.json notes | `lib/video-stages.ts` `videoStages()`; filled in `postState()` |
+| The timeline of § 4.1 | `lib/video-stages.ts` `timeline()`, `components/production/Timeline.tsx` |
+| The rail and the segment table | `components/production/VideoStages.tsx`; `?stage=N` and `?seg=<nn>-<t>` on the post page |
+| The stage panels and one segment card | `components/production/VideoView.tsx` (stages 1, 2, 8), `VideoProduction.tsx` (3 to 7) |
+| The brief summary and the ready lists | `lib/video.ts` `briefSummaryOf()`, `ready.json` (`video_plan.py review`, `ready --json`) |
+| The place for **Choose a reaction** | `components/production/ReactionPickSlot.tsx` (the reaction library fills it) |
+| The board tile's stage | `components/production/Board.tsx` |
+| The new lines | `source.*`, `narration.*`, `composite.sendback`, `storyboard.sendback` with `segments`, `cut.sendback` with `segment` and `cost_usd`; pick another take (the take list) |
+| The media paths | `lib/media-paths.ts`, shared by the route and the pages |
+| The agent side | `review.py source|narration --from-atlas`, the redo and the regenerate, `review.py pending`; one line in each skill |
+| Tests | `lib/video-stages.test.ts` (one fixture per video type, and the hand-written approvals of 2026-10-14); `tests/character-bridge` (source and narration from the Atlas, `pending`) |
+
+Still open:
+
+- Stage 3 does not show the prompt lint result or the flat-on result of `qc.py --keyframe`:
+  neither is written to a file yet.
+- Stage 5 shows no transcript against the script: `qc.py` prints the transcript and writes
+  no file. The card says to check the words by ear.
+- The items of § 9 stay as they are.
+
