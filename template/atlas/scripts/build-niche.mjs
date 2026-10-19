@@ -9,6 +9,10 @@
  *   apps/<slug>/niche/searches/general.<kw>[.<variant>].p<N>.json
  *                                                     TikHub fetch_general_search_result pages
  *                                                     (data[].aweme_info), window GENERAL
+ *   apps/<slug>/niche/searches/<YYYY-MM-DD>/{photo,general}.*.json
+ *                                                     an older read moved aside so a new run fetches fresh
+ *                                                     pages; its posts stay, a post read again keeps the
+ *                                                     newest numbers, a general read is window GENERAL_<date>
  *   apps/<slug>/niche/searches/<kw>.<RANGE>.json      the apidojo keyword search array
  *   research/<slug>/searches/<slug>.<RANGE>.json      the R1 keyword searches apps.sh writes
  *   apps/<slug>/niche/instagram/searches/hashtag.<kw>.<top|recent>.p<N>.json
@@ -27,8 +31,8 @@
  *   node scripts/build-niche.mjs [--verbose]
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { batchMediaOf, generalItems, generalPost, igItems, igPost, lenientJson } from "../lib/niche-posts.ts";
@@ -42,6 +46,8 @@ const verbose = process.argv.includes("--verbose");
 
 const readJson = (p) => { try { return lenientJson(readFileSync(p, "utf8")); } catch { return null; } };
 const listJson = (dir) => (existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith(".json")).sort().map((f) => join(dir, f)) : []);
+/* When a file was read: the date of its dated folder (searches/<YYYY-MM-DD>/, batches/<date>/), else the file's mtime. */
+const readAtOf = (file) => { const d = basename(dirname(file)).match(/^\d{4}-\d{2}-\d{2}/); return d ? d[0] : statSync(file).mtime.toISOString(); };
 
 function build(slug) {
   const nicheDir = join(APPS, slug, "niche");
@@ -51,7 +57,11 @@ function build(slug) {
     return existsSync(join(nicheDir, rel)) ? `/media/apps/${slug}/niche/${rel}` : null;
   };
   const igFiles = listJson(join(nicheDir, "instagram", "searches")).filter((f) => /\/hashtag\.[^/]+\.json$/.test(f));
-  const files = [...listJson(join(nicheDir, "searches")), ...listJson(join(RESEARCH, slug, "searches"))];
+  /* An older read of the general search or the Photo tab, moved aside to searches/<YYYY-MM-DD>/ so a new run fetches fresh
+     pages, still counts: its posts stay in the catalog, and a post found again takes the newer numbers. */
+  const sdir = join(nicheDir, "searches");
+  const archived = existsSync(sdir) ? readdirSync(sdir).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().flatMap((d) => listJson(join(sdir, d)).filter((f) => /\/(general|photo)\./.test(f))) : [];
+  const files = [...archived, ...listJson(sdir), ...listJson(join(RESEARCH, slug, "searches"))];
   if (!files.length && !igFiles.length) return null;
   const posts = [];
   const notes = [];
@@ -63,7 +73,8 @@ function build(slug) {
     const res = readJson(file);
     if (!res) { notes.push(`${file.split("/").pop()}: not JSON`); continue; }
     const list = photoByKw.get(kw) ?? new Map();
-    for (const it of res.item_list ?? []) if (it?.id && !list.has(it.id)) list.set(it.id, it);
+    const readAt = readAtOf(file);
+    for (const it of res.item_list ?? []) if (it?.id && (!list.has(it.id) || readAt > list.get(it.id)._readAt)) list.set(it.id, { ...it, _readAt: readAt });
     photoByKw.set(kw, list);
   }
   for (const [keyword, list] of photoByKw) {
@@ -74,21 +85,24 @@ function build(slug) {
       const views = n("playCount"), saves = n("collectCount");
       const handle = it.author?.uniqueId ?? "";
       const local = coverUrl(it.id);
-      posts.push({ id: it.id, keyword, window: "PHOTO_TAB", handle, mediaType: "slideshow", slideCount: images.length, views, likes: n("diggCount"), comments: n("commentCount"), saves, shares: n("shareCount"), saveRate: views > 0 ? saves / views : 0, date: new Date((it.createTime ?? 0) * 1000).toISOString().slice(0, 10), caption: (it.desc ?? "").replace(/\s+/g, " ").trim(), cover: local ?? images[0]?.imageURL?.urlList?.[0] ?? it.imagePost?.cover?.imageURL?.urlList?.[0] ?? null, coverLocal: !!local, url: `https://www.tiktok.com/@${handle}/photo/${it.id}` });
+      posts.push({ id: it.id, keyword, window: "PHOTO_TAB", handle, mediaType: "slideshow", slideCount: images.length, views, likes: n("diggCount"), comments: n("commentCount"), saves, shares: n("shareCount"), saveRate: views > 0 ? saves / views : 0, date: new Date((it.createTime ?? 0) * 1000).toISOString().slice(0, 10), caption: (it.desc ?? "").replace(/\s+/g, " ").trim(), cover: local ?? images[0]?.imageURL?.urlList?.[0] ?? it.imagePost?.cover?.imageURL?.urlList?.[0] ?? null, coverLocal: !!local, url: `https://www.tiktok.com/@${handle}/photo/${it.id}`, readAt: it._readAt });
     }
   }
 
-  /* The general search pages, grouped by keyword; a post on two pages keeps the row with the most views. */
+  /* The general search pages, grouped by keyword; a post on two pages keeps the row of its newest read
+     (ties: the most views). The window carries the read date, GENERAL_<YYYY-MM-DD>, so each read can be
+     filtered on its own. */
   const generalByKw = new Map();
   for (const file of files.filter((f) => /\/general\./.test(f))) {
     const kw = file.split("/").pop().split(".")[1];
     const res = readJson(file);
     if (!res) { notes.push(`${file.split("/").pop()}: not JSON`); continue; }
     const list = generalByKw.get(kw) ?? new Map();
+    const readAt = readAtOf(file);
     for (const a of generalItems(res)) {
-      const p = generalPost(a, kw);
+      const p = { ...generalPost(a, kw), window: `GENERAL_${readAt.slice(0, 10)}`, readAt };
       const prev = list.get(p.id);
-      if (!prev || p.views > prev.views) list.set(p.id, p);
+      if (!prev || p.readAt > prev.readAt || (p.readAt === prev.readAt && p.views > prev.views)) list.set(p.id, p);
     }
     generalByKw.set(kw, list);
   }
@@ -132,7 +146,7 @@ function build(slug) {
       const slideshow = images.length > 0;
       const views = Number(r.views ?? 0), saves = Number(r.bookmarks ?? 0);
       const local = coverUrl(r.id);
-      posts.push({ id: r.id, keyword, window: window ?? "SEARCH", handle: r.channel?.username ?? "", mediaType: slideshow ? "slideshow" : "video", slideCount: slideshow ? images.length : null, views, likes: Number(r.likes ?? 0), comments: Number(r.comments ?? 0), saves, shares: Number(r.shares ?? 0), saveRate: views > 0 ? saves / views : 0, date: (r.uploadedAtFormatted ?? "").slice(0, 10), caption: (r.title ?? "").replace(/\s+/g, " ").trim(), cover: local ?? (slideshow ? images[0]?.url : r.video?.cover) ?? null, coverLocal: !!local, url: r.postPage ?? (r.channel?.username ? `https://www.tiktok.com/@${r.channel.username}/${slideshow ? "photo" : "video"}/${r.id}` : "") });
+      posts.push({ id: r.id, keyword, window: window ?? "SEARCH", handle: r.channel?.username ?? "", mediaType: slideshow ? "slideshow" : "video", slideCount: slideshow ? images.length : null, views, likes: Number(r.likes ?? 0), comments: Number(r.comments ?? 0), saves, shares: Number(r.shares ?? 0), saveRate: views > 0 ? saves / views : 0, date: (r.uploadedAtFormatted ?? "").slice(0, 10), caption: (r.title ?? "").replace(/\s+/g, " ").trim(), cover: local ?? (slideshow ? images[0]?.url : r.video?.cover) ?? null, coverLocal: !!local, url: r.postPage ?? (r.channel?.username ? `https://www.tiktok.com/@${r.channel.username}/${slideshow ? "photo" : "video"}/${r.id}` : ""), readAt: readAtOf(file) });
     }
   }
 
@@ -142,14 +156,19 @@ function build(slug) {
      so a post that a search also found keeps its held mark on the page. */
   const batchPosts = [];
   const batchRoot = join(nicheDir, "batches");
-  const batchDates = existsSync(batchRoot) ? readdirSync(batchRoot).filter((d) => /^\d{4}-\d{2}-\d{2}/.test(d)).sort() : [];
+  /* A batch folder holding a .not-niche file is a reference read for another purpose (a format study,
+     off-niche on purpose); it stays on disk and out of the niche page. */
+  const batchDates = existsSync(batchRoot) ? readdirSync(batchRoot).filter((d) => /^\d{4}-\d{2}-\d{2}/.test(d) && !existsSync(join(batchRoot, d, ".not-niche"))).sort() : [];
   for (const date of batchDates) {
     const bdir = join(batchRoot, date);
+    /* A post dropped as off-niche (niche-raw.py drop -> dropped.tsv) stays in the paid profile files but not on the page. */
+    const dfile = join(bdir, "dropped.tsv");
+    const dropped = new Set(existsSync(dfile) ? readFileSync(dfile, "utf8").split("\n").map((l) => l.split("\t")[0].trim()).filter(Boolean) : []);
     const byId = new Map();
     for (const file of readdirSync(bdir).filter((f) => /^(posts|.+\.profile\d*)\.raw\.json$/.test(f))) {
       const rows = readJson(join(bdir, file));
       if (!Array.isArray(rows)) { notes.push(`batches/${date}/${file}: not an array`); continue; }
-      for (const r of rows) { if (!r?.id || !r.channel?.username) continue; const prev = byId.get(r.id); if (!prev || (r.views ?? 0) > (prev.views ?? 0)) byId.set(r.id, r); }
+      for (const r of rows) { if (!r?.id || !r.channel?.username || dropped.has(String(r.id))) continue; const prev = byId.get(r.id); if (!prev || (r.views ?? 0) > (prev.views ?? 0)) byId.set(r.id, r); }
     }
     for (const r of byId.values()) {
       const handle = r.channel.username;
@@ -159,12 +178,29 @@ function build(slug) {
       const held = existsSync(join(pdir, "video.mp4")) ? "video" : existsSync(join(pdir, "slide-01.jpg")) ? "slides" : "metadata";
       const views = Number(r.views ?? 0), saves = Number(r.bookmarks ?? 0);
       const media = existsSync(pdir) ? batchMediaOf(readdirSync(pdir), `/media/apps/${slug}/niche/batches/${date}/${encodeURIComponent(handle)}/${r.id}`) : null;
-      /* The cover: the one the searches saved, else a video's cover.jpg in its own folder. */
-      const local = coverUrl(r.id) ?? (!slideshow ? media?.cover ?? null : null);
-      batchPosts.push({ id: r.id, keyword: "batch", window: `BATCH_${date}`, handle, mediaType: slideshow ? "slideshow" : "video", slideCount: slideshow ? images.length : null, views, likes: Number(r.likes ?? 0), comments: Number(r.comments ?? 0), saves, shares: Number(r.shares ?? 0), saveRate: views > 0 ? saves / views : 0, date: (r.uploadedAtFormatted ?? "").slice(0, 10), caption: (r.title ?? "").replace(/\s+/g, " ").trim(), cover: local ?? (slideshow ? images[0]?.url : r.video?.cover) ?? null, coverLocal: !!local, url: r.postPage ?? `https://www.tiktok.com/@${handle}/${slideshow ? "photo" : "video"}/${r.id}`, held, ...(media?.video ? { video: media.video } : {}), durationS: slideshow ? null : Number(r.video?.duration ?? 0) || null });
+      /* The cover: the one the searches saved, else the cover.jpg in the post's own folder. */
+      const local = coverUrl(r.id) ?? media?.cover ?? null;
+      batchPosts.push({ id: r.id, keyword: "batch", window: `BATCH_${date}`, handle, mediaType: slideshow ? "slideshow" : "video", slideCount: slideshow ? images.length : null, views, likes: Number(r.likes ?? 0), comments: Number(r.comments ?? 0), saves, shares: Number(r.shares ?? 0), saveRate: views > 0 ? saves / views : 0, date: (r.uploadedAtFormatted ?? "").slice(0, 10), caption: (r.title ?? "").replace(/\s+/g, " ").trim(), cover: local ?? (slideshow ? images[0]?.url : r.video?.cover) ?? null, coverLocal: !!local, url: r.postPage ?? `https://www.tiktok.com/@${handle}/${slideshow ? "photo" : "video"}/${r.id}`, held, ...(media?.video ? { video: media.video } : {}), durationS: slideshow ? null : Number(r.video?.duration ?? 0) || null, readAt: date.slice(0, 10) });
     }
   }
   posts.unshift(...batchPosts);
+
+  /* One post, one set of numbers: every row of a post (one per keyword, window or batch that found it)
+     carries the counts of its newest read (ties: the most views), and a row that repeats a post's
+     keyword and window is dropped. */
+  const newest = new Map();
+  for (const p of posts) {
+    const k = `${p.platform ?? "tiktok"}:${p.id}`, b = newest.get(k);
+    if (!b || (p.readAt ?? "") > (b.readAt ?? "") || ((p.readAt ?? "") === (b.readAt ?? "") && (p.views ?? -1) > (b.views ?? -1))) newest.set(k, p);
+  }
+  const rowSeen = new Set();
+  for (let i = 0; i < posts.length; i++) {
+    const p = posts[i], k = `${p.platform ?? "tiktok"}:${p.id}`, rk = `${k}\t${p.keyword}\t${p.window}`;
+    if (rowSeen.has(rk)) { posts.splice(i--, 1); continue; }
+    rowSeen.add(rk);
+    const b = newest.get(k);
+    if (b !== p) for (const f of ["views", "likes", "comments", "saves", "shares", "saveRate"]) p[f] = b[f];
+  }
 
   const key = (p) => `${p.platform ?? "tiktok"}:${p.id}`;
   const ids = new Set(posts.map(key));

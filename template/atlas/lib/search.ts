@@ -60,6 +60,13 @@ export const stateFields = (st: Pick<PostState, "row" | "deck" | "posted" | "lin
   st.link,
 ];
 
+/**
+ * One of our posts by its name alone (the search's "title only" toggle,
+ * `title=1`): the topic, the name the studio and the Our posts card show.
+ * Not the deck's title or caption, not the text of any slide, not the handle.
+ */
+export const stateTitle = (st: Pick<PostState, "row">): Field[] => [st.row.topic];
+
 /** A post of the Niche grid: the caption, the handle, every keyword (as #kw) and window that found it, the id and the date. */
 export const tileFields = (t: { caption: string; handle: string; id: string; date: string }, keywords: string[], windows: string[]): Field[] => [
   t.caption,

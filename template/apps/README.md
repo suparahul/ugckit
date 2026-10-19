@@ -23,6 +23,10 @@ is a pending slot on the canvas, never an error.
                                  video + cover + contact sheets + transcript, comments, post.json),
                                  screenshots/, BATCH.md (the read), dropped.tsv (the off-niche posts taken out);
                                  the niche page reads LINKS.md, posts.raw.json and BATCH.md
+        marks.json               the curation marks of the niche page: per <platform>:<id>, out (ruled out), study
+                                 (fetch it in full) or keep, by you or the agent (the niche-curate skill)
+        CLEANUP.md               the cleanup rules the agent applies after every search, refresh and batch read
+                                 (shape: docs/niche-cleanup.example.md)
         learnings.md             your findings, dated sections, the shape of brain/learnings-slideshows.md
         anatomy.md               your findings' post-table rows, the shape of brain/SLIDESHOW-ANATOMY.md
         architecture.md          your findings' account-table rows, the shape of brain/ACCOUNT-ARCHITECTURE.md

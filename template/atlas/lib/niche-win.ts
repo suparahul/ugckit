@@ -64,24 +64,32 @@ export function rateOf(t: Pick<Rated, "platform" | "views" | "likes" | "saves">)
   return top === null ? null : top / t.views;
 }
 
-export function markWins<T extends Rated>(tiles: T[]): WinRule {
+/**
+ * Marks every tile against the bars. The medians and the counts come from
+ * `measured` (all the tiles unless given: the niche page passes the posts not
+ * ruled out, so an off-niche post never sets the bar); every tile is marked.
+ */
+export function markWins<T extends Rated>(tiles: T[], measured: T[] = tiles): WinRule {
   const tt = tiles.filter((t) => t.platform === "tiktok");
   const ig = tiles.filter((t) => t.platform === "instagram");
+  const mtt = measured.filter((t) => t.platform === "tiktok");
+  const mig = measured.filter((t) => t.platform === "instagram");
 
-  const ttMedian = medianOf(tt.filter((t) => t.kind === "slideshow" && (t.views ?? 0) >= WIN_VIEWS).map((t) => rateOf(t) ?? 0));
-  const ttOver = tt.filter((t) => t.kind === "slideshow" && (t.views ?? 0) >= WIN_VIEWS).length;
+  const ttMedian = medianOf(mtt.filter((t) => t.kind === "slideshow" && (t.views ?? 0) >= WIN_VIEWS).map((t) => rateOf(t) ?? 0));
+  const ttOver = mtt.filter((t) => t.kind === "slideshow" && (t.views ?? 0) >= WIN_VIEWS).length;
   for (const t of tt) {
     const r = rateOf(t) ?? 0;
     t.win_ = (t.views ?? 0) >= WIN_VIEWS && r >= ttMedian && ttMedian > 0;
     t.strength = ttMedian > 0 && t.views ? r / ttMedian : null;
   }
 
-  const reels = ig.filter((t) => t.kind === "video" && (t.views ?? 0) >= WIN_VIEWS && t.likes !== null);
+  const reels = mig.filter((t) => t.kind === "video" && (t.views ?? 0) >= WIN_VIEWS && t.likes !== null);
   const igMedian = medianOf(reels.map((t) => rateOf(t)!));
   const likesFloor = igMedian > 0 ? Math.round(WIN_VIEWS * igMedian) : IG_LIKES_FLOOR;
-  const shareReels = ig.filter((t) => t.kind === "video" && (t.views ?? 0) >= WIN_VIEWS && t.shares != null);
+  const shareReels = mig.filter((t) => t.kind === "video" && (t.views ?? 0) >= WIN_VIEWS && t.shares != null);
   const shareMedian = medianOf(shareReels.map((t) => t.shares! / t.views!));
   const sharesFloor = shareMedian > 0 ? Math.round(WIN_VIEWS * shareMedian) : null;
+  const inMeasure = new Set<T>(measured);
   let likeWins = 0, shareWins = 0;
   for (const t of ig) {
     /* On likes: a reel by likes per view, a photo or carousel by the likes floor. */
@@ -95,14 +103,14 @@ export function markWins<T extends Rated>(tiles: T[]): WinRule {
       else { onShares = t.shares >= sharesFloor!; shareStrength = t.shares / sharesFloor!; }
     }
     t.win_ = onLikes || onShares;
-    if (onLikes) likeWins++;
-    if (onShares) shareWins++;
+    if (onLikes && inMeasure.has(t)) likeWins++;
+    if (onShares && inMeasure.has(t)) shareWins++;
     t.strength = likeStrength === null && shareStrength === null ? null : Math.max(likeStrength ?? 0, shareStrength ?? 0);
   }
 
   return {
-    tiktok: { median: ttMedian, over: ttOver, wins: tt.filter((t) => t.win_ && t.kind === "slideshow").length, slideshows: tt.filter((t) => t.kind === "slideshow").length },
-    instagram: { median: igMedian, over: reels.length, likesFloor, shareMedian, shareOver: shareReels.length, sharesFloor, wins: ig.filter((t) => t.win_).length, likeWins, shareWins, posts: ig.length, withShares: ig.filter((t) => t.shares != null).length },
+    tiktok: { median: ttMedian, over: ttOver, wins: mtt.filter((t) => t.win_ && t.kind === "slideshow").length, slideshows: mtt.filter((t) => t.kind === "slideshow").length },
+    instagram: { median: igMedian, over: reels.length, likesFloor, shareMedian, shareOver: shareReels.length, sharesFloor, wins: mig.filter((t) => t.win_).length, likeWins, shareWins, posts: mig.length, withShares: mig.filter((t) => t.shares != null).length },
   };
 }
 

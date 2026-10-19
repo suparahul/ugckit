@@ -89,5 +89,9 @@ only likes win). The rule is in
 Report: keywords, pages, results per door (slideshows, videos, handles; on Instagram,
 if it ran, photos and carousels, reels), how many are from the last 90 days, the computed spend, and
 the covers that could not be fetched.
+If `apps/<slug>/niche/CLEANUP.md` exists (the user's cleanup rules), run the
+`niche-curate` skill now, without asking: the new posts are marked by those rules, so only
+the relevant ones stay on the page. If it does not, say in one line that the user can
+mark sample posts on the page (Edit marks: Rule out, Study) and ask for a cleanup.
 Open http://localhost:3210/app/<slug>/niche. Then run the `niche-hunt` skill: the
 recipe, or the hand-in if the user already has links.

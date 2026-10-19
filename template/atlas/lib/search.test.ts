@@ -10,7 +10,7 @@ import { test } from "node:test";
 
 import type { Post } from "./data.ts";
 import type { PostState } from "./production.ts";
-import { batchFields, matches, postFields, quoted, stateFields, terms, tileFields } from "./search.ts";
+import { batchFields, matches, postFields, quoted, stateFields, stateTitle, terms, tileFields } from "./search.ts";
 
 test("terms: lower case, split on space, an empty search has none", () => {
   assert.deepEqual(terms("  Cat  FOOD "), ["cat", "food"]);
@@ -85,6 +85,33 @@ test("one of our posts is found by its topic, deck, first slide, handle, key and
   assert.equal(matches(terms("dog"), stateFields(st)), false);
   /* No deck yet: the row alone still answers. */
   assert.equal(matches(terms("hide"), stateFields({ ...st, deck: null })), true);
+});
+
+test("title only: one of our posts is found by its topic alone, every word and every phrase in it", () => {
+  const st = {
+    row: { topic: "Why cats hide pain from vets", handle: "@vet.notes", short: "vet", key: "2026-10-02/vet/1", format: "listicle", date: "2026-10-02" },
+    deck: { title: "Hidden pain", caption: "Save this for later", slides: [{ blocks: [{ text: "5 quiet signs" }] }, { blocks: [{ text: "Limping" }] }] },
+    posted: { at: "2026-10-02T09:14:00Z", time: "09:14", url: "" },
+    link: "https://www.tiktok.com/@vet.notes/video/123",
+  } as unknown as PostState;
+  const f = stateTitle(st);
+  assert.deepEqual(f, ["Why cats hide pain from vets"]);
+  /* Words: each one in the topic, in any order; a phrase whole and in order. */
+  for (const s of ["HIDE", "pain cats", '"hide pain"', '"cats hide pain" vets', '"hide pa']) assert.equal(matches(terms(s), f), true, s);
+  for (const s of ['"pain hide"', '"cats pain"']) assert.equal(matches(terms(s), f), false, s);
+  /* A word found only outside the topic does not count: the deck's title, the caption, the first slide, the handle, the key, the format, the dates, the link. */
+  for (const s of ["hidden", "save", "quiet", "@vet.notes", "2026-10-02/vet/1", "listicle", "2026-10", "video/123"]) {
+    assert.equal(matches(terms(s), stateFields(st)), true, `all fields: ${s}`);
+    assert.equal(matches(terms(s), f), false, `title only: ${s}`);
+  }
+  /* A later slide is not read either. */
+  assert.equal(matches(terms("limping"), f), false);
+  /* Every word must be in the topic: one word from elsewhere fails the post. */
+  assert.equal(matches(terms("cats save"), f), false);
+  assert.equal(matches(terms('"hide pain" quiet'), f), false);
+  /* No deck: the topic still answers. No words: everything matches. */
+  assert.equal(matches(terms("vets"), stateTitle({ ...st, deck: null } as PostState)), true);
+  assert.equal(matches([], f), true);
 });
 
 test("a Niche post is found by its caption, handle, keywords, windows, id and date", () => {

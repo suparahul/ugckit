@@ -13,7 +13,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 const PAUSE_MS = 180;
 
-export function PostSearch({ value, count, placeholder, drop = ["page"] }: { value: string; /** The matches line, from the server. */ count: string; placeholder: string; /** Params that go back to their default on a new search. */ drop?: string[] }) {
+export function PostSearch({ value, count, placeholder, drop = ["page"], titleOnly, compact }: { value: string; /** The matches line, from the server. */ count: string; /** In a filter bar: the box alone, the matches line said elsewhere. */ compact?: boolean; placeholder: string; /** Params that go back to their default on a new search. */ drop?: string[]; /** Given: a "title only" toggle beside the box, written as `title=1`. Absent: no toggle. */ titleOnly?: boolean }) {
   const router = useRouter();
   const path = usePathname();
   const params = useSearchParams();
@@ -31,15 +31,21 @@ export function PostSearch({ value, count, placeholder, drop = ["page"] }: { val
   }, [value]);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
-  const push = (v: string) => {
+  const push = (v: string, title = titleOnly) => {
     const t = v.trim();
     sent.current = t;
     const u = new URLSearchParams(params?.toString() ?? "");
     if (t) u.set("search", t);
     else u.delete("search");
+    if (title) u.set("title", "1");
+    else u.delete("title");
     for (const k of drop) u.delete(k);
     const q = u.toString();
     start(() => router.replace(`${path}${q ? `?${q}` : ""}`, { scroll: false }));
+  };
+  const flip = (on: boolean) => {
+    if (timer.current) clearTimeout(timer.current);
+    push(text, on);
   };
   const type = (v: string) => {
     setText(v);
@@ -53,13 +59,18 @@ export function PostSearch({ value, count, placeholder, drop = ["page"] }: { val
   };
 
   return (
-    <div className={`psearch${pending ? " is-pending" : ""}`} role="search">
+    <div className={`psearch${compact ? " psearch--compact" : ""}${pending ? " is-pending" : ""}`} role="search">
       <label className="psearch__box">
         <span className="psearch__label">search</span>
         <input type="search" value={text} placeholder={placeholder} aria-label="Search the posts" autoComplete="off" spellCheck={false} onChange={(e) => type(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape" && text) { e.preventDefault(); clear(); } }} />
         {text ? <button type="button" className="psearch__clear" aria-label="Clear the search" onClick={clear}>✕</button> : null}
       </label>
-      <span className="psearch__count" aria-live="polite">{count}</span>
+      {titleOnly !== undefined ? (
+        <label className="psearch__toggle" title="Match the post's name only: not the caption, the slides or the handle">
+          <input type="checkbox" checked={titleOnly} onChange={(e) => flip(e.target.checked)} /> title only
+        </label>
+      ) : null}
+      {compact ? null : <span className="psearch__count" aria-live="polite">{count}</span>}
     </div>
   );
 }

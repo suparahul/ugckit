@@ -236,7 +236,7 @@ the Organic Factory UI reads them in place, and "filled" is derived from the fil
 | 1 | Setup | `setup` | the state file, the keys, the brain in place | `setup` done |
 | 2 | The app | `product` (`product-facts.sh`) | `apps/<slug>/APP.md`, `product.json`, `icon.jpg`, `PRODUCT-SCREENS.md` | both exist and `product.json` has a source |
 | 3 | Competitor apps | `apps` → `teardown` as above, then `apps-learnings` | the ledger, the teardowns; the first sections of `niche/{learnings,anatomy,architecture}.md`, marked `competitor apps` | every ledger app has a teardown |
-| 4 | The niche | `niche-search` (`niche-search.sh`, `niche-import.sh`), `niche-hunt`, `niche-fetch` (`niche-fetch.sh`, `niche-raw.py`), `niche-read` (`niche-stats.py`) | `niche/NICHE.md`, `searches/` (TikTok: the Photo tab for slideshows, the general search for recent videos), `covers/`, `instagram/{searches,covers}/` after a yes, `batches/<date>/{LINKS.md, posts.raw.json, …, BATCH.md}`; the `niche` sections and rows of the findings trio | one batch read and the trio exists |
+| 4 | The niche | `niche-search` (`niche-search.sh`, `niche-import.sh`), `niche-hunt`, `niche-fetch` (`niche-fetch.sh`, `niche-raw.py`), `niche-read` (`niche-stats.py`), `niche-curate` (`niche-marks.py`) | `niche/NICHE.md`, `searches/` (TikTok: the Photo tab for slideshows, the general search for recent videos), `covers/`, `instagram/{searches,covers}/` after a yes, `batches/<date>/{LINKS.md, posts.raw.json, …, BATCH.md}`; the `niche` sections and rows of the findings trio | one batch read and the trio exists |
 | 5 | Account architecture | `account-architecture` | `strategy/ACCOUNTS.md` | it exists; the user approves on the strategy page |
 | 6 | Handle identities | `handles`, `persona-identity` | `handles/<handle>/HANDLE.md`, `references/` | one handle complete at five steps; two recommended |
 | 7 | App fit and plan | `app-fit`, `plan` (`hashtag-pool.sh`) | `strategy/APP-FIT.md`, `production/PLAN.md`, optionally `strategy/HASHTAG-POOL.md` | the fit exists and the plan parses with a handle and a row |
@@ -257,7 +257,22 @@ refresh, ends with the three files the Atlas niche page reads from the folder:
 and `BATCH.md` (the post table first). Before the table, the read drops the off-niche
 posts (`niche-raw.py drop`): their folders go, they leave the three files, and the paid
 `<handle>.profile.raw.json` fetch files stay untouched. A batch is not done until all
-three exist.
+three exist. Then, when `niche/CLEANUP.md` exists, the curation runs by itself (below).
+
+**The curation marks.** The niche page is one explorer over every post (the searches,
+the batches, your scroll), and its edit mode marks a post **Rule out** (it leaves the
+explorer; nothing is deleted) or **Study** (its full slides or video are wanted); a post
+with no mark is kept and not downloaded. The marks are one file per niche,
+`apps/<slug>/niche/marks.json`, keyed `<platform>:<id>`, each mark with `by` (`you` or
+`agent`), so they outlive every index rebuild and refresh. The user marks samples, then
+asks you to clean up the rest the same way: the `niche-curate` skill
+(`scripts/niche-marks.py`) reads the samples, marks the rest as `agent`, and fetches the
+Study posts through `niche-fetch` (its figure first, as rule 9). **A mark by `you` is
+never changed by an agent.** The user asks you to keep the cleanup instructions in
+`apps/<slug>/niche/CLEANUP.md` (the shape is `docs/niche-cleanup.example.md`), and to
+update them when they correct a mark; after every `niche-search` run, weekly refresh and
+batch read, when that file exists, you apply it to the unmarked posts without asking, so
+only the relevant posts stay. The ruled-out posts never set the win bar.
 
 **Two platforms.** An identity posts on TikTok, and may repost on Instagram: its
 `HANDLE.md` then has an `## Accounts` table, one row per platform, each account with its

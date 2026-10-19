@@ -7,20 +7,23 @@
  */
 
 import { usePathname, useRouter } from "next/navigation";
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 
 export type PickOpt = { v: string; label: string; n?: number };
 export type Pick = { key: string; label: string; def: string; opts: PickOpt[] };
 export type Check = { key: string; label: string };
 
-export function NicheFilters({ picks, checks, values, sort, anchor = "wins", keep = [] }: { picks: Pick[]; checks: Check[]; values: Record<string, string>; sort?: Pick; anchor?: string; /** Params kept as they are, outside the picks (the app, the view). */ keep?: string[] }) {
+export function NicheFilters({ picks, checks, values, sort, range, search, tail, anchor = "wins", keep = [] }: { picks: Pick[]; checks: Check[]; values: Record<string, string>; /** The search box, at the right end with the sort. */ search?: ReactNode; /** One more control after the sort (the niche page's edit mode switch). */ tail?: ReactNode; /** One sort pick, or several side by side (the metric, then the order). */ sort?: Pick | Pick[]; /** A date pick whose `custom` value opens two day boxes, written as `from` and `to`. */ range?: string; anchor?: string; /** Params kept as they are, outside the picks (the app, the view). */ keep?: string[] }) {
   const router = useRouter();
   const path = usePathname();
   const bar = useRef<HTMLDivElement>(null);
-  const defs = Object.fromEntries([...picks, ...(sort ? [sort] : [])].map((p) => [p.key, p.def]));
+  const sorts = sort ? (Array.isArray(sort) ? sort : [sort]) : [];
+  const defs = Object.fromEntries([...picks, ...sorts].map((p) => [p.key, p.def]));
   const go = (key: string, v: string) => {
     const u = new URLSearchParams();
     const next = { ...values, [key]: v };
+    /* The day boxes belong to the custom range: another date pick drops them. */
+    if (range && key === range && v !== "custom") { next.from = ""; next.to = ""; }
     for (const [k, val] of Object.entries(next)) {
       if (k === "n") continue;
       const def = defs[k] ?? "";
@@ -56,7 +59,13 @@ export function NicheFilters({ picks, checks, values, sort, anchor = "wins", kee
           <input type="checkbox" checked={values[c.key] === "1"} onChange={(e) => go(c.key, e.target.checked ? "1" : "")} /> {c.label}
         </label>
       ))}
-      {sort ? <div className="filt__sort">{one(sort)}</div> : null}
+      {range && values[range] === "custom" ? (
+        <span className="filt__range">
+          <label><small>from</small><input type="date" value={values.from ?? ""} max={values.to || undefined} onChange={(e) => go("from", e.target.value)} /></label>
+          <label><small>to</small><input type="date" value={values.to ?? ""} min={values.from || undefined} onChange={(e) => go("to", e.target.value)} /></label>
+        </span>
+      ) : null}
+      {sorts.length || search || tail ? <div className="filt__sort">{search}{sorts.map(one)}{tail}</div> : null}
     </div>
   );
 }

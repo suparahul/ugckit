@@ -95,3 +95,18 @@ test("Instagram shares: a post wins on likes OR on shares", () => {
   assert.ok(Math.abs(tiles[3].strength! - 0.005 / 0.003) < 1e-9); // the higher of the two bars
   assert.ok(Math.abs(tiles[6].strength! - 400 / 150) < 1e-9);
 });
+
+test("measured: the ruled-out posts set no bar, and are still marked against it", () => {
+  /* Two off-niche posts with a huge save rate would lift the median to 0.05 and leave one win. */
+  const kept = [tt(100_000, 1000), tt(100_000, 3000), tt(100_000, 5000)];
+  const out = [tt(100_000, 9000), tt(100_000, 9500)];
+  const all = [...kept, ...out];
+  assert.equal(markWins(all.map((t) => ({ ...t }))).tiktok.median, 0.05);
+  const rule = markWins(all, kept);
+  assert.equal(rule.tiktok.median, 0.03);
+  assert.equal(rule.tiktok.over, 3);
+  assert.equal(rule.tiktok.slideshows, 3, "the counts are over the measured posts");
+  assert.equal(rule.tiktok.wins, 2);
+  assert.deepEqual(all.map((t) => t.win_), [false, true, true, true, true]);
+  assert.equal(out[0].strength, 3);
+});

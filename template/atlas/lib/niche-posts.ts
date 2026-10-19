@@ -171,7 +171,7 @@ export function generalPost(a: Record<string, any>, keyword: string): NichePost 
 /* ------------------------------------------------------------- the detail */
 
 /** A search window as the niche pages name it. */
-export const windowLabel = (w: string) => ({ LAST_THREE_MONTHS: "last three months", PHOTO_TAB: "photo tab", THIS_MONTH: "this month", SCROLL: "your scroll", GENERAL: "general search", IG_TOP: "Instagram top", IG_RECENT: "Instagram recent" }[w] ?? w.toLowerCase().replace(/_/g, " "));
+export const windowLabel = (w: string) => ({ LAST_THREE_MONTHS: "last three months", PHOTO_TAB: "photo tab", THIS_MONTH: "this month", SCROLL: "your scroll", GENERAL: "general search", IG_TOP: "Instagram top", IG_RECENT: "Instagram recent" }[w] ?? (/^GENERAL_\d{4}-\d{2}-\d{2}$/.test(w) ? `general search, read ${w.slice(8)}` : w.toLowerCase().replace(/_/g, " ")));
 
 /** The detail page of a niche post: /app/<slug>/niche/post/<platform>/<id>. */
 export const nichePostHref = (slug: string, platform: Platform, id: string) =>

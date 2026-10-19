@@ -40,7 +40,9 @@ handles of the earlier batches (their `LINKS.md` rows and `<handle>.profile.raw.
 files) plus any the user adds; ask once whether to drop or add one. Write one `@handle`
 row per handle, `Source` = `own search`, and in the note why the handle is followed (for
 example "from the batch of <date>"). `Searched:` names the refresh and its window
-("weekly refresh, posts since <the last batch date>").
+("weekly refresh, posts since <the last batch date>"). A handle whose posts are all
+ruled out on the niche page (`niche/marks.json`, by the user or by a `CLEANUP.md` rule) is
+not followed again: name it when you ask about dropping handles.
 
 ## What every mode writes
 

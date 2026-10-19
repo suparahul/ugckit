@@ -105,8 +105,10 @@ another date is a second folder and a second dated section.
 
     scripts/state.py set <slug> niche done
 
-Check that the batch folder holds `LINKS.md`, `posts.raw.json` and `BATCH.md`, and
-that the niche page (http://localhost:3210/app/<slug>/niche) shows the batch's posts and
+Rebuild the index (`cd atlas && npm run index`). If `apps/<slug>/niche/CLEANUP.md` exists,
+run the `niche-curate` skill now, without asking, on the new posts (a weekly refresh
+too): they are marked by the user's cleanup rules. Check that the batch folder holds
+`LINKS.md`, `posts.raw.json` and `BATCH.md`, and that the niche page (http://localhost:3210/app/<slug>/niche) shows the batch's posts and
 none of the dropped ones.
 Report the batch file, the three findings files with their row counts, and the two or
 three findings the strategy will use (the format that repeats across handles, the

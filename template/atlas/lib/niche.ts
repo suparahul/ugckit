@@ -163,6 +163,12 @@ export function getNicheDetail(slug: string, platform: Platform, id: string): { 
   const scrolled = platform === "tiktok" ? listBatches(slug).filter((b) => b.read).flatMap((b) => b.posts.filter((p) => p.slides.length || p.video)) : [];
   const post = nicheDetailOf(posts, platform, id) ?? (() => { const b = scrolled.find((p) => p.id === id); return b ? scrollDetailOf(b) : null; })();
   if (!post) return null;
+  /* A searched post whose slides were also pulled into a batch shows those slides (and its first slide as the cover). */
+  if (platform === "tiktok" && !post.slides.length) {
+    /* The same post can sit in more than one batch; the copy with the most slides wins. */
+    const onDisk = listBatches(slug).flatMap((b) => b.posts).filter((p) => p.id === id && p.slides.length).sort((a, b) => b.slides.length - a.slides.length)[0];
+    if (onDisk) { post.slides = onDisk.slides; post.cover = post.cover ?? onDisk.slides[0]; }
+  }
   const ids = new Set(posts.filter((p) => (p.platform ?? "tiktok") === platform && p.handle === post.handle && p.id !== id).map((p) => p.id));
   const more = [...ids].map((x) => nicheDetailOf(posts, platform, x)!)
     .concat(scrolled.filter((p) => p.handle === post.handle && p.id !== id && !ids.has(p.id)).map(scrollDetailOf))
