@@ -59,7 +59,8 @@ fields. Production's check is `scripts/character/bridge.py`; the schema, when sh
       "reaction_refs": [{"id": "rx1", "post_id", "platform", "handle", "post_dir", "video_path",
                          "video_sha256": null, "start_s", "end_s", "notes_ref",
                          "generation_input": "face_replace", "burned_in_text": null,
-                         "permission_ref": null}],   (optional; never required)
+                         "library_id": null, "library_differs": null,
+                         "permission_ref": null}],   (permission_ref optional; never required)
       "assets": [{"id", "kind", "origin", "path", "sha256", "source_url", "permission_ref",
                   "subject_ids", "set_ref", "trim_s", "screen_id", "paired_input_ref"}],
       "narrators": [{"id", "kind", "character_ref", "voice_ref", "source_ref", "credential_ref"}],
@@ -107,6 +108,16 @@ reports every one.
   fallback (`"none"`) and the gate-B checklist. A face-replace beat lasts exactly
   `end_s - start_s`, has `set_id` null (the room and clothes are the clip's), and its
   `framing`, `camera_distance` and `camera` describe the clip as it is. With no reference, `reaction` is null and `ready` blocks the lock.
+- **A reference from the reaction library** (the brief's `reaction_reference.library_id`):
+  copy the entry (`library/reactions/reactions.json`) into `reaction_refs` with the same
+  `library_id`, post, range and `video_sha256`; `library_differs` only when the brief has
+  it. Its `expression_beats` are already timed from the range's start: each becomes a
+  beat's expression beat with `ref_s` = [entry `start_s` + its `start_s`, entry `start_s` +
+  its `end_s`], and its face, eyes and head as written; check them against the preview
+  sheet. `generation_input` is `"face_replace"` when the entry's `fit.face_replace.ok` is
+  true; else `"none"` (the written route), and REVIEW.md says why in one line (the fit's
+  reason). An entry with no expression beats yet: watch the range and write them, then
+  `reactions.py describe` the entry with the same beats.
 - **Full-screen app beats** are framing `app_screen`.
 - **Cast and world**: the exact fixed subjects of each beat, by id; one set and one outfit
   per generated character; a real animal only in supplied beats.

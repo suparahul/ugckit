@@ -35,3 +35,7 @@ atlas/tsconfig.tsbuildinfo
 
 # The identity gate's face models (about 39 MB): fetched once by scripts/character/identity.py, checked by sha256.
 scripts/character/face-models/
+
+# The reaction library's preview sheets are made again by scripts/planning/reactions.py fill.
+# The entries (library/reactions/reactions.json) are the user's work: keep them.
+library/reactions/previews/

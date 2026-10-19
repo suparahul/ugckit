@@ -1,0 +1,48 @@
+{
+  "_comment": "One entry of the reaction library, library/reactions/reactions.json: {\"version\": 1, \"entries\": {\"<id>\": <entry>}}. The library is an index of real ranges of real posts: the video stays where it is (research/ or apps/<slug>/niche/batches/) and is never copied. scripts/planning/reactions.py writes it (add, describe, fill); the Atlas Reactions page writes the user's fields. Times: start_s and end_s are seconds in the post; each expression beat's times are seconds from start_s. status: proposed (by an agent), kept (only the user sets it), retired. set_by_you lists the fields the user set; an agent never changes them. fit is computed by reactions.py fill from people, speech, cuts, face_hidden_s and the length. Tags come from docs/character/reaction-tags.json.",
+  "id": "rx-tiktok-7626442321860644127-0",
+  "status": "proposed",
+  "source": {
+    "platform": "tiktok",
+    "post_id": "7626442321860644127",
+    "handle": "@kailyn.lifts",
+    "url": "https://www.tiktok.com/@kailyn.lifts/video/7626442321860644127",
+    "post_dir": "research/<slug>/<brand>/kailyn.lifts/7626442321860644127",
+    "video": "research/<slug>/<brand>/kailyn.lifts/7626442321860644127/video.mp4",
+    "video_sha256": "<sha256 of video, written by fill>",
+    "notes": "research/<slug>/<brand>/kailyn.lifts/7626442321860644127/notes.md",
+    "views": 13160469,
+    "date": "2026-04-08"
+  },
+  "start_s": 0.0,
+  "end_s": 2.0,
+  "length_s": 2.0,
+  "expression_beats": [
+    {"start_s": 0.0, "end_s": 0.8, "face": "brows up, mouth opens", "eyes": "at the phone", "head": "pulls back"},
+    {"start_s": 0.8, "end_s": 2.0, "face": "a slow, wide smile", "eyes": "to the lens", "head": "tilts left"}
+  ],
+  "framing": {
+    "framing": "chest-up, centred",
+    "camera_distance": "arm's length",
+    "camera": "selfie, handheld",
+    "people": 1,
+    "room": "gym floor, bright",
+    "cuts": 0,
+    "face_hidden_s": 0.0
+  },
+  "speech": "none",
+  "burned_in_text": [
+    {"text": "4 years at the gym and NOW I find this?!!??", "where": "top third", "start_s": 0.0, "end_s": 2.0, "kind": "hook"}
+  ],
+  "hook_text": "4 years at the gym and NOW I find this?!!??",
+  "tags": ["surprise", "regret"],
+  "fit": {
+    "face_replace": {"ok": true, "why": "one face, silent, no cut, 2.0 s"},
+    "written": {"ok": true, "why": "one face, 2 expression beats"}
+  },
+  "preview": "library/reactions/previews/rx-tiktok-7626442321860644127-0.jpg",
+  "note": "",
+  "added": {"by": "agent", "at": "2026-10-19T12:00:00Z", "from": "agent-scan"},
+  "set_by_you": [],
+  "updated_at": "2026-10-19T12:00:00Z"
+}

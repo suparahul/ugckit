@@ -3,8 +3,11 @@
 video. Free, local: no generation, no network, no production state.
 
     video_plan.py catalogue [<slug>]                 taxonomy version and catalogue digest
-    video_plan.py reactions <slug> [--grep <word>]   real reaction posts in the workspace's
-                                                     research, for a reaction hook's reference
+    video_plan.py reactions <slug> [--grep <word>] [--job <hook job>]
+                                                     the reaction library first (kept, then
+                                                     proposed; library/reactions/), then the real
+                                                     reaction posts in the workspace's research
+                                                     that are not in it yet
     video_plan.py brief  <brief.json>                the brief against the taxonomy
     video_plan.py check  <plan.draft.json|plan.json> the planning contract (must pass to lock)
     video_plan.py review <plan.draft.json>           write REVIEW.md beside the draft, from the
@@ -234,6 +237,7 @@ def check_brief(b, out):
             for k in ("post_dir", "video"):
                 if rr.get(k) and not os.path.exists(os.path.join(ROOT, rr[k])):
                     out.no(f"reaction_reference.{k} {rr[k]} is not in the workspace")
+            check_library_ref("reaction_reference", rr, rr.get("video"), out)
     if b.get("selected_hook") not in {h.get("id") for h in alts}:
         out.no(f"selected_hook {b.get('selected_hook')!r} is not one of the alternatives")
     check_row_fields(b, t, out)
@@ -623,6 +627,35 @@ RX_KEYS = ["ref_id", "framing", "camera_distance", "expression_beats"]
 RX_STEP_KEYS = ["start_s", "end_s", "ref_s", "face", "eyes", "head"]
 
 
+def library():
+    """The workspace's reaction library (scripts/planning/reactions.py): {id: entry}."""
+    p = os.path.join(ROOT, "library", "reactions", "reactions.json")
+    return (load(p).get("entries") or {}) if os.path.exists(p) else {}
+
+
+def check_library_ref(where, r, video, out):
+    """A reference picked from the reaction library names its entry in `library_id`: the entry
+    exists and is not retired, and the reference is its post and its range, or says in
+    `library_differs` why the range differs."""
+    lid = r.get("library_id")
+    if not lid:
+        return
+    e = library().get(lid)
+    if not e:
+        out.no(f"{where}: library_id {lid} is not in library/reactions/reactions.json")
+        return
+    if e.get("status") == "retired":
+        out.no(f"{where}: library entry {lid} is retired; pick another")
+    s = e.get("source") or {}
+    if str(r.get("post_id")) != str(s.get("post_id")) or (video and video != s.get("video")):
+        out.no(f"{where}: post {r.get('post_id')} is not the post of library entry {lid} ({s.get('post_id')})")
+    if (r.get("start_s"), r.get("end_s")) != (e.get("start_s"), e.get("end_s")) and not r.get("library_differs"):
+        out.no(f"{where}: range {r.get('start_s')}–{r.get('end_s')} s is not the library entry's "
+               f"{e.get('start_s')}–{e.get('end_s')} s; copy it, or say why in library_differs")
+    if r.get("video_sha256") and s.get("video_sha256") and r["video_sha256"] != s["video_sha256"]:
+        out.no(f"{where}: video_sha256 is not the library entry's: the post's video changed")
+
+
 def reaction_beats(plan):
     """The beats that perform a reaction: each beat with a `reaction` key, and the first
     beat of a reaction hook."""
@@ -651,6 +684,7 @@ def check_reaction(plan, beats, hook, ck, out):
         if r.get("generation_input") not in RX_INPUT:
             out.no(f"reaction ref {rid}: generation_input is \"face_replace\" (the default, founder "
                    "2026-10-04) or \"none\"")
+        check_library_ref(f"reaction ref {rid}", r, r.get("video_path"), out)
     if hook.get("channel") == "reaction" and beats:
         b0 = beats[0]
         if b0.get("lines") or b0.get("performance") != "silent_action":
@@ -1161,6 +1195,10 @@ def pin(draft_path):
         p = os.path.join(ROOT, obj[key]) if obj.get(key) else None
         if p and os.path.exists(p):
             h = sha256_file(p)
+            lib_sha = ((library().get(obj.get("library_id") or "") or {}).get("source") or {}).get("video_sha256")
+            if lib_sha and lib_sha != h:
+                print(f"  ! {obj.get('id')}: {obj[key]} is not the file of library entry {obj['library_id']} "
+                      f"(sha256 {h[:12]}… against {lib_sha[:12]}…): check the range again")
             if obj.get(sha) != h:
                 obj[sha] = h
                 n += 1
@@ -1286,9 +1324,25 @@ RX_WORDS = re.compile(r"react|shock|surpris|disbelief|gasp|amaz|stunned|jaw|hand
 VIDEO_EXT = (".mp4", ".mov", ".webm")
 
 
-def reactions(slug, grep=None, limit=30):
-    """Downloaded posts in the workspace's research whose notes describe a reaction. The
-    reference of a reaction hook is chosen from these; never from memory."""
+def reactions(slug, grep=None, limit=30, job=None):
+    """The reaction library first: kept entries, then proposed ones, with the hook job's tags
+    first when --job names it. Then the downloaded posts in the workspace's research whose
+    notes describe a reaction and that are not in the library. The reference of a reaction
+    hook is chosen from these; never from memory."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import reactions as rx
+    lib = {"entries": library()}
+    entries = [e for e in rx.ranked(lib, job=job)
+               if not grep or re.search(grep, json.dumps(e, ensure_ascii=False), re.I)]
+    print(f"{len(entries)} library entr{'y' if len(entries) == 1 else 'ies'} (library/reactions/reactions.json)"
+          + (f" for hook job {job}" if job else "") + (f", matching {grep!r}" if grep else ""))
+    for e in entries[:limit]:
+        print(f"- {e['id']} · {e['status']} · {e['length_s']:g} s · {', '.join(e.get('tags') or []) or 'no tags'}"
+              f" · face replace {rx.fit_word((e.get('fit') or {}).get('face_replace') or {'ok': None})}"
+              f"\n    {e['source']['video']} {e['start_s']:g}–{e['end_s']:g} s · "
+              f"{len(e.get('expression_beats') or [])} beat(s)" + (f" · note: {e['note']}" if e.get("note") else ""))
+    in_lib = {e["source"].get("post_dir") for e in lib["entries"].values()}
+    print()
     roots = [os.path.join(ROOT, "research", slug), os.path.join(ROOT, "apps", slug, "niche", "batches")]
     rows = []
     for top in roots:
@@ -1296,7 +1350,7 @@ def reactions(slug, grep=None, limit=30):
             if "notes.md" not in files:
                 continue
             vids = [f for f in files if f.lower().endswith(VIDEO_EXT)]
-            if not vids:
+            if not vids or os.path.relpath(d, ROOT) in in_lib:
                 continue
             text = open(os.path.join(d, "notes.md"), errors="replace").read()
             hits = [ln.strip() for ln in text.splitlines() if RX_WORDS.search(ln)]
@@ -1306,8 +1360,9 @@ def reactions(slug, grep=None, limit=30):
             views = int((m.group(1) or m.group(2)).replace(",", "")) if m else -1
             rows.append((views, os.path.relpath(d, ROOT), vids[0], hits[0][:180]))
     rows.sort(reverse=True)
-    print(f"{len(rows)} downloaded post(s) with a reaction in their notes"
-          + (f", matching {grep!r}" if grep else "") + "; read the notes and the frames before you pick one")
+    print(f"{len(rows)} downloaded post(s) with a reaction in their notes, not in the library"
+          + (f", matching {grep!r}" if grep else "") + "; read the notes and the frames before you pick one, "
+          "and add the one you use (reactions.py add)")
     for views, d, v, hit in rows[:limit]:
         print(f"- {d}/{v} · views {views if views >= 0 else '?'}\n    {hit}")
 
@@ -1322,12 +1377,13 @@ def main():
     ap.add_argument("--date")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--grep")
+    ap.add_argument("--job")
     ap.add_argument("--from-atlas", action="store_true")
     a = ap.parse_args()
     if a.cmd == "reactions":
         if not a.path:
             sys.exit("reactions <slug>")
-        reactions(a.path, a.grep)
+        reactions(a.path, a.grep, job=a.job)
         return
     if a.cmd == "catalogue":
         tv, cd = catalogue(a.path)

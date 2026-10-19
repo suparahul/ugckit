@@ -1,0 +1,22 @@
+{
+  "_comment": "The fixed tag list of the reaction library (library/reactions/reactions.json) and the tags each hook job asks for. Each tag names a thing you can see in the clip. scripts/planning/reactions.py, video_plan.py reactions and the Atlas Reactions page read this file; change it here only.",
+  "version": 1,
+  "tags": [
+    "surprise", "shock", "disbelief", "regret", "relief", "delight", "confusion", "cringe",
+    "realisation", "smug", "worry", "tears", "jaw drop", "hand to mouth", "slow reveal", "pet"
+  ],
+  "hook_jobs": {
+    "discovery_regret": ["regret", "realisation", "disbelief"],
+    "imminent_need": ["shock", "worry"],
+    "confession_reframe": ["cringe", "realisation"],
+    "quoted_challenge": ["disbelief", "smug"],
+    "specific_promise": ["delight", "surprise"],
+    "peer_question": ["confusion", "disbelief"],
+    "visible_result": ["delight", "surprise", "jaw drop"],
+    "in_progress": ["confusion", "worry"],
+    "gratitude_discovery": ["relief", "delight", "tears"],
+    "category_analogy": ["realisation", "surprise"],
+    "withheld_reveal": ["slow reveal", "surprise", "shock"],
+    "explanation": ["realisation", "confusion"]
+  }
+}

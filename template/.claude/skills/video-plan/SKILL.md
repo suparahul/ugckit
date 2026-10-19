@@ -7,8 +7,10 @@ description: Video planning, step 2 — one finalised video idea (a handle, a da
 
     python3 scripts/planning/video_plan.py catalogue <slug>     the taxonomy version and digest to pin
     python3 scripts/planning/video_plan.py brief <brief.json>    the check; must pass
-    python3 scripts/planning/video_plan.py reactions <slug> [--grep <word>]
-                                                                 real reaction posts in research
+    python3 scripts/planning/video_plan.py reactions <slug> [--job <hook job>] [--grep <word>]
+                                                                 the reaction library, then real
+                                                                 reaction posts in research
+    python3 scripts/planning/reactions.py add|describe|fill ... the library (see its --help)
 
 Input: one finalised idea — the handle, the date (or the row number of an undated week) and
 the row of the user's plan. The idea is already chosen; this step does not choose it.
@@ -72,6 +74,7 @@ Lowercase, digits and hyphens. It is the folder name here and under `pipeline/ch
                              "post_dir": "research/<project>/<app>/<handle>/<post>",
                              "video": "<post_dir>/video.mp4", "notes": "<post_dir>/notes.md",
                              "start_s": 0.0, "end_s": 2.9, "burned_in_text": "<text, where> or null",
+                             "library_id": "<rx-... from library/reactions/, or null>",
                              "why": "...", "candidates_seen": []},
                             (only with hook channel "reaction"; null when none is found)
       "facts": [{"id": "f1", "claim": "...", "source": "<title, url or section>", "verified": false}],
@@ -112,15 +115,32 @@ Lowercase, digits and hyphens. It is the folder name here and under `pipeline/ch
   a reacting face or "I just found this??" takes hook channel `reaction`: a silent face, the
   hook as text. Every hook alternative is a `reaction` text.
 - **A reaction comes from a real reference, never from the writer** (user decision,
-  2026-10-03). Run `video_plan.py reactions <slug>` (add `--grep` with the hook's words). It
-  lists downloaded posts in `research/<project>/…/<post>/` and
-  `apps/<slug>/niche/batches/<date>/<handle>/<post>/` whose notes describe a reaction. Read
-  the notes of the best matches. Look at the frames: `ffmpeg -t 5 -i <video> -vf
-  "fps=4,scale=270:-1,tile=6x3" -frames:v 1 <scratch>/sheet.jpg` writes one contact sheet to
-  a scratch folder, free and local. Pick the post whose reaction does the same hook job, with
-  no speech, and fits the handle's set. Write its post id and the exact range of the
-  reaction (the first and last face frame) in `reaction_reference`, and the others you saw
-  in `candidates_seen`. Never write to a research folder.
+  2026-10-03). Look in this order, and stop at the first that fits:
+  1. **The user's pick.** A `reaction.pick` line in `apps/<slug>/production/log.jsonl` for
+     this video (`data.video`, `data.entry_id`; no `actor`): the user chose a library entry
+     in the Atlas (the Reactions page, or Choose a reaction on the plan). Use it. If it does
+     not fit the hook job or the handle, say why and ask; never replace it in silence.
+  2. **The reaction library.** Run `video_plan.py reactions <slug> --job <hook job>` (add
+     `--grep` with the hook's words). It lists `library/reactions/reactions.json` first:
+     `kept` entries (the user kept them), then `proposed` ones (an agent added them), with
+     the length, the tags, the expression beats and whether face replace fits. Open the
+     preview sheet of the best ones and play the range.
+  3. **The research.** The same command then lists downloaded posts in
+     `research/<project>/…/<post>/` and `apps/<slug>/niche/batches/<date>/<handle>/<post>/`
+     whose notes describe a reaction and that are not in the library. Read the notes of the
+     best matches. Look at the frames: `ffmpeg -t 5 -i <video> -vf
+     "fps=4,scale=270:-1,tile=6x3" -frames:v 1 <scratch>/sheet.jpg` writes one contact sheet
+     to a scratch folder, free and local. If you use one, first add it to the library:
+     `reactions.py add <post_dir> <start> <end> --tags ...`, then `describe` with what you
+     saw in the frames, then `fill`. It goes in as `proposed`.
+
+  Pick the reaction that does the same hook job, with no speech, and fits the handle's set.
+  Copy the entry into `reaction_reference`: `library_id`, the post (`post_id`, `platform`,
+  `handle`, `post_dir`, `video`, `notes`), its exact range (`start_s`, `end_s`) and its
+  burned-in text as one line with its place. List the other entry ids you looked at in
+  `candidates_seen`. `why` is your own words. A range other than the entry's needs
+  `library_differs` with the reason (the brief check refuses it otherwise). Never write
+  to a research folder, and never set an entry to `kept`: only the user keeps one.
 - **No reference, no plan.** When no downloaded post fits, `reaction_reference` is null and
   the missing input `{"id": "reaction_reference", "owner": "founder", "blocks": "lock"}`
   says what to download. Never describe a made-up reaction.

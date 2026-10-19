@@ -28,6 +28,11 @@ One post at a time, under `apps/<slug>/niche/batches/<date>/<handle>/<postId>/`:
 slides at once. Transcribe the on-image text **verbatim**: original spelling,
 capitalisation, typos, emoji.
 
+A video whose sheets show one face reacting without speech (surprise, regret, disbelief, a
+jaw drop) is a reaction a later reaction hook can use: add the range to the reaction
+library, `scripts/planning/reactions.py add <post dir> <start_s> <end_s> --tags ...`, then
+`describe` it with what you saw and `fill` it. It goes in as `proposed`; free.
+
 ## 1b. Drop the off-niche posts
 
 A post that is not about the niche (another animal, the creator's life, a fan-art meme,

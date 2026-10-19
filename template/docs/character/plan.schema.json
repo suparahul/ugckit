@@ -1130,6 +1130,20 @@
               "null"
             ],
             "description": "optional; never required (founder, 2026-10-04)"
+          },
+          "library_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "the reaction library entry this reference copies (library/reactions/reactions.json, scripts/planning/reactions.py), or null for a research post not in the library"
+          },
+          "library_differs": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "why the range is not the library entry's range; null when it is"
           }
         }
       }
