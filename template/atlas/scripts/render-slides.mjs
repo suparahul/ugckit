@@ -52,7 +52,7 @@
  * by rendering it, so no font-metrics library is needed.
  */
 
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import sharp from "sharp";
@@ -125,6 +125,14 @@ function pictureOf(key, n, events) {
     else if (e.kind === "slide.reject") approved = null;
   }
   const ok = (f) => f && existsSync(join(FILES, f));
+  /* A slide composed after the last upload or choose is the current candidate (the same rule as lib/production.ts). */
+  const pickAt = last(events.filter((e) => e.slide === n && (e.kind === "slide.upload" || e.kind === "slide.choose") && e.file))?.at;
+  let composed = null;
+  for (const f of files.filter((f) => /^composed-.*\.(png|jpe?g)$/i.test(f))) {
+    const mtime = statSync(join(dir, f)).mtimeMs;
+    if (!composed || mtime > composed.mtime) composed = { file: rel(f), mtime };
+  }
+  if (composed && (!pickAt || composed.mtime > Date.parse(pickAt))) current = composed.file;
   return { approved: ok(approved) ? approved : null, current: ok(current) ? current : files.length ? rel(last(files)) : null };
 }
 
@@ -231,6 +239,8 @@ async function blockSvg(b, x, y, w, sizeCqw) {
  * bottom 18% stays empty for TikTok's caption and button column.
  */
 async function defaultLayoutSvg(slide, hasCard) {
+  /* A camera cover's words are drawn by cameraLayer, in its own type. */
+  if (slide.cover?.style === "camera") return "";
   const groups = { top: [], middle: [], bottom: [] };
   /* A "The screen" or "The phone" block is a build note for the phone's screen, not words on the slide (as Frame.tsx Stacks). */
   for (const b of slide.blocks) if (!isScreenBlock(b.label)) groups[b.place === "flow" ? "top" : b.place].push(b);
@@ -239,8 +249,6 @@ async function defaultLayoutSvg(slide, hasCard) {
   let out = "";
   for (const place of ["top", "middle", "bottom"]) {
     const bs = groups[place];
-  /* A camera cover's words are drawn by cameraLayer, in its own type. */
-  if (slide.cover?.style === "camera") return "";
     if (!bs.length) continue;
     /* The callout stack is 94% wide (production.css), so the sentence's trailing emoji does not strand on a line of its own. */
     const wide = hasCard && place === "bottom";
@@ -264,14 +272,6 @@ async function defaultLayoutSvg(slide, hasCard) {
   return out;
 }
 
-async function lockedLayoutSvg(layout) {
-  let out = "";
-  for (const b of layout.blocks) {
-    const x = (b.x / 100) * W, y = (b.y / 100) * H, w = (b.w / 100) * W;
-    out += (await blockSvg({ text: b.text, box: !!b.box, align: b.align === "left" ? "left" : "center" }, x, y, w, b.fs)).svg;
-  }
-  return out;
-}
 /**
  * The camera cover's layer (lib/camera-cover.ts): the 3x3 grid and the zoom buttons over the
  * picture, and with `withText` the hook in its stacked, staggered lines. A transparent PNG at
@@ -310,6 +310,14 @@ async function cameraLayer(slide, withText) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+async function lockedLayoutSvg(layout) {
+  let out = "";
+  for (const b of layout.blocks) {
+    const x = (b.x / 100) * W, y = (b.y / 100) * H, w = (b.w / 100) * W;
+    out += (await blockSvg({ text: b.text, box: !!b.box, align: b.align === "left" ? "left" : "center" }, x, y, w, b.fs)).svg;
+  }
+  return out;
+}
 
 /* ------------------------------------------------------------- render */
 
@@ -367,6 +375,8 @@ async function renderPost(key, { force = false, override = {}, burnCover = false
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><defs><filter id="sh" x="-5%" y="-5%" width="110%" height="110%"><feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-color="#000" flood-opacity="0.6"/></filter></defs>${body}</svg>`;
       layers.push({ input: Buffer.from(svg), top: 0, left: 0 });
     }
+    /* A camera cover: the grid and the zoom buttons always (they belong to the picture), the hook when the text is burned. */
+    if (slide.cover?.style === "camera" && !illustrated) layers.push({ input: await cameraLayer(slide, flag === "baked" && !layoutOf(slide.n, events)), top: 0, left: 0 });
     let cardNote = "";
     if (hasCard) {
       /* The card: where the locked layout put it (x, y, w in % of the frame; the height follows the 139:34 ratio), or the
@@ -375,8 +385,6 @@ async function renderPost(key, { force = false, override = {}, burnCover = false
       const { path, note } = await cardFor(key, layout, cardPath);
       cardNote = note;
       const lc = layout?.card;
-    /* A camera cover: the grid and the zoom buttons always (they belong to the picture), the hook when the text is burned. */
-    if (slide.cover?.style === "camera" && !illustrated) layers.push({ input: await cameraLayer(slide, flag === "baked" && !layoutOf(slide.n, events)), top: 0, left: 0 });
       const cw = Math.round(((lc ? lc.w : CARD.w) / 100) * W), ch = Math.round(cw * CARD.ratio);
       const cardLeft = Math.round(lc ? (lc.x / 100) * W : (W - cw) / 2);
       const cardTop = Math.round(lc ? (lc.y / 100) * H : (FR.safe.bottom / 100) * H - ch);

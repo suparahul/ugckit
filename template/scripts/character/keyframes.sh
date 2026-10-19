@@ -50,8 +50,12 @@ N=$("$PY" -c "import json,sys; print(len(json.load(open(sys.argv[1]))['stills'])
 
 # ---------------------------------------------------------------- codex exec
 echo "codex exec: $N still(s), $(( ${#IARGS[@]} / 2 )) reference file(s); about two minutes a picture"
+# Codex image runs always use gpt-6-luna with medium reasoning; CODEX_MODEL and CODEX_EFFORT
+# override. Never fall back to the ~/.codex/config.toml default for an image run.
+CODEX_MODEL="${CODEX_MODEL:-gpt-6-luna}"; CODEX_EFFORT="${CODEX_EFFORT:-medium}"
+echo "model: $CODEX_MODEL; reasoning effort: $CODEX_EFFORT"
 START=$(date +%s)
-codex exec -C "$ROOT" -s workspace-write --skip-git-repo-check --ephemeral --json \
+codex exec -C "$ROOT" -s workspace-write --skip-git-repo-check --ephemeral --json -m "$CODEX_MODEL" -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
   -o "$KDIR/keyframes-result.md" "${IARGS[@]}" - \
   < "$KDIR/keyframes-instruction.txt" > "$KDIR/keyframes-events.jsonl" 2> "$KDIR/keyframes-stderr.txt"
 RC=$?

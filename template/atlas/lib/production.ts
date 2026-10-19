@@ -403,6 +403,24 @@ export function uploadedFiles(slug: string, key: string, sub: string): string[] 
   return readdirSync(dir).filter((f) => !f.startsWith(".")).sort().map((f) => `${slug}/${fileKey(key)}/${sub}/${f}`);
 }
 
+/**
+ * The finished slide of a slide folder: the newest `composed-*` file (the name
+ * every compose step writes), with its modification time. A compose step writes
+ * no log line, so the state takes this file as the current candidate when it is
+ * newer than the last upload or choose line.
+ */
+export function newestComposed(files: string[]): { file: string; mtime: number } | null {
+  let best: { file: string; mtime: number } | null = null;
+  for (const f of files) {
+    if (!/^composed-[^/]*\.(png|jpe?g)$/i.test(f.split("/").pop() ?? "")) continue;
+    const abs = fileAbs(f);
+    if (!abs || !existsSync(abs)) continue;
+    const mtime = statSync(abs).mtimeMs;
+    if (!best || mtime > best.mtime) best = { file: f, mtime };
+  }
+  return best;
+}
+
 /* --------------------------------------------------------------------- state */
 
 /**
@@ -576,6 +594,10 @@ function slideStates(slug: string, deck: Deck, key: string, events: Event[], cha
       else if (e.kind === "slide.reject") { rejected = !!current; approved = null; note = e.note ?? null; at = e.at; }
     }
     if (current && !files.includes(current)) current = last(files);
+    /* A slide composed after the last upload or choose is the current candidate. */
+    const pickAt = last(ev.filter((e) => (e.kind === "slide.upload" || e.kind === "slide.choose") && e.file))?.at;
+    const composed = newestComposed(files);
+    if (composed && composed.file !== current && (!pickAt || composed.mtime > Date.parse(pickAt))) { current = composed.file; rejected = false; }
     if (approved && !files.includes(approved)) approved = null;
     const status: SlideState["status"] = !current ? "empty" : rejected ? "needsnew" : approved ? "approved" : "candidate";
     const textEv = last(ev.filter((e) => e.kind === "slide.text"));

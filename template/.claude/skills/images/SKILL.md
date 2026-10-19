@@ -48,8 +48,8 @@ never stored. A missing `codex` is `npm install -g @openai/codex`.
 - **Claude.** Run `scripts/codex-images.sh <slug> <post>` with `run_in_background` and
   wait for the notification; do not poll. It makes the check, writes the job, starts
   one `codex exec` (`-C <root> -s workspace-write --skip-git-repo-check --ephemeral
-  --json -o images-result.md -i <every reference> -` with the instruction on stdin),
-  then verifies. About two minutes a picture: a seven-slide post is about twelve
+  --json -m gpt-6-luna -c model_reasoning_effort="medium" -o images-result.md -i <every
+  reference> -` with the instruction on stdin), then verifies. About two minutes a picture: a seven-slide post is about twelve
   minutes; say so.
   Before the verify, the bridge checks that every new slide file is a byte copy of a
   picture in the run's own `~/.codex/generated_images/<thread>/` folder (the thread from
@@ -57,6 +57,12 @@ never stored. A missing `codex` is `npm install -g @openai/codex`.
   copy another run's picture. Such a file moves to `foreign/`, the script exits 1 with no
   log line, and it lists the run's own pictures: put each on its slide by hand, or re-run
   those slides with `--only`.
+
+**Model rule (Rahul, 2026-10-14).** Codex image runs always use `gpt-6-luna` with low
+reasoning. Never run image jobs on the `~/.codex/config.toml` default. Never use `pkill`
+on codex processes. `codex-images.sh` and `character/keyframes.sh` set both and print
+them; `CODEX_MODEL` or `CODEX_EFFORT` override, only when the user asks. When Codex is
+the agent and makes the pictures inline, the same model and effort apply.
 
 ## What is on disk after a run
 
@@ -94,7 +100,11 @@ What to look for on a photo handle, before a slide is chosen:
 - Redo the slides the user named. For any other slide, say how many and why before you
   spend a run, and offer the smallest set.
 - When the slides are composed, make the finished slide the chosen candidate of each
-  slide; no placeholder covers a finished picture.
+  slide; no placeholder covers a finished picture. Name each finished slide
+  `composed-<stamp>.png` in its slide folder: Atlas and `render-slides.mjs` take the newest
+  `composed-*` file as the active candidate when it is newer than the slide's last upload or
+  choose line. A finished slide under another name stays behind the raw picture. Open the
+  post page and check each slide before you report.
 
 Then run pass 2 of the `slideshow-review` skill on the post's pictures.
 
