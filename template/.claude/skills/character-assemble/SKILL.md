@@ -20,7 +20,13 @@ file.
 
 1. **Trim.** A talking segment runs from 0.15 s before its first word to 0.2 s after its
    last, by faster-whisper word times. Otherwise the segment's `trim` in `video.json`
-   (`[in, out]` in seconds), or the shot's `trim_to_seconds`.
+   (`[in, out]` in seconds), or the shot's `trim_to_seconds`. **A continuous take** (a
+   shot with `continuity.from`): the clip before the cut ends at its last frame, the one
+   the next clip was seeded with (`last-frame.json` `out_s`, never by word times), and the
+   continuing clip starts at its second frame, so no frame is shown twice. Picture and
+   sound are cut at the same points, with the same fade and loudness as every join. The
+   script stops before any encode when a last frame changed or the approved continuing
+   take was seeded with another frame.
 2. **Upscale once**, lanczos, to 1080x1920 (a composite is already there). No AI upscaler,
    no sharpening.
 3. **R**: the recording from its `trim` in point, cropped to 9:16 around the hero
@@ -67,12 +73,16 @@ hero element on the final file** (and on the grain file); no green left in the p
 segments. With overlays: **as planned** (the plan's, exactly), **readable** (up for
 words / 3 s, 1 s at least, not cut by the end of the file), **clear** of every hero
 element, every caption and each other, and **read back** by OCR on the final file. With
-supplied media: the files still match the plan's sha256. A FAIL marks P5 failed, and
+supplied media: the files still match the plan's sha256. At each continuous cut: the
+first clip ends at its last frame and the next starts at its second, with three numbers
+(0 to 255) for the eye: the two frames shown at the cut, the dropped first frame against
+the last frame, and the take's first frame against its seed. A FAIL marks P5 failed, and
 gate C refuses an approval while an overlay or supplied-file check fails.
 
 Then **look**: the contact sheet, and the file at full size, at every join. The final
 checklist, for gate C: the face holds across every segment; the outfit and the set hold;
-the voice and the room agree across every join; no join inside a sentence; the app's
+the voice and the room agree across every join; no join inside a sentence; a
+continuous cut shows no jump and no repeated frame; the app's
 strings are real and readable where they must be; the captions match the frozen script
 and the house style; each overlay says the plan's words at the plan's time; each panel
 shows its source; a live demonstration shows the real input and its real result in step.

@@ -423,8 +423,8 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
 | A, once per character | D1 identity | `persona-identity` (mode 3, the video half) | anchors, set plates, signature details, the twenty-generation gate |
 | | D2 voice | `character-voice` | the approved voice reference |
 | B, per video | P1 shots | `character-shots` | segments, shot files, `video.json`, keyframes, prompts, `refs.json`; **gate A**, the storyboard the user approves |
-| | P2 generate | `character-generate` | one segment per run, after the user's yes to its computed cost |
-| | P3 review | `character-review` | keep, reject or regenerate one segment; **gate B**; a reject adds a ledger row; each supplied file and narrator take approved |
+| | P2 generate | `character-generate` | one segment per run, after the user's yes to its computed cost; a continuing segment opens on the previous clip's approved last frame |
+| | P3 review | `character-review` | keep, reject or regenerate one segment; **gate B**; a reject adds a ledger row; each supplied file and narrator take approved; an approval takes the last frame the next clip continues from |
 | | P4 composite | `character-composite` (with `screens`, the screen library) | the real app on the green phone, at 1080x1920, and its insertion gates; **skipped when `app_insertion` is false** |
 | | P5 assemble | `character-assemble` | one 1080x1920 file from `video.json`: trims, R and P, supplied C and panels M, narration, sound, captions, the plan's overlays, the export pass |
 | | P6 deliver | `character-deliver` | **gate C**, then the finished file in `final/`; the pipeline ends here |
@@ -447,13 +447,18 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
   overlay; founder, 2026-10-03: a reaction hook is never spoken). A full-screen app beat
   has framing `app_screen` (R or P). In face-replace mode (founder, 2026-10-04) the
   reference clip, trimmed to its range with its burned-in text masked (`shots.py
-  reference`), is the motion input of the X generation and the character's face goes in;
-  research footage is never an input anywhere else. The shot's `face_replace.route` picks
-  the model: `edit` (Wan 2.7 Edit Video, the clip's frames, timing and length kept) or
-  `guided` (MiniMax H3 reference-to-video, a new clip trimmed to the clip's length, with
-  its own gate B check). `generate.sh` refuses every live face-replace run until the
-  founder approves a paid test (`capabilities.json` `bridge.face_replace`); the written
-  expression beats are the fallback. Production refuses a dry-run planning approval, a
+  reference`), is the motion input of the X generation; research footage is never an
+  input anywhere else. The shot's `face_replace.route` picks the model; a shot that names
+  none takes `models.json` `face_replace.default_route`. **`motion`, the default** (the
+  founder's final decision after the paid tests): Kling 3.0 Pro Motion Control on Supagen
+  (template `ugc-character-face-kling-motion`); the picture is the character's first
+  frame, a keyframe made from the hero and the clip's first frame and approved at gate A
+  by its checksum; the video is the original clip, padded to 3.0 s and trimmed back at
+  assembly. **`replace`, the backup**: Wan 2.2 Animate replace on Supagen, the original
+  clip and one face picture. `animate` (Wan 2.2 Animate move) and `guided` (MiniMax H3)
+  are fallbacks; `edit` (Wan 2.7 Edit Video) is retired. Every take passes the identity
+  gate (`identity.py`) before gate B approves it. `capabilities.json`
+  `bridge.face_replace` is true; the written expression beats stay the other route. Production refuses a dry-run planning approval, a
   number on an overlay without `fact_refs`, and research footage attached to a generation.
   A narrator speaks where no generated face
   talks: the character's approved performance, a supplied voice, or an original synthetic
@@ -469,7 +474,12 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
   recreation pipeline's. In the character pipeline, a segment may carry `refs.json` with
   only these kinds: the character's anchors (and her hero), the segment's approved
   keyframe, a frame of the neighbour segment, a set plate, a fixed subject's picture, the
-  character's voice reference. **Never an app UI, a screenshot or a screen recording as a
+  character's voice reference. **Continuity between clips comes from the last frame of the
+  approved clip**: a shot that continues from the clip before it (`continuity.from`) opens
+  on that clip's last frame, taken at gate B with its checksum
+  (`scripts/character/continuity.py`), never on a frame picked by hand; assembly cuts the
+  two with no frame shown twice. How the frame reaches each model is in `models.json`
+  (`continuity`); on every model it is unverified until a paid run measures it. **Never an app UI, a screenshot or a screen recording as a
   reference**: reference conditioning cannot reproduce text; the app is inserted at P4.
   `scripts/character/generate.sh` refuses any other kind, refuses more pictures than the
   model takes (4 on the default), and asks for an explicit opt-in (`ALLOW_REFS=1`) on

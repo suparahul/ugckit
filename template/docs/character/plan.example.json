@@ -126,6 +126,7 @@
       "set_id": "<world.json set of a generated beat>",
       "framing": "face | hands_only | subject_only | app_screen (the real app full frame: R or P)",
       "layout": "sequence",
+      "continues_previous": "<optional, true | false: true when this beat's picture continues the previous beat's in one take (both generated, one set); production seeds its first clip with the last frame of the previous beat's clip and cuts them with no frame shown twice>",
       "panels": [],
       "repeat_group": null,
       "item_index": null,

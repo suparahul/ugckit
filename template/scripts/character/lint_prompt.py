@@ -17,13 +17,34 @@ and no "exactly one person"), and the exact count of each fixed subject. For X (
 reaction): no line and the silence stated, no lip sync, exactly one person, no phone and
 no app, every expression beat of the written performance (its face, eyes and head) word for
 word with its time from the segment's start, and no copy of the reference (its post id,
-its creator's handle, its file, or words that ask the model to copy a clip). For X in
-face-replace mode (the reference's generation_input face_replace): the clip named in
-REFERENCES and bound to motion and timing, the face replaced by face.png, "nothing of the
-original person" stated, the reference post, creator and file never named; the written
-beats are then the gate B checklist, not prompt text.
+its creator's handle, its file, or words that ask the model to copy a clip).
+
+X in face-replace mode (the reference's generation_input face_replace) has two kinds of
+prompt:
+  - the replace route sends no prompt and has no keyframe: nothing to lint (a prompt.txt
+    left in the segment is reported as not sent).
+  - the motion route (Kling motion control) lints the keyframe_prompt as animate does, and
+    its prompt.txt: present, at most 600 characters, no file name.
+  - the animate route sends no video prompt. Its keyframe_prompt (the character's first
+    frame, made by Codex from the hero and the clip's first frame) is linted instead:
+    exactly one person, the identity lock's face and hair word for word, the band
+    sentence of every blur or box mask (bridge.band_sentence, "picture"), no file name, and
+    no name of the reference post or its creator.
+  - a prompt.txt for a model that edits or follows the clip (the guided route, or any
+    editing model) follows the rules for editing models: the edit first (the face
+    replacement in the first 300 characters), short (at most 1,500 characters), the inputs
+    called "the input video" and "the reference image" and never by a file name, no
+    instruction to keep or follow the clip's frames exactly, "nothing of the original
+    person" stated, and the band sentence of every blur or box mask
+    (bridge.band_sentence, "video"). The written beats are the gate B checklist.
+
+A continuing segment (its refs.json opens on the previous clip's last-frame.png): that
+line of REFERENCES binds it as the first frame. A face-replace X never continues.
 """
 import json, os, re, sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bridge
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MAX_CHARS = 5000
@@ -54,6 +75,55 @@ APP_WORDS = [r"green screen", r"phone screen", r"\bthe app\b", r"app screen", r"
 COUNT_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
 COPY_WORDS = [r"reference (video|clip|reaction)", r"\bcopy\b", r"\brecreate\b", r"\breplicate\b",
               r"\bmimic\b", r"same as the (video|clip)"]
+# Editing models (face replace): an instruction to keep the clip as it is wins over the edit.
+EDIT_MAX_CHARS = 1500
+FILE_NAME = r"\b[\w-]+\.(mp4|mov|png|jpe?g|webp)\b"
+KEEP_AS_IS = [r"keep (its|the) frames", r"(follow|match)\w* (the )?(input video|clip|reference)[^.]{0,40}\bexactly",
+              r"\bexactly\b[^.]{0,30}\b(input video|clip)\b", r"stays? (those|that) of", r"its frames,"]
+
+
+def face_route_of(shot):
+    """(route name, route record) of a face-replace shot, from models.json."""
+    spec = json.load(open(os.path.join(ROOT, "scripts", "character", "models.json")))
+    route = bridge.face_route_name(shot.get("face_replace") or {})
+    return route, ((spec.get("face_replace") or {}).get("routes") or {}).get(route) or {}
+
+
+def norm(x):
+    return " ".join(str(x).split())
+
+
+def lint_first_frame(video, seg, shot, plan, ref):
+    """The animate route: the keyframe prompt of the character's first frame."""
+    results = []
+
+    def check(name, ok, detail=""):
+        results.append((name, ok, detail))
+
+    kp = shot.get("keyframe_prompt") or ""
+    flat = norm(kp)
+    low = flat.lower()
+    check("keyframe prompt (animate route: no video prompt)", bool(kp.strip()),
+          f"{len(kp)} characters" if kp.strip() else "the shot has no keyframe_prompt")
+    check("length", len(kp) <= MAX_CHARS, f"{len(kp)} characters (limit {MAX_CHARS})")
+    check("the people rule (face)", "exactly one person" in low, "say 'Exactly one person.'")
+    hdir = os.path.join(ROOT, "apps", plan["app"], "handles", plan["handle"].lstrip("@"))
+    cid = (plan.get("characters") or [""])[0].split("@")[0]
+    cp = os.path.join(hdir, "characters", cid, "creator.json")
+    lock = (json.load(open(cp)).get("identity_lock") or {}) if os.path.exists(cp) else {}
+    miss = [k for k in ("face", "hair") if not lock.get(k) or norm(lock[k]).lower() not in low]
+    check("the identity lock's face and hair, word for word", not miss,
+          ("missing: " + ", ".join(miss)) if miss else "")
+    bands = bridge.band_sentence((shot.get("face_replace") or {}).get("masks"), "picture")
+    gone = [b for b in bands if norm(b) not in flat]
+    check("the band sentence of every blur or box mask", not gone,
+          ("paste, word for word: " + " | ".join(gone)) if gone else f"{len(bands)} band(s)")
+    fn = sorted({m.group(0) for m in re.finditer(FILE_NAME, kp)})
+    check("no file name", not fn, ", ".join(fn) or "call the pictures 'the first reference picture' and 'the pose picture'")
+    names = [str(ref.get(k)) for k in ("post_id", "handle") if ref.get(k)]
+    cpn = [n for n in names if n.lower() in low]
+    check("no name of the reference", not cpn, ", ".join(cpn))
+    return results
 
 
 def sections(text):
@@ -94,8 +164,24 @@ def lint(video, seg):
     refs = []
     if os.path.exists(os.path.join(sd, "refs.json")):
         refs = json.load(open(os.path.join(sd, "refs.json"))).get("references") or []
-    text = open(pp).read()
     t = str(shot.get("segment_type", "")).upper()
+    rx0 = shot.get("reaction") or {}
+    ref0 = next((r for r in plan.get("reaction_refs") or [] if r.get("id") == rx0.get("ref_id")), {})
+    fr0 = t == "X" and ref0.get("generation_input") == "face_replace" and isinstance(shot.get("face_replace"), dict)
+    if fr0 and face_route_of(shot)[1].get("first_frame") == "keyframe":
+        res = lint_first_frame(video, seg, shot, plan, ref0)
+        if face_route_of(shot)[1].get("prompt") is True:
+            # The motion route also sends a short prompt.txt beside the first frame and the clip.
+            vp = open(pp).read().strip() if os.path.exists(pp) else ""
+            res.append(("video prompt present (motion route)", bool(vp), ""))
+            res.append(("video prompt short", len(vp) <= 600, f"{len(vp)} chars, at most 600"))
+            res.append(("no file name in the video prompt", not re.search(FILE_NAME, vp), ""))
+        return res
+    if fr0 and face_route_of(shot)[1].get("prompt") is False:
+        route = face_route_of(shot)[0]
+        return [(f"no prompt ({route} route: the clip and the face picture are the request)", True,
+                 "prompt.txt is in the segment but is not sent" if os.path.exists(pp) else "")]
+    text = open(pp).read()
     sv = shot.get("video") or {}
     secs = sections(text)
     heads = [kind(h) for h, _ in secs]
@@ -131,15 +217,16 @@ def lint(video, seg):
         [h for h in present if h in need] == sorted([h for h in present if h in need],
                                                     key=lambda h: SECTIONS.index(h))
     missing = [h for h in need if h not in present]
-    check("sections", order_ok and heads[-1] == "NO TEXT",
-          ("missing " + ", ".join(missing) + "; " if missing else "") +
-          ("NO TEXT is last" if heads[-1] == "NO TEXT" else "NO TEXT must be the last section") +
-          ("" if order_ok else "; the order is in the character-shots skill, step 5"))
+    if not fr0:     # a prompt for an editing model is short: no screenplay sections
+        check("sections", order_ok and heads[-1] == "NO TEXT",
+              ("missing " + ", ".join(missing) + "; " if missing else "") +
+              ("NO TEXT is last" if heads[-1] == "NO TEXT" else "NO TEXT must be the last section") +
+              ("" if order_ok else "; the order is in the character-shots skill, step 5"))
 
     hits = sorted({w for w in BOOSTERS if unnegated(front, w)})
     check("no booster or glamour word", not hits, ", ".join(hits))
 
-    if refs:
+    if refs and not fr0:
         rb = allb("REFERENCES")
         unbound = [r["file"] for r in refs if os.path.basename(r["file"]) not in rb]
         sentences = [s for s in re.split(r"\n+", rb) if s.strip()]
@@ -147,17 +234,25 @@ def lint(video, seg):
               ("not named in REFERENCES: " + ", ".join(unbound)) if unbound else
               f"{len(refs)} reference(s), {len(sentences)} line(s)")
 
-    shots_b = [b for h, b in secs if kind(h) == "SHOT"]
-    no_end = [i + 1 for i, b in enumerate(shots_b) if "end state:" not in b.lower()]
-    check("an end state on every shot", shots_b and not no_end,
-          f"shot(s) {no_end} have no 'End state:'" if no_end else f"{len(shots_b)} shot(s)")
+    seed = [r for r in refs if r.get("kind") == "neighbour-frame" and isinstance(r.get("continuity"), dict)]
+    if seed:
+        name = os.path.basename(seed[0]["file"])
+        said = [l for l in allb("REFERENCES").splitlines() if name in l]
+        check("the last frame bound as the first frame", bool(said) and "first frame" in said[0].lower(),
+              f"REFERENCES says '{name} is the first frame' (the last frame of {seed[0]['continuity'].get('from')})")
 
-    gen = sv.get("duration_seconds") or 5
-    ends = [float(m.group(2)) for h, _ in secs if kind(h) == "SHOT"
-            for m in [re.search(r"\(\s*(\d+(?:\.\d+)?)\s*(?:to|-|–)\s*(\d+(?:\.\d+)?)\s*s", h)] if m]
-    check("shot times within the length", bool(ends) and max(ends) <= gen + 0.05,
-          f"the shots end at {max(ends):g} s; the segment is generated at {gen} s" if ends
-          else "each SHOT header gives its times, as 'SHOT 1 (0.0 to 5.0 s)'")
+    shots_b = [b for h, b in secs if kind(h) == "SHOT"]
+    if not fr0:
+        no_end = [i + 1 for i, b in enumerate(shots_b) if "end state:" not in b.lower()]
+        check("an end state on every shot", shots_b and not no_end,
+              f"shot(s) {no_end} have no 'End state:'" if no_end else f"{len(shots_b)} shot(s)")
+
+        gen = sv.get("duration_seconds") or 5
+        ends = [float(m.group(2)) for h, _ in secs if kind(h) == "SHOT"
+                for m in [re.search(r"\(\s*(\d+(?:\.\d+)?)\s*(?:to|-|–)\s*(\d+(?:\.\d+)?)\s*s", h)] if m]
+        check("shot times within the length", bool(ends) and max(ends) <= gen + 0.05,
+              f"the shots end at {max(ends):g} s; the segment is generated at {gen} s" if ends
+              else "each SHOT header gives its times, as 'SHOT 1 (0.0 to 5.0 s)'")
 
     hands = shot.get("hands") or {}
     empty = [s for s in ("left", "right") if not hands.get(s) or "<" in str(hands.get(s))]
@@ -250,19 +345,30 @@ def lint(video, seg):
         if ref.get("video_path"):
             names.append(os.path.basename(str(ref["video_path"])))
         if fr_mode:
-            # Face replace (founder, 2026-10-04): the prompt names its input clip, binds it
-            # to motion and timing only, and puts the character's face in.
-            clip = os.path.basename(str(shot["face_replace"].get("clip") or "reference.mp4"))
-            rb = " ".join(allb("REFERENCES").lower().split())
-            bound = clip.lower() in rb and re.search(r"\bmotion\b", rb) and re.search(r"\btiming\b", rb)
-            check("the clip bound to motion and timing", bool(bound),
-                  f"REFERENCES says '{clip} is the motion, timing, expression and camera only'")
-            swap = re.search(r"\breplace[sd]? (her|his|the|its) face\b", flat) is not None
-            check("the face replaced by the character's", swap and "face.png" in rb,
-                  "say 'Replace the face with the face of face.png' and bind face.png in REFERENCES")
+            # Editing models (2026-10-04: Wan 2.7 Edit Video kept the clip's face under a
+            # long prompt that said to keep its frames): the edit first, short, the inputs by
+            # their role, nothing that says to keep the clip as it is.
+            check("short (an editing model)", len(text) <= EDIT_MAX_CHARS,
+                  f"{len(text)} characters (limit {EDIT_MAX_CHARS} for a prompt with an input video)")
+            head_ = " ".join(text[:300].lower().split())
+            swap = re.search(r"\breplace[sd]? (the|her|his|its) (woman|man|person|face)", head_) is not None
+            check("the edit first", swap,
+                  "open with the edit: 'Replace the person in the input video with the person in the reference image.'")
+            roles = "the input video" in flat and "the reference image" in flat
+            check("the inputs by their role", roles,
+                  "call them 'the input video' and 'the reference image'; the model never sees a file name")
+            fn = sorted({m.group(0) for m in re.finditer(FILE_NAME, text)})
+            check("no file name", not fn, ", ".join(fn))
+            keep = [p for p in KEEP_AS_IS if re.search(p, flat)]
+            check("no instruction to keep the clip as it is", not keep,
+                  ", ".join(keep) + (": an editing model keeps its input when told to" if keep else ""))
             trace = re.search(r"\b(nothing|no trace) of the (original|source) (person|creator|face)", flat)
             check("no trace of the original person", trace is not None,
                   "say 'Nothing of the original person's face, hair or identity remains'")
+            bands = bridge.band_sentence(shot["face_replace"].get("masks"), "video")
+            gone = [b for b in bands if " ".join(b.lower().split()) not in flat]
+            check("the band sentence of every blur or box mask", not gone,
+                  ("paste, word for word: " + " | ".join(gone)) if gone else f"{len(bands)} band(s)")
             cp = [n for n in names if n.lower() in flat]
         else:
             cp = [w for w in COPY_WORDS if re.search(w, flat)] + [n for n in names if n.lower() in flat]
@@ -284,7 +390,7 @@ def lint(video, seg):
         st = os.path.join(ROOT, "pipeline", "character", "state.json")
         slug = (json.load(open(st)).get("model") or {}).get("slug") if os.path.exists(st) else None
         lim = spec["known_model_limits"].get(slug or spec["default"], {})
-        rt = ((spec.get("face_replace") or {}).get("routes") or {}).get((shot.get("face_replace") or {}).get("route"))
+        rt = ((spec.get("face_replace") or {}).get("routes") or {}).get(bridge.face_route_name(shot.get("face_replace") or {}))
         if t == "X" and rt:
             lim = spec["known_model_limits"].get(rt["model"], {})
     except Exception:
@@ -301,8 +407,14 @@ def main():
         sys.exit(__doc__)
     video = a[0]
     sroot = os.path.join(ROOT, "pipeline", "character", video, "segments")
+    shots_dir = os.path.join(ROOT, "pipeline", "character", video, "shots")
+
+    def first_frame_route(d):
+        sp = os.path.join(shots_dir, f"{d}.json")
+        return d.endswith("-x") and os.path.exists(sp) and \
+            face_route_of(json.load(open(sp)))[1].get("first_frame") == "keyframe"
     segs = a[1:] or sorted(d for d in os.listdir(sroot)
-                           if os.path.exists(os.path.join(sroot, d, "prompt.txt")))
+                           if os.path.exists(os.path.join(sroot, d, "prompt.txt")) or first_frame_route(d))
     if not segs:
         sys.exit("no segment has a prompt.txt yet")
     fails = 0

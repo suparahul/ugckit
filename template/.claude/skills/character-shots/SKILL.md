@@ -49,7 +49,8 @@ generate what the plan supplies, never change the format to pass a check.
 Mark the cut points on the frozen script first, then give each segment its lines.
 
 - **A join sits on a sentence end**, never inside a line while the face is visible, and
-  is a visible change: another segment type, or the same set reframed by about 10%.
+  is a visible change: another segment type, or the same set reframed by about 10%. The
+  one exception is a continuous take (below): its join is not seen, so it is not reframed.
 - **Length.** The model takes whole seconds from 5 to 15 (`models.json`). A segment
   planned at 3 or 4 s is generated at 5 s with `trim_to_seconds` set; nothing is planned
   under 3 s. At most 15 words per 4 s of the planned length.
@@ -77,30 +78,58 @@ Mark the cut points on the frozen script first, then give each segment its lines
   generation; the face stays the handle's own. A beat with `reaction: null` has no
   reference yet: stop and send it back to planning. This is the written route, used
   when the reference's `generation_input` is `none`.
-- **X in face-replace mode** (the reference's `generation_input` is `face_replace`;
-  founder, 2026-10-04): the reference clip itself drives the motion and timing, and the
-  model puts the character's face in. The beat lasts the clip's range and has no set.
-  Look at the range for burned-in text (the reference's `burned_in_text`, a handle, a
-  watermark, a caption) and write `face_replace` in the shot: `{ref_id, route, clip:
-  "segments/<nn>-x/source/reference.mp4", range_s, masks: [{rect, how, text}]}`; a mask
-  is `crop` at an edge, else `blur` or `box`. The route (`models.json`
-  `face_replace.routes`) is `edit` by default: Wan 2.7 Edit Video edits the clip, so its
-  frames, timing and length stay; `duration_seconds` is null, the clip is 2 to 10 s, and
-  the only picture is the character's face. `guided` is the fallback: MiniMax H3
-  reference-to-video makes a new clip guided by the clip, so the frames and timing are
-  not kept exactly; `duration_seconds` is 5 (its template version, at least the clip's
-  length) and the take is trimmed to the clip at assembly. Then run
+- **X in face-replace mode** (the reference's `generation_input` is `face_replace`): the
+  reference clip drives the motion and timing, and the face is the character's. The beat
+  lasts the clip's range and has no set. Look at the range for burned-in text (the
+  reference's `burned_in_text`, a handle, a watermark, a caption) and write
+  `face_replace` in the shot: `{ref_id, route, clip: "segments/<nn>-x/source/reference.mp4",
+  range_s, masks: [{rect, how, text, behind}]}`; a mask is `crop` at an edge, else `blur`
+  or `box`, and a `blur` or `box` mask says in `behind` what the band hides ("the chin,
+  the neck and the top of the shirt"). Then run
   `scripts/character/shots.py reference <video> <nn>-x`: it checks the post against its
-  checksum, trims the range, masks it, and refuses while OCR still reads text. The
-  generation references are that clip (kind `face_replace_clip`) and the character's
-  approved face (kind `hero`); no keyframe. `trim_to_seconds` is the clip's length. The
-  prompt names the clip in REFERENCES ("reference.mp4 is the motion, timing, expression
-  and camera only"), says "Replace the face with the face of face.png" and "Nothing of the
-  original person's face, hair or identity remains", "No lip sync" and "She does not
-  speak", and never names the post, its creator or the research file. Never attach the
-  research file itself. Until the founder approves a paid test (`capabilities.json`
-  `bridge.face_replace`), `generate.sh` stops before any cost; the written route is the
-  fallback.
+  checksum, cuts the range, and writes the clip's first frame, `source/first-frame.png`.
+  `trim_to_seconds` is the clip's length; `duration_seconds` is null. Never attach the
+  research file itself.
+
+  **The route is `motion`** (`models.json` `face_replace.default_route`, the founder's
+  final decision after the paid tests): Kling 3.0 Pro Motion Control on Supagen. Write
+  `"route": "motion"` (a shot that names no route takes it). Two steps:
+  1. **The character's first frame** is the shot's keyframe (`keyframes/<nn>-x.png`),
+     made by Codex like any keyframe, from the hero (kind `hero`) and the pose picture
+     `segments/<nn>-x/source/first-frame.png` (kind `face_replace_frame`). Kling takes
+     the room, the light and the camera of this picture, so copy the clip's first frame:
+     its room and light, the camera height and angle, the clothes, the pose mid-motion and
+     the mouth as it starts. A cropped portrait (a front anchor as it is) gave a still
+     camera in a bright room and a reaction that read as a yawn. The `keyframe_prompt`
+     pastes the identity lock's face and hair word for word, says "Exactly one person",
+     calls the pictures "the first reference picture" and "the pose picture" (never a file
+     name), and pastes, word for word, the band sentence of every `blur` or `box` mask
+     (`bridge.band_sentence(masks, "picture")`): no band in the still. The user approves
+     this still at gate A, and its checksum goes into `approval.json` (step 6).
+  2. **The motion**: the generation references are the clip (kind `face_replace_clip`)
+     and the keyframe (kind `keyframe`), in that order, nothing else. `shots.py reference`
+     writes the ORIGINAL clip (no mask; Kling removes the text), held on its last frame to
+     3.0 s (Kling takes 3 s or more; the take is trimmed to the range at assembly).
+     `prompt.txt` is short (at most 600 characters, no file name): the person in the
+     reference image performs the reference video's motion exactly, with the same
+     expressions, mouth shapes, eye and head movements at the same moments; the face,
+     hair, clothes and room as in the reference image; no captions and no on-screen text.
+
+  **The backup is `replace`** (Wan 2.2 Animate, replace mode, on Supagen), only when the
+  user names it after a failed motion take. Its generation references are the clip (kind
+  `face_replace_clip`), then one picture of the character's face (kind `hero` or
+  `anchor`, the one that shows the face and hair most clearly), nothing else. `shots.py
+  reference` writes the original clip, unpadded and unmasked (the masks stay in the shot
+  as a record of the text). No keyframe, no `keyframe_prompt`, no `prompt.txt`. In the paid
+  test it got the face shape, the clothes and the room wrong; gate B checks them.
+
+  `animate` (Wan 2.2 Animate move: the keyframe as on the motion route, no prompt) timed
+  out on Supagen; `guided` (MiniMax H3 reference-to-video, a new clip guided by the masked
+  clip, `duration_seconds` 5, trimmed to the clip) is untested. `edit` (Wan 2.7 Edit Video)
+  is **retired**: it kept the reference person's face in every frame, and `shots.py
+  validate` and `generate.sh` refuse it. A face-replace X neither continues a clip nor is
+  continued (`continuity.py`). The failures of each model are in
+  `docs/character-model-known.md`.
 - **A full-screen app beat** has framing `app_screen`: it is R or P, never generated.
 - **C, supplied media** (v2): the plan's clip (`source_range_s`, inside the asset's
   approved `trim_s`) or still (`still_s`). No casting, no keyframe, no prompt, no
@@ -114,13 +143,30 @@ Mark the cut points on the frozen script first, then give each segment its lines
 - **Supplied media is never a reference.** No plan asset and nothing under `supplied/`
   is attached to a keyframe or a generation; `shots.py validate` and `generate.sh`
   refuse it. The same holds for research footage and a reference reaction's post.
+- **A continuous take over two clips** (a beat longer than one clip, a movement across
+  a join, or a plan beat with `continues_previous: true`): the second shot declares
+  `"continuity": {"from": "<nn>-<type>"}`, the segment right before it in `video.json`.
+  Its first frame is then that clip's last frame, taken from the file the user approves
+  at gate B (`scripts/character/continuity.py`, run by `review.py` on the approval). Do
+  not list a `neighbour-frame` yourself: `shots.py refs` puts the frame in the keyframe's
+  place, first. Write the shot's keyframe as usual: it is the storyboard's picture of the
+  opening, and the generation does not carry it. Both clips are T, B or X by the written
+  route (never a phone plate, C, M, R, P or a face-replace X), in one set, with the same
+  `punch_in`, and the continuing one has no `trim` in `video.json` (`trim_to_seconds`
+  sets its end). The cut of the first clip is fixed when its frame is taken: set its
+  `trim` or `trim_to_seconds` before gate B; a talking clip that is continued is not
+  trimmed by word times at its end. A model with no continuity input
+  (`models.json` `continuity.input` none, Wan 2.7 Edit Video) cannot continue a clip.
+  Before gate A `validate` notes the frame as pending; after it, `validate` and
+  `generate.sh` refuse a continuing shot whose previous clip has no approved last frame.
 - **The references, at most four pictures on the default model**, in this order: the
-  keyframe, the hero, the sheet of each fixed subject in the shot, then one more (the
-  angle anchor nearest the shot, or the last frame of the neighbour segment). The voice
-  reference goes on every talking segment and does not count. The keyframe already
-  carries the outfit and the set, so their pictures are not attached to the generation.
-  Allowed kinds: `keyframe`, `hero`, `anchor`, `subject`, `set`, `neighbour-frame`,
-  `voice`. **Never an app screen, a screenshot or a recording.**
+  keyframe (for a continuing shot, the previous clip's last frame in its place), the
+  hero, the sheet of each fixed subject in the shot, then one more (the angle anchor
+  nearest the shot). The voice reference goes on every talking segment and does not
+  count. The keyframe already carries the outfit and the set, so their pictures are not
+  attached to the generation. Allowed kinds: `keyframe`, `hero`, `anchor`, `subject`,
+  `set`, `neighbour-frame` (the last frame of the clip before, written by `shots.py
+  refs`), `voice`. **Never an app screen, a screenshot or a recording.**
 
 ## 3. Write the files
 
@@ -149,6 +195,10 @@ Then check them, and write each segment's `refs.json` (and, for a phone segment,
     scripts/character/shots.py validate <video>
     scripts/character/shots.py refs <video>
     scripts/character/shots.py supplied <video>        # only for a C segment with insert
+
+The refs.json of a continuing shot opens on
+`pipeline/character/<video>/segments/<prev>/last-frame.png`. The file does not exist yet:
+it is written when `<prev>` is approved at gate B.
 
 For a v2 plan, `validate` ends with the bridge: each beat in its segments at the plan's
 seconds (half a second, or a tenth of the beat, either way), the words, the performance
@@ -201,6 +251,7 @@ line with its name in capitals:
 
     (opening look, no name)   vertical 9:16 phone video, the set, the light, the flaws by name
     REFERENCES                one line per refs.json file, naming the file: what it controls, what it does not
+                              (a continuing shot: "last-frame.png is the first frame: the last frame of <prev>")
     STRUCTURE                 shot count, exact cut times
     SUBJECT                   the identity lock, pasted; the outfit; the signature details; counts as numbers
     SETTING                   the set lock, pasted; "no other location"
@@ -260,22 +311,40 @@ the template. Under 5,000 characters. Then:
     scripts/character/lint_prompt.py <video>
 
 Every check must pass. A failure is fixed in the prompt (or the shot), then the lint
-runs again.
+runs again. On the motion route the lint reads the shot's `keyframe_prompt` and the short
+`prompt.txt`; on the replace route there is no prompt to lint.
 
 ## 6. Gate A: the storyboard approval
 
     .venv/bin/python3 scripts/character/shots.py storyboard <video>
 
 Show the user `keyframes/storyboard.jpg` and, per segment, one line: the type, the
-planned and generated length, the lines it speaks, the references it will carry, and the
+planned and generated length, the lines it speaks, the references it will carry (for a
+continuing segment: "opens on the last frame of <prev>, taken at gate B"), and the
 computed cost of its generation (`price_per_s` × generated seconds, from `models.json`),
 with the total. C and M segments cost nothing and have no keyframe: give their source
 asset, range and panels, and the narration or sound laid under them. Ask for approval **by word**. A "redo <n>" goes back to step 4 for that
 still only.
 
+The post page in the Atlas shows the same: the storyboard, every keyframe, the computed
+cost per segment and the total, with Approve storyboard and Send back. When the user
+clicks there, record the click:
+
+    scripts/character/review.py storyboard <video> --from-atlas
+
+It refuses when a keyframe changed after the click, and writes `gate_a_storyboard`: the
+decision, the words, every keyframe's sha256 (`keyframes_sha256`), the approved cost and
+the click. A send-back records "redo" with the user's note: redo the stills it names. By
+word, the same command records it: `review.py storyboard <video> --decision approve
+--words "<the user's words>"`.
+
 On approval, write `approval.json` from `approval.example.json`: `gate_a_storyboard` with
 each check you made (true or false), `prompt_lint` true, `decision` `approve`, and the
 user's words quoted with the date. Copy the words into each shot's `keyframe_approved`.
+For a face-replace X on the motion or animate route, `gate_a_storyboard.keyframes_sha256`
+must hold `{"<nn>-x": "<sha256 of keyframes/<nn>-x.png>"}`: `generate.sh` runs only the
+keyframe the user approved, byte for byte. `review.py storyboard` writes it for every
+keyframe.
 Then:
 
     scripts/character/state.py set <video> shots done "storyboard approved"

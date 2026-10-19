@@ -15,7 +15,14 @@
                                         reference post checked against its checksum, trimmed
                                         to the planned range, its burned-in text masked, read
                                         back by OCR (segments/<seg>/source/reference.mp4 and
-                                        reference.json)
+                                        reference.json), and its first frame, the pose
+                                        picture of the animate route's keyframe
+                                        (source/first-frame.png)
+
+A shot may continue from the clip before it ("continuity": {"from": "<nn>-<type>"}):
+validate checks the pair and, once gate A is approved, refuses it while the previous clip has
+no approved last frame (scripts/character/continuity.py); refs puts that frame (kind
+neighbour-frame) in the keyframe's place.
 
 A v2 plan (schema_version 2) is also checked by scripts/character/bridge.py: check runs
 its plan checks, validate compares video.json with the plan's beats, words and overlays.
@@ -43,7 +50,10 @@ INSERT_MODE = {"O": "over-shoulder", "G": "in-hand", "S": "show-to-camera", "H":
 GEN_KINDS = {"keyframe", "hero", "anchor", "subject", "set", "neighbour-frame", "voice", "face_replace_clip"}
 # face_replace_clip: only on an X segment in face-replace mode (founder, 2026-10-04), and
 # only the trimmed, masked copy that shots.py reference writes. Never the research file.
-KEYFRAME_KINDS = {"hero", "anchor", "subject", "set", "keyframe"}
+KEYFRAME_KINDS = {"hero", "anchor", "subject", "set", "keyframe", "face_replace_frame"}
+# face_replace_frame: only on an X shot on the animate route, and only the first frame of the
+# masked clip (segments/<seg>/source/first-frame.png, shots.py reference): the pose, the
+# framing and the room of the character's first frame, never the person.
 AUDIO_EXT = (".mp3", ".wav", ".m4a", ".aac")
 VIDEO_EXT = (".mp4", ".mov")
 IMAGE_EXT = (".png", ".jpg", ".jpeg", ".webp")
@@ -61,6 +71,7 @@ STATUS_OK = {"video-setup", "live"}
 PROBLEMS, NOTES = [], []
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge
+import continuity
 
 
 def bad(msg):
@@ -132,7 +143,7 @@ def face_route(shot):
     """The face-replace route a shot names (models.json face_replace.routes) and its
     model's limits, or (None, None, {}) when the route is unknown."""
     spec = load(MODELS)
-    route = (shot.get("face_replace") or {}).get("route")
+    route = bridge.face_route_name(shot.get("face_replace") or {})
     rt = ((spec.get("face_replace") or {}).get("routes") or {}).get(route)
     return (route, rt, spec["known_model_limits"].get(rt["model"], {})) if rt else (None, None, {})
 
@@ -245,6 +256,10 @@ def cmd_check(video):
     sets = {s.get("id"): s for s in world.get("sets") or []}
     subjects = {s.get("id"): s for s in world.get("fixed_subjects") or []}
     beat_sets = {b.get("set_id") for b in plan["beats"] if not placeholder(b.get("set_id"))}
+    # Face replace keeps the reference clip's room and clothes: a plan whose generated beats
+    # are all face-replace reactions names no set and no outfit.
+    gen_beats = [b for b in plan["beats"] if b.get("media_origin", "generated") == "generated"]
+    fr_only = v2 and bool(gen_beats) and all(bridge.face_replace_ref(plan, b) for b in gen_beats)
     for raw, cid, ver in pins(plan):
         if not cid:
             bad(f"character pin {raw!r} is not <character>@v<n>")
@@ -282,7 +297,9 @@ def cmd_check(video):
             note(f"{raw}: no approved voice reference -- talking segments cannot be generated "
                  "until character-voice is done")
         s = (plan.get("set") or {}).get(cid)
-        if placeholder(s) and v2 and beat_sets:
+        if placeholder(s) and fr_only:
+            good(f"{raw}: no set; face replace keeps the reference clip's room")
+        elif placeholder(s) and v2 and beat_sets:
             good(f"{raw}: the sets come from the beats ({', '.join(sorted(beat_sets))})")
         elif placeholder(s):
             bad(f"{raw}: the plan names no set")
@@ -300,6 +317,8 @@ def cmd_check(video):
         outfits = {x.get("id"): x for x in c.get("outfits") or []}
         if placeholder(o) and mascot:
             pass                      # a mascot's look is its style lock
+        elif placeholder(o) and fr_only:
+            good(f"{raw}: no outfit; face replace keeps the reference clip's clothes")
         elif placeholder(o):
             bad(f"{raw}: the plan names no outfit")
         elif o not in outfits:
@@ -379,9 +398,10 @@ def reaction_marks(plan):
     return marks
 
 
-def check_refs(video, plan, name, refs, kinds, max_images, what, fr_clip=None):
+def check_refs(video, plan, name, refs, kinds, max_images, what, fr_clip=None, fr_frame=None):
     """fr_clip: the one face-replace input this shot may carry (an X segment in
-    face-replace mode), else None and no clip is allowed."""
+    face-replace mode), else None and no clip is allowed. fr_frame: the one pose picture a
+    keyframe of the animate route may carry, else None and none is allowed."""
     images = 0
     supplied = supplied_paths(plan)
     posts = reaction_marks(plan)
@@ -399,6 +419,12 @@ def check_refs(video, plan, name, refs, kinds, max_images, what, fr_clip=None):
         if f.startswith("research/") or "/research/" in f or any(pid in f for pid in posts):
             bad(f"{name}: {f} is research footage or the reference reaction -- never attached as it is; "
                 "a face-replace reaction uses the trimmed, masked copy (shots.py reference)")
+        if k == "face_replace_frame":
+            if not fr_frame:
+                bad(f"{name}: {f} is a face-replace pose picture; only the keyframe of an X shot on the animate "
+                    "route carries one")
+            elif f != fr_frame:
+                bad(f"{name}: the pose picture is {fr_frame}, not {f}")
         if k == "face_replace_clip":
             if not fr_clip:
                 bad(f"{name}: {f} is a face-replace clip; only an X segment in face-replace mode carries one")
@@ -415,10 +441,10 @@ def check_refs(video, plan, name, refs, kinds, max_images, what, fr_clip=None):
                 bad(f"{name}: {f} is a picture but its kind is 'voice'")
         else:
             bad(f"{name}: {f} is neither a picture nor an audio clip")
-        if k == "face_replace_clip" and not os.path.exists(os.path.join(vdir(video), f)):
+        if k in ("face_replace_clip", "face_replace_frame") and not os.path.exists(os.path.join(vdir(video), f)):
             bad(f"{name}: {f} is not written yet (shots.py reference {video} {name})")
             continue
-        if k != "face_replace_clip" and not os.path.exists(resolve(video, plan, f)) \
+        if k not in ("face_replace_clip", "face_replace_frame") and not os.path.exists(resolve(video, plan, f)) \
                 and not f.startswith("keyframes/"):
             bad(f"{name}: {what} reference missing on disk: {f}")
     if max_images and images > max_images:
@@ -506,15 +532,20 @@ def cmd_validate(video):
             rb = [bmap[b] for b in seg.get("beat_ids") or [] if b in bmap and "reaction" in bmap[b]]
             fr = bridge.face_replace_ref(plan, rb[0]) if rb else None
         fr_clip = (shot.get("face_replace") or {}).get("clip") if fr else None
+        fr_frame = None
         fr_lim = None
         if fr:
-            # The segment is as long as the clip. The edit route keeps the clip's timing and
+            # The segment is as long as the clip. The exact routes keep the clip's timing and
             # length; the guided route generates its template's length and is trimmed to it.
             want = fr["end_s"] - fr["start_s"]
             if not isinstance(trim, (int, float)) or abs(trim - want) > 0.05:
                 bad(f"{name}: trim_to_seconds {trim!r}; a face-replace reaction is its clip's {want:g} s")
             total += want
             route, rt, fr_lim = face_route(shot)
+            if rt and rt.get("retired"):
+                bad(f"{name}: face_replace.route {route!r} is retired: {rt['retired']}")
+            if rt and rt.get("first_frame") == "keyframe":
+                fr_frame = f"segments/{name}/source/first-frame.png"
             if rt and rt["length"] == "exact" and dur is not None:
                 bad(f"{name}: duration_seconds {dur!r}; the {route} route has no length of its own (null)")
             elif rt and rt["length"] != "exact" and (dur != rt.get("duration_s") or dur < want):
@@ -575,9 +606,11 @@ def cmd_validate(video):
             bad(f"{name}: a {t} segment has no phone (the app is shown only by O, G, S, H, F, R or P)")
         if t == "H" and placeholder(((shot.get("phone_motion") or {}).get("push") or {}).get("end_still")):
             bad(f"{name}: an H segment needs its end still (phone_motion.push.end_still)")
-        if placeholder(shot.get("keyframe_prompt")):
+        # The guided route has no keyframe (the clip leads); every other generated shot has one.
+        if placeholder(shot.get("keyframe_prompt")) and not (fr and not fr_frame):
             bad(f"{name}: no keyframe_prompt")
-        check_refs(video, plan, name, shot.get("keyframe_references") or [], KEYFRAME_KINDS, None, "keyframe")
+        check_refs(video, plan, name, shot.get("keyframe_references") or [], KEYFRAME_KINDS, None, "keyframe",
+                   fr_frame=fr_frame)
         check_refs(video, plan, name, gen_refs(shot), GEN_KINDS,
                    (fr_lim if fr_lim else lim).get("max_reference_images"), "generation", fr_clip)
         if t == "T" and not any(r.get("kind") == "voice" for r in gen_refs(shot)) and sl:
@@ -586,11 +619,40 @@ def cmd_validate(video):
             kinds = [r.get("kind") for r in gen_refs(shot)]
             if kinds.count("face_replace_clip") != 1:
                 bad(f"{name}: a face-replace reaction carries its clip once (kind face_replace_clip)")
-            if "hero" not in kinds:
+            if fr_frame:
+                # motion, animate: the approved keyframe is the subject; the clip gives the motion only.
+                kk = [r.get("kind") for r in shot.get("keyframe_references") or []]
+                if kinds != ["face_replace_clip", "keyframe"] or \
+                        [r.get("file") for r in gen_refs(shot) if r.get("kind") == "keyframe"] != [f"keyframes/{name}.png"]:
+                    bad(f"{name}: the {route} route carries the clip (face_replace_clip) and the shot's own "
+                        f"keyframe (keyframes/{name}.png), in that order, nothing else")
+                if "hero" not in kk or kk.count("face_replace_frame") != 1:
+                    bad(f"{name}: the {route} keyframe is made from the character's hero (kind hero) and the clip's "
+                        f"first frame ({fr_frame}, kind face_replace_frame)")
+            elif rt and rt.get("clip") == "original":
+                # replace: the original clip and one picture of the character's face, nothing else.
+                if len(kinds) != 2 or kinds[0] != "face_replace_clip" or kinds[1] not in ("hero", "anchor"):
+                    bad(f"{name}: the {route} route carries the clip (face_replace_clip), then one picture of the "
+                        "character's face (kind hero or anchor), nothing else")
+            elif "hero" not in kinds:
                 bad(f"{name}: a face-replace reaction carries the character's approved face (kind hero), the "
                     "identity the model puts in")
         elif not any(r.get("kind") == "keyframe" for r in gen_refs(shot)):
             bad(f"{name}: every generated segment starts from its own keyframe (a 'keyframe' reference)")
+    # Continuity: a shot that continues from the clip before it, and that clip's last frame.
+    for level, msg in continuity.rules(video, v, shots, slug, lim):
+        (bad if level == "bad" else note)(msg)
+    ap = os.path.join(vdir(video), "approval.json")
+    gate_a = os.path.exists(ap) and (load(ap).get("gate_a_storyboard") or {}).get("decision") == "approve"
+    for prev, name in continuity.continuing(video):
+        ok, why, info = continuity.state(video, name)
+        if ok:
+            good(f"{name} continues from {prev}: {info['file']} (sha256 {info['sha256'][:12]})")
+        elif gate_a:
+            bad(f"{name} continues from {prev}: {why}")
+        else:
+            note(f"{name} continues from {prev}: its first frame is {prev}'s last, taken when {prev} is approved "
+                 "at gate B (the storyboard shows its keyframe)")
     missing = [l for l in order if l not in seen]
     if missing:
         bad(f"lines no segment carries: {', '.join(missing)}")
@@ -620,14 +682,25 @@ def cmd_refs(video, only):
                        "generation", (shot.get("face_replace") or {}).get("clip") if name.endswith("-x") else None)
         sdir = os.path.join(vdir(video), "segments", name)
         os.makedirs(sdir, exist_ok=True)
+        rows = [{"kind": r["kind"], "file": os.path.relpath(resolve(video, plan, r["file"]), ROOT),
+                 "binding": r.get("role", "")} for r in refs]
+        prev = continuity.source_of(shot)
+        if prev:
+            # A continuing clip opens on the last frame of the clip before it: that frame takes
+            # the keyframe's place, first. It is written when the previous clip is approved.
+            fr = {"kind": "neighbour-frame", "file": continuity.frame_rel(video, prev),
+                  "binding": f"the first frame: the last frame of {prev}, the clip this one continues",
+                  "continuity": {"from": prev}}
+            rows = [fr] + [r for r in rows if r["kind"] != "keyframe"]
         out = {"_comment": "Written by scripts/character/shots.py refs from the shot file. "
                            "generate.sh accepts only these kinds.",
-               "references": [{"kind": r["kind"],
-                               "file": os.path.relpath(resolve(video, plan, r["file"]), ROOT),
-                               "binding": r.get("role", "")} for r in refs]}
+               "references": rows}
         json.dump(out, open(os.path.join(sdir, "refs.json"), "w"), indent=2)
         nv = sum(1 for r in refs if r.get("kind") == "face_replace_clip")
         msg = f"{name}: refs.json, {n} picture(s), {len(refs) - n - nv} audio" + (f", {nv} video" if nv else "")
+        if prev:
+            msg += f"; opens on the last frame of {prev}" + ("" if os.path.exists(os.path.join(ROOT, fr["file"]))
+                                                            else " (taken when it is approved)")
         t = str(shot.get("segment_type", "")).upper()
         if t in PHONE:
             ip = os.path.join(sdir, "insert.json")
@@ -697,7 +770,9 @@ For each still in the job's "stills":
   1. Use its "prompt" as written. Its "references" are the person (or the mascot), the
      outfit, the room and any fixed subject: the picture must show the same person (same
      face, hair and signature details), in that outfit, in that room, with each fixed
-     subject in its true size and exact count. Who is in the picture is the still's
+     subject in its true size and exact count. A reference of kind "face_replace_frame"
+     is a pose picture: take only its pose, framing, camera angle, light and room from
+     it, never its person's face, hair or identity, and never a band, a blur or text. Who is in the picture is the still's
      "people" rule, as written. No text, no captions, no logo in the picture. A phone
      screen, when there is one, is flat solid green (RGB 0 177 64).
   2. Ask the tool for a portrait picture (1024x1536).
@@ -858,19 +933,25 @@ def check_reference(video, plan, name, shot, r):
     rj_ = load(rp)
     fx = shot.get("face_replace") or {}
     clip = os.path.join(vdir(video), str(fx.get("clip")))
+    original = (face_route(shot)[1] or {}).get("clip") == "original"
     if rj_.get("source_sha256") != r.get("video_sha256") or rj_.get("range_s") != [r["start_s"], r["end_s"]] \
-            or rj_.get("masks") != fx.get("masks"):
+            or rj_.get("masks") != ([] if original else fx.get("masks")) or bool(rj_.get("original")) != original:
         bad(f"{name}: reference.json was made from another clip, range or masks -- run shots.py reference again")
     if not os.path.exists(clip) or bridge.sha256_file(clip) != rj_.get("sha256"):
         bad(f"{name}: {fx.get('clip')} is missing or changed after shots.py reference")
     if rj_.get("text_left"):
         bad(f"{name}: OCR still reads text on the masked clip: {rj_['text_left']}")
+    elif original and rj_.get("text_kept"):
+        note(f"{name}: the {face_route(shot)[0]} route sends the original clip; its text can stay in the output "
+             f"({rj_['text_kept']}): check it at gate B")
     elif rj_.get("ocr") is None:
         note(f"{name}: no OCR engine: the masked clip's text was not read; look at it by eye")
 
 
 def cmd_reference(video, only):
-    """The input clip of each face-replace reaction: checked, trimmed, masked, read back."""
+    """The input clip of each face-replace reaction: checked, trimmed, masked, read back.
+    The replace route (models.json routes.replace.clip "original") takes the original clip:
+    trimmed to the range, at its own size, no mask."""
     plan = plan_of(video)
     vp = os.path.join(vdir(video), "video.json")
     if not os.path.exists(vp):
@@ -890,11 +971,14 @@ def cmd_reference(video, only):
         shot = shots.get(name) or {}
         fx = shot.get("face_replace") or {}
         masks = fx.get("masks") if isinstance(fx.get("masks"), list) else []
+        original = (face_route(shot)[1] or {}).get("clip") == "original"
+        if original:
+            masks = []
         src = os.path.join(ROOT, r["video_path"])
         if not os.path.exists(src) or bridge.sha256_file(src) != r.get("video_sha256"):
             bad(f"{name}: {r['video_path']} is missing or does not match its video_sha256")
             continue
-        if r.get("burned_in_text") and not masks:
+        if r.get("burned_in_text") and not masks and not original:
             bad(f"{name}: the reference carries burned-in text ({r['burned_in_text']!r}); write "
                 "face_replace.masks in the shot first")
             continue
@@ -904,14 +988,28 @@ def cmd_reference(video, only):
         w, h = 1080, 1920
         fc, last = mask_filter(masks, w, h)
         base = f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},setsar=1[s0]"
+        if original:
+            # The clip as it is: its own size and frames, only cut to the range. A route with
+            # pad_to_s (Kling asks 3 s or more) holds the last frame up to that length; the
+            # take is trimmed back to the range at assembly.
+            base = "[0:v]setsar=1[s0]"
+            pad = (face_route(shot)[1] or {}).get("pad_to_s") or 0
+            if pad > r["end_s"] - r["start_s"]:
+                base = f"[0:v]setsar=1,tpad=stop_mode=clone:stop_duration={pad - (r['end_s'] - r['start_s']) + 0.05:.3f}[s0]"
         fc = base + (";" + fc.replace("[0:v]", "[s0]", 1) if fc else "")
         last = last.replace("[0:v]", "[s0]") if fc != base else "[s0]"
         r_ = subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{r['start_s']:.3f}", "-to", f"{r['end_s']:.3f}",
                              "-i", src, "-filter_complex", fc, "-map", last, "-an", "-c:v", "libx264", "-crf", "14",
+                             *(["-t", f"{pad:.3f}"] if original and pad > r["end_s"] - r["start_s"] else []),
                              "-preset", "medium", "-pix_fmt", "yuv420p", "-r", "30", out],
                             capture_output=True, text=True)
         if r_.returncode != 0:
             bad(f"{name}: ffmpeg could not cut the reference: {r_.stderr[-400:]}")
+            continue
+        first = os.path.join(sdir, "first-frame.png")
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", out, "-frames:v", "1", first], capture_output=True)
+        if not os.path.exists(first):
+            bad(f"{name}: ffmpeg could not write the clip's first frame")
             continue
         work = os.path.join(sdir, "ocr")
         os.makedirs(work, exist_ok=True)
@@ -921,9 +1019,14 @@ def cmd_reference(video, only):
                                "The research file is never attached; this copy is.",
                    "ref_id": r["id"], "source": r["video_path"], "source_sha256": r["video_sha256"],
                    "range_s": [r["start_s"], r["end_s"]], "masks": masks, "sha256": bridge.sha256_file(out),
-                   "duration_s": bridge.probe(out)[0], "ocr": text, "text_left": left or None},
+                   "duration_s": bridge.probe(out)[0], "first_frame_sha256": bridge.sha256_file(first),
+                   "ocr": text, "original": original or None,
+                   "text_left": None if original else (left or None),
+                   "text_kept": (left or None) if original else None},
                   open(os.path.join(sdir, "reference.json"), "w"), indent=2)
-        if left:
+        if left and original:
+            note(f"{name}: {os.path.relpath(out, ROOT)} is the original clip; its text stays in the input: {left}")
+        elif left:
             bad(f"{name}: OCR still reads text on the masked clip: {left} -- add or widen a mask")
         elif text is None:
             note(f"{name}: no OCR engine: look at {os.path.relpath(out, ROOT)} by eye for text")

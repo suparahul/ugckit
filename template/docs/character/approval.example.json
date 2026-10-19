@@ -1,5 +1,5 @@
 {
-  "_comment": "pipeline/character/<video>/approval.json. Gate A is written by character-shots (P1); gate B by scripts/character/review.py segment (P3), one entry per decision, and its composite by review.py composite (P4); gate C by review.py final (P6). Always with the user's words. gate_b_sources (review.py source): the user's approval of each supplied file, its checksum, permission and range. gate_b_narration (review.py narration): each narrator take, after the natural-voice check. Gate C refuses an approval when the file is from another plan revision or an overlay check failed.",
+  "_comment": "pipeline/character/<video>/approval.json. Gate A is written by character-shots (P1); gate B by scripts/character/review.py segment (P3), one entry per decision, and its composite by review.py composite (P4); gate C by review.py final (P6). Always with the user's words. gate_b_sources (review.py source): the user's approval of each supplied file, its checksum, permission and range. gate_b_narration (review.py narration): each narrator take, after the natural-voice check. Gate C refuses an approval when the file is from another plan revision or an overlay check failed. A gate B approval of a clip that the next one continues takes its last frame (segments/<seg>/last-frame.json); the approval of a continuing clip records continuity, the frame it was seeded with (from its generated/<take>.seed.json), and checks.seed_diff.",
   "video_id": "<video>",
   "gate_a_storyboard": {
     "keyframes_match_anchors": null,
@@ -33,7 +33,14 @@
       "date": "<YYYY-MM-DD>",
       "model": "<model slug>",
       "fix": "<the prompt change, for a reject>",
-      "checks": {},
+      "checks": {
+        "seed_diff": "<a continuing clip: its first frame against the seed frame, 0 to 255>"
+      },
+      "continuity": {
+        "from": "<a continuing clip only: the segment it continues>",
+        "last_frame": "pipeline/character/<video>/segments/<from>/last-frame.png",
+        "last_frame_sha256": "<sha256 of that frame, as last-frame.json>"
+      },
       "composite": {
         "file": "composite/<seg>-composite-<stamp>.mp4",
         "gates": "pass",

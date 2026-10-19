@@ -106,4 +106,8 @@ Show the user the composite and the sheets, then:
     scripts/character/review.py composite <video> <nn>-<type> --file composite/<file>.mp4 \
         --words "<the user's words>"
 
+When the user approved it in the Atlas (Approve composite on the post page), record the
+click: `scripts/character/review.py composite <video> <nn>-<type> --from-atlas` (refused
+when the file changed after the click).
+
 Assembly uses this file. When every phone segment of the video has one, P4 is done.

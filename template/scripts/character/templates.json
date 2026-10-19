@@ -34,8 +34,8 @@
       "name": "ugc-character-face-replace",
       "output_type": "video",
       "required": false,
-      "create_when": "the founder approves the paid face-replace test (models.json face_replace); setup does not create it before",
-      "description": "Face replace, the edit route (models.json face_replace.routes.edit): Wan 2.7 Edit Video. The masked reference clip is the source video and the character's face the one reference image. Messages-only. The output is the source video's length: no duration setting. 720p, 9:16.",
+      "create_when": "never: the edit route it serves is retired (models.json face_replace.routes.edit, 2026-10-04)",
+      "description": "RETIRED. Face replace, the edit route (models.json face_replace.routes.edit): Wan 2.7 Edit Video. The masked reference clip is the source video and the character's face the one reference image. Messages-only. The output is the source video's length: no duration setting. 720p, 9:16.",
       "_version_rules": "Every version keeps system_instructions unset, variables empty and duration null, as in ugc-character.",
       "versions": [
         {
@@ -81,6 +81,81 @@
             "extensions": {
               "duration": 5,
               "resolution": "768P"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "ugc-character-face-animate-replace",
+      "name": "ugc-character-face-animate-replace",
+      "output_type": "video",
+      "required": false,
+      "create_when": "only when a shot names its fallback route; created 2026-10-06/07 for the founder's tests",
+      "description": "FALLBACK (founder, 2026-10-07; the default is ugc-character-face-kling-motion). Face replace, the replace route (models.json face_replace.routes.replace): Wan 2.2 Animate replace. The original reference clip is the source video and the character's face the one image. No prompt. Messages-only. The output is the source video's length: no duration setting. 720p.",
+      "_version_rules": "Every version keeps system_instructions unset, variables empty and duration null.",
+      "versions": [
+        {
+          "name": "v1-720p",
+          "activate": true,
+          "default": true,
+          "model_slug": "wan-2-2-animate-replace",
+          "model_id_hint": "3a8c53c7-f83e-4d22-97a0-79d31e5243fe",
+          "_model_note": "$0.005 a source-video frame at 720p (the higher of the catalog's two figures). No text input.",
+          "video_settings": {
+            "resolution": "720p",
+            "n": 1,
+            "duration": null
+          }
+        }
+      ]
+    },
+    {
+      "slug": "ugc-character-face-animate-move",
+      "name": "ugc-character-face-animate-move",
+      "output_type": "video",
+      "required": false,
+      "create_when": "only when a shot names its fallback route; created 2026-10-06/07 for the founder's tests",
+      "description": "FALLBACK (founder, 2026-10-07; the default is ugc-character-face-kling-motion). Face replace on Supagen: wan-2-2-animate-move. The original reference clip is the video part and the character's approved first frame the one picture. Messages-only.",
+      "_version_rules": "system_instructions unset, variables empty, duration null.",
+      "versions": [
+        {
+          "name": "v1",
+          "activate": true,
+          "default": true,
+          "model_slug": "wan-2-2-animate-move",
+          "model_id_hint": "f498eca0-1ae6-47be-8ace-0be74346e987",
+          "_model_note": "$0.005 a source frame at 720p. No text input.",
+          "video_settings": {
+            "resolution": "720p",
+            "n": 1,
+            "duration": null
+          }
+        }
+      ]
+    },
+    {
+      "slug": "ugc-character-face-kling-motion",
+      "name": "ugc-character-face-kling-motion",
+      "output_type": "video",
+      "required": false,
+      "create_when": "the first face-replace reaction (the default route); created 2026-10-07",
+      "description": "DEFAULT face-replace template (founder, 2026-10-07): the motion route, Kling 3.0 Pro Motion Control. The original reference clip (padded to 3.0 s) is the video part, the character's approved first frame the one picture, and a short prompt the text part. character_orientation video, keep_original_sound false. Messages-only.",
+      "_version_rules": "system_instructions unset, variables empty, duration null.",
+      "versions": [
+        {
+          "name": "v1",
+          "activate": true,
+          "default": true,
+          "model_slug": "kling-v3-0-pro-motion-control",
+          "model_id_hint": "4f3e1cd0-d5f9-44fd-b098-e965d9220e6c",
+          "_model_note": "$0.168 a second of output.",
+          "video_settings": {
+            "n": 1,
+            "duration": null,
+            "extensions": {
+              "character_orientation": "video",
+              "keep_original_sound": false
             }
           }
         }

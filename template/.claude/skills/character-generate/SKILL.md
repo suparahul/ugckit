@@ -37,6 +37,13 @@ output and wait for a yes. **A yes covers one run.** A re-run, or the next segme
 its own yes. Report the computed cost (`price_per_s` × seconds), never the figure Supagen
 reports.
 
+In the Atlas the yes is a click. The storyboard approval (`storyboard.approve`, recorded
+at gate A) carries the computed cost of the first run of every segment: it is the yes to
+each first run, when the cost generate.sh prints is not above the segment's figure on the
+post page. A rejected take with "Generate it again" (`take.reject`, `data.decision`
+`regenerate`, `data.cost_usd`) is the yes to one more run of that segment. Anything else
+(a higher cost, a run nobody clicked for) needs the user's word here.
+
 References are the standard mode of this pipeline, but each referenced run is still an
 explicit opt-in: `ALLOW_REFS=1` goes on the command only after the yes.
 
@@ -51,19 +58,54 @@ notification. Do not poll with sleep.
   app screen: the app is inserted at P4), and never supplied media (a plan asset or a
   file under `supplied/`), research footage or a reference reaction's post. C, M, R and P
   are never generated. An X segment (a silent reaction) carries no voice clip. An X segment
-  in face-replace mode carries only its masked clip (`shots.py reference`) and the
-  character's face, on its route's model and template (the shot's
-  `face_replace.route`: `edit`, Wan 2.7 Edit Video, the clip as the source video; or
-  `guided`, MiniMax H3 reference-to-video, the clip as a video reference). The clip is
-  the one video part of the request, before the face. A live face-replace run is refused
-  until the founder approves a paid test (`capabilities.json` `bridge.face_replace`);
-  `REQUEST_ONLY=1` writes the request it would send, with placeholder file ids, and
-  spends nothing.
+  in face-replace mode runs on its route (the shot's `face_replace.route`; a shot that
+  names none takes `models.json` `face_replace.default_route`), with the route's model and
+  template. The clip is the one video part of the request, before the picture:
+  - `motion`, **the default** (the founder's final decision, after the paid tests): Kling
+    3.0 Pro Motion Control on Supagen, template `ugc-character-face-kling-motion`. It sends
+    `prompt.txt` as the text part, the original clip (`shots.py reference`, padded to 3.0 s
+    with its last frame), then the shot's keyframe, approved at gate A byte for byte
+    (`approval.json` `gate_a_storyboard.keyframes_sha256`). The template sets
+    `character_orientation` video and `keep_original_sound` false. $0.168 a second of
+    output: a 3 s clip is $0.50. A run takes about 4 minutes.
+  - `replace`, **the backup**: Wan 2.2 Animate, replace mode, on Supagen, template
+    `ugc-character-face-animate-replace`. It sends the original clip (unpadded), then one
+    picture of the character's face; no text part. $0.005 a source frame: 89 frames is
+    $0.45. Use it only when the user names it after a failed motion take.
+  - `animate` (Wan 2.2 Animate move: it timed out on Supagen) and `guided` (MiniMax H3
+    reference-to-video, untested) are fallbacks. `edit` (Wan 2.7 Edit Video) is retired and
+    refused: it kept the reference person's face.
+  The route's template must exist in Supagen: at the first face-replace reaction, create
+  it from `scripts/character/templates.json` with its version and activate that version,
+  as the `setup` skill does for `ugc-character` (free; no generation). After the download
+  the script runs the identity gate (`identity.py`, with the `.venv` Python) and prints
+  whose face is in the file. `capabilities.json` `bridge.face_replace`
+  is true: the founder approved the paid tests. Set it to false to stop every live
+  face-replace run. `REQUEST_ONLY=1` writes the request it would send, with placeholder
+  file ids, and spends nothing.
 - At most `max_reference_images` pictures (4 on the default model); the voice clip does
   not count.
+- A continuing segment (its shot's `continuity.from`): the previous clip approved at
+  gate B, its last frame taken from that file and unchanged (`continuity.py check`),
+  `refs.json` carrying that frame once and first, and a model whose `models.json`
+  `continuity.input` is `reference`. Otherwise it stops before any cost.
 - The prompt under 5,000 characters, counted as characters; sent once, as message
   content.
 - A model not in `models.json`, a length over its cap or under its minimum.
+
+## A continuing segment
+
+Generate the clips of a continuous take in order: the first one, then gate B for it (the
+approval takes its last frame), then the next. The cost step adds one line, for example
+
+    continuity  from 01-t: last-frame.png (sha256 7e92bbd786b0) as the first reference image,
+                in the keyframe's place (UNVERIFIED: models.json continuity)
+
+Say it to the user with the cost: on the H3 models the frame is a reference image, not a
+first-frame setting, and no paid run has yet shown that the take opens on it. The script
+writes `<take>.seed.json` beside the take: the frame it was seeded with. Gate B needs it.
+If the first clip is approved again with another take, its last frame changes and the
+continuing clip is generated again.
 
 ## When it fails
 

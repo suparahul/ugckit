@@ -24,6 +24,14 @@ captions; each supplied clip is the approved one.
     scripts/character/review.py final <video> --decision regenerate --segment <n> --words "<the user's words>"
     scripts/character/review.py final <video> --decision reject --words "<the user's words>"
 
+When the user decided in the Atlas (Approve the cut, or Send back, on the post page):
+
+    scripts/character/review.py final <video> --from-atlas
+
+It reads the last `cut.approve` or `cut.sendback` line, refuses when the assembled file
+changed after the click (its sha256), and takes the export the user chose. Then run
+`deliver.sh`; the file shows on the post page for the posting approval.
+
 For a v2 plan an approval is refused when the file was assembled from another revision
 of the plan, or when an overlay or supplied-file check failed in `assembly.json`:
 assemble again, or take the problem back to P1 or to planning.

@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to pipeline/character/<video>/video.json. Written by character-shots (P1) from the locked plan; nothing can be assembled without it. With app_insertion false, it has no O, G, S, H, F, R or P segment. Optional per segment, read by assemble.sh: trim [in, out] in seconds of the source; punch_in; audio_from: '<video>.<seg>' (another approved segment's voice under this one), 'asset:<id>' (a supplied voice or sound approved at gate B, cut to audio_range_s or its trim_s) or 'narration:<take>' (a narrator's take approved at gate B); for R and P screen_id and punch_in_to_hero. For a v2 plan: plan_revision and plan_sha256 (bridge.py digest) pin the plan it was written from, every segment names the plan beats it carries (beat_ids), overlays is the plan's overlays copied exactly, and planned_s may give a segment's planned length. B is a silent generated action (hands only, pet only, or a mascot; never the app); C is supplied media (asset_id, source_range_s for a clip or still_s for a still, fit cover | pad, audio source | mute, and insert {mode, screen_id} for a filmed phone); M lays panels (each one source: asset_id, project of an approved B, or screen_id; source_range_s, rect as shares of the frame, crop, sync_offset_s, audio true on the panel whose sound plays).",
+  "_comment": "Copy to pipeline/character/<video>/video.json. Written by character-shots (P1) from the locked plan; nothing can be assembled without it. With app_insertion false, it has no O, G, S, H, F, R or P segment. Optional per segment, read by assemble.sh: trim [in, out] in seconds of the source; punch_in; audio_from: '<video>.<seg>' (another approved segment's voice under this one), 'asset:<id>' (a supplied voice or sound approved at gate B, cut to audio_range_s or its trim_s) or 'narration:<take>' (a narrator's take approved at gate B); for R and P screen_id and punch_in_to_hero. For a v2 plan: plan_revision and plan_sha256 (bridge.py digest) pin the plan it was written from, every segment names the plan beats it carries (beat_ids), overlays is the plan's overlays copied exactly, and planned_s may give a segment's planned length. B is a silent generated action (hands only, pet only, or a mascot; never the app); C is supplied media (asset_id, source_range_s for a clip or still_s for a still, fit cover | pad, audio source | mute, and insert {mode, screen_id} for a filmed phone); M lays panels (each one source: asset_id, project of an approved B, or screen_id; source_range_s, rect as shares of the frame, crop, sync_offset_s, audio true on the panel whose sound plays). A continuous take: when a shot declares continuity.from, the segment before it is cut at its last frame (last-frame.json out_s) and the continuing one starts at its second frame; the continuing segment has no trim, and both keep one punch_in.",
   "video_id": "<video>",
   "characters": [
     "<character>@v<n>"
@@ -140,6 +140,32 @@
         }
       ],
       "_note": "split_screen or picture_in_picture, copied from the plan's panels"
+    },
+    {
+      "n": 10,
+      "type": "B",
+      "project": "<video>.10-b",
+      "beat_ids": [
+        "<b>"
+      ],
+      "script_lines": [
+        "<the narrated lines>"
+      ],
+      "audio_from": "narration:<take>",
+      "_note": "the first clip of a continuous take: it is cut at its last frame, the frame the next clip opens on"
+    },
+    {
+      "n": 11,
+      "type": "B",
+      "project": "<video>.11-b",
+      "beat_ids": [
+        "<b>"
+      ],
+      "script_lines": [
+        "<the narrated lines>"
+      ],
+      "audio_from": "narration:<take>",
+      "_note": "a continuing clip: shots/11-b.json has \"continuity\": {\"from\": \"10-b\"}; it opens on the last frame of 10-b and starts at its own second frame; no trim, the punch_in of 10-b"
     }
   ],
   "joins": {

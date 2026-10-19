@@ -8,17 +8,20 @@ Builds a scratch workspace from template/ (scripts/character, docs/character, th
 link for the caption renderer), a handle with its world, a human character, a mascot and a
 synthetic narrator, a screen library, and synthetic media made locally with ffmpeg, cv2
 and macOS `say`. The "generated" segments are ffmpeg test pictures standing in for
-approved generations. Then, for every fixture plan in fixtures/ (two v1, ten v2):
+approved generations. Then, for every fixture plan in fixtures/ (two v1, eleven v2):
 
   - shots.py check, the bridge plan check, shots.py validate and the bridge video check pass;
   - the B prompt passes the lint;
   - six videos are assembled end to end and pass gate C (review.py final);
+  - clip-to-clip continuity (v2-continuous): the last frame of the approved first clip is
+    taken with its checksum, opens the second clip's refs.json and request (REQUEST_ONLY=1),
+    is checked at gate B, and the two are cut with no frame shown twice;
   - each broken copy (a mutation) is refused with the expected reason.
 
 --venv names a Python environment with opencv and faster-whisper (requirements.txt); it is
 linked as the workspace's .venv for assemble.sh. Exit 1 when any expectation fails.
 """
-import copy, hashlib, json, os, shutil, subprocess, sys, tempfile
+import copy, glob, hashlib, json, os, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -196,6 +199,7 @@ def build_workspace():
         "sets": ["kitchen", "hallway"], "fixed_subjects": ["pip", "biscuit"],
         "outfits": [{"id": "apron", "what": "a green apron",
                      "reference": "characters/nora/references/anchors/outfits/apron.png"}],
+        "identity_lock": {"face": LOCK_FACE, "hair": LOCK_HAIR},
         "anchors": dict(anchors, hero="references/face.png", approved=["all, fixture 2026-10-01"])})
     mdir = os.path.join(HANDLE, "characters", "whisker")
     picture(os.path.join(mdir, "references", "anchors", "hero.png"), "orange")
@@ -517,30 +521,47 @@ def reference_clip(path, dur=4.0):
     os.remove(tmp)
 
 
-FR_PROMPT = """Vertical 9:16 selfie video, the room, light and camera of the input clip.
-REFERENCES
-reference.mp4 is the motion, timing, expression and camera only: keep them frame for frame.
-face.png is her face: identity, hair and signature details. Not its background.
-STRUCTURE
-One shot, no cuts, as long as the clip.
-SUBJECT
-Exactly one person. Replace the face with the face of face.png in every frame. Nothing of the original person's face, hair or identity remains.
-SETTING
-The room of the clip, unchanged.
-SHOT 1 (0.0 to 2.9 s)
-She reacts to the lens as in the clip. End state: she smiles at the lens.
-PERFORMANCE
-She does not speak. No lip sync: her mouth never forms words.
-AUDIO
-No voice, no music.
-CONSISTENCY
-The same face as face.png in every frame.
-NO TEXT
-No captions, no text, no watermark, no logo.
-"""
+LOCK_FACE = "an oval face, a soft jaw, warm brown eyes and a small mole on the left cheek"
+LOCK_HAIR = "dark brown hair in a low bun"
+
+FR_KEYFRAME = (
+    "A vertical 9:16 phone selfie video frame, the front camera at chest height; normal phone processing, true "
+    "colours, no beauty filter.\n\nThe first reference picture is the woman: her face and hair exactly. The second "
+    "reference picture is the pose picture: take only its pose, framing, camera angle, light and room, never its "
+    f"person's face, hair, clothes or identity.\n\nThe woman: {LOCK_FACE}; {LOCK_HAIR}. Exactly one person.\n\n"
+    "The pose, as in the pose picture: her face fills the upper half of the frame, her eyes on the lens.\n\n"
+    "{band}\n\nNo text, no captions, no watermark, no logo.")
+
+FR_MOTION = ("The woman in the reference image reacts to the camera exactly as the person in the reference video "
+             "does, at the same moments: her brows go up, then she smiles at the lens. Keep her face, hair, clothes "
+             "and the room as in the reference image. No captions and no on-screen text.")
+
+
+def stub_identity(result):
+    """The identity gate needs real faces; the fixtures have none. A scratch-only stand-in
+    that returns `result`, or None to put the real identity.py back."""
+    ip = os.path.join(WS, "scripts", "character", "identity.py")
+    keep = ip + ".real"
+    for c in glob.glob(os.path.join(WS, "scripts", "character", "__pycache__", "identity.*")):
+        os.remove(c)        # a stale compiled copy of the other stand-in (same size, same second)
+    if result is None:
+        if os.path.exists(keep):
+            os.replace(keep, ip)
+        return
+    if not os.path.exists(keep):
+        shutil.copy(ip, keep)
+    open(ip, "w").write(
+        "def check(video, seg, rel=None):\n"
+        f"    return {{'result': {result!r}, 'why': 'fixture stand-in', 'median_character': 0.6, "
+        "'median_reference': 0.1, 'file': rel}\n\n"
+        "def show(rec):\n    print(rec['result'])\n")
 
 
 def face_replace(assemble_on):
+    """The default route (motion: Kling 3.0 Pro Motion Control), offline: the original clip
+    padded to 3.0 s, the character's first frame made from the hero and the clip's first frame
+    and approved at gate A by its checksum, the short prompt, the request, gate B with the
+    identity gate. Then the backup route (replace) and the untested guided route."""
     v_ = "v2-face-replace"
     fx = fixture(v_)
     ref = fx["reaction_refs"][0]
@@ -550,68 +571,87 @@ def face_replace(assemble_on):
     pl = lock(fx)
     checks(v_)
     clip_rel = "segments/01-x/source/reference.mp4"
+    frame_rel = "segments/01-x/source/first-frame.png"
     masks = [{"rect": [0, 0.9, 1, 0.1], "how": "crop", "text": "@somecreator"},
-             {"rect": [0.02, 0.52, 0.96, 0.07], "how": "blur", "text": "4 YEARS AT THE GYM"}]
+             {"rect": [0.02, 0.52, 0.96, 0.07], "how": "blur", "text": "4 YEARS AT THE GYM",
+              "behind": "her grey top and the wall behind her"}]
+    band = bridge_band(masks)
     sh = shot(v_, "01-x", "X", [], pl["beats"][0]["action"])
     sh["video"].update(duration_seconds=None, trim_to_seconds=2.9,
                        references=[{"file": clip_rel, "kind": "face_replace_clip", "role": "the motion and timing"},
-                                   {"file": "references/face.png", "kind": "hero", "role": "her face"}])
+                                   {"file": "keyframes/01-x.png", "kind": "keyframe",
+                                    "role": "the subject and the room"}])
+    sh["keyframe_prompt"] = FR_KEYFRAME.replace("{band}", band)
+    sh["keyframe_references"] = [{"file": "references/face.png", "kind": "hero", "role": "her face"},
+                                 {"file": frame_rel, "kind": "face_replace_frame", "role": "the pose and the room"}]
     sh["reaction"] = copy.deepcopy(pl["beats"][0]["reaction"])
-    sh["face_replace"] = {"ref_id": "r1", "route": "edit", "clip": clip_rel, "range_s": [0.0, 2.9], "masks": masks}
+    # No route named: the shot takes models.json face_replace.default_route (motion).
+    sh["face_replace"] = {"ref_id": "r1", "clip": clip_rel, "range_s": [0.0, 2.9], "masks": masks}
     shp = p("pipeline", "character", v_, "shots", "01-x.json")
     wj(shp, sh)
     video_json(pl, [{"n": 1, "type": "X", "project": f"{v_}.01-x", "beat_ids": ["b1"], "script_lines": []},
                     {"n": 2, "type": "R", "screen_id": "scan-result", "trim": [1, 6], "beat_ids": ["b2"],
                      "script_lines": []}])
-    # The input clip: the pinned post, trimmed, masked, read back with no text left.
-    wj(shp, {**sh, "face_replace": {**sh["face_replace"], "masks": masks[:1]}})
-    expect(f"{v_}: shots.py reference refuses a caption left unmasked",
-           [PY, f"{SC}/shots.py", "reference", v_], ok=False, contains="OCR still reads text")
-    wj(shp, sh)
-    expect(f"{v_}: shots.py reference (trimmed, masked, no text)", [PY, f"{SC}/shots.py", "reference", v_])
+    # The input clip: the original, cut to the range and held on its last frame to 3.0 s.
+    expect(f"{v_}: shots.py reference (the original clip, padded for Kling)", [PY, f"{SC}/shots.py", "reference", v_])
     ref_mp4 = p("pipeline", "character", v_, clip_rel)
     d_ = run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", ref_mp4])[1].strip()
-    ok = abs(float(d_ or 0) - 2.9) < 0.1
-    RESULTS.append((f"{v_}: the reference clip is the planned 2.9 s", ok))
-    print(f"{'PASS' if ok else 'FAIL'}  {v_}: the reference clip is the planned 2.9 s ({d_} s)")
-    validate(v_)
-    sd = p("pipeline", "character", v_, "segments", "01-x")
-    pp = os.path.join(sd, "prompt.txt")
-    open(pp, "w").write(FR_PROMPT)
-    expect(f"{v_}: shots.py refs (the clip and her face)", [PY, f"{SC}/shots.py", "refs", v_])
-    expect(f"{v_}: lint of the face-replace prompt", [PY, f"{SC}/lint_prompt.py", v_, "01-x"])
-    for label, text, why in (
-            ("a prompt that does not replace the face",
-             FR_PROMPT.replace("Replace the face with the face of face.png in every frame. ", ""),
-             "the face replaced"),
-            ("a prompt without 'nothing of the original person'",
-             FR_PROMPT.replace("Nothing of the original person's face, hair or identity remains.", ""),
-             "no trace of the original person"),
-            ("a prompt that names the creator", FR_PROMPT.replace("as in the clip", "as @somecreator does"),
-             "no copy of the reference"),
-            ("a clip not bound to motion and timing",
-             FR_PROMPT.replace("is the motion, timing, expression and camera only: keep them frame for frame",
-                               "is the look of the video"), "bound to motion and timing")):
-        open(pp, "w").write(text)
-        expect(f"{v_}: lint refuses {label}", [PY, f"{SC}/lint_prompt.py", v_, "01-x"], ok=False, contains=why)
-    open(pp, "w").write(FR_PROMPT)
-    # generate.sh stops before any cost: no face-replace model; the raw research file; a
-    # face-replace clip on a segment that is not face replace.
+    ok = abs(float(d_ or 0) - 3.0) < 0.1 and os.path.exists(p("pipeline", "character", v_, frame_rel))
+    RESULTS.append((f"{v_}: the motion clip is the 2.9 s range held to 3.0 s, with its first frame", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  {v_}: the motion clip is the 2.9 s range held to 3.0 s ({d_} s), with its first frame")
+    # The character's first frame (keyframes.sh makes it; a stand-in here) and gate A by its checksum.
     vd = p("pipeline", "character", v_)
+    kf = os.path.join(vd, "keyframes", "01-x.png")
+    picture(kf, "tan", "720x1280")
+    validate(v_)
+    sd = os.path.join(vd, "segments", "01-x")
+    pp = os.path.join(sd, "prompt.txt")
+    open(pp, "w").write(FR_MOTION)
+    expect(f"{v_}: shots.py refs (the clip, then the keyframe)", [PY, f"{SC}/shots.py", "refs", v_])
+    expect(f"{v_}: lint of the motion route (the keyframe prompt and the short prompt)",
+           [PY, f"{SC}/lint_prompt.py", v_, "01-x"])
+    for label, kp, vp, why in (
+            ("a keyframe prompt without the identity lock", sh["keyframe_prompt"].replace(LOCK_HAIR, "her hair"),
+             FR_MOTION, "the identity lock's face and hair"),
+            ("a keyframe prompt without the band sentence", sh["keyframe_prompt"].replace(band, ""), FR_MOTION,
+             "the band sentence"),
+            ("a motion prompt that names a file", None, FR_MOTION.replace("the reference image", "keyframes/01-x.png"),
+             "no file name in the video prompt"),
+            ("a motion prompt over 600 characters", None, FR_MOTION + " " + "She reacts. " * 50, "video prompt short")):
+        wj(shp, {**sh, "keyframe_prompt": kp or sh["keyframe_prompt"]})
+        open(pp, "w").write(vp)
+        expect(f"{v_}: lint refuses {label}", [PY, f"{SC}/lint_prompt.py", v_, "01-x"], ok=False, contains=why)
+    wj(shp, sh)
+    open(pp, "w").write(FR_MOTION)
     ap = os.path.join(vd, "approval.json")
-    wj(ap, {**(rj(ap) if os.path.exists(ap) else {}),
-            "gate_a_storyboard": {"decision": "approve", "words": "Storyboard is good."}})
-    expect(f"{v_}: generate.sh stops before any cost: face replace is not approved for a live run",
-           ["bash", f"{SC}/generate.sh", v_, "01-x"], ok=False, contains="bridge.face_replace is false",
-           env={"ALLOW_REFS": "1", "CONFIRM": "1"})
+    gate_a = {"decision": "approve", "words": "Storyboard is good."}
+    wj(ap, {**(rj(ap) if os.path.exists(ap) else {}), "gate_a_storyboard": gate_a})
+    gen = ["bash", f"{SC}/generate.sh", v_, "01-x"]
+    expect(f"{v_}: generate.sh refuses a keyframe not approved at gate A by its checksum", gen, ok=False,
+           contains="not the keyframe approved at gate A", env={"ALLOW_REFS": "1", "REQUEST_ONLY": "1"})
+    # Gate A from the Atlas: the click pins the keyframe by its sha256; review.py records it.
+    log = p("apps", "catapp", "production", "log.jsonl")
+    def atlas(kind, data, note=None, at="2026-10-20T10:00:00.000Z"):
+        os.makedirs(os.path.dirname(log), exist_ok=True)
+        open(log, "a").write(json.dumps({"at": at, "post": "2026-10-20/nora/1", "kind": kind,
+                                         **({"note": note} if note else {}), "data": {"video": v_, **data}}) + "\n")
+    atlas("storyboard.approve", {"keyframes": {"01-x": "0" * 64}, "cost_usd": 0.5})
+    expect(f"{v_}: review.py storyboard --from-atlas refuses a click on another keyframe",
+           [PY, f"{SC}/review.py", "storyboard", v_, "--from-atlas"], ok=False, contains="changed after the click")
+    atlas("storyboard.approve", {"keyframes": {"01-x": sha(kf)}, "cost_usd": 0.5}, at="2026-10-20T10:05:00.000Z")
+    expect(f"{v_}: review.py storyboard --from-atlas records gate A",
+           [PY, f"{SC}/review.py", "storyboard", v_, "--from-atlas"], contains="1 keyframe(s) pinned")
+    g = rj(ap)["gate_a_storyboard"]
+    ok = g.get("keyframes_sha256") == {"01-x": sha(kf)} and g.get("approved_in", {}).get("atlas_line_at", "").endswith("10:05:00.000Z")
+    RESULTS.append((f"{v_}: gate A from the Atlas pins the keyframe and the click", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  {v_}: gate A from the Atlas pins the keyframe and the click")
     request_shape(v_, sd, sh, shp, clip_rel)
     refs = os.path.join(sd, "refs.json")
     keep_refs = open(refs).read()
     wj(refs, {"references": [{"kind": "face_replace_clip", "file": ref["video_path"]},
-                             {"kind": "hero", "file": "apps/catapp/handles/nora/references/face.png"}]})
-    expect(f"{v_}: generate.sh refuses the raw research file as the clip",
-           ["bash", f"{SC}/generate.sh", v_, "01-x"], ok=False, contains="Research footage is never an input",
-           env={"ALLOW_REFS": "1"})
+                             {"kind": "keyframe", "file": f"pipeline/character/{v_}/keyframes/01-x.png"}]})
+    expect(f"{v_}: generate.sh refuses the raw research file as the clip", gen, ok=False,
+           contains="Research footage is never an input", env={"ALLOW_REFS": "1"})
     open(refs, "w").write(keep_refs)
     wsd = p("pipeline", "character", "v2-reaction", "segments", "01-x")
     wrefs = os.path.join(wsd, "refs.json")
@@ -621,29 +661,50 @@ def face_replace(assemble_on):
            ["bash", f"{SC}/generate.sh", "v2-reaction", "01-x"], ok=False, contains="is a face-replace clip",
            env={"ALLOW_REFS": "1"})
     open(wrefs, "w").write(keep_w)
-    # Gate B: the face, no trace of the creator, silent, the clip's length, no text.
-    gen = os.path.join(sd, "generated", "01-x-take1.mp4")
-    os.makedirs(os.path.dirname(gen), exist_ok=True)
-    ff("-i", ref_mp4, "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-shortest", "-c:v", "libx264",
-       "-pix_fmt", "yuv420p", "-c:a", "aac", gen)
+    # Gate B: the checks, the identity gate, the padded length, no text.
+    take = os.path.join(sd, "generated", "01-x-take1.mp4")
+    os.makedirs(os.path.dirname(take), exist_ok=True)
+    clip(take, 2.95, "smptebars", 120, size="720x1280", audio=False)
     rv = [PY, f"{SC}/review.py", "segment", v_, "01-x", "--decision", "approve", "--file",
           "generated/01-x-take1.mp4", "--words", "Keep it."]
     ok_checks = ["--check", "identity=pass", "--check", "no_source_identity=pass", "--check", "silent=pass"]
     expect(f"{v_}: gate B refuses a face replace without the no-trace check",
            rv + ["--check", "identity=pass", "--check", "silent=pass"], ok=False, contains="no_source_identity")
+    expect(f"{v_}: gate B refuses a face replace the identity gate did not pass (no face in the fixture)",
+           rv + ok_checks, ok=False, contains="identity gate")
+    stub_identity("FAIL")
+    expect(f"{v_}: gate B refuses an identity FAIL", rv + ok_checks, ok=False, contains="identity gate FAIL")
+    stub_identity("PASS")
     dirty = os.path.join(sd, "generated", "01-x-dirty.mp4")
-    ff("-ss", "0", "-to", "2.9", "-i", src, "-c:v", "libx264", "-pix_fmt", "yuv420p", dirty)
+    ff("-ss", "0", "-to", "2.95", "-i", src, "-c:v", "libx264", "-pix_fmt", "yuv420p", dirty)
     expect(f"{v_}: gate B refuses a file with the creator's caption and handle",
            rv[:8] + ["generated/01-x-dirty.mp4"] + rv[9:] + ok_checks, ok=False, contains="OCR reads text")
     os.remove(dirty)
     long_ = os.path.join(sd, "generated", "01-x-long.mp4")
     clip(long_, 5, "smptebars", 120, size="720x1280")
-    expect(f"{v_}: gate B refuses a file longer than the clip",
+    expect(f"{v_}: gate B refuses a file longer than the padded clip",
            rv[:8] + ["generated/01-x-long.mp4"] + rv[9:] + ok_checks, ok=False, contains="length gate")
     os.remove(long_)
-    expect(f"{v_}: gate B approves the face replace with its checks", rv + ok_checks)
+    # Gate B from the Atlas: the take by its sha256 and the ticked checks; a changed file is refused.
+    atlas("take.approve", {"segment": "01-x", "file": "generated/01-x-take1.mp4", "sha256": "0" * 64,
+                           "checks": {"identity": "pass", "no_source_identity": "pass", "silent": "pass"}},
+          at="2026-10-20T11:00:00.000Z")
+    fa = [PY, f"{SC}/review.py", "segment", v_, "01-x", "--from-atlas"]
+    expect(f"{v_}: review.py segment --from-atlas refuses a take changed after the click", fa, ok=False,
+           contains="changed after the click")
+    atlas("take.approve", {"segment": "01-x", "file": "generated/01-x-take1.mp4", "sha256": sha(take),
+                           "checks": {"identity": "pass", "no_source_identity": "pass", "silent": "pass"}},
+          at="2026-10-20T11:05:00.000Z")
+    expect(f"{v_}: gate B approves the motion take (2.95 s of the 3.0 s padded clip) from the Atlas click", fa)
+    e = [x for x in rj(ap)["gate_b_segments"] if x.get("project") == f"{v_}.01-x"][-1]
+    ok = e.get("decision") == "approve" and e.get("atlas_line_at", "").endswith("11:05:00.000Z") and e.get("sha256") == sha(take)
+    RESULTS.append((f"{v_}: the gate B row names the click and the take's sha256", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  {v_}: the gate B row names the click and the take's sha256")
+    stub_identity(None)
     assemble(v_, assemble_on)
+    stub_identity("PASS")
     guided_gate_b(v_, sd, sh, shp)
+    stub_identity(None)
     # The plan and the shot.
     mutate(v_, "a face-replace beat that is not the clip's length",
            plan_fn=lambda q: q["reaction_refs"][0].update(end_s=3.5), cmd="plan", contains="lasts its clip's range")
@@ -665,9 +726,15 @@ def face_replace(assemble_on):
     mutate(v_, "a crop mask in the middle of the frame",
            video_fn=lambda v: wj(shp, {**sh, "face_replace": {**sh["face_replace"], "masks": [
                {"rect": [0.02, 0.52, 0.96, 0.07], "how": "crop", "text": "x"}]}}), contains="lies at an edge")
-    mutate(v_, "a face replace without the character's face",
+    mutate(v_, "a motion shot without its keyframe",
            video_fn=lambda v: wj(shp, {**sh, "video": {**sh["video"], "references": sh["video"]["references"][:1]}}),
-           contains="character's approved face")
+           contains="and the shot's own keyframe")
+    mutate(v_, "a motion keyframe not made from the clip's first frame",
+           video_fn=lambda v: wj(shp, {**sh, "keyframe_references": sh["keyframe_references"][:1]}),
+           contains="the clip's first frame")
+    mutate(v_, "the retired edit route",
+           video_fn=lambda v: wj(shp, {**sh, "face_replace": {**sh["face_replace"], "route": "edit"}}),
+           contains="is retired")
     mutate(v_, "a face-replace length that is not the clip's",
            video_fn=lambda v: wj(shp, {**sh, "video": {**sh["video"], "trim_to_seconds": 3}}),
            contains="its clip's 2.9 s")
@@ -678,71 +745,86 @@ def face_replace(assemble_on):
            contains="only an X segment in face-replace mode")
 
 
+def bridge_band(masks):
+    sys.path.insert(0, os.path.join(WS, "scripts", "character"))
+    import bridge
+    return " ".join(bridge.band_sentence(masks, "picture"))
+
+
 def request_shape(v_, sd, sh, shp, clip_rel):
-    """The two face-replace routes, offline: the request generate.sh would send
-    (REQUEST_ONLY=1, placeholder file ids, no upload, no run), the cost it quotes, and the
-    stop before spend as the only block."""
+    """The routes, offline: the request generate.sh would send (REQUEST_ONLY=1, placeholder
+    file ids, no upload, no run), the cost it quotes, and the stops before spend."""
     gen = ["bash", f"{SC}/generate.sh", v_, "01-x"]
-    face = "apps/catapp/handles/nora/references/face.png"
     clip_file = f"pipeline/character/{v_}/{clip_rel}"
-    for route, model, tpl, cost, extra in (
-            ("edit", "wan-2-7-edit-video", "ugc-character-face-replace", "$0.30", {"duration_seconds": None}),
-            ("guided", "minimax-h3-reference-to-video", "ugc-character-face-guided", "$0.30",
-             {"duration_seconds": 5})):
-        wj(shp, {**sh, "face_replace": {**sh["face_replace"], "route": route},
-                 "video": {**sh["video"], **extra}})
-        validate(v_) if route == "guided" else None
-        out = expect(f"{v_}: generate.sh REQUEST_ONLY, the {route} route", gen, env={"ALLOW_REFS": "1", "REQUEST_ONLY": "1"})
-        rq = os.path.join(sd, "generated", "request-draft.json")
+    kf_file = f"pipeline/character/{v_}/keyframes/01-x.png"
+    face = "apps/catapp/handles/nora/references/face.png"
+    rq = os.path.join(sd, "generated", "request-draft.json")
+
+    def shape(label, tpl, model, cost, prompt, parts_want, trim):
+        out = expect(f"{v_}: generate.sh REQUEST_ONLY, {label}", gen, env={"ALLOW_REFS": "1", "REQUEST_ONLY": "1"})
         req = rj(rq) if os.path.exists(rq) else {}
         parts = ((req.get("messages") or [{}])[0]).get("content") or []
-        shape = [(x.get("type"), (x.get("source") or {}).get("file_id")) for x in parts[1:]]
-        ok = (req.get("template_slug") == tpl and parts[:1] and parts[0].get("type") == "text"
-              and parts[0].get("text") == FR_PROMPT.strip()
-              and shape == [("video", f"offline:{clip_file}"), ("image", f"offline:{face}")]
-              and f"model       {model}" in out and f"est. cost   {cost}" in out
-              and ("trim to 2.9s" in out) == (route == "guided"))
-        RESULTS.append((f"{v_}: the {route} request: {tpl}, the clip as the one video part first, then her face", ok))
-        print(f"{'PASS' if ok else 'FAIL'}  {v_}: the {route} request: {tpl}, the clip first, then her face")
+        texts = [x.get("text") for x in parts if x.get("type") == "text"]
+        got = [(x.get("type"), (x.get("source") or {}).get("file_id")) for x in parts if x.get("type") != "text"]
+        ok = (req.get("template_slug") == tpl and texts == ([prompt] if prompt else []) and got == parts_want
+              and f"model       {model}" in out and f"est. cost   {cost}" in out and ("trim to 2.9s" in out) == trim)
+        RESULTS.append((f"{v_}: the {label} request: {tpl}", ok))
+        print(f"{'PASS' if ok else 'FAIL'}  {v_}: the {label} request: {tpl}, {cost}")
         if not ok:
-            print("      " + json.dumps({"template": req.get("template_slug"), "parts": shape}) + "\n      "
-                  + "\n      ".join(out.strip().splitlines()[-8:]))
-        os.remove(rq)
-    # The stop is the only block: with bridge.face_replace true (this scratch copy only) the
-    # run reaches the cost prompt and stops there without CONFIRM. Nothing is sent.
+            print("      " + json.dumps({"template": req.get("template_slug"), "texts": texts, "parts": got}) + "\n      "
+                  + "\n      ".join(out.strip().splitlines()[-10:]))
+        if os.path.exists(rq):
+            os.remove(rq)
+        return out
+
+    # motion (the default): the prompt, the clip held to 3.0 s, then the approved keyframe; 3 s x $0.168.
+    shape("the motion route (default)", "ugc-character-face-kling-motion", "kling-v3-0-pro-motion-control", "$0.50",
+          FR_MOTION, [("video", f"offline:{clip_file}"), ("image", f"offline:{kf_file}")], False)
+    # The live stops: capabilities.json false refuses; true reaches the cost prompt and stops without CONFIRM.
     cp = os.path.join(WS, "scripts", "character", "capabilities.json")
     keep_c = open(cp).read()
-    wj(cp, {**json.loads(keep_c), "bridge.face_replace": True})
-    expect(f"{v_}: with the paid test approved, the guided route stops at the cost prompt", gen, ok=False,
-           contains="This would spend $0.30", env={"ALLOW_REFS": "1"})
+    wj(cp, {**json.loads(keep_c), "bridge.face_replace": False})
+    expect(f"{v_}: generate.sh stops before any cost when face replace is switched off", gen, ok=False,
+           contains="bridge.face_replace is false", env={"ALLOW_REFS": "1", "CONFIRM": "1"})
     open(cp, "w").write(keep_c)
-    # The route's rules.
+    expect(f"{v_}: the motion route stops at the cost prompt without CONFIRM", gen, ok=False,
+           contains="This would spend $0.50", env={"ALLOW_REFS": "1"})
+    # replace (the backup): the original clip, unpadded, then one face picture; no prompt; per frame.
+    rep = {**sh, "face_replace": {**sh["face_replace"], "route": "replace"},
+           "video": {**sh["video"], "references": [sh["video"]["references"][0],
+                                                   {"file": "references/face.png", "kind": "hero", "role": "her face"}]}}
+    wj(shp, rep)
+    expect(f"{v_}: shots.py reference for the replace route (no padding)", [PY, f"{SC}/shots.py", "reference", v_])
+    expect(f"{v_}: shots.py refs for the replace route", [PY, f"{SC}/shots.py", "refs", v_])
+    out = shape("the replace route (backup)", "ugc-character-face-animate-replace", "wan-2-2-animate-replace", "$0.44",
+                None, [("video", f"offline:{clip_file}"), ("image", f"offline:{face}")], False)
+    # Back to the default route and its padded clip.
+    wj(shp, sh)
+    expect(f"{v_}: shots.py reference for the motion route again", [PY, f"{SC}/shots.py", "reference", v_])
+    expect(f"{v_}: shots.py refs for the motion route again", [PY, f"{SC}/shots.py", "refs", v_])
     for label, change, why in (
-            ("a guided shot at 3 s", {"duration_seconds": 3}, "the guided route generates 5 s"),
-            ("an edit shot with a length of its own", None, "has no length of its own")):
-        if change:
-            wj(shp, {**sh, "face_replace": {**sh["face_replace"], "route": "guided"}, "video": {**sh["video"], **change}})
-        else:
-            wj(shp, {**sh, "video": {**sh["video"], "duration_seconds": 5}})
+            ("a motion shot with a length of its own", {"duration_seconds": 5}, "has no length of its own"),):
+        wj(shp, {**sh, "video": {**sh["video"], **change}})
         expect(f"{v_}: shots.py validate refuses {label}", [PY, f"{SC}/shots.py", "validate", v_], ok=False, contains=why)
-        expect(f"{v_}: generate.sh refuses {label}", gen + [], ok=False, contains=why.replace("the guided route generates 5 s", "generates 5 s"),
+        expect(f"{v_}: generate.sh refuses {label}", gen, ok=False, contains=why,
                env={"ALLOW_REFS": "1", "REQUEST_ONLY": "1"})
-    wj(shp, {**sh, "face_replace": {k: x for k, x in sh["face_replace"].items() if k != "route"}})
-    expect(f"{v_}: bridge refuses a face replace with no route", [PY, f"{SC}/bridge.py", "video", v_], ok=False,
-           contains="face_replace.route")
+    wj(shp, {**sh, "face_replace": {**sh["face_replace"], "route": "edit"}})
+    expect(f"{v_}: generate.sh refuses the retired edit route", gen, ok=False, contains="is retired",
+           env={"ALLOW_REFS": "1", "REQUEST_ONLY": "1"})
     two = {**sh, "video": {**sh["video"], "references": sh["video"]["references"] + [
-        {"file": "references/face.png", "kind": "anchor", "role": "a second angle"}]}}
+        {"file": "references/face.png", "kind": "hero", "role": "a second picture"}]}}
     wj(shp, two)
-    expect(f"{v_}: shots.py validate refuses two pictures on the edit route (Wan takes one)",
+    expect(f"{v_}: shots.py validate refuses two pictures on the motion route (Kling takes one)",
            [PY, f"{SC}/shots.py", "validate", v_], ok=False, contains="at most 1")
     wj(shp, sh)
-    expect(f"{v_}: state.py refuses the edit model as the segment model",
-           [PY, f"{SC}/state.py", "model", "set", "wan-2-7-edit-video", "5"], ok=False, contains="never as the segment model")
+    for m in ("wan-2-7-edit-video", "kling-v3-0-pro-motion-control"):
+        expect(f"{v_}: state.py refuses {m} as the segment model",
+               [PY, f"{SC}/state.py", "model", "set", m, "5"], ok=False, contains="never as the segment model")
 
 
 def guided_gate_b(v_, sd, sh, shp):
-    """Gate B on the guided route: a new clip of 5 s, at least the clip's length, trimmed at
-    assembly, with the check that the reaction follows the clip."""
+    """Gate B on the guided route (untested with a paid run): a new clip of 5 s, at least the
+    clip's length, trimmed at assembly, with the check that the reaction follows the clip."""
     wj(shp, {**sh, "face_replace": {**sh["face_replace"], "route": "guided"}, "video": {**sh["video"], "duration_seconds": 5}})
     rv = [PY, f"{SC}/review.py", "segment", v_, "01-x", "--decision", "approve", "--words", "Keep it.",
           "--check", "identity=pass", "--check", "no_source_identity=pass", "--check", "silent=pass"]
@@ -759,6 +841,236 @@ def guided_gate_b(v_, sd, sh, shp):
     for f in (g5, g2):
         os.remove(f)
     wj(shp, sh)
+
+
+CONT_PROMPT = B_PROMPT.replace(
+    "keyframes/01-b.png is the first frame: composition, the counter, the light. Nothing else.",
+    "last-frame.png is the first frame: the last frame of 01-b, where this take begins. Nothing else.").replace(
+    "Her hands set two bowls a body length apart for Pip and Biscuit. End state: both cats eat, her hands rest on the counter.",
+    "Her hands stay on the counter while both cats keep eating. End state: both cats eat, her hands rest on the counter.")
+
+
+def continuous_takes(dir_, name="take"):
+    """One moving 10 s take split in two, as a model that honours its first frame would make
+    them: 01-b is 0 to 5 s; 02-b opens on 01-b's last frame (frame 149), then goes on."""
+    full = os.path.join(dir_, "full.mp4")
+    clip(full, 10, "testsrc", 220, size="720x1280")
+    a = p("pipeline", "character", "v2-continuous", "segments", "01-b", "generated", f"01-b-{name}1.mp4")
+    b = p("pipeline", "character", "v2-continuous", "segments", "02-b", "generated", f"02-b-{name}1.mp4")
+    for f in (a, b):
+        os.makedirs(os.path.dirname(f), exist_ok=True)
+    enc = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "12", "-c:a", "aac"]
+    ff("-i", full, "-t", "5", *enc, a)
+    ff("-ss", f"{149 / 30:.6f}", "-i", full, "-t", f"{151 / 30:.6f}", *enc, b)
+    os.remove(full)
+    return a, b
+
+
+def continuity_test(assemble_on):
+    """Clip-to-clip continuity: 02-b continues from 01-b. The last frame of the approved 01-b
+    is taken with its checksum, put in 02-b's refs.json in the keyframe's place, sent in the
+    request (REQUEST_ONLY=1, nothing spent), checked at gate B, and cut without a repeated
+    frame at assembly. Each refusal names its reason."""
+    v_ = "v2-continuous"
+    sys.path.insert(0, SC)
+    import continuity
+    pl = lock(fixture(v_))
+    checks(v_)
+    vd = p("pipeline", "character", v_)
+    for n, b in (("01-b", pl["beats"][0]), ("02-b", pl["beats"][1])):
+        shot(v_, n, "B", [], b["action"], subjects=["pip", "biscuit"], framing="hands_only")
+    shp = os.path.join(vd, "shots", "02-b.json")
+    wj(shp, {**rj(shp), "continuity": {"from": "01-b"}})
+    video_json(pl, [{"n": 1, "type": "B", "project": f"{v_}.01-b", "beat_ids": ["b1"], "script_lines": ["l1"],
+                     "audio_from": "narration:n1"},
+                    {"n": 2, "type": "B", "project": f"{v_}.02-b", "beat_ids": ["b2"], "script_lines": ["l2"],
+                     "audio_from": "narration:n2"}])
+    expect(f"{v_}: shots.py validate, the frame pending before gate A", [PY, f"{SC}/shots.py", "validate", v_],
+           contains="taken when 01-b is approved")
+    expect(f"{v_}: bridge video", [PY, f"{SC}/bridge.py", "video", v_])
+    expect(f"{v_}: shots.py refs", [PY, f"{SC}/shots.py", "refs", v_], contains="opens on the last frame of 01-b")
+    frame = f"pipeline/character/{v_}/segments/01-b/last-frame.png"
+    r2 = rj(os.path.join(vd, "segments", "02-b", "refs.json"))["references"]
+    ok = r2[0]["file"] == frame and r2[0]["kind"] == "neighbour-frame" and not any(r["kind"] == "keyframe" for r in r2) \
+        and len(r2) == 4
+    RESULTS.append((f"{v_}: refs.json opens on 01-b's last frame, in the keyframe's place", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  {v_}: refs.json opens on 01-b's last frame, in the keyframe's place")
+    r1 = rj(os.path.join(vd, "segments", "01-b", "refs.json"))["references"]
+    ok = r1[0]["kind"] == "keyframe" and not any(r["kind"] == "neighbour-frame" for r in r1)
+    RESULTS.append((f"{v_}: the first clip keeps its own keyframe", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  {v_}: the first clip keeps its own keyframe")
+    pp = os.path.join(vd, "segments", "02-b", "prompt.txt")
+    open(pp, "w").write(CONT_PROMPT)
+    expect(f"{v_}: lint of the continuing prompt", [PY, f"{SC}/lint_prompt.py", v_, "02-b"])
+    open(pp, "w").write(CONT_PROMPT.replace("last-frame.png is the first frame", "last-frame.png is the look"))
+    expect(f"{v_}: lint refuses a last frame not bound as the first frame", [PY, f"{SC}/lint_prompt.py", v_, "02-b"],
+           ok=False, contains="the last frame bound as the first frame")
+    open(pp, "w").write(CONT_PROMPT)
+    # Gate A: from here the frame is a production input.
+    ap = os.path.join(vd, "approval.json")
+    wj(ap, {**(rj(ap) if os.path.exists(ap) else {}),
+            "gate_a_storyboard": {"decision": "approve", "words": "Storyboard is good."}})
+    expect(f"{v_}: shots.py validate refuses a continuing shot before its previous clip is approved",
+           [PY, f"{SC}/shots.py", "validate", v_], ok=False, contains="no approved clip at gate B yet")
+    expect(f"{v_}: state.py model set (the default, 5 s)",
+           [PY, f"{SC}/state.py", "model", "set", "minimax-h3-max-reference-to-video", "5"])
+    gen = ["bash", f"{SC}/generate.sh", v_, "02-b"]
+    ro = {"ALLOW_REFS": "1", "REQUEST_ONLY": "1"}
+    expect(f"{v_}: generate.sh refuses the continuing segment before any cost", gen, ok=False,
+           contains="no approved clip at gate B yet", env=ro)
+    # 01-b approved: its last frame is taken, with its checksum.
+    a, b = continuous_takes(p("pipeline", "character", v_))
+    expect(f"{v_}: gate B 01-b takes its last frame",
+           [PY, f"{SC}/review.py", "segment", v_, "01-b", "--decision", "approve", "--file",
+            "generated/01-b-take1.mp4", "--words", "Keep it."], contains="last-frame.png (frame 149 of 150")
+    lf = rj(os.path.join(vd, "segments", "01-b", "last-frame.json"))
+    png = p(frame)
+    d_ = continuity.diff(continuity.gray(png), continuity.gray(a, 149))
+    ok = (lf["frame_index"] == 149 and abs(lf["out_s"] - 5.0) < 0.002 and lf["sha256"] == sha(png)
+          and lf["source_sha256"] == sha(a) and d_ is not None and d_ < 1.0)
+    RESULTS.append((f"{v_}: last-frame.json: frame 149, the cut at 5.0 s, both checksums; the PNG is that frame", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  {v_}: last-frame.json: frame 149, the cut at 5.0 s, both checksums "
+          f"({lf['frame_index']}, {lf['out_s']}, diff {d_})")
+    expect(f"{v_}: continuity.py check", [PY, f"{SC}/continuity.py", "check", v_], contains="02-b continues from 01-b")
+    validate(v_)
+    # The request, offline: the frame is the first image part. The take's seed record.
+    out = expect(f"{v_}: generate.sh REQUEST_ONLY, the continuing segment", gen, env=ro)
+    rq = os.path.join(vd, "segments", "02-b", "generated", "request-draft.json")
+    req = rj(rq) if os.path.exists(rq) else {}
+    parts = ((req.get("messages") or [{}])[0]).get("content") or []
+    shape = [(x.get("type"), (x.get("source") or {}).get("file_id")) for x in parts[1:]]
+    seed = os.path.join(vd, "segments", "02-b", "generated", f"{v_}.02-b-draft.seed.json")
+    ok = (req.get("template_slug") == "ugc-character" and shape[:1] == [("image", f"offline:{frame}")]
+          and len(shape) == 4 and "continuity  from 01-b: last-frame.png" in out and "UNVERIFIED" in out
+          and os.path.exists(seed) and rj(seed).get("sha256") == lf["sha256"])
+    RESULTS.append((f"{v_}: the request carries 01-b's last frame as the first image; the seed is recorded", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  {v_}: the request carries 01-b's last frame as the first image; the seed is "
+          f"recorded {shape[:1]}")
+    if not ok:
+        print("      " + "\n      ".join(out.strip().splitlines()[-10:]))
+    for f in (rq, seed):
+        if os.path.exists(f):
+            os.remove(f)
+    gd = os.path.join(vd, "segments", "02-b", "generated")
+    expect(f"{v_}: generate.sh without CONFIRM stops at the cost", gen, ok=False, contains="This would spend $0.40",
+           env={"ALLOW_REFS": "1"})
+    left = glob.glob(os.path.join(gd, "*.seed.json"))
+    RESULTS.append((f"{v_}: a run stopped at the cost leaves no seed record", not left))
+    print(f"{'PASS' if not left else 'FAIL'}  {v_}: a run stopped at the cost leaves no seed record {left}")
+    # Refusals before any cost: refs.json not rewritten; a model that cannot continue.
+    refs = os.path.join(vd, "segments", "02-b", "refs.json")
+    keep_refs = open(refs).read()
+    wj(refs, {"references": [x for x in rj(refs)["references"] if x["kind"] != "neighbour-frame"]})
+    expect(f"{v_}: generate.sh refuses refs.json without the last frame", gen, ok=False, contains="once, first",
+           env={**ro, "REQUEST_ONLY": "1"})
+    open(refs, "w").write(keep_refs)
+    mp = os.path.join(SC, "models.json")
+    keep_m = open(mp).read()
+    m = json.loads(keep_m)
+    m["known_model_limits"]["minimax-h3-max-reference-to-video"]["continuity"]["input"] = "none"
+    wj(mp, m)
+    expect(f"{v_}: generate.sh refuses a model with no continuity input", gen, ok=False,
+           contains="has continuity input 'none'", env=ro)
+    expect(f"{v_}: shots.py validate refuses a model with no continuity input", [PY, f"{SC}/shots.py", "validate", v_],
+           ok=False, contains="has no continuity input")
+    open(mp, "w").write(keep_m)
+    # Gate B of the continuing take: the seed record, and that it is the current frame.
+    rv = [PY, f"{SC}/review.py", "segment", v_, "02-b", "--decision", "approve", "--file",
+          "generated/02-b-take1.mp4", "--words", "Keep it."]
+    expect(f"{v_}: gate B refuses a continuing take with no seed record", rv, ok=False, contains="seed.json is missing")
+    sj = b[:-4] + ".seed.json"
+    wj(sj, {"from": "01-b", "file": frame, "sha256": "0" * 64})
+    expect(f"{v_}: gate B refuses a take seeded with another frame", rv, ok=False, contains="seeded with another last frame")
+    wj(sj, {"from": "01-b", "file": frame, "sha256": lf["sha256"], "model": "minimax-h3-max-reference-to-video"})
+    out = expect(f"{v_}: gate B approves the continuing take", rv, contains="differs from the last frame of 01-b by")
+    e = [x for x in rj(ap)["gate_b_segments"] if x["project"] == f"{v_}.02-b"][-1]
+    ok = (e.get("continuity") or {}).get("last_frame_sha256") == lf["sha256"] and \
+        (e["checks"].get("seed_diff") is not None and e["checks"]["seed_diff"] < 1.0)
+    RESULTS.append((f"{v_}: gate B records the seed frame and its match", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  {v_}: gate B records the seed frame and its match ({e.get('checks')})")
+    narration_take(v_, "n1", pl["script"][0]["line"], "l1")
+    narration_take(v_, "n2", pl["script"][1]["line"], "l2")
+    if assemble_on:
+        assemble(v_, assemble_on)
+        man = rj(os.path.join(vd, "assembly", "assembly.json"))
+        sg = {x["name"]: x for x in man["segments"]}
+        c = (sg.get("02-b") or {}).get("continuity") or {}
+        cut = c.get("cut") or {}
+        ok = (abs(sg["01-b"]["out"] - 5.0) < 0.002 and "continues from it" in sg["01-b"]["trim_by"]
+              and 0.03 <= sg["02-b"]["in"] <= 0.034 and cut.get("dropped_diff") is not None
+              and cut["dropped_diff"] < 0.5 and cut["shown_diff"] > 3 * cut["dropped_diff"] + 0.2
+              and (man["checks"].get("continuous cut 01-b > 02-b") or {}).get("result") == "PASS")
+        RESULTS.append((f"{v_}: 01-b ends at its last frame, 02-b starts at its second: no frame shown twice", ok))
+        print(f"{'PASS' if ok else 'FAIL'}  {v_}: 01-b ends at its last frame, 02-b starts at its second: no frame "
+              f"shown twice ({sg['01-b']['out']}, {sg['02-b']['in']}, {cut})")
+        d2 = run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
+                  os.path.join(vd, "assembly", f"{v_}.mp4")])[1].strip()
+        ok = abs(float(d2 or 0) - (5 + 151 / 30 - 1 / 30)) < 0.05
+        RESULTS.append((f"{v_}: the file is the two clips less the one dropped frame", ok))
+        print(f"{'PASS' if ok else 'FAIL'}  {v_}: the file is the two clips less the one dropped frame ({d2} s)")
+    # 01-b approved again with another take: the frame changes, so 02-b is stale everywhere.
+    t2 = os.path.join(os.path.dirname(a), "01-b-take2.mp4")
+    clip(t2, 5, "smptebars", 220, size="720x1280")
+    expect(f"{v_}: a new approval of 01-b warns that 02-b is stale",
+           [PY, f"{SC}/review.py", "segment", v_, "01-b", "--decision", "approve", "--file", "generated/01-b-take2.mp4",
+            "--words", "Use the second."], contains="02-b was approved from another last frame")
+    if assemble_on:
+        expect(f"{v_}: assemble refuses a continuing take seeded with an old frame",
+               ["bash", f"{SC}/assemble.sh", v_], ok=False, contains="not seeded with the current last frame")
+    expect(f"{v_}: generate.sh REQUEST_ONLY uses the new frame", gen, env=ro,
+           contains=f"sha256 {sha(p(frame))[:12]}")
+    for f in glob.glob(os.path.join(vd, "segments", "02-b", "generated", "*draft*")):
+        os.remove(f)
+    expect(f"{v_}: gate B 01-b, the first take again", [PY, f"{SC}/review.py", "segment", v_, "01-b", "--decision",
+                                                       "approve", "--file", "generated/01-b-take1.mp4", "--words", "Keep it."])
+    expect(f"{v_}: the first take's frame is current again", [PY, f"{SC}/continuity.py", "check", v_])
+    # A frame changed by hand, a cut changed after the frame was taken.
+    keep_png = open(png, "rb").read()
+    open(png, "ab").write(b"\0")
+    expect(f"{v_}: refuses a last frame changed after it was taken", [PY, f"{SC}/continuity.py", "check", v_],
+           ok=False, contains="changed after it was taken")
+    open(png, "wb").write(keep_png)
+    mutate(v_, "a cut of the previous clip changed after its last frame was taken",
+           video_fn=lambda v: v["segments"][0].update(trim=[0, 4]), cmd=[PY, f"{SC}/continuity.py", "check", v_],
+           contains="the cut of 01-b changed")
+    # The shot and video.json.
+    mutate(v_, "a continuation from a segment that is not the one before",
+           video_fn=lambda v: wj(shp, {**rj(shp), "continuity": {"from": "03-b"}}), contains="right before it")
+    mutate(v_, "a continuing shot in another set",
+           video_fn=lambda v: wj(shp, {**rj(shp), "set_ref": "hallway"}), contains="stays in its set")
+    mutate(v_, "a neighbour frame written by hand on a continuing shot",
+           video_fn=lambda v: wj(shp, {**rj(shp), "video": {**rj(shp)["video"], "references": rj(shp)["video"]["references"]
+                                       + [{"file": frame, "kind": "neighbour-frame"}]}}),
+           contains="list no neighbour-frame by hand")
+    mutate(v_, "a trim on a continuing segment", video_fn=lambda v: v["segments"][1].update(trim=[0.5, 5]),
+           contains="no trim in video.json")
+    mutate(v_, "a punch-in on one side of a continuous cut", video_fn=lambda v: v["segments"][1].update(punch_in=1.1),
+           contains="keeps one framing")
+    mutate(v_, "a beat that continues with no continuing shot",
+           video_fn=lambda v: wj(shp, {k: x for k, x in rj(shp).items() if k != "continuity"}),
+           contains='declares "continuity"')
+    # The plan.
+    mutate(v_, "continues_previous on the first beat", plan_fn=lambda q: q["beats"][0].update(continues_previous=True),
+           cmd="plan", contains="on the first beat")
+    mutate(v_, "continues_previous across two sets", plan_fn=lambda q: q["beats"][1].update(set_id="hallway"),
+           cmd="plan", contains="stays in the set of the beat before")
+    mutate(v_, "continues_previous after supplied media",
+           plan_fn=lambda q: q["beats"][0].update(source_asset_ids=["milo-clip"]), cmd="plan",
+           contains="joins two generated clips")
+    # A face-replace reaction neither continues nor is continued.
+    fv = "v2-face-replace"
+    fsp = p("pipeline", "character", fv, "shots", "01-x.json")
+    keep_f = open(fsp).read()
+    vj = p("pipeline", "character", fv, "video.json")
+    keep_v = open(vj).read()
+    v2 = rj(vj)
+    v2["segments"].insert(0, {"n": 0, "type": "T", "project": f"{fv}.00-t", "beat_ids": ["b1"], "script_lines": []})
+    wj(vj, v2)
+    wj(fsp, {**json.loads(keep_f), "continuity": {"from": "00-t"}})
+    expect(f"{fv}: shots.py validate refuses a face-replace reaction that continues a clip",
+           [PY, f"{SC}/shots.py", "validate", fv], ok=False, contains="is a face-replace reaction: its frames")
+    open(fsp, "w").write(keep_f)
+    open(vj, "w").write(keep_v)
 
 
 # ---------------------------------------------------------------- per fixture
@@ -828,7 +1140,7 @@ def mutate(name, label, plan_fn=None, video_fn=None, cmd="validate", contains=No
             video_fn(v)
             wj(os.path.join(vd, "video.json"), v)
         c = {"check": [PY, f"{SC}/shots.py", "check", name], "validate": [PY, f"{SC}/shots.py", "validate", name],
-             "plan": [PY, f"{SC}/bridge.py", "plan", name]}.get(cmd, cmd)
+             "plan": [PY, f"{SC}/bridge.py", "plan", name]}.get(cmd, cmd) if isinstance(cmd, str) else cmd
         expect(f"{name}: refuses {label}", c, ok=False, contains=contains)
     finally:
         for f, t in keep.items():
@@ -1158,6 +1470,8 @@ def main():
     reaction(assemble_on)
     # ---- v2: the same hook in face-replace mode: the reference clip, trimmed and masked
     face_replace(assemble_on)
+    # ---- v2: one take over two clips: 02-b opens on the last frame of 01-b
+    continuity_test(assemble_on)
 
     print()
     bad = [l for l, ok in RESULTS if not ok]

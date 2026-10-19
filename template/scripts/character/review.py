@@ -17,7 +17,15 @@
     review.py narration <video> <take> --narrator <id> --lines l2,l3 --decision approve|reject
               --words "<the user's words>" [--check natural_voice=pass ...]
                                     gate B for a narrator's take, narration/<take>.wav|mp3
+    review.py storyboard <video> --decision approve|redo --words "<the user's words>"
+                                    gate A (P1): the storyboard, every keyframe by its sha256
     review.py show <video>          every segment: generated, approved, composited
+
+    --from-atlas, on storyboard, segment, composite and final, in place of --decision and
+    --words: the user's click in the Atlas (apps/<app>/production/log.jsonl, the last
+    storyboard.*, take.*, composite.approve or cut.* line for this video, by the user). The
+    file the line names must still have the sha256 it recorded; the words are the click's
+    note, or say what was clicked. Every gate runs as for words given here.
     review.py rates                 the keep rate per segment type and per set, from every video
 
 Writes pipeline/character/<video>/approval.json. A reject or a regenerate with --class
@@ -27,14 +35,22 @@ the table is made at the model's first reject); --fixed-by on a later approve fi
 without the user's words. Gate C refuses an approval when the file is stale (the plan
 changed after assembly) or its overlays are not the plan's. An X segment in face-replace
 mode is approved only with --check identity=pass, no_source_identity=pass and silent=pass,
-a length within 0.25 s of its reference clip, and no text read by OCR. An X segment by the
+a PASS of the identity gate (identity.py) on the file, a length within 0.25 s of its
+reference clip, and no text read by OCR. An X segment by the
 written route (a silent reaction) is approved only with --check identity=pass, hands=pass, silent=pass and
 performance=pass, and only when the file is as long as the shot plans.
+
+Continuity (scripts/character/continuity.py): an approval of a segment that the next one
+continues from takes its last frame (segments/<seg>/last-frame.png and last-frame.json). A
+continuing take is approved only when generate.sh recorded the frame it was seeded with
+(<take>.seed.json) and that frame is the current one; how far its first frame is from the
+seed frame is recorded as checks.seed_diff.
 """
 import glob, json, os, re, subprocess, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge
+import continuity
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CH = os.path.join(ROOT, "pipeline", "character")
@@ -102,6 +118,101 @@ def model_slug():
 def latest(d, project):
     rows = [e for e in d.get("gate_b_segments") or [] if e.get("project") == project]
     return rows[-1] if rows else None
+
+
+# ---------------------------------------------------------------- the Atlas
+def atlas_line(video, kinds, segment=None):
+    """The user's last Atlas decision of `kinds` for this video (and segment), from the app's
+    decision log. A line written by an agent (an actor) is never the user's decision."""
+    app = plan_of(video).get("app") or ""
+    lp = os.path.join(ROOT, "apps", app, "production", "log.jsonl")
+    rows = []
+    if app and os.path.exists(lp):
+        for ln in open(lp, encoding="utf-8"):
+            try:
+                e = json.loads(ln)
+            except ValueError:
+                continue
+            dd = e.get("data") or {}
+            if e.get("kind") in kinds and dd.get("video") == video and (segment is None or dd.get("segment") == segment):
+                rows.append(e)
+    if not rows:
+        sys.exit(f"no Atlas decision ({', '.join(kinds)}) for {video}{' ' + segment if segment else ''} in "
+                 f"apps/{app}/production/log.jsonl: the user decides in the Atlas, or gives their words here")
+    e = rows[-1]
+    if e.get("actor"):
+        sys.exit(f"the last Atlas line was written by {e['actor']!r}, not by the user: it is not a decision")
+    return e
+
+
+def atlas_file(path, e, what):
+    """The file a line names must be the one the user saw: the same sha256."""
+    want = (e.get("data") or {}).get("sha256")
+    if not os.path.exists(path):
+        sys.exit(f"{what} {os.path.relpath(path, ROOT)} is not on disk")
+    if bridge.sha256_file(path) != want:
+        sys.exit(f"{what} {os.path.relpath(path, ROOT)} changed after the click ({e['at'][:16]}): the user decides again")
+
+
+def from_atlas(cmd, video, seg=None):
+    """The Atlas line as this script's own arguments."""
+    if cmd == "segment":
+        e = atlas_line(video, ("take.approve", "take.reject"), seg)
+        dd = e["data"]
+        atlas_file(os.path.join(vdir(video), "segments", seg, dd.get("file") or ""), e, "the take")
+        if e["kind"] == "take.approve":
+            a = ["--decision", "approve", "--words", (e.get("note") or "").strip()
+                 or f"Approve this take of {seg} (clicked in the Atlas)"]
+            for k, v in (dd.get("checks") or {}).items():
+                a += ["--check", f"{k}={v}"]
+        else:
+            a = ["--decision", "regenerate" if dd.get("decision") != "reject" else "reject",
+                 "--words", e.get("note") or "", "--class", e.get("note") or ""]
+            if dd.get("fix"):
+                a += ["--fix", dd["fix"]]
+        return a + ["--file", dd["file"], "--atlas-at", e["at"]]
+    if cmd == "composite":
+        e = atlas_line(video, ("composite.approve",), seg)
+        dd = e["data"]
+        atlas_file(os.path.join(vdir(video), "segments", seg, dd.get("file") or ""), e, "the composite")
+        return ["--file", dd["file"], "--words", (e.get("note") or "").strip()
+                or f"Approve the composite of {seg} (clicked in the Atlas)", "--atlas-at", e["at"]]
+    if cmd == "final":
+        e = atlas_line(video, ("cut.approve", "cut.sendback"))
+        dd = e["data"]
+        atlas_file(os.path.join(ROOT, dd.get("file") or ""), e, "the cut")
+        if e["kind"] == "cut.sendback":
+            return ["--decision", "reject", "--words", e.get("note") or "", "--atlas-at", e["at"]]
+        return ["--decision", "approve", "--words", (e.get("note") or "").strip() or "Approve the cut (clicked in the Atlas)",
+                "--export", dd.get("export") or "default", "--atlas-at", e["at"]]
+    if cmd == "storyboard":
+        e = atlas_line(video, ("storyboard.approve", "storyboard.sendback"))
+        if e["kind"] == "storyboard.sendback":
+            return ["--decision", "redo", "--words", e.get("note") or "", "--atlas-at", e["at"]]
+        return ["--decision", "approve", "--words", (e.get("note") or "").strip()
+                or f"Approve the storyboard and its computed cost, ${(e['data'].get('cost_usd') or 0):.2f} (clicked in the Atlas)",
+                "--atlas-at", e["at"], "--keyframes", json.dumps(e["data"].get("keyframes") or {}),
+                "--cost", str(e["data"].get("cost_usd"))]
+    sys.exit(f"--from-atlas does not apply to {cmd}")
+
+
+def keyframes_of(video):
+    """{segment: sha256 of keyframes/<seg>.png} for every generated segment of this video that
+    starts from a keyframe; a missing one is None. A face-replace X on a route with no first
+    frame (replace, guided) has none: the clip leads."""
+    spec = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "models.json")))
+    out = {}
+    for s, t, name, proj in video_segments(video):
+        if t not in GENERATED or not proj.startswith(video + "."):
+            continue
+        if t == "X" and face_replace_of(video, name):
+            sp = os.path.join(vdir(video), "shots", f"{name}.json")
+            route = bridge.face_route_name((json.load(open(sp)) if os.path.exists(sp) else {}).get("face_replace") or {})
+            if (((spec.get("face_replace") or {}).get("routes") or {}).get(route) or {}).get("first_frame") != "keyframe":
+                continue
+        kf = os.path.join(vdir(video), "keyframes", f"{name}.png")
+        out[name] = bridge.sha256_file(kf) if os.path.exists(kf) else None
+    return out
 
 
 def video_segments(video):
@@ -248,11 +359,14 @@ def cmd_segment(video, seg, a):
              "words": words or None, "date": today(), "model": o.get("--model") or model_slug(),
              "set_id": o.get("--set"), "failure_class": o.get("--class"), "fix": o.get("--fix"),
              "checks": dict(c.split("=", 1) for c in o.get("--check", []) if "=" in c)}
+    if o.get("--atlas-at"):
+        entry["atlas_line_at"] = o["--atlas-at"]
+    entry["sha256"] = bridge.sha256_file(os.path.join(sdir, f))
     fr = face_replace_of(video, seg) if t == "X" else None
     if fr and dec == "approve":
         sp = os.path.join(vdir(video), "shots", f"{seg}.json")
         shot = json.load(open(sp)) if os.path.exists(sp) else {}
-        route = (shot.get("face_replace") or {}).get("route")
+        route = bridge.face_route_name(shot.get("face_replace") or {})
         need = FACE_REPLACE_CHECKS + (GUIDED_CHECKS if route == "guided" else ())
         miss = [k for k in need if entry["checks"].get(k) != "pass"]
         if miss:
@@ -269,10 +383,28 @@ def cmd_segment(video, seg, a):
             if not got or got < want - 0.05 or (bridge.num(gen) and got > gen + 0.7):
                 sys.exit(f"the file is {got or 0:.2f} s; the guided route generates {gen} s, at least the "
                          f"reference clip's {want:g} s, and is trimmed to it at assembly (length gate)")
-        elif not got or abs(got - want) > 0.25:
-            sys.exit(f"the file is {got or 0:.2f} s; the reference clip is {want:g} s (length gate: the edit "
-                     "route keeps the clip's timing)")
+        else:
+            # A route with pad_to_s (motion: Kling takes 3 s or more) gets the clip held on its
+            # last frame to that length; the take is that long and is trimmed to the clip at assembly.
+            pad = (((json.load(open(os.path.join(ROOT, "scripts", "character", "models.json"))).get("face_replace")
+                     or {}).get("routes") or {}).get(route) or {}).get("pad_to_s") or 0
+            sent = max(want, pad)
+            if not got or abs(got - sent) > 0.25:
+                sys.exit(f"the file is {got or 0:.2f} s; the input clip is {sent:g} s"
+                         + (f" (the {want:g} s reference held to {pad:g} s)" if pad > want else "")
+                         + f" (length gate: the {route} route keeps the clip's timing)")
         entry["checks"]["length"] = "pass"
+        # The identity gate (identity.py): the face is measured, not only looked at.
+        try:
+            import identity
+            idr = identity.check(video, seg, f)
+        except ImportError as e:
+            sys.exit(f"the identity gate needs opencv ({e}): run review.py with .venv/bin/python3")
+        if idr["result"] != "PASS":
+            sys.exit(f"identity gate {idr['result']}: {idr.get('why')} (qc/identity-*.json). A face-replace reaction "
+                     "is approved only when the face is measured as the character's")
+        entry["checks"]["identity_gate"] = (f"pass: median {idr['median_character']} to the character, "
+                                            f"{idr['median_reference']} to the reference")
         left = text_on(os.path.join(sdir, f), os.path.join(sdir, os.path.dirname(f), "qc"))
         if left:
             sys.exit(f"OCR reads text on the file: {left} -- a burned-in caption, handle or watermark of the "
@@ -292,6 +424,23 @@ def cmd_segment(video, seg, a):
         if not bridge.num(want) or not got or got < float(want) - 0.05:
             sys.exit(f"the file is {got or 0:.2f} s; the shot plans {want} s (duration gate)")
         entry["checks"]["duration"] = "pass"
+    cprev = continuity.source_of(continuity.shot_of(video, seg))
+    if cprev and dec == "approve":
+        ok, why, info = continuity.state(video, seg)
+        seed = os.path.join(sdir, os.path.splitext(f)[0] + ".seed.json")
+        if not ok:
+            sys.exit(f"{seg} continues from {cprev}: {why}")
+        if not os.path.exists(seed):
+            sys.exit(f"{seg} continues from {cprev}, but {os.path.relpath(seed, sdir)} is missing: generate.sh records the "
+                     "frame each continuing take is seeded with. A take with no record is not approved as a continuation")
+        sd_ = json.load(open(seed))
+        if sd_.get("sha256") != info["sha256"]:
+            sys.exit(f"{f} was seeded with another last frame of {cprev} (sha256 {str(sd_.get('sha256'))[:12]}, now "
+                     f"{info['sha256'][:12]}): {cprev} was approved again after this take; regenerate {seg}")
+        d_, _ = continuity.match(video, seg, os.path.join(sdir, f))
+        entry["continuity"] = {"from": cprev, "last_frame": info["file"], "last_frame_sha256": info["sha256"]}
+        entry["checks"]["seed_diff"] = d_
+        print(f"continuity: the first frame of {f} differs from the last frame of {cprev} by {d_} (0 to 255)")
     gp = os.path.join(sdir, os.path.dirname(f), "qc", "gates.json")        # beside the plate
     if (t in PHONE or t == "C") and os.path.exists(gp):
         g = json.load(open(gp))
@@ -307,6 +456,17 @@ def cmd_segment(video, seg, a):
         ledger_add(entry["model"] or "unknown model", o["--class"], where, o.get("--fix"))
     if dec == "approve" and o.get("--fixed-by"):
         ledger_fixed(where, o["--fixed-by"])
+    if dec == "approve":
+        # The next clip continues from this one: its first frame is this clip's last.
+        for prev, nxt in continuity.continuing(video):
+            if prev != seg:
+                continue
+            ok, msg = continuity.take(video, seg)
+            print(("continuity: " if ok else "continuity: FAILED ") + msg + f" -- the first frame of {nxt}")
+            e_n = latest(d, f"{video}.{nxt}")
+            if ok and e_n and e_n.get("decision") == "approve" and (e_n.get("continuity") or {}).get(
+                    "last_frame_sha256") != (continuity.state(video, nxt)[2] or {}).get("sha256"):
+                print(f"warning: {nxt} was approved from another last frame of {seg}: regenerate {nxt}")
     update_review_state(video)
 
 
@@ -464,7 +624,10 @@ def cmd_composite(video, seg, a):
         sys.exit("the gates in composite/qc/gates.json are for another file; run qc.py --composite on this one")
     failed = [r["gate"] for r in g["results"] if r["result"] != "PASS"]
     e["composite"] = {"file": f, "gates": "pass" if not failed else "fail: " + ", ".join(failed),
-                      "hero": g.get("hero"), "words": words, "date": today()}
+                      "hero": g.get("hero"), "words": words, "date": today(),
+                      "sha256": bridge.sha256_file(os.path.join(sdir, f))}
+    if o.get("--atlas-at"):
+        e["composite"]["atlas_line_at"] = o["--atlas-at"]
     save_approval(video, d)
     if failed:
         print(f"warning: gates not passed ({', '.join(failed)}); recorded on the user's word")
@@ -499,7 +662,9 @@ def cmd_final(video, a):
     g.update({"decision": dec if dec != "regenerate" else f"regenerate segment {o.get('--segment', '?')}",
               "words": words, "date": today(), "file": m.get("file"),
               "export_choice": o.get("--export", "default"),
-              "final_checks": m.get("checks")})
+              "final_checks": m.get("checks"),
+              "sha256": bridge.sha256_file(os.path.join(ROOT, m["file"])) if m.get("file") and os.path.exists(os.path.join(ROOT, m["file"])) else None,
+              "atlas_line_at": o.get("--atlas-at")})
     for c in o.get("--check", []):
         if "=" in c:
             k, v = c.split("=", 1)
@@ -507,6 +672,44 @@ def cmd_final(video, a):
     d["gate_c_final"] = g
     save_approval(video, d)
     print(f"gate C: {video} {g['decision']}")
+
+
+def cmd_storyboard(video, a):
+    """Gate A: the user's decision on the storyboard. An approval pins every keyframe by its
+    sha256 (generate.sh runs a face-replace X only from that very keyframe) and records the
+    computed cost the user approved for the first runs. The checks the agent made at gate A
+    (character-shots) stay in the record."""
+    o = opts(a)
+    dec = o.get("--decision")
+    if dec not in ("approve", "redo"):
+        sys.exit("--decision approve | redo")
+    words = o.get("--words", "").strip()
+    if not words:
+        sys.exit("gate A needs the user's words (--words)")
+    have = keyframes_of(video)
+    if dec == "approve":
+        missing = [k for k, v in have.items() if not v]
+        if missing:
+            sys.exit(f"no keyframe yet for {', '.join(missing)}: make it (keyframes.sh) before gate A")
+        if o.get("--keyframes") is not None:
+            want = json.loads(o["--keyframes"])
+            moved = [k for k, v in have.items() if want.get(k) != v]
+            if moved:
+                sys.exit(f"keyframe(s) {', '.join(moved)} changed after the click: show the storyboard again")
+    d = load_approval(video)
+    g = d.get("gate_a_storyboard") or {}
+    g.update({"decision": "approve" if dec == "approve" else f"redo: {words}", "words": words, "date": today()})
+    if dec == "approve":
+        g["keyframes_sha256"] = {k: v for k, v in have.items() if v}
+        if o.get("--cost") not in (None, "None"):
+            g["cost_usd"] = float(o["--cost"])
+    if o.get("--atlas-at"):
+        g["approved_in"] = {"atlas_line_at": o["--atlas-at"]}
+    d["gate_a_storyboard"] = g
+    save_approval(video, d)
+    if dec == "approve":
+        state_set(video, "shots", "done", "storyboard approved")
+    print(f"gate A: {video} {g['decision']} ({len(g.get('keyframes_sha256') or {})} keyframe(s) pinned)")
 
 
 def cmd_show(video):
@@ -569,6 +772,14 @@ def main():
     if not a:
         sys.exit(__doc__)
     c = a[0]
+    if "--from-atlas" in a:
+        a = [x for x in a if x != "--from-atlas"]
+        if c in ("segment", "composite") and len(a) >= 3:
+            a = a[:3] + from_atlas(c, a[1], a[2]) + a[3:]
+        elif c in ("final", "storyboard") and len(a) >= 2:
+            a = a[:2] + from_atlas(c, a[1]) + a[2:]
+        else:
+            sys.exit(__doc__)
     if c == "segment" and len(a) >= 3:
         cmd_segment(a[1], a[2], a[3:])
     elif c == "composite" and len(a) >= 3:
@@ -579,6 +790,8 @@ def main():
         cmd_source(a[1], a[2], a[3:])
     elif c == "narration" and len(a) >= 3:
         cmd_narration(a[1], a[2], a[3:])
+    elif c == "storyboard" and len(a) >= 2:
+        cmd_storyboard(a[1], a[2:])
     elif c == "show" and len(a) == 2:
         cmd_show(a[1])
     elif c == "rates":

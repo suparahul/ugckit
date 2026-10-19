@@ -694,6 +694,10 @@
                 }
               }
             ]
+          },
+          "continues_previous": {
+            "type": "boolean",
+            "description": "Optional. true: this beat's picture continues the previous beat's in one take, across the join (a beat longer than one clip, or one movement over two beats). Production seeds this beat's first clip with the last frame of the previous beat's clip (scripts/character/continuity.py) and cuts the two without a repeated frame. Both beats are generated (no source asset, layout sequence, not the app, not a face-replace reaction) in the same set. Absent or false: an ordinary cut."
           }
         }
       }

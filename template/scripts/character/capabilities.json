@@ -6,7 +6,9 @@
   "bridge.composition": true,
   "bridge.live": true,
   "bridge.reaction": true,
-  "bridge.face_replace": false,
+  "bridge.face_replace": true,
+  "bridge.continuity": true,
+  "bridge.continuity.input_verified": false,
   "_what": {
     "bridge.B": "a silent generated action: hands only, pet only or an approved mascot (segment B); never the app",
     "bridge.C": "supplied media: a clip or a still from the plan's assets, checksum, range and source approval at gate B (segment C); a filmed phone goes through the insertion gates of its mode",
@@ -14,6 +16,8 @@
     "bridge.composition": "split-screen and picture-in-picture panels (segment M), sequential stitch, timed overlays, the source credit and the day counter, checked at gate C",
     "bridge.live": "a real input clip paired with its app recording, the measured offset checked in sequence or in panels",
     "bridge.reaction": "a silent reaction (segment X) by the written route (generation_input none): the handle's approved generated face, no voice and no lip sync, performed from the written expression beats of a real reference reaction (reaction_refs), under the timed hook overlay; identity, hands, silence, performance and duration approved at gate B. The reference clip is not an input in this route",
-    "bridge.face_replace": "false until the founder approves a paid test. Two routes are written and tested offline (models.json face_replace.routes, chosen per X shot by face_replace.route): edit, Wan 2.7 Edit Video, the masked clip as the source video, its frames, timing and length kept; guided, MiniMax H3 reference-to-video, a new clip guided by the clip, trimmed to its length. The checks, the trimmed and masked input clip (shots.py reference), the lint and gate B exist; generate.sh refuses every live face-replace run while this is false (REQUEST_ONLY=1 shows the request)"
+    "bridge.face_replace": "true since 2026-10-14: the founder ran the paid face-replace tests in a user workspace and approved them. The default is the motion route (models.json face_replace.default_route): Kling 3.0 Pro Motion Control on Supagen (template ugc-character-face-kling-motion), the character's approved first frame (a keyframe in the clip's pose and room, approved at gate A) moved by the original clip, padded to 3.0 s and trimmed back at assembly. The backup is the replace route (Wan 2.2 Animate replace on Supagen, the original clip and one face picture): its test got the face shape, the clothes and the room wrong. animate (Wan 2.2 Animate move) timed out on Supagen and stays a fallback; guided (MiniMax H3 reference-to-video) is untested; edit (Wan 2.7 Edit Video) kept the reference person's face and is retired. Every take is measured by the identity gate (identity.py, OpenCV YuNet and SFace) over the clip's range, and review.py refuses a face-replace approval without its PASS. A face-replace X neither continues nor is continued (continuity.py). Set this to false to stop every live face-replace run (REQUEST_ONLY=1 still shows the request)",
+    "bridge.continuity": "clip-to-clip continuity: a shot continues from the clip before it (shot continuity.from), the previous clip's approved last frame taken with its checksum (continuity.py), checked at validate, refs, generate and gate B, cut without a repeated frame at assembly. T, B and X by the written route only",
+    "bridge.continuity.input_verified": "false until a paid continuing run is measured. No model of the pipeline has a first-frame input: the frame goes to the H3 models as the first reference image (models.json known_model_limits.<model>.continuity, UNVERIFIED), and the face-replace models cannot continue. Live runs are not blocked: the request has the shape of every referenced run, and generate.sh prints the UNVERIFIED status in the cost step"
   }
 }

@@ -1,0 +1,24 @@
+{
+  "_comment": "pipeline/character/<video>/segments/<seg>/last-frame.json, beside last-frame.png. Written by scripts/character/continuity.py last-frame (review.py runs it when the clip is approved at gate B and the next segment continues from it). Never edited by hand. The continuing segment's refs.json opens on the PNG; generate.sh, gate B and assembly refuse it when the approved file, the PNG or the cut changed since.",
+  "project": "<video>.01-t",
+  "segment": "01-t",
+  "file": "pipeline/character/<video>/segments/01-t/last-frame.png",
+  "sha256": "<sha256 of the PNG>",
+  "source": "pipeline/character/<video>/segments/01-t/generated/<the approved mp4>",
+  "source_sha256": "<sha256 of the approved file>",
+  "approved": {
+    "words": "<the user's words at gate B>",
+    "date": "<YYYY-MM-DD>"
+  },
+  "frame_index": 149,
+  "frame_t_s": 4.966667,
+  "frame_duration_s": 0.033333,
+  "frames": 150,
+  "out_s": 5.0,
+  "planned_out_s": null,
+  "out_by": "the end of the file | trim_to_seconds | the trim in video.json",
+  "size": [
+    720,
+    1280
+  ]
+}

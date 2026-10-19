@@ -294,7 +294,7 @@ def check_editorial(plan, pins, narrators, out):
     check_strategy_ref(ed.get("strategy_ref"), out)
     # The app is shown only through app insertion.
     ins = plan.get("app_insertion") is True
-    if ed.get("app_presence") not in (None, "none") and not ins:
+    if ed.get("app_presence") not in (None, "none") and not ins and plan.get("segment_of") is None:
         out.bad(f"app_presence {ed.get('app_presence')!r} shows the real app: app_insertion must be true")
     # The cast.
     ck = ed.get("cast_kind")
@@ -499,6 +499,25 @@ def check_beats(plan, beats, lines, length, pins, subjects, sets, assets, narrat
         # phone insertion (generated plate) or R/P from the screen library.
         generated = not src and layout == "sequence"
         action_only = generated and not b.get("app_on_screen")
+        # continues_previous: one continuous take across the join; production seeds this beat's
+        # first clip with the last frame of the previous beat's (scripts/character/continuity.py).
+        cp = b.get("continues_previous")
+        if cp not in (None, False, True):
+            out.bad(f"{tag}: continues_previous is true or false")
+        elif cp:
+            pb = beats[i - 2] if i > 1 else None
+            if pb is None:
+                out.bad(f"{tag}: continues_previous on the first beat; there is no clip before it")
+            for who, x in ((tag, b), (f"the beat before {tag}", pb or {})):
+                gen_x = not (x.get("source_asset_ids") or []) and x.get("layout", "sequence") == "sequence"
+                if pb is not None and (not gen_x or x.get("app_on_screen") or x.get("framing") == "app_screen"):
+                    out.bad(f"{tag}: continues_previous joins two generated clips; {who} is supplied, panels or "
+                            "the app (a phone plate gets the app at P4)")
+                if pb is not None and face_replace_ref(plan, x):
+                    out.bad(f"{tag}: continues_previous: {who} is a face-replace reaction, made of its clip's frames")
+            if pb is not None and b.get("set_id") != pb.get("set_id"):
+                out.bad(f"{tag}: continues_previous stays in the set of the beat before ({pb.get('set_id')!r}, "
+                        f"not {b.get('set_id')!r})")
         # The words.
         bl = b.get("lines") or []
         for lid in bl:
@@ -804,7 +823,9 @@ def check_overlays(plan, beats, length, assets, ed, out):
         if o.get("placement") == "panel" and o.get("panel_id") not in panels:
             out.bad(f"{tag}: panel_id {o.get('panel_id')!r} is not a panel of any beat")
         need = max(MIN_OVERLAY_S, words(o.get("text")) / READ_WORDS_PER_S)
-        if e - s < need - 1e-6:
+        # A segment's overlay that runs to its end continues in the parent video, checked there.
+        if e - s < need - 1e-6 and not (plan.get("segment_of") is not None and length
+                                        and abs(e - length) <= BEAT_TOL_S):
             out.bad(f"{tag}: {words(o.get('text'))} words for {e - s:g} s; it needs {need:.1f} s to be read")
         if norm(o.get("text")) in heroes:
             out.bad(f"{tag}: the text is a hero string; the app's real words come from the real screen, "
@@ -999,7 +1020,8 @@ def check_video(plan, v, shots, out):
             out.bad(f"{name}: no planned length (planned_s, the shot's duration, or the source range)")
             d = 0.0
         timeline.append({"seg": s, "name": name, "type": ty, "beats": bids, "start": t, "end": t + d, "shot": shot,
-                         "first": not timeline})
+                         "first": not timeline, "prev": timeline[-1]["name"] if timeline else None,
+                         "opens_beat": bids[0] not in covered or covered[bids[0]] == [len(timeline)]})
         t += d
     missing = [b.get("id") for b in beats if b.get("id") not in covered]
     if missing:
@@ -1076,6 +1098,12 @@ def check_segment_against_beats(plan, it, bmap, lines, assets, narrators, subjec
             out.bad(f"{name}: the shot's framing_kind {fk!r} is not the beats' framing {sorted(framings)}")
     # A silent reaction: one reaction beat, the handle's face, no voice, the written
     # performance copied exactly.
+    # A beat that continues the one before: its first segment continues from the clip before.
+    first = bb[0] if bb else {}
+    if first.get("continues_previous") is True and it.get("opens_beat") and \
+            (shot.get("continuity") or {}).get("from") != it.get("prev"):
+        out.bad(f"{name}: beat {first.get('id')} continues the previous beat (continues_previous); its first segment "
+                f"declares \"continuity\": {{\"from\": \"{it.get('prev')}\"}}")
     rx_beats = [b for b in bb if "reaction" in b]
     if ty == "X":
         if len(bb) != 1 or len(rx_beats) != 1:
@@ -1209,7 +1237,46 @@ def check_segment_against_beats(plan, it, bmap, lines, assets, narrators, subjec
 
 
 MASK_HOW = {"crop", "blur", "box"}
-FR_ROUTES = ("edit", "guided")      # models.json face_replace.routes
+FR_ROUTES = ("motion", "animate", "replace", "guided")   # models.json face_replace.routes, without the retired ones
+
+
+def face_route_name(fx):
+    """The face-replace route of a shot: its face_replace.route, or models.json
+    face_replace.default_route when the shot names none (founder, 2026-10-07: motion). A shot
+    with no face_replace block has no route (None): it is not a face-replace shot."""
+    if not isinstance(fx, dict) or not fx:
+        return None
+    if fx.get("route"):
+        return fx["route"]
+    spec = json.load(open(os.path.join(ROOT, "scripts", "character", "models.json")))
+    return (spec.get("face_replace") or {}).get("default_route")
+FR_RETIRED = ("edit",)
+
+
+def band_sentence(masks, medium="video"):
+    """The instruction for each blur or box mask, word for word: the band is not part of the
+    scene, and what is behind it is drawn instead. medium "video" is a prompt with an input
+    video; "picture" is a keyframe prompt made from the masked clip's first frame. lint_prompt.py
+    checks the sentence in the prompt; the character-shots skill pastes it."""
+    out = []
+    for m in masks or []:
+        if not isinstance(m, dict) or m.get("how") not in ("blur", "box"):
+            continue
+        rc = m.get("rect") or [0, 0, 0, 0]
+        top, bottom = round(rc[1] * 100), round((rc[1] + rc[3]) * 100)
+        band = "a soft blurred band" if m["how"] == "blur" else "a solid black box"
+        what = str(m.get("behind") or "").strip().rstrip(".")
+        if medium == "picture":
+            out.append(f"The pose picture has {band} across the frame, from {top}% to {bottom}% of its height. "
+                       f"It is not part of the scene: do not draw it. In its place, draw what is behind it, "
+                       f"continuous with the picture above and below the band: {what}. No band, no blur, no box "
+                       f"and no text in that area.")
+        else:
+            out.append(f"The input video has {band} across the frame, from {top}% to {bottom}% of its height. "
+                       f"It is not part of the scene. Remove it in every frame. In its place, show what is "
+                       f"behind it, continuous with the image above and below the band: {what}. No band, no "
+                       f"blur, no box and no text in that area.")
+    return out
 
 
 def check_face_replace_shot(name, r, fx, out):
@@ -1218,10 +1285,14 @@ def check_face_replace_shot(name, r, fx, out):
     if not isinstance(fx, dict):
         out.bad(f"{name}: a face-replace reaction names its clip: face_replace {{ref_id, route, clip, range_s, masks}}")
         return
-    if fx.get("route") not in FR_ROUTES:
-        out.bad(f"{name}: face_replace.route {fx.get('route')!r}; it is edit (Wan 2.7 Edit Video: the clip is the "
-                "source video, its frames and timing stay) or guided (MiniMax H3: a new clip guided by the clip, "
-                "trimmed to its length)")
+    route = face_route_name(fx)
+    if route in FR_RETIRED:
+        out.bad(f"{name}: face_replace.route {route!r} is retired (models.json face_replace.routes."
+                f"{route}.retired); use motion")
+    elif route not in FR_ROUTES:
+        out.bad(f"{name}: face_replace.route {route!r}; it is motion (the default: Kling 3.0 Pro Motion Control, the "
+                "approved first frame moved by the original clip), animate (Wan 2.2 Animate move; fallback), replace "
+                "(Wan 2.2 Animate replace; fallback) or guided (MiniMax H3; untested)")
     if fx.get("ref_id") != r.get("id"):
         out.bad(f"{name}: face_replace.ref_id {fx.get('ref_id')!r}; the beat's reference is {r.get('id')}")
     if fx.get("range_s") != [r.get("start_s"), r.get("end_s")]:
@@ -1245,7 +1316,11 @@ def check_face_replace_shot(name, r, fx, out):
         if m.get("how") == "crop" and not (rc[0] <= 0.001 or rc[1] <= 0.001 or rc[0] + rc[2] >= 0.999
                                            or rc[1] + rc[3] >= 0.999):
             out.bad(f"{name}: a crop mask lies at an edge of the frame; text in the middle is blurred or boxed")
-    if not placeholder(r.get("burned_in_text")) and not masks:
+        if m.get("how") in ("blur", "box") and placeholder(m.get("behind")):
+            out.bad(f"{name}: a {m.get('how')} mask says what it hides (behind: \"the chin, the neck and the top of "
+                    "the shirt\"); the prompt tells the model to draw that, not the band")
+    # The replace route sends the original clip, text and all (founder, 2026-10-06): no mask is applied.
+    if not placeholder(r.get("burned_in_text")) and not masks and route != "replace":
         out.bad(f"{name}: the reference carries burned-in text ({r['burned_in_text']!r}); the shot masks it "
                 "before generation (face_replace.masks)")
 

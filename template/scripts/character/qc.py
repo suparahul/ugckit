@@ -12,6 +12,8 @@ On the plate it writes a contact sheet and per-shot frames next to the video and
   - green-screen quality, if there is any green (flatness is what keying cares about)
   - the spoken dialogue, transcribed back, for diffing against the script
   - pitch spread per 2s window, which is how you catch a monotone read
+  - for a face-replace reaction (X), the identity gate (identity.py): the face is the
+    character's, not the reference clip's person
   - for a phone segment (O, G, S, H, F), the insertion gates of the plate: the screen
     flat-on to the lens, the drift, the screen width against the hero element's need,
     and for H and F the motion gates (holds, the push angle, the corner track)
@@ -199,6 +201,16 @@ if has_audio:
                     print(f"    {w0:>3}-{w0+2:<3}s   {spread:5.2f} st{flag}")
     except Exception as e:
         print(f"\nprosody: skipped ({e})")
+
+# ---------------------------------------------------------------- the identity gate
+# A face-replace reaction (X with a reference clip): whose face is in the file.
+if SEGMENT.split("-")[-1].upper() == "X" and os.path.exists(f"{SEGDIR}/source/reference.mp4"):
+    print()
+    try:
+        import identity
+        identity.show(identity.check(video, SEGMENT, os.path.relpath(V, SEGDIR)))
+    except ImportError as e:
+        print(f"identity gate: skipped ({e}); run qc.py with .venv/bin/python3")
 
 # ---------------------------------------------------------------- the insertion gates
 if os.path.exists(f"{SEGDIR}/insert.json") or SEGMENT.split("-")[-1].upper() in ("O", "G", "S", "H", "F"):

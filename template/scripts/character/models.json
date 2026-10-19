@@ -1,5 +1,5 @@
 {
-  "_comment": "The character pipeline's own model file. It is not the recreation pipeline's templates.json, and the recreation scripts never read it. The character scripts (scripts/character/generate.sh and the model command of scripts/character/state.py) read it to refuse an impossible request before it costs anything, and to compute cost. Same shape as known_model_limits in templates.json, plus min_duration_s and max_reference_images. MiniMax H3 Max reference-to-video is the default; MiniMax H3 reference-to-video stays as a second entry, and is also the guided face-replace route. Wan 2.7 Edit Video is the face-replace model only (founder, 2026-10-04): it has no length range of its own, and state.py model set refuses it as the segment model. Add another model only with a measured cap and price. max_reference_images is the most pictures one run may attach; every image counts, the start frame too, and the voice clip does not.",
+  "_comment": "The character pipeline's own model file. It is not the recreation pipeline's templates.json, and the recreation scripts never read it. The character scripts (scripts/character/generate.sh and the model command of scripts/character/state.py) read it to refuse an impossible request before it costs anything, and to compute cost. Same shape as known_model_limits in templates.json, plus min_duration_s and max_reference_images. MiniMax H3 Max reference-to-video is the default; MiniMax H3 reference-to-video stays as a second entry, and is also the guided face-replace route. Wan 2.7 Edit Video, Wan 2.2 Animate and Kling 3.0 Pro Motion Control are face-replace models only: they have no length range of their own, and state.py model set refuses them as the segment model. Add another model only with a measured cap and price. max_reference_images is the most pictures one run may attach; every image counts, the start frame too, and the voice clip does not.",
   "default": "minimax-h3-max-reference-to-video",
   "known_model_limits": {
     "minimax-h3-max-reference-to-video": {
@@ -7,7 +7,12 @@
       "max_duration_s": 15,
       "price_per_s": 0.08,
       "max_resolution": "768p",
-      "max_reference_images": 4
+      "max_reference_images": 4,
+      "continuity": {
+        "input": "reference",
+        "status": "UNVERIFIED",
+        "what": "The model has no first-frame input: Supagen's catalog (GET /api/v1/models, read 2026-10-14) lists references only (1 to 4: image, video, audio), no first_frame field. generate.sh sends the previous clip's last frame as the first image part of the request, in the keyframe's place, and the prompt binds it as the first frame. Whether the take really opens on that frame is not measured: no run of this model exists yet. continuity.py match measures it on the first paid take."
+      }
     },
     "minimax-h3-reference-to-video": {
       "min_duration_s": 5,
@@ -21,6 +26,11 @@
       "source_video": {
         "min_s": 2,
         "max_s": 15
+      },
+      "continuity": {
+        "input": "reference",
+        "status": "UNVERIFIED",
+        "what": "As the H3 Max entry: references only, no first_frame field in the catalog (2026-10-14; its route lists 1 to 5 references in all, its constraints 9 pictures). The last frame is the first image part. Not measured. The catalog also lists supports_video_extension; the kit does not use it."
       }
     },
     "wan-2-7-edit-video": {
@@ -39,7 +49,105 @@
           "mov"
         ]
       },
-      "output_length": "the source video's length (no duration setting)"
+      "output_length": "the source video's length (no duration setting)",
+      "retired": "2026-10-04: one paid run kept the reference person's face in every frame (see face_replace.routes.edit)",
+      "continuity": {
+        "input": "none",
+        "status": "NOT SUPPORTED",
+        "what": "Every frame comes from the source video (the face-replace clip); its one picture is the face. A face-replace segment neither continues nor is continued."
+      }
+    },
+    "wan-2-2-animate-move": {
+      "provider": "supagen",
+      "endpoint": "fal-ai/wan/v2.2-14b/animate/move",
+      "modes": [
+        "face_replace_animate"
+      ],
+      "billing": "$0.005 a source-video frame at 720p on Supagen (as wan-2-2-animate-replace, whose bill of 2026-10-06 showed $0.005; the catalog summary says $0.0025). 89 frames is $0.45.",
+      "resolution": "720p",
+      "max_reference_images": 1,
+      "source_video": {
+        "min_s": 1,
+        "max_s": 10,
+        "formats": [
+          "mp4",
+          "mov"
+        ],
+        "_note": "fal.ai lists no length limit; 10 s is this pipeline's own cap"
+      },
+      "output_length": "the driving video's length",
+      "request": "Messages-only, no text part: one video part (the clip) then one image part (the picture). The picture is the subject and the room; the video gives the body pose and the face expression only.",
+      "supagen_model_id": "f498eca0-1ae6-47be-8ace-0be74346e987",
+      "price_per_frame": 0.005,
+      "runtime": "2026-10-07: the paid test failed after 610 s with provider_timeout ('max poll attempts exceeded'): Supagen stops polling fal.ai at about 10 minutes, and a Wan Animate job of 89 frames at 720p takes about 9 to 10 minutes. Ask Supagen to raise the limit, or try 580p or 480p.",
+      "continuity": {
+        "input": "none",
+        "status": "NOT SUPPORTED",
+        "what": "A face-replace model: its first frame is the shot's own keyframe in the reference clip's pose (motion, animate) or the clip's own frame (replace), and its motion is the clip's. A face-replace segment neither continues nor is continued (continuity.py rules)."
+      }
+    },
+    "wan-2-2-animate-replace": {
+      "provider": "supagen",
+      "supagen_model_id": "3a8c53c7-f83e-4d22-97a0-79d31e5243fe",
+      "endpoint": "fal-ai/wan/v2.2-14b/animate/replace",
+      "modes": [
+        "face_replace_original"
+      ],
+      "price_per_frame": 0.005,
+      "billing": "$0.005 a source-video frame at 720p, confirmed by a Supagen bill of 2026-10-06 (89 frames, $0.445). The catalog's pricing_summary ($0.0025) is wrong.",
+      "resolution": "720p",
+      "allowed_resolutions": [
+        "480p",
+        "580p",
+        "720p"
+      ],
+      "max_reference_images": 1,
+      "source_video": {
+        "min_s": 1,
+        "max_s": 10,
+        "formats": [
+          "mp4",
+          "mov"
+        ],
+        "_note": "the catalog lists no length limit; 10 s is this pipeline's own cap"
+      },
+      "output_length": "the source video's length",
+      "request": "Messages-only, no text part: one video part (the original clip) then one image part (the character's face). The model puts the picture's person into the video and keeps the video's scene, light and colour.",
+      "runtime": "about 9 minutes for 89 frames (2026-10-06). A sync call ends in a 504 at 5 minutes, and a first try failed at 10 minutes with provider_timeout; generate.sh uses poll mode.",
+      "continuity": {
+        "input": "none",
+        "status": "NOT SUPPORTED",
+        "what": "A face-replace model: its first frame is the shot's own keyframe in the reference clip's pose (motion, animate) or the clip's own frame (replace), and its motion is the clip's. A face-replace segment neither continues nor is continued (continuity.py rules)."
+      }
+    },
+    "kling-v3-0-pro-motion-control": {
+      "provider": "supagen",
+      "supagen_model_id": "4f3e1cd0-d5f9-44fd-b098-e965d9220e6c",
+      "endpoint": "fal-ai/kling-video/v3/pro/motion-control",
+      "modes": [
+        "face_replace_motion"
+      ],
+      "price_per_s": 0.168,
+      "billing": "$0.168 a second of output, billed on the exact length: a 2.93 s output (2026-10-07) cost $0.4929 (2.9333 x 0.168). generate.sh quotes whole seconds of the padded clip, rounded up.",
+      "max_reference_images": 1,
+      "source_video": {
+        "min_s": 1,
+        "max_s": 30,
+        "formats": [
+          "mp4",
+          "mov"
+        ],
+        "_note": "fal.ai: 30 s at most with character_orientation video (10 s with image). Kling asks for 3 s or more; shots.py reference pads a shorter clip to 3.0 s with its last frame (route pad_to_s) and the take is trimmed at assembly."
+      },
+      "inputs": "image_url (the characters and background of the output come from it), video_url (the motion), character_orientation video|image (required), keep_original_sound (default true), prompt (optional), elements (one facial element, frontal_image_url + 1 to 3 reference_image_urls, video orientation only; not passed through Supagen yet). No negative_prompt or cfg_scale on this endpoint.",
+      "settings": "template extensions: character_orientation video, keep_original_sound false",
+      "runtime": "about 4 minutes for a 3.0 s clip (2026-10-07). The output was 2.93 s (88 frames) from a 3.0 s input, at 1072x1920.",
+      "continuity": {
+        "input": "none",
+        "status": "NOT SUPPORTED",
+        "what": "A face-replace model: its first frame is the shot's own keyframe in the reference clip's pose (motion, animate) or the clip's own frame (replace), and its motion is the clip's. A face-replace segment neither continues nor is continued (continuity.py rules)."
+      },
+      "start_picture": "Measured 2026-10-14: the output takes the room, the light and the camera of the picture. A cropped portrait (a front anchor) as the picture gave a still camera in a bright room, and the reaction read as a yawn. The picture is a keyframe that copies the clip's first frame: its room, light, camera height and angle, the clothes, the pose mid-motion and the mouth as it starts (character-shots)."
     }
   },
   "output": {
@@ -70,16 +178,42 @@
     "output_length": "SETTLED BY MEASUREMENT for minimax-h3-reference-to-video: outputs run 0.1 to 0.6 s long (5 s gave 5.184 s, 6 s gave 6.592 s, 15 s gave 15.104 s). Not measured yet for H3 Max reference. Trim to the planned length at assembly."
   },
   "face_replace": {
-    "_comment": "Founder, 2026-10-04: an X segment (a reaction hook) may run in face-replace mode: the trimmed, masked reference clip and the character's approved face go to a model with the clip as a video input. The shot names its route (shots/<nn>-x.json face_replace.route). generate.sh takes the model and the template from the route, not from state.json, and checks that the model lists the route's mode. Prices and limits: Supagen's public model catalog (GET https://supagen.dev/api/v1/models, no key, no run), read 2026-10-04.",
-    "status": "NOT RUN. The routes are written and tested offline. generate.sh refuses every live face-replace run while capabilities.json bridge.face_replace is false, which it stays until the founder approves a paid test. The founder plans that test in his own Organic Factory space.",
+    "_comment": "An X segment (a reaction hook) may run in face-replace mode: the reference clip and the character's approved picture go to a model with the clip as a video input. The shot names its route (shots/<nn>-x.json face_replace.route); a shot that names none takes default_route. generate.sh takes the model and the template from the route, not from state.json, and checks that the model lists the route's mode. The founder's paid tests (2026-10-04 to 2026-10-14, in a user workspace) are in decision and tests; the failures are in docs/character-model-known.md.",
+    "status": "LIVE (capabilities.json bridge.face_replace true since 2026-10-14). Final decision: the motion route (Kling 3.0 Pro Motion Control on Supagen, template ugc-character-face-kling-motion) is the default. The replace route (Wan 2.2 Animate replace) is the backup. animate (Wan 2.2 Animate move) timed out on Supagen and stays a fallback; guided is untested; edit is retired. Every take is measured by identity.py over the clip's range, and gate B approves only a PASS.",
     "routes": {
-      "edit": {
-        "model": "wan-2-7-edit-video",
-        "mode": "face_replace",
-        "template": "ugc-character-face-replace",
+      "motion": {
+        "model": "kling-v3-0-pro-motion-control",
+        "mode": "face_replace_motion",
+        "template": "ugc-character-face-kling-motion",
         "length": "exact",
-        "what": "PRIMARY. Wan 2.7 Edit Video (fal-ai/wan/v2.7/edit-video): the masked clip is the source video and the character's face is its one reference image. It edits the clip, so the frames, motion and timing are the clip's and the output is the clip's length: duration_seconds null, trim_to_seconds the clip's length, gate B within 0.25 s of it.",
-        "limits": "Source video 2 to 10 s, mp4 or mov, at most 100 MB. One reference image. 720p or 1080p, 9:16. $0.10 a second at 720p ($0.15 at 1080p), billed on the output seconds: a 2.9 s clip is about $0.29 (generate.sh quotes whole seconds: $0.30)."
+        "clip": "original",
+        "first_frame": "keyframe",
+        "prompt": true,
+        "pad_to_s": 3.0,
+        "what": "DEFAULT (founder, 2026-10-07; final 2026-10-14). Kling 3.0 Pro Motion Control on Supagen. The picture is the character's approved first frame (the output takes its person, clothes and room from the picture, and it starts in the clip's pose); the ORIGINAL clip (trimmed, no mask, padded to 3.0 s with its last frame) gives the motion, character_orientation video so the head and body follow the clip. keep_original_sound false (the reaction is silent and the input has no audio). A short prompt: the expressions, mouth and head in time, and no on-screen text (the endpoint has no negative_prompt).",
+        "limits": "Video up to 30 s with orientation video. One picture. $0.168 a second of output: 3 s is $0.50."
+      },
+      "replace": {
+        "model": "wan-2-2-animate-replace",
+        "mode": "face_replace_original",
+        "template": "ugc-character-face-animate-replace",
+        "length": "exact",
+        "clip": "original",
+        "prompt": false,
+        "what": "BACKUP (founder, 2026-10-07; the default on 2026-10-06). Test of 2026-10-06: the face shape, the clothes (the picture's sweater) and the room wrong. Wan 2.2 Animate, replace mode, on Supagen: the ORIGINAL reference clip (trimmed to the planned range, its own size, no mask) is the source video, and the character's face picture the one image. The model replaces the person in the clip with the character and keeps the room, the light, the motion, the expressions, the mouth and the timing. No prompt, no first frame. The clip's burned-in text is part of the scene, so it can stay in the output: gate B checks it.",
+        "limits": "Source video up to 10 s (this pipeline's cap). One picture. 720p. $0.005 a source-video frame (the higher of the catalog's two figures): 2.95 s at 30 fps, 89 frames, is $0.45."
+      },
+      "animate": {
+        "model": "wan-2-2-animate-move",
+        "mode": "face_replace_animate",
+        "provider": "supagen",
+        "length": "exact",
+        "first_frame": "keyframe",
+        "what": "FALLBACK (founder, 2026-10-07). Test of 2026-10-07 timed out on Supagen (provider_timeout at 610 s); not retried. Founder, 2026-10-07: on Supagen. Wan 2.2 Animate, move mode: the character's first frame (keyframes/<nn>-x.png, approved at gate A by its checksum) is the subject and the room; the ORIGINAL clip (trimmed, no mask) gives the body pose and the face expression. No prompt.",
+        "limits": "Source video up to 10 s (this pipeline's cap). One picture. 720p. $0.005 a source frame: 89 frames is $0.45.",
+        "template": "ugc-character-face-animate-move",
+        "clip": "original",
+        "prompt": false
       },
       "guided": {
         "model": "minimax-h3-reference-to-video",
@@ -87,12 +221,32 @@
         "template": "ugc-character-face-guided",
         "length": "trim",
         "duration_s": 5,
-        "what": "FALLBACK. MiniMax H3 reference-to-video (minimax/h3/reference-to-video): the masked clip is a video reference and the character's face an image reference. It makes a new clip guided by the reference, so it does not keep the exact frames and timing: duration_seconds is the template's length (5 s, at least the clip's), trim_to_seconds the clip's length; gate B needs the file at least the clip's length, trims it at assembly, and adds the check that the reaction follows the clip (follows_reference).",
+        "what": "UNTESTED FALLBACK. MiniMax H3 reference-to-video (minimax/h3/reference-to-video): the masked clip is a video reference and the character's face an image reference. It makes a new clip guided by the reference, so it does not keep the exact frames and timing: duration_seconds is the template's length (5 s, at least the clip's), trim_to_seconds the clip's length; gate B needs the file at least the clip's length, trims it at assembly, and adds the check that the reaction follows the clip (follows_reference).",
         "limits": "Video reference 2 to 15 s; 1 to 5 references in all (pictures, video, audio). Output 5 to 15 whole seconds, 768p. $0.06 a second at 768p: a 5 s run is $0.30. A clip longer than 5 s needs a template version at that length."
+      },
+      "edit": {
+        "model": "wan-2-7-edit-video",
+        "mode": "face_replace",
+        "template": "ugc-character-face-replace",
+        "length": "exact",
+        "what": "RETIRED. Wan 2.7 Edit Video (fal-ai/wan/v2.7/edit-video): the masked clip as the source video and the character's face as its one reference image.",
+        "limits": "Source video 2 to 10 s, mp4 or mov, at most 100 MB. One reference image. 720p or 1080p, 9:16. $0.10 a second at 720p ($0.15 at 1080p), billed on the output seconds: a 2.9 s clip is about $0.29 (generate.sh quotes whole seconds: $0.30).",
+        "retired": "2026-10-04, the founder's paid test: the output kept the reference person's face, hair and every pixel (identity.py: similarity 0.90 to the reference, 0.18 to the character). Wan 2.7 Edit Video is an instruction editor; its reference image guides an edit, it does not replace a person. generate.sh refuses this route."
       }
     },
-    "request": "Unverified until the paid test: generate.sh sends the clip as a message part {type: video, source: {file_id}} before the picture parts, the face as {type: image, ...}; the file is uploaded with purpose invocation_input like the pictures. REQUEST_ONLY=1 writes the request it would send, with placeholder file ids, and stops: no upload, no run.",
-    "not_offered": "Wan 2.2 Animate (replace mode) is not in Supagen's catalog. Other Supagen models with a source video and a face picture: kling-o3-pro-edit-video and kling-video-o1-edit-video ($0.168 a second, clip 3 s or more), happyhorse-1-0-edit-video ($0.14 in + $0.14 out a second at 720p, clip 3 s or more).",
-    "fallback": "generation_input none: the written expression beats, generated by the default model from the keyframe and the character's references."
+    "request": "motion, replace, animate: Supagen templates (ugc-character-face-kling-motion, ugc-character-face-animate-replace, ugc-character-face-animate-move), messages-only: the original clip as a video part, then the picture as an image part; the motion route adds its prompt.txt as a text part first. Poll mode. guided: the Supagen template, the clip as a video part before the pictures.",
+    "not_offered": "Supagen's catalog (read 2026-10-06) now has wan-2-2-animate-replace (3a8c53c7-f83e-4d22-97a0-79d31e5243fe), wan-2-2-animate-move (f498eca0-1ae6-47be-8ace-0be74346e987), kling-v3-0-pro-motion-control ($0.168/s output) and kling-v3-0-std-motion-control ($0.126/s output). The replace route uses the first. Instruction editors with a source video and a face picture (kling-o3-pro-edit-video, kling-video-o1-edit-video, happyhorse-1-0-edit-video) are like the retired edit route.",
+    "fallback": "generation_input none: the written expression beats, generated by the default model from the keyframe and the character's references.",
+    "default_route": "motion",
+    "next_improvement": "Kling motion control takes elements: one facial element (frontal_image_url + 1 to 3 reference_image_urls), with character_orientation video. Send the character's front anchor (and the three-quarter anchors) as that element once Supagen passes the field through; it is the main lever on the face score.",
+    "tests": {
+      "_comment": "The founder's paid tests, one reference reaction of 2.95 s (89 frames at 30 fps), identity.py: median similarity to the character / to the reference person / share of frames closer to the character (PASS needs 0.363 and 75%).",
+      "edit (Wan 2.7 Edit Video, 2026-10-04)": "kept the reference person's face, hair and every pixel: 0.18 / 0.90. Retired.",
+      "replace (Wan 2.2 Animate replace, 2026-10-06)": "0.347 / 0.404 / 38%. The burned-in text was gone; the hair and clothes came from the face picture, the face shape stayed partly the reference person's, and most of the room changed. Pose, hand, mouth and timing followed the clip. $0.45.",
+      "animate (Wan 2.2 Animate move, 2026-10-07)": "no output: provider_timeout after 610 s on Supagen.",
+      "motion (Kling 3.0 Pro Motion Control, 2026-10-07)": "0.392 / 0.368 / 62%. No on-screen text; the room, the clothes and the blanket of the approved first frame; the expressions, eyes, mouth, hand and head followed the clip in time; 2.93 s from a 3.0 s input. $0.49.",
+      "motion (Kling 3.0 Pro Motion Control, 2026-10-14, a second video)": "first take rejected at gate B: the start picture was a cropped front anchor, so Kling kept its bright room and still camera and the reaction read as a yawn. Second take, from a keyframe that copies the clip's first frame (the dark room, the phone below the face, the clothes, mid-step): approved by the founder, written into approval.json by hand. Every frame with a face was closer to the character (median 0.522 to the character, 0.233 to the reference), but identity.py read FAIL (a face in 4 of 8 frames): three of its samples fell in the 3.0 s padding after the 2.0 s range, and one in the range had the hand over the mouth. The review length gate also compared the padded 2.93 s file with the 2.0 s range. Both now measure the clip's range (identity.py samples inside it; review.py accepts the padded length)."
+    },
+    "decision": "Founder, 2026-10-07, final 2026-10-14: Kling 3.0 Pro Motion Control on Supagen (the motion route, template ugc-character-face-kling-motion) is the route for character face replacement in reaction videos. It gave correct text removal, motion, timing, clothes, room and hair, and the closest face. Wan 2.2 Animate replace (the replace route) is the backup: name it in the shot (face_replace.route replace) when the motion route fails. The start picture decides the room and the camera: make the keyframe from the clip's first frame."
   }
 }

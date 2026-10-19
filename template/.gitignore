@@ -32,3 +32,6 @@ atlas/data/index.json
 atlas/public/search.json
 atlas/tsconfig.tsbuildinfo
 *.bak
+
+# The identity gate's face models (about 39 MB): fetched once by scripts/character/identity.py, checked by sha256.
+scripts/character/face-models/

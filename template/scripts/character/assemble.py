@@ -42,6 +42,14 @@ exact times: hook, paragraph, step and comparison labels, the day counter, the s
 credit. A legacy `title_overlay` is drawn as one hook overlay. After the pass, gate C's
 checks add: the overlays as planned, long enough to read, clear of every hero element,
 every caption and each other; the supplied files unchanged.
+
+A continuing segment (its shot's continuity.from, scripts/character/continuity.py) is one
+take with the clip before it: that clip is cut at its last frame (last-frame.json out_s, the
+end of the frame the next clip was seeded with; never by word times), and the continuing
+clip starts at its second frame, so the frame the model opened on is not shown twice.
+Picture and sound are cut at the same points, with the fade and the loudness of every join.
+It stops before any encode when the last frame is stale or the approved take was seeded
+with another frame. After the pass: the cut checked, with the measured differences.
 """
 import difflib, glob, hashlib, json, os, re, shutil, subprocess, sys
 
@@ -49,6 +57,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import bridge
+import continuity
 CH = os.path.join(ROOT, "pipeline", "character")
 W, H, FPS = 1080, 1920, 30
 GENERATED = ("T", "O", "G", "S", "H", "F", "B", "X")
@@ -531,6 +540,21 @@ def main():
             shot_p = os.path.join(CH, pv, "shots", f"{pseg}.json")
             item["trim_to"] = ((load(shot_p).get("video") or {}).get("trim_to_seconds")
                                if os.path.exists(shot_p) else None)
+            cprev = continuity.source_of(continuity.shot_of(video, name))
+            if cprev:
+                ok, why, info = continuity.state(video, name)
+                if not ok:
+                    bad(f"{name} continues from {cprev}: {why}")
+                    continue
+                if (e.get("continuity") or {}).get("last_frame_sha256") != info["sha256"]:
+                    bad(f"{name}: its approved take was not seeded with the current last frame of {cprev} "
+                        f"(sha256 {info['sha256'][:12]}): regenerate {name}, then gate B")
+                    continue
+                if not plan_segs or plan_segs[-1]["name"] != cprev:
+                    bad(f"{name} continues from {cprev}, which is not the segment before it")
+                    continue
+                item["continues"] = {"from": cprev, "info": info}
+                plan_segs[-1]["continued"] = {"by": name, "info": info}
         elif t in ("R", "P"):
             row, rec = screen_row(plan["app"], s.get("screen_id"))
             if not row or not rec or not os.path.exists(rec):
@@ -638,6 +662,17 @@ def main():
                 win, how = [0.0, float(it["trim_to"])], "trim_to_seconds"
             else:
                 win, how = [0.0, duration(src)], "whole file"
+            if it.get("continued"):
+                win[1] = float(it["continued"]["info"]["out_s"])
+                how += f"; to its last frame (the next clip, {it['continued']['by']}, continues from it)"
+            if it.get("continues"):
+                fr = continuity.frames(src)
+                # Just under the second frame's time: the first frame, a copy of the previous
+                # clip's last frame, is not shown again.
+                win[0] = max(0.0, fr[1][0] - 0.0005) if len(fr) > 1 else 0.0       # from the first frame
+                how += f"; from its second frame (continues {it['continues']['from']})"
+            if (it.get("continued") or it.get("continues")) and win[1] - win[0] < 0.5:
+                sys.exit(f"{name}: the continuous cut leaves {win[1] - win[0]:.2f} s ({how})")
             dur = win[1] - win[0]
             if it.get("audio_src"):
                 aw, aheard = audio_window(it, work)
@@ -656,6 +691,13 @@ def main():
                 ain = None
             encode_segment(out, ["-ss", f"{win[0]:.3f}", "-to", f"{win[1]:.3f}", "-i", src],
                            vf_generated(s.get("punch_in")), ain, audio_chain(dur, fade), dur)
+            if it.get("continues"):
+                c = it["continues"]
+                entry["continuity"] = {"from": c["from"], "last_frame": c["info"]["file"],
+                                       "last_frame_sha256": c["info"]["sha256"], "head_dropped_s": round(win[0], 4)}
+            if it.get("continued"):
+                entry["continued_by"] = {"segment": it["continued"]["by"], "cut_s": round(win[1], 4),
+                                         "out_s": it["continued"]["info"]["out_s"]}
             entry.update({"src": os.path.relpath(src, ROOT), "in": round(win[0], 3), "out": round(win[1], 3),
                           "trim_by": how, "punch_in": s.get("punch_in"),
                           "composite": bool(it.get("composite")) or None,
@@ -754,6 +796,19 @@ def main():
         timeline.append(entry)
         parts.append(out)
         t_final += d
+
+    # The continuing cuts, measured on the normalised segments: the last frame shown before the
+    # cut, the first shown after it, and the frame that was dropped (the take's first).
+    for k, e in enumerate(timeline):
+        if not e.get("continuity") or not k:
+            continue
+        a, b = parts[k - 1], parts[k]
+        last = continuity.gray(a, max(0, len(continuity.frames(a)) - 1))
+        src0 = continuity.gray(os.path.join(ROOT, e["src"]), 0)
+        e["continuity"]["cut"] = {
+            "shown_diff": continuity.diff(last, continuity.gray(b, 0)),
+            "dropped_diff": continuity.diff(last, src0),
+            "seed_diff": continuity.diff(continuity.gray(os.path.join(ROOT, e["continuity"]["last_frame"])), src0)}
 
     # Caption timing: each caption runs to the next one when the gap is short.
     for i, c in enumerate(caps):
@@ -943,6 +998,20 @@ def final_checks(outputs, timeline, work, video, plan=None, v=None, drawn=(), ca
         print(f"  {tag:<7}  {name}  ({detail})")
 
     overlay_checks(rep, out, outputs["default"], timeline, work, plan or {}, v or {}, list(drawn), list(caps))
+    # A continuing cut: the clip before it ends at the seed frame, this one starts after its
+    # first frame. The differences (0 to 255) are for the eye at gate C.
+    for k, e in enumerate(timeline):
+        c = e.get("continuity")
+        if not c:
+            continue
+        p_ = timeline[k - 1] if k else {}
+        ok = bool(k) and p_.get("name") == c["from"] and c["head_dropped_s"] > 0 and \
+            abs(p_.get("out", -1) - (p_.get("continued_by") or {}).get("out_s", -9)) < 0.002
+        m = c.get("cut") or {}
+        rep(f"continuous cut {c['from']} > {e['name']}", ok,
+            f"{c['from']} ends at its last frame, {e['name']} starts at its second; shown frames differ by "
+            f"{m.get('shown_diff')}, the dropped first frame by {m.get('dropped_diff')}, the take's first frame "
+            f"from the seed by {m.get('seed_diff')}")
 
     f = outputs["default"]
     r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",

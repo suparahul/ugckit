@@ -70,12 +70,44 @@ it.** The checklist (the user sees the same list):
 - **X segments in face-replace mode**: the motion is the clip's; look at the face. The
   character's face in every frame; nothing of the original creator's face, hair or marks;
   no handle, watermark or caption of the reference (OCR reads the file and refuses any
-  text); no voice. `review.py` approves it only with
+  text); no band, blur or box left from a mask; no voice. Check the hair, the clothes and
+  the room against the approved keyframe (motion route). First the identity gate,
+  measured (free, local):
+
+      .venv/bin/python3 scripts/character/identity.py <video> <nn>-x generated/<file>.mp4
+
+  It compares eight frames inside the reaction's range (not the motion route's padding)
+  with the character's hero and anchors, and with the same moments of the reference clip
+  (OpenCV YuNet and SFace; 0.363 is "same person"). PASS needs a face in 6 of the 8
+  frames, a median similarity to the character of 0.363 or more, and the face closer to
+  the character than to the clip's person in 75% of the frames. A FAIL is a reject,
+  whatever the face looks like at a glance: the retired edit route scored 0.18 to the
+  character and 0.90 to the reference. The face models (about 39 MB) are fetched once into
+  `scripts/character/face-models/` and checked by sha256. `qc.py` prints the same gate, and
+  `review.py` runs it again and refuses an approval without a PASS. Then `review.py`
+  approves it only with
   `--check identity=pass --check no_source_identity=pass --check silent=pass`. On the
-  `edit` route the file is within 0.25 s of the clip's length. On the `guided` route the
+  `motion`, `replace` and `animate` routes the file is within 0.25 s of the clip the model
+  got (on the motion route, the range padded to 3.0 s; the take is trimmed to the range
+  at assembly). On the `guided` route the
   take is a new clip: it is at least the clip's length (it is trimmed to it at assembly),
   and it needs `--check follows_reference=pass` too: the reaction follows the clip's
   expression beats in order and time within the trimmed length.
+
+- **A clip that the next one continues** (the next shot's `continuity.from`): its
+  approval takes its last frame, `segments/<nn>-<type>/last-frame.png` with
+  `last-frame.json` (the frame, its sha256, the approved file's sha256, its time and the
+  cut). Look at the end of the clip before you approve: the next clip starts from that
+  exact picture. Approving another take later takes a new frame, and `review.py` warns
+  when a continuing clip was approved from the old one: it is generated again.
+  `scripts/character/continuity.py last-frame <video> <nn>-<type>` takes it again by hand
+  (after a change of `trim` or `trim_to_seconds`).
+- **A continuing clip**: it opens where the clip before it ends. Look at the join: the
+  same pose, light, set and framing in its first second as at the end of the clip before.
+  `review.py` approves it only when its `<take>.seed.json` (written by `generate.sh`)
+  names the current last frame, and records `checks.seed_diff`: how far its first frame
+  is from that frame (0 to 255; a few points is the same picture). No threshold is set
+  yet: the first paid continuing run gives the first number.
 
 Pull a frame where you are unsure:
 
@@ -92,6 +124,18 @@ the file and ask for their word. Record it:
     scripts/character/review.py segment <video> <nn>-<type> --decision reject \
         --class "<the failure, in one line>" --fix "<the prompt change, if known>" \
         --words "<the user's words>"
+
+**When the user decides in the Atlas** (the post page shows every take, the reference
+clip, the keyframe and the identity gate, with Approve this take and Reject), record the
+click instead of asking again:
+
+    scripts/character/review.py segment <video> <nn>-<type> --from-atlas
+
+It reads the last `take.approve` or `take.reject` line for that segment, refuses when the
+take changed after the click (its sha256), and runs every gate as above (the identity
+gate too). An approval carries the checks the user ticked; a reject carries what failed
+(`--class`) and the fix. The words are the note, or say what was clicked. The same for a
+phone segment's composite: `review.py composite <video> <nn>-<type> --from-atlas`.
 
 - **approve**: the file is kept for assembly. With `--fixed-by "<change>"` on the approval
   of a regenerated segment, the ledger's open rows of this segment say what fixed them.
