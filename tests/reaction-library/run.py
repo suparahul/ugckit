@@ -6,8 +6,8 @@ a test video made by ffmpeg, no network. Not shipped (the installer copies templ
 
   - reactions.py: scan finds a post whose notes describe a reaction; add refuses a range past the
     end of the video and an unknown tag; describe never changes a field the user set; fill writes
-    the sha256, the preview and the fit; check finds a changed video and a "kept" not set by the user;
-  - the fit: face replace refuses two people, speech, a cut and a hidden face;
+    the sha256 and the preview; check finds a changed video and a "kept" not set by the user;
+  - no route fit: an entry has none, a save drops an old one, and list has no --fit filter;
   - video_plan.py: reactions lists the library before the research; check_library_ref refuses an
     unknown or retired entry and another range without library_differs.
 
@@ -72,7 +72,7 @@ def main():
             "framing": {"people": 1, "cuts": 0, "face_hidden_s": 0, "framing": "chest-up"}}))
         e = json.load(open(lib_path))["entries"][eid]
         expect("describe keeps the user's tags", code == 0 and e["tags"] == ["regret"] and "kept the user's tags" in out, out)
-        expect("the fit: one face, silent, no cut fits face replace", e["fit"]["face_replace"]["ok"] is True, json.dumps(e["fit"]))
+        expect("an entry has no route fit (every reaction is a motion copy)", "fit" not in e, json.dumps(e))
 
         code, out = run(ws, "describe", eid, "--json", json.dumps({"expression_beats": [{"start_s": 0, "end_s": 5, "face": "x", "eyes": "y", "head": "z"}]}))
         expect("describe refuses a beat outside the range", code != 0, out)
@@ -86,16 +86,13 @@ def main():
 
         sys.path.insert(0, os.path.dirname(SCRIPT))
         os.environ["UGCKIT_ROOT"] = ws
-        import reactions as rx  # noqa: E402
-        base = {"length_s": 2.0, "expression_beats": beats, "speech": "none",
-                "framing": {"people": 1, "cuts": 0, "face_hidden_s": 0}}
-        for label, change in [("two people", {"framing": {"people": 2, "cuts": 0, "face_hidden_s": 0}}),
-                              ("speech", {"speech": "speaks"}),
-                              ("a cut", {"framing": {"people": 1, "cuts": 1, "face_hidden_s": 0}}),
-                              ("a hidden face", {"framing": {"people": 1, "cuts": 0, "face_hidden_s": 0.8}})]:
-            expect(f"the fit: face replace refuses {label}", rx.compute_fit({**base, **change})["face_replace"]["ok"] is False)
-        expect("the fit: a clip that speaks fits no route", rx.compute_fit({**base, "speech": "speaks"})["written"]["ok"] is False)
-        expect("the fit: unknown until described", rx.compute_fit({"length_s": 2})["face_replace"]["ok"] is None)
+        lib = json.load(open(lib_path))
+        lib["entries"][eid]["fit"] = {"face_replace": {"ok": True, "why": "an entry written before 2026-10-19"}}
+        json.dump(lib, open(lib_path, "w"))
+        code, out = run(ws, "fill", eid, "--no-ocr")
+        expect("a save drops an old entry's fit", code == 0 and "fit" not in json.load(open(lib_path))["entries"][eid], out)
+        code, out = run(ws, "list", "--fit", "written")
+        expect("list has no --fit filter", code != 0, out)
 
         lib = json.load(open(lib_path))
         lib["entries"][eid]["status"] = "kept"

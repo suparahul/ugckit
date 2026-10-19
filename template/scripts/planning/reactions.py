@@ -13,9 +13,9 @@ Free, local: ffmpeg, the OCR of scripts/character/ocr.py, no network, no generat
                      | --file <x.json>             framing, speech, burned_in_text, hook_text, tags,
                                                    note, start_s, end_s; never a field the user set
     reactions.py fill <id>|--all [--no-ocr]        sha256, length, the preview sheet, the OCR of the
-                                                   burned-in text (when none is written), the fit
+                                                   burned-in text (when none is written)
     reactions.py check                             every entry against its file and the tag list
-    reactions.py list [--tag t] [--job j] [--fit face_replace|written] [--max-s n]
+    reactions.py list [--tag t] [--job j] [--max-s n]
                       [--status s] [--json]        the entries, best first
 
 The library is library/reactions/reactions.json at the workspace root, with the previews in
@@ -45,7 +45,6 @@ DESCRIBE_KEYS = ("expression_beats", "framing", "speech", "burned_in_text", "hoo
                  "start_s", "end_s")
 BEAT_KEYS = ("start_s", "end_s", "face", "eyes", "head")
 FRAMING_KEYS = ("framing", "camera_distance", "camera", "people", "room", "cuts", "face_hidden_s")
-FR_MAX_S, FR_MIN_S, HIDDEN_MAX_S = 30.0, 1.0, 0.3
 
 
 def now():
@@ -74,6 +73,10 @@ def save_lib(lib):
     """Write the library atomically. The file is read again just before, by the caller, so a
     field the user set in the Atlas in the meantime is not lost."""
     os.makedirs(LIB_DIR, exist_ok=True)
+    # Every reaction with a reference is a motion copy (founder, 2026-10-19): an entry has no
+    # route fit any more, and one written before then loses it here.
+    for e in lib.get("entries", {}).values():
+        e.pop("fit", None)
     fd, tmp = tempfile.mkstemp(dir=LIB_DIR, prefix=".tmp-")
     with os.fdopen(fd, "w") as f:
         json.dump(lib, f, indent=2, ensure_ascii=False)
@@ -152,42 +155,6 @@ def source_of(post_dir):
     return src
 
 
-# ----------------------------------------------------------------------------- the fit
-def compute_fit(e):
-    """Face replace (the default route, models.json face_replace) fits one face that stays in
-    view, silent, with no cut, 1 to 30 s; a closed eye or a hand over the mouth drifts toward
-    the reference person (docs/character-model-known.md). The written route fits any clip whose
-    expression beats are written. A clip that speaks fits no reaction hook (never spoken)."""
-    fr = e.get("framing") or {}
-    beats = e.get("expression_beats") or []
-    ln = e.get("length_s")
-    speech, people, cuts, hidden = e.get("speech"), fr.get("people"), fr.get("cuts"), fr.get("face_hidden_s")
-    if speech is None or people is None or cuts is None or hidden is None:
-        unknown = [k for k, v in (("speech", speech), ("people", people), ("cuts", cuts), ("face_hidden_s", hidden))
-                   if v is None]
-        fr_fit = {"ok": None, "why": "not described yet: " + ", ".join(unknown)}
-    else:
-        no = []
-        if people != 1:
-            no.append(f"{people} people in the frame")
-        if speech != "none":
-            no.append(f"speech: {speech}")
-        if cuts:
-            no.append(f"{cuts} cut(s) inside the range")
-        if num(hidden) and hidden > HIDDEN_MAX_S:
-            no.append(f"the face is hidden or the eyes closed for {hidden:g} s")
-        if num(ln) and not FR_MIN_S <= ln <= FR_MAX_S:
-            no.append(f"{ln:g} s long")
-        fr_fit = {"ok": not no, "why": "; ".join(no) if no else f"one face, silent, no cut, {ln:g} s"}
-    if speech == "speaks":
-        wr = {"ok": False, "why": "the person speaks; a reaction hook is never spoken"}
-    elif not beats:
-        wr = {"ok": None, "why": "no expression beats yet"}
-    else:
-        wr = {"ok": True, "why": f"{len(beats)} expression beat(s)" + (f", {people} people" if people and people != 1 else "")}
-    return {"face_replace": fr_fit, "written": wr}
-
-
 # ---------------------------------------------------------------------------- commands
 def cmd_scan(slug, sheets=False, as_json=False):
     lib = load_lib()
@@ -253,10 +220,9 @@ def cmd_add(post_dir, start_s, end_s, tags, note, by, frm):
     e = {"id": eid, "status": "kept" if by == "you" else "proposed", "source": src,
          "start_s": round(start_s, 2), "end_s": round(end_s, 2), "length_s": round(end_s - start_s, 2),
          "expression_beats": [], "framing": {k: None for k in FRAMING_KEYS}, "speech": None,
-         "burned_in_text": [], "hook_text": None, "tags": tags, "fit": {}, "preview": None, "note": note or "",
+         "burned_in_text": [], "hook_text": None, "tags": tags, "preview": None, "note": note or "",
          "added": {"by": by, "at": t, "from": frm}, "set_by_you": (["start_s", "end_s", "tags", "status"] + (["note"] if note else [])) if by == "you" else [],
          "updated_at": t}
-    e["fit"] = compute_fit(e)
     lib = load_lib()
     lib["entries"][eid] = e
     save_lib(lib)
@@ -302,18 +268,12 @@ def cmd_describe(eid, obj):
     errs = check_beats(e.get("expression_beats") or [], e["length_s"])
     if errs:
         sys.exit("; ".join(errs))
-    e["fit"] = compute_fit(e)
     e["updated_at"] = now()
     lib = load_lib()
     lib["entries"][eid] = e
     save_lib(lib)
     print(f"  ✓ {eid}: " + ", ".join(k for k in obj if k not in skipped)
-          + (f" (kept the user's {', '.join(skipped)})" if skipped else "")
-          + f"; face replace {fit_word(e['fit']['face_replace'])}, written {fit_word(e['fit']['written'])}")
-
-
-def fit_word(f):
-    return {True: "fits", False: "no", None: "?"}[f.get("ok")] + (f" ({f['why']})" if f.get("ok") is not True and f.get("why") else "")
+          + (f" (kept the user's {', '.join(skipped)})" if skipped else ""))
 
 
 def preview(e):
@@ -385,15 +345,13 @@ def cmd_fill(ids, no_ocr=False):
             if seen:
                 e["burned_in_text"] = [{"text": s, "where": None, "start_s": 0.0, "end_s": e["length_s"], "kind": "ocr"}
                                        for s in seen[:6]]
-        e["fit"] = compute_fit(e)
         e["updated_at"] = now()
         fresh = load_lib()
         fresh["entries"][eid] = {**fresh["entries"].get(eid, {}), **{k: e[k] for k in
-                                 ("source", "length_s", "preview", "burned_in_text", "fit", "updated_at")}}
+                                 ("source", "length_s", "preview", "burned_in_text", "updated_at")}}
         save_lib(fresh)
         lib = fresh
-        print(f"  ✓ {eid}: {e['length_s']:g} s, preview {e['preview'] or '—'}, "
-              f"face replace {fit_word(e['fit']['face_replace'])}, written {fit_word(e['fit']['written'])}")
+        print(f"  ✓ {eid}: {e['length_s']:g} s, preview {e['preview'] or '—'}")
 
 
 def problems(e, tags):
@@ -433,7 +391,7 @@ def cmd_check():
     sys.exit(1 if n else 0)
 
 
-def ranked(lib, tag=None, job=None, fit=None, max_s=None, status=None):
+def ranked(lib, tag=None, job=None, max_s=None, status=None):
     want = set([tag] if tag else []) | set(tag_file()["hook_jobs"].get(job, []) if job else [])
     rows = []
     for e in lib["entries"].values():
@@ -443,27 +401,24 @@ def ranked(lib, tag=None, job=None, fit=None, max_s=None, status=None):
             continue
         if want and not want & set(e.get("tags") or []):
             continue
-        if fit and (e.get("fit") or {}).get(fit, {}).get("ok") is not True:
-            continue
         if max_s and (e.get("length_s") or 0) > max_s:
             continue
-        score = (e.get("status") == "kept", len(want & set(e.get("tags") or [])),
-                 (e.get("fit") or {}).get("face_replace", {}).get("ok") is True, e["source"].get("views") or 0)
+        score = (e.get("status") == "kept", len(want & set(e.get("tags") or [])), e["source"].get("views") or 0)
         rows.append((score, e))
     rows.sort(key=lambda r: r[0], reverse=True)
     return [e for _, e in rows]
 
 
-def cmd_list(tag=None, job=None, fit=None, max_s=None, status=None, as_json=False, limit=40):
+def cmd_list(tag=None, job=None, max_s=None, status=None, as_json=False, limit=40):
     lib = load_lib()
-    rows = ranked(lib, tag, job, fit, max_s, status)
+    rows = ranked(lib, tag, job, max_s, status)
     if as_json:
         print(json.dumps(rows[:limit], indent=1, ensure_ascii=False))
         return
     print(f"{len(rows)} entr{'y' if len(rows) == 1 else 'ies'} in library/reactions/reactions.json")
     for e in rows[:limit]:
         print(f"- {e['id']} · {e['status']} · {e['length_s']:g} s · {', '.join(e.get('tags') or []) or 'no tags'}"
-              f" · face replace {fit_word(e['fit']['face_replace'])}\n    {e['source']['post_dir']}"
+              f"\n    {e['source']['post_dir']}"
               f" {e['start_s']:g}–{e['end_s']:g} s · {len(e.get('expression_beats') or [])} beat(s)"
               + (f" · “{e['hook_text']}”" if e.get("hook_text") else ""))
 
@@ -483,7 +438,6 @@ def main():
     ap.add_argument("--no-ocr", action="store_true")
     ap.add_argument("--tag")
     ap.add_argument("--job")
-    ap.add_argument("--fit", choices=["face_replace", "written"])
     ap.add_argument("--max-s", type=float)
     ap.add_argument("--status", choices=STATUSES)
     a = ap.parse_args()
@@ -510,7 +464,7 @@ def main():
     elif a.cmd == "check":
         cmd_check()
     else:
-        cmd_list(a.tag, a.job, a.fit, a.max_s, a.status, a.json is True)
+        cmd_list(a.tag, a.job, a.max_s, a.status, a.json is True)
 
 
 if __name__ == "__main__":

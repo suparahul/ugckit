@@ -1,5 +1,5 @@
 {
-  "_comment": "One entry of the reaction library, library/reactions/reactions.json: {\"version\": 1, \"entries\": {\"<id>\": <entry>}}. The library is an index of real ranges of real posts: the video stays where it is (research/ or apps/<slug>/niche/batches/) and is never copied. scripts/planning/reactions.py writes it (add, describe, fill); the Atlas Reactions page writes the user's fields. Times: start_s and end_s are seconds in the post; each expression beat's times are seconds from start_s. status: proposed (by an agent), kept (only the user sets it), retired. set_by_you lists the fields the user set; an agent never changes them. fit is computed by reactions.py fill from people, speech, cuts, face_hidden_s and the length. Tags come from docs/character/reaction-tags.json.",
+  "_comment": "One entry of the reaction library, library/reactions/reactions.json: {\"version\": 1, \"entries\": {\"<id>\": <entry>}}. The library is an index of real ranges of real posts: the video stays where it is (research/ or apps/<slug>/niche/batches/) and is never copied. scripts/planning/reactions.py writes it (add, describe, fill); the Atlas Reactions page writes the user's fields. Times: start_s and end_s are seconds in the post; each expression beat's times are seconds from start_s. status: proposed (by an agent), kept (only the user sets it), retired. set_by_you lists the fields the user set; an agent never changes them. An entry has no route fit: every reaction with a reference is a motion copy (founder, 2026-10-19). Tags come from docs/character/reaction-tags.json.",
   "id": "rx-tiktok-7626442321860644127-0",
   "status": "proposed",
   "source": {
@@ -36,10 +36,6 @@
   ],
   "hook_text": "4 years at the gym and NOW I find this?!!??",
   "tags": ["surprise", "regret"],
-  "fit": {
-    "face_replace": {"ok": true, "why": "one face, silent, no cut, 2.0 s"},
-    "written": {"ok": true, "why": "one face, 2 expression beats"}
-  },
   "preview": "library/reactions/previews/rx-tiktok-7626442321860644127-0.jpg",
   "note": "",
   "added": {"by": "agent", "at": "2026-10-19T12:00:00Z", "from": "agent-scan"},
