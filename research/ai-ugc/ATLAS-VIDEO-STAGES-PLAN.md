@@ -126,7 +126,14 @@ Two places, both exist today. No new page.
 │ 01-x  X face replace 0–2 s  ✓ A        2 takes     ● you      n/a        –      │
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │ STAGE PANEL (the stage picked in the rail; the current stage by default)        │
-│  what it made  │  checks  │  decision bar: Approve · Reject/Send back · note    │
+│ ┌ timeline ────────────────────┐ what it made │ checks │ decision bar:          │
+│ │ 0.0–2.0 s  hook · 01-x       │                         Approve · Reject/Send  │
+│ │ [picture] sees: her face …   │                         back · note            │
+│ │           text: "I just…"    │                                                │
+│ │           sound: none, silent│                                                │
+│ │           app: not on screen │                                                │
+│ │ 2.0–… s   …                  │                                                │
+│ └──────────────────────────────┘                                                │
 └─────────────────────────────────────────────────────────────────────────────────┘
 │ The frame (final or empty) · the beats · the caption (as today)                 │
 ```
@@ -142,13 +149,73 @@ Two places, both exist today. No new page.
   click on a row opens the segment card (§ 6) inside the current panel. Before
   `video.json` exists, the table shows the plan's beats instead, with "segments not cut
   yet".
-- **The stage panel**: the same three parts at every stage: what the stage made (players,
-  pictures, text), the checks (measured numbers and the checklist), and the decision bar.
+- **The stage panel**: the timeline on its left (§ 4.1), then the same three parts at every
+  stage: what the stage made (players, pictures, text), the checks (measured numbers and
+  the checklist), and the decision bar.
 - **The slot** under it stays as it is today (the frame, the beats, the caption). After
   delivery, the production panels fold into "Production record", as today.
 
 On a phone, the rail scrolls sideways inside its own box, the table becomes one card per
-segment, and the stage panel is one column.
+segment, and the stage panel is one column, with the timeline first.
+
+### 4.1 The timeline
+
+A vertical strip on the left of the stage panel. It runs from 0 s at the top to the end of
+the video at the bottom. It is the same strip at every stage and for every video type; only
+its pictures change as the video moves on. It reads the plan; it writes nothing.
+
+**One checkpoint per beat** of the plan (`plan.json beats[]`; before the lock,
+`plan.draft.json` of the current revision; before a script exists, the strip says "no
+beats yet" and stage 1 shows the brief). A checkpoint's height follows its length, with a
+minimum height so that a 0.5 s beat is still readable. The time range is written as text
+("0.0–2.0 s"), so the reader never measures it. A checkpoint carries:
+
+| Line | What it says | From |
+|---|---|---|
+| Head | the time range, the beat's role (hook, step, payoff …), the segment that carries it (`01-x`) once `video.json` exists | `beats[].start_s`, `end_s`, `role`; `video.json` |
+| sees | what the viewer sees, in one or two lines | `beats[].action`, `framing`, `layout` (for M: "three panels: …") |
+| text | the on-screen text in that range, word for word, with its place | `overlays[]` whose range meets the beat's range: `text`, `placement` |
+| sound | the voice or the sound: the spoken line and who speaks it, a narration take, "silent", the music note | `beats[].lines`, `script[]`, `narrators`, the shot's `audio_from`, `publishing_note` |
+| app | where the app or product comes in: "not on screen", or the screen id and its hero string, or the supplied clip | `app_on_screen`, `screen_id`, `hero_strings`, `source_asset_ids` |
+
+There is no colour code. A grey checkpoint means nothing; every meaning is in the words.
+The checkpoint of the stage panel's open segment has a plain border, so the reader sees
+which beats the panel talks about. A click on a checkpoint opens its segment card (§ 6).
+
+**One picture per checkpoint, at no cost.** Every picture is a file that is already on
+disk, or a frame that the browser shows from a video that is already on disk (a paused
+`<video>` at a set time; no frame is extracted and nothing is generated). The picture
+has a label in words under it ("reference", "hero", "keyframe", "take 2, approved"), because
+the label replaces a colour. The strip takes the first picture that exists in this
+order:
+
+| Stage reached | The picture | File |
+|---|---|---|
+| Plan, plan approval (1–2) | a reaction beat: the reference clip at the start of its range | the post's video at `reaction_refs[].start_s` (research, served today) |
+| | a beat with the app on screen: the screen | `apps/<slug>/screens/` still, or the recording at its first frame (`screens.json`) |
+| | a supplied clip or still (C, an M panel) | the plan asset at `source_range_s` or `still_s` |
+| | a beat with a fixed subject and no face (pet only) | `handles/<h>/references/subject-<name>.png` |
+| | a beat with the character in it | the approved hero, `handles/<h>/references/face.png` (or the character's `hero.png`) |
+| | none of these (an R or P recording before it exists, text only) | no picture: the label says why |
+| Gate A done (3) | the keyframe of the segment that carries the beat | `keyframes/<nn>-<t>.png` |
+| Gate B, a take approved (5) | the approved take, at the beat's time inside the segment; it plays on a click | `segments/<seg>/generated/<take>.mp4` |
+| Composite approved (6) | the composite in place of the plate | `segments/<seg>/composite/*.mp4` |
+| Gate C (7–8) | the whole strip plays the cut: one player beside the strip, a marker moves down it, a click on a checkpoint jumps to its start | `assembly/<video>.mp4`, then `final/<video>.mp4` |
+
+A picture that a later stage replaced stays one click away ("show the reference"), so the
+user can compare the take with what was planned. A beat whose picture is stale (a new
+keyframe after the take) says so in its label.
+
+**The segment table and the timeline show the same thing two ways.** The table is one
+row per segment with the stage cells; the strip is one checkpoint per beat with the
+content. A segment with two beats has two checkpoints and one row. The table's "beats and
+their times" column links to the checkpoints.
+
+**For every video type it is the same strip.** A face-replace reaction is one checkpoint
+with the reference frame, then the hook text. A talking head shows the spoken lines. A
+pet-only video shows the pet's picture and the narration lines. A video with app insertion
+shows the screen at the beat where the app comes in. Nothing in the strip asks for the
+type.
 
 ## 5. Each stage
 
@@ -167,7 +234,9 @@ and what it unlocks. "Line" is the log line; "agent" is the command that records
   digest, as today.
 - **Do.** Read. **Send back** with a note (the existing `plan.sendback`) is how the user
   answers a founder question or picks another hook alternative. There is no separate
-  brief gate in the pipeline, and this plan adds none.
+  brief gate in the pipeline, and this plan adds none. For a reaction hook, **Choose a
+  reaction** opens the reaction library (`REACTION-LIBRARY-PLAN.md` § 5) and writes a
+  `reaction.pick` line.
 - **Writes.** `plan.sendback` → `video-script` makes a new revision of `plan.draft.json`,
   `video_plan.py review` writes a new `REVIEW.md`. No production file.
 - **Unlocks.** A `REVIEW.md` with a digest for the current revision opens stage 2.
@@ -377,11 +446,13 @@ committed, on top of it.
 | `lib/video-production.ts` | A `stages()` function: the eight stage states of § 3 from the files and the log; the `state.json` disagreement note; sources and narration takes from `video.json` and `plan.json` (the same list as `review.py needs()`); each segment's qc, gates, seam and source facts for § 6. `productionStep()` covers sources, narration, composite send-back and cut regenerate. |
 | `lib/video.ts` | The brief's summary for stage 1; the `ready` file for stage 2. |
 | `components/production/VideoStages.tsx` (new) | The rail, the "Now" sentence, the segment table. |
+| `lib/video-production.ts`, `timeline()` (new) | The checkpoints of § 4.1: each beat's range, role, segment, sees, text, sound and app lines, and its picture by the order of § 4.1. Pure; tested with the fixtures. |
+| `components/production/Timeline.tsx` (new) | The vertical strip; the picture label; the player beside it at gate C. |
 | `components/production/VideoProduction.tsx` | Split into the stage panels; one `SegmentCard` with the panels of § 6; "approve" on any take in the list; the source, narration, redo, composite send-back and regenerate controls. |
 | `components/production/VideoView.tsx`, the post page | The rail and the table above the slot; `?stage=`. |
 | `components/production/Board.tsx` | The stage number and word on the video tile. |
 | `app/api/production/decide/route.ts` | Kinds `source.approve`, `source.reject`, `narration.approve`, `narration.reject`, `composite.sendback`; `data.segments` on `storyboard.sendback`; `data.segment` and `cost_usd` on `cut.sendback`. Every sha256 read from disk. |
-| `app/media/[...path]/route.ts` | Also serve: `keyframes/<nn>-h-end.png`; `segments/<seg>/source/first-frame.png`; `segments/<seg>/last-frame.png`; `segments/<seg>/generated/qc/*.png` and `composite/qc/*.png`; `segments/<seg>/source/plate.mp4`; `narration/*.wav`; `assembly/contact-sheet.png`; a plan asset's file under `supplied/`. Still no JSON, no plan, no prompt. |
+| `app/media/[...path]/route.ts` | Also serve: `keyframes/<nn>-h-end.png`; `segments/<seg>/source/first-frame.png`; `segments/<seg>/last-frame.png`; `segments/<seg>/generated/qc/*.png` and `composite/qc/*.png`; `segments/<seg>/source/plate.mp4`; `narration/*.wav`; `assembly/contact-sheet.png`; a plan asset's file under `supplied/`; for the timeline, `apps/<slug>/screens/` (stills and recordings; handle references and research are served today). Still no JSON, no plan, no prompt. |
 | `lib/*.test.ts` | One fixture per video type of § 6, and the latte case (a hand-written approval, `state.json` behind). |
 
 **Pipeline** (small, no generation)
@@ -428,8 +499,9 @@ committed, on top of it.
 
 ## 10. Build order
 
-1. The rail, the stage states and the segment table, read-only (no new line kind). This
-   alone answers "where is this video now" for every video in `pipeline/character/`.
+1. The rail, the stage states, the segment table and the timeline, read-only (no new line
+   kind). This alone answers "where is this video now" and "what is in it" for every
+   video in `pipeline/character/`.
 2. The segment card with the panels of § 6 and the extra media paths.
 3. The new lines and the `review.py --from-atlas` additions: pick a take, source,
    narration, redo one keyframe, composite send-back, regenerate one segment from the cut.
