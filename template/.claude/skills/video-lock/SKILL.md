@@ -30,7 +30,9 @@ cost: those are production gates.
    `video-script`; it is a new revision. The user can also read `REVIEW.md` on the post's page
    in the Atlas and click **Approve plan** (or **Send back** with a note): the click writes a
    `plan.approve` line to `apps/<slug>/production/log.jsonl` with the video id, the revision
-   and the digest REVIEW.md showed.
+   and the digest REVIEW.md showed. `video_plan.py review` also writes `ready.json` beside
+   REVIEW.md (or `ready <plan> --json`): stage 2 in the Atlas lists its blocking inputs and
+   dependencies, and keeps Approve plan closed while a blocking input is listed.
 4. **Lock.** With the user's words and the date, run `lock` with the digest from the
    `REVIEW.md` they approved. After an Atlas approval, run `lock --from-atlas`: it takes the
    last Atlas plan line for this video, refuses a send-back, a line another actor wrote, or a

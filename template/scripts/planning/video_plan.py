@@ -14,7 +14,10 @@ video. Free, local: no generation, no network, no production state.
                                                      exact draft and its brief.json
     video_plan.py ready  <plan.draft.json|plan.json> what production still needs: blocking
                                                      inputs, part-A dependencies, bridge
-                                                     capabilities; then the bridge's own check
+                                                     capabilities; then the bridge's own check.
+                                                     --json also writes ready.json beside the file
+                                                     (review writes it beside REVIEW.md): the Atlas
+                                                     shows its lists at stage 2
     video_plan.py pin    <plan.draft.json>           fill each supplied asset's and reaction
                                                      reference's sha256 from its file (before
                                                      the review; it changes the digest)
@@ -1175,6 +1178,18 @@ def write_review(draft_path):
     with open(p, "w") as f:
         f.write("\n".join(R))
     print(f"wrote {os.path.relpath(p, ROOT)} (revision {plan.get('revision')}, digest {digest(plan)[:12]}…)")
+    write_ready(draft_path, plan, block, dep)
+    return p
+
+
+def write_ready(plan_path, plan, block, dep):
+    """ready.json beside the plan file: the lists `ready` prints, for this revision's digest. The
+    Atlas shows them at stage 2 and keeps Approve plan closed while a blocking input is listed."""
+    p = os.path.join(os.path.dirname(os.path.abspath(plan_path)), "ready.json")
+    with open(p, "w") as f:
+        json.dump({"revision": plan.get("revision"), "digest": digest(plan), "blocking": block,
+                   "dependencies": dep, "plan": os.path.basename(plan_path)}, f, indent=2, ensure_ascii=False)
+        f.write("\n")
     return p
 
 
@@ -1379,6 +1394,7 @@ def main():
     ap.add_argument("--grep")
     ap.add_argument("--job")
     ap.add_argument("--from-atlas", action="store_true")
+    ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
     if a.cmd == "reactions":
         if not a.path:
@@ -1426,6 +1442,8 @@ def main():
         print(f"dependencies for production ({len(dep)})")
         for x in dep:
             print(f"  ! {x}")
+        if a.json:
+            print(f"wrote {os.path.relpath(write_ready(a.path, plan, block, dep), ROOT)}")
         print("the production bridge's check")
         bridge_check(plan)
         print()
