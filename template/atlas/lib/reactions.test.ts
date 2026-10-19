@@ -24,7 +24,7 @@ const described = (e: ReturnType<typeof rx.newEntry>) => ({ ...e, speech: "none"
 test("the reaction card: a library entry by library_id, else the reference, the post's picture and the plan's beats", () => {
   const e = { ...described(rx.newEntry(src, 0.5, 2.5, ["regret"], "", AT)), id: "rx-tiktok-7600000000000000001-5", preview: "library/reactions/previews/x.jpg" };
   const lib = { version: 1 as const, entries: { [e.id]: e } };
-  const fromLib = rx.reactionCardOf({ library_id: e.id, generation_input: "face_replace" }, [], lib)!;
+  const fromLib = rx.reactionCardOf({ library_id: e.id, generation_input: "motion_copy" }, [], lib)!;
   assert.equal(fromLib.entryId, e.id);
   assert.equal(fromLib.preview, `/api/reactions/preview/${e.id}`);
   assert.equal(fromLib.video, "/media/demo/brand/some.handle/7600000000000000001/video.mp4");
