@@ -326,6 +326,10 @@ with the total. C and M segments cost nothing and have no keyframe: give their s
 asset, range and panels, and the narration or sound laid under them. Ask for approval **by word**. A "redo <n>" goes back to step 4 for that
 still only.
 
+First, every session: `scripts/character/review.py pending <video>` lists each Atlas click
+that no file records yet, with the command that records it. Record those before you ask
+the user again.
+
 The post page in the Atlas shows the same: the storyboard, every keyframe, the computed
 cost per segment and the total, with Approve storyboard and Send back. When the user
 clicks there, record the click:
@@ -334,8 +338,9 @@ clicks there, record the click:
 
 It refuses when a keyframe changed after the click, and writes `gate_a_storyboard`: the
 decision, the words, every keyframe's sha256 (`keyframes_sha256`), the approved cost and
-the click. A send-back records "redo" with the user's note: redo the stills it names. By
-word, the same command records it: `review.py storyboard <video> --decision approve
+the click. A send-back records "redo" with the user's note: redo the stills it names. A
+**Redo this keyframe** click names its segments (`redo_segments` in `gate_a_storyboard`):
+step 4 makes only those again (`keyframes.sh --only <nn>-<type>`). By word, the same command records it: `review.py storyboard <video> --decision approve
 --words "<the user's words>"`.
 
 On approval, write `approval.json` from `approval.example.json`: `gate_a_storyboard` with

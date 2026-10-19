@@ -20,12 +20,18 @@
     review.py storyboard <video> --decision approve|redo --words "<the user's words>"
                                     gate A (P1): the storyboard, every keyframe by its sha256
     review.py show <video>          every segment: generated, approved, composited
+    review.py pending [<video>]     every Atlas click no file records yet, with the command
+                                    that records it (run it first in every character-* skill)
 
-    --from-atlas, on storyboard, segment, composite and final, in place of --decision and
-    --words: the user's click in the Atlas (apps/<app>/production/log.jsonl, the last
-    storyboard.*, take.*, composite.approve or cut.* line for this video, by the user). The
-    file the line names must still have the sha256 it recorded; the words are the click's
-    note, or say what was clicked. Every gate runs as for words given here.
+    --from-atlas, on storyboard, segment, composite, final, source and narration, in place
+    of --decision and --words: the user's click in the Atlas (apps/<app>/production/log.jsonl,
+    the last storyboard.*, take.*, composite.*, cut.*, source.* or narration.* line for this
+    video, by the user). The file the line names must still have the sha256 it recorded; the
+    words are the click's note, or say what was clicked. Every gate runs as for words given
+    here. A storyboard send-back that names segments is a redo of only those keyframes; a
+    cut send-back that names a segment is "regenerate segment <n>" at gate C, the user's yes
+    to one more run of it at the cost on the line. A composite send-back is not a record of
+    approval.json: the agent notes it (state.py note) and runs composite.sh again.
     review.py rates                 the keep rate per segment type and per set, from every video
 
 Writes pipeline/character/<video>/approval.json. A reject or a regenerate with --class
@@ -121,21 +127,30 @@ def latest(d, project):
 
 
 # ---------------------------------------------------------------- the Atlas
-def atlas_line(video, kinds, segment=None):
-    """The user's last Atlas decision of `kinds` for this video (and segment), from the app's
-    decision log. A line written by an agent (an actor) is never the user's decision."""
+def log_lines(video):
+    """Every line of the app's decision log, in order."""
     app = plan_of(video).get("app") or ""
     lp = os.path.join(ROOT, "apps", app, "production", "log.jsonl")
-    rows = []
+    out = []
     if app and os.path.exists(lp):
         for ln in open(lp, encoding="utf-8"):
             try:
-                e = json.loads(ln)
+                out.append(json.loads(ln))
             except ValueError:
                 continue
-            dd = e.get("data") or {}
-            if e.get("kind") in kinds and dd.get("video") == video and (segment is None or dd.get("segment") == segment):
-                rows.append(e)
+    return app, out
+
+
+def atlas_line(video, kinds, segment=None, key="segment"):
+    """The user's last Atlas decision of `kinds` for this video (and segment, or the line's
+    `key` field), from the app's decision log. A line written by an agent (an actor) is never
+    the user's decision."""
+    app, lines = log_lines(video)
+    rows = []
+    for e in lines:
+        dd = e.get("data") or {}
+        if e.get("kind") in kinds and dd.get("video") == video and (segment is None or dd.get(key) == segment):
+            rows.append(e)
     if not rows:
         sys.exit(f"no Atlas decision ({', '.join(kinds)}) for {video}{' ' + segment if segment else ''} in "
                  f"apps/{app}/production/log.jsonl: the user decides in the Atlas, or gives their words here")
@@ -181,6 +196,9 @@ def from_atlas(cmd, video, seg=None):
         e = atlas_line(video, ("cut.approve", "cut.sendback"))
         dd = e["data"]
         atlas_file(os.path.join(ROOT, dd.get("file") or ""), e, "the cut")
+        if e["kind"] == "cut.sendback" and dd.get("segment"):
+            return ["--decision", "regenerate", "--segment", dd["segment"], "--words", e.get("note") or "",
+                    "--atlas-at", e["at"]] + (["--cost", str(dd["cost_usd"])] if dd.get("cost_usd") is not None else [])
         if e["kind"] == "cut.sendback":
             return ["--decision", "reject", "--words", e.get("note") or "", "--atlas-at", e["at"]]
         return ["--decision", "approve", "--words", (e.get("note") or "").strip() or "Approve the cut (clicked in the Atlas)",
@@ -188,11 +206,31 @@ def from_atlas(cmd, video, seg=None):
     if cmd == "storyboard":
         e = atlas_line(video, ("storyboard.approve", "storyboard.sendback"))
         if e["kind"] == "storyboard.sendback":
-            return ["--decision", "redo", "--words", e.get("note") or "", "--atlas-at", e["at"]]
+            segs = (e.get("data") or {}).get("segments") or []
+            return ["--decision", "redo", "--words", e.get("note") or "", "--atlas-at", e["at"]] + \
+                (["--segments", ",".join(segs)] if segs else [])
         return ["--decision", "approve", "--words", (e.get("note") or "").strip()
                 or f"Approve the storyboard and its computed cost, ${(e['data'].get('cost_usd') or 0):.2f} (clicked in the Atlas)",
                 "--atlas-at", e["at"], "--keyframes", json.dumps(e["data"].get("keyframes") or {}),
                 "--cost", str(e["data"].get("cost_usd"))]
+    if cmd == "source":
+        e = atlas_line(video, ("source.approve", "source.reject"), seg, key="asset_id")
+        atlas_file(os.path.join(ROOT, (e.get("data") or {}).get("file") or ""), e, "the source")
+        if e["kind"] == "source.reject":
+            return ["--decision", "reject", "--words", e.get("note") or "", "--atlas-at", e["at"]]
+        return ["--decision", "approve", "--words", (e.get("note") or "").strip()
+                or f"Approve the source {seg} (clicked in the Atlas)", "--atlas-at", e["at"]]
+    if cmd == "narration":
+        e = atlas_line(video, ("narration.approve", "narration.reject"), seg, key="take")
+        dd = e.get("data") or {}
+        atlas_file(os.path.join(vdir(video), dd.get("file") or ""), e, "the narration take")
+        a = ["--narrator", dd.get("narrator") or "", "--lines", ",".join(dd.get("lines") or []), "--atlas-at", e["at"]]
+        if e["kind"] == "narration.reject":
+            return a + ["--decision", "reject", "--words", e.get("note") or ""]
+        a += ["--decision", "approve", "--words", (e.get("note") or "").strip() or f"Approve the narration take {seg} (clicked in the Atlas)"]
+        for k, v in (dd.get("checks") or {}).items():
+            a += ["--check", f"{k}={v}"]
+        return a
     sys.exit(f"--from-atlas does not apply to {cmd}")
 
 
@@ -555,7 +593,8 @@ def cmd_source(video, asset_id, a):
     d.setdefault("gate_b_sources", []).append({
         "asset_id": asset_id, "kind": asset.get("kind"), "origin": asset.get("origin"),
         "file": asset.get("path"), "sha256": sha, "trim_s": trim, "decision": dec,
-        "words": words, "date": today(), "checks": checks})
+        "words": words, "date": today(), "checks": checks,
+        **({"atlas_line_at": o["--atlas-at"]} if o.get("--atlas-at") else {})})
     save_approval(video, d)
     print(f"gate B source: {asset_id} {dec} ({asset.get('path')}, sha256 {sha[:12]})")
     update_review_state(video)
@@ -598,7 +637,8 @@ def cmd_narration(video, take, a):
     d.setdefault("gate_b_narration", []).append({
         "take": take, "file": os.path.relpath(files[0], vdir(video)), "sha256": bridge.sha256_file(files[0]),
         "narrator": nid, "voice_ref": nar.get("voice_ref"), "lines": lines, "decision": dec,
-        "words": words, "date": today(), "checks": checks})
+        "words": words, "date": today(), "checks": checks,
+        **({"atlas_line_at": o["--atlas-at"]} if o.get("--atlas-at") else {})})
     save_approval(video, d)
     print(f"gate B narration: {take} ({nid}, {', '.join(lines)}) {dec}")
     update_review_state(video)
@@ -665,6 +705,8 @@ def cmd_final(video, a):
               "final_checks": m.get("checks"),
               "sha256": bridge.sha256_file(os.path.join(ROOT, m["file"])) if m.get("file") and os.path.exists(os.path.join(ROOT, m["file"])) else None,
               "atlas_line_at": o.get("--atlas-at")})
+    if dec == "regenerate" and o.get("--cost") not in (None, "None"):
+        g["regenerate_cost_usd"] = float(o["--cost"])
     for c in o.get("--check", []):
         if "=" in c:
             k, v = c.split("=", 1)
@@ -699,6 +741,8 @@ def cmd_storyboard(video, a):
     d = load_approval(video)
     g = d.get("gate_a_storyboard") or {}
     g.update({"decision": "approve" if dec == "approve" else f"redo: {words}", "words": words, "date": today()})
+    if dec == "redo":
+        g["redo_segments"] = [s for s in (o.get("--segments") or "").split(",") if s] or None
     if dec == "approve":
         g["keyframes_sha256"] = {k: v for k, v in have.items() if v}
         if o.get("--cost") not in (None, "None"):
@@ -744,6 +788,80 @@ def cmd_show(video):
     print(f"gate C: {gc.get('decision') or 'not yet'}")
 
 
+# The command that records each kind of Atlas line, by what the line names.
+RECORDS = {
+    "storyboard.approve": "storyboard", "storyboard.sendback": "storyboard",
+    "take.approve": "segment", "take.reject": "segment",
+    "composite.approve": "composite", "composite.sendback": None,
+    "cut.approve": "final", "cut.sendback": "final",
+    "source.approve": "source", "source.reject": "source",
+    "narration.approve": "narration", "narration.reject": "narration",
+}
+
+
+def recorded(video, e, d):
+    """Whether approval.json records this user line: a row of its gate, written after the click
+    (atlas_line_at, or a date on or after the click's)."""
+    k, dd, at = e["kind"], e.get("data") or {}, e.get("at", "")
+
+    def after(row):
+        return bool(row) and (row.get("atlas_line_at") == at or str(row.get("date") or "") >= at[:10])
+    if k.startswith("storyboard."):
+        g = d.get("gate_a_storyboard") or {}
+        ok = g.get("decision") == "approve" if k.endswith("approve") else str(g.get("decision", "")).startswith("redo")
+        return ok and ((g.get("approved_in") or {}).get("atlas_line_at") == at or str(g.get("date") or "") >= at[:10])
+    if k.startswith("take."):
+        r = latest(d, f"{video}.{dd.get('segment')}")
+        return after(r) and r.get("file") == dd.get("file") and (r.get("decision") == "approve") == (k == "take.approve")
+    if k == "composite.approve":
+        r = latest(d, f"{video}.{dd.get('segment')}") or {}
+        return after(r.get("composite")) and (r.get("composite") or {}).get("file") == dd.get("file")
+    if k.startswith("cut."):
+        g = d.get("gate_c_final") or {}
+        return after(g) and g.get("file") == dd.get("file") and (g.get("decision") == "approve") == (k == "cut.approve")
+    if k.startswith("source."):
+        r = latest_source(d, dd.get("asset_id"))
+        return after(r) and (r.get("decision") == "approve") == (k == "source.approve")
+    if k.startswith("narration."):
+        r = latest_take(d, dd.get("take"))
+        return after(r) and (r.get("decision") == "approve") == (k == "narration.approve")
+    return True
+
+
+def cmd_pending(only=None):
+    """Every user line in the Atlas that no file records yet, newest last, with the command
+    that records it. Read only."""
+    videos = [only] if only else sorted(os.path.basename(os.path.dirname(p)) for p in glob.glob(os.path.join(CH, "*", "plan.json")))
+    n = 0
+    for video in videos:
+        if not os.path.exists(os.path.join(vdir(video), "plan.json")):
+            sys.exit(f"no pipeline/character/{video}/plan.json")
+        app, lines = log_lines(video)
+        d = load_approval(video)
+        last = {}
+        for e in lines:
+            dd = e.get("data") or {}
+            if e.get("actor") or dd.get("video") != video or e.get("kind") not in RECORDS:
+                continue
+            k = e["kind"].split(".")[0]
+            last[(k, dd.get("segment") or dd.get("asset_id") or dd.get("take"))] = e
+        for (k, what), e in sorted(last.items(), key=lambda x: x[1].get("at", "")):
+            if recorded(video, e, d):
+                continue
+            cmd = RECORDS[e["kind"]]
+            n += 1
+            note = f' — "{e["note"]}"' if e.get("note") else ""
+            if cmd is None:
+                print(f"{video}  {e['at'][:16]}  {e['kind']} {what}{note}\n"
+                      f"    scripts/character/state.py note {video} \"{what} composite: {e.get('note') or ''}\", then composite.sh")
+                continue
+            arg = f" {what}" if cmd in ("segment", "composite", "source", "narration") else ""
+            print(f"{video}  {e['at'][:16]}  {e['kind']}{' ' + what if what else ''}{note}\n"
+                  f"    .venv/bin/python3 scripts/character/review.py {cmd} {video}{arg} --from-atlas")
+    if not n:
+        print("no Atlas click waits to be recorded" + (f" for {only}" if only else ""))
+
+
 def cmd_rates():
     by_t, by_set = {}, {}
     for p in glob.glob(os.path.join(CH, "*", "approval.json")):
@@ -774,7 +892,7 @@ def main():
     c = a[0]
     if "--from-atlas" in a:
         a = [x for x in a if x != "--from-atlas"]
-        if c in ("segment", "composite") and len(a) >= 3:
+        if c in ("segment", "composite", "source", "narration") and len(a) >= 3:
             a = a[:3] + from_atlas(c, a[1], a[2]) + a[3:]
         elif c in ("final", "storyboard") and len(a) >= 2:
             a = a[:2] + from_atlas(c, a[1]) + a[2:]
@@ -792,6 +910,8 @@ def main():
         cmd_narration(a[1], a[2], a[3:])
     elif c == "storyboard" and len(a) >= 2:
         cmd_storyboard(a[1], a[2:])
+    elif c == "pending" and len(a) <= 2:
+        cmd_pending(a[1] if len(a) == 2 else None)
     elif c == "show" and len(a) == 2:
         cmd_show(a[1])
     elif c == "rates":

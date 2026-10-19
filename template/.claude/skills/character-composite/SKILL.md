@@ -108,6 +108,9 @@ Show the user the composite and the sheets, then:
 
 When the user approved it in the Atlas (Approve composite on the post page), record the
 click: `scripts/character/review.py composite <video> <nn>-<type> --from-atlas` (refused
-when the file changed after the click).
+when the file changed after the click). A **Send back** there (`composite.sendback`, the
+note says what is wrong) is not an approval record: note it with `state.py note <video>
+"<nn>-<type> composite: <note>"`, fix `insert.json` and run `composite.sh` again.
+`review.py pending <video>` lists every click not recorded yet.
 
 Assembly uses this file. When every phone segment of the video has one, P4 is done.

@@ -1087,6 +1087,44 @@ def approve_sources(video, plan):
                                                   "--decision", "approve", "--words", "That's my clip, use it."])
 
 
+def atlas_line(video, kind, data, note=None, at="2026-10-22T09:00:00.000Z"):
+    """One user line in the video's app log, as the Atlas writes it."""
+    app = rj(p("pipeline", "character", video, "plan.json")).get("app")
+    log = p("apps", app, "production", "log.jsonl")
+    os.makedirs(os.path.dirname(log), exist_ok=True)
+    open(log, "a").write(json.dumps({"at": at, "post": f"x/{video}", "kind": kind, **({"note": note} if note else {}),
+                                     "data": {"video": video, **data}}) + "\n")
+
+
+def atlas_source(video, plan):
+    """Gate B for a supplied file from the Atlas: pending lists the click, --from-atlas records it."""
+    a = next(x for x in plan.get("assets") or [] if x["kind"] != "screen")
+    atlas_line(video, "source.approve", {"asset_id": a["id"], "file": a["path"], "sha256": sha(p(a["path"]))})
+    expect(f"{video}: review.py pending lists the source click", [PY, f"{SC}/review.py", "pending", video],
+           contains=f"review.py source {video} {a['id']} --from-atlas")
+    expect(f"{video}: review.py source --from-atlas records it", [PY, f"{SC}/review.py", "source", video, a["id"], "--from-atlas"],
+           contains=f"gate B source: {a['id']} approve")
+    e = [x for x in rj(p("pipeline", "character", video, "approval.json"))["gate_b_sources"] if x["asset_id"] == a["id"]][-1]
+    ok = e.get("atlas_line_at") == "2026-10-22T09:00:00.000Z"
+    RESULTS.append((f"{video}: the source row names the click", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  {video}: the source row names the click")
+    expect(f"{video}: nothing pending after the record", [PY, f"{SC}/review.py", "pending", video], contains="no Atlas click waits")
+
+
+def atlas_narration(video, take, text, lines):
+    """A narration take from the Atlas: the natural-voice check on the line; a changed file is refused."""
+    f = p("pipeline", "character", video, "narration", f"{take}.wav")
+    speech(f, text)
+    atlas_line(video, "narration.approve", {"take": take, "file": f"narration/{take}.wav", "sha256": "0" * 64, "narrator": "calm",
+                                            "lines": lines.split(","), "checks": {"natural_voice": "pass"}})
+    expect(f"{video}: review.py narration --from-atlas refuses a take changed after the click",
+           [PY, f"{SC}/review.py", "narration", video, take, "--from-atlas"], ok=False, contains="changed after the click")
+    atlas_line(video, "narration.approve", {"take": take, "file": f"narration/{take}.wav", "sha256": sha(f), "narrator": "calm",
+                                            "lines": lines.split(","), "checks": {"natural_voice": "pass"}}, at="2026-10-22T09:05:00.000Z")
+    expect(f"{video}: review.py narration --from-atlas records the take",
+           [PY, f"{SC}/review.py", "narration", video, take, "--from-atlas"], contains=f"gate B narration: {take}")
+
+
 def narration_take(video, take, text, lines):
     f = p("pipeline", "character", video, "narration", f"{take}.wav")
     speech(f, text)
@@ -1186,6 +1224,7 @@ def main():
                     {"n": 2, "type": "R", "screen_id": "scan-result", "trim": [1, 6], "beat_ids": ["b2"],
                      "script_lines": []}])
     validate("v2-live-cat")
+    atlas_source("v2-live-cat", pl)
     approve_sources("v2-live-cat", pl)
     assemble("v2-live-cat", assemble_on)
     mutate("v2-live-cat", "a real cat generated",
@@ -1267,7 +1306,7 @@ def main():
     expect("v2-hands-two-cats: lint refuses a count that is not exact",
            [PY, f"{SC}/lint_prompt.py", "v2-hands-two-cats", "01-b"], ok=False, contains="exact count")
     open(os.path.join(sd, "prompt.txt"), "w").write(B_PROMPT)
-    narration_take("v2-hands-two-cats", "n1", pl["script"][0]["line"], "l1")
+    atlas_narration("v2-hands-two-cats", "n1", pl["script"][0]["line"], "l1")
     narration_take("v2-hands-two-cats", "n2", pl["script"][1]["line"], "l2")
     expect("v2-hands-two-cats: gate B refuses a take without the natural-voice check",
            [PY, f"{SC}/review.py", "narration", "v2-hands-two-cats", "n1", "--narrator", "calm", "--lines", "l1",

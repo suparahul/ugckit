@@ -135,7 +135,13 @@ It reads the last `take.approve` or `take.reject` line for that segment, refuses
 take changed after the click (its sha256), and runs every gate as above (the identity
 gate too). An approval carries the checks the user ticked; a reject carries what failed
 (`--class`) and the fix. The words are the note, or say what was clicked. The same for a
-phone segment's composite: `review.py composite <video> <nn>-<type> --from-atlas`.
+phone segment's composite: `review.py composite <video> <nn>-<type> --from-atlas`. A take
+the user picked from the older takes is approved the same way: the line names its file.
+The supplied sources and the narration takes have their own cards and lines:
+`review.py source <video> <asset-id> --from-atlas` and `review.py narration <video> <take>
+--from-atlas` (the natural-voice check ticked). First, every session: `scripts/character/review.py pending <video>` lists each Atlas click
+that no file records yet, with the command that records it. Record those before you ask
+the user again.
 
 - **approve**: the file is kept for assembly. With `--fixed-by "<change>"` on the approval
   of a regenerated segment, the ledger's open rows of this segment say what fixed them.

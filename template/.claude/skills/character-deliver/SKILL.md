@@ -30,7 +30,11 @@ When the user decided in the Atlas (Approve the cut, or Send back, on the post p
 
 It reads the last `cut.approve` or `cut.sendback` line, refuses when the assembled file
 changed after the click (its sha256), and takes the export the user chose. Then run
-`deliver.sh`; the file shows on the post page for the posting approval.
+`deliver.sh`; the file shows on the post page for the posting approval. A send-back that
+names a segment (**Regenerate segment** in the Atlas) records "regenerate segment <n>" with
+its computed cost: that is the user's yes to one more run of that segment; generate it
+(`character-generate`), then gate B again. `review.py pending <video>` lists every click not
+recorded yet.
 
 For a v2 plan an approval is refused when the file was assembled from another revision
 of the plan, or when an overlay or supplied-file check failed in `assembly.json`:
