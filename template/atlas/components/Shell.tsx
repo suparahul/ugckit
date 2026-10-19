@@ -32,6 +32,7 @@ export function sections(slug: string | null) {
     { key: "home", label: "Home", href: s ? `/app/${s}` : "/" },
     { key: "studio", label: "Studio", href: s ? `/production/${s}` : "/production" },
     { key: "niche", label: "Niche", href: s ? `/app/${s}/niche` : "/" },
+    { key: "reactions", label: "Reactions", href: s ? `/reactions?app=${s}` : "/reactions" },
     { key: "handles", label: "Handles", href: s ? `/app/${s}/handles` : "/" },
     { key: "strategy", label: "Strategy", href: s ? `/app/${s}/strategy` : "/" },
     { key: "posts", label: "All posts", href: s ? `/posts?app=${s}` : "/posts" },
@@ -46,6 +47,7 @@ export function currentSection(pathname: string): string | null {
   if (/^\/app\/[^/]+\/handle/.test(pathname)) return "handles";
   if (/^\/app\/[^/]+\/strategy/.test(pathname)) return "strategy";
   if (/^\/posts(\/|$)/.test(pathname)) return "posts";
+  if (/^\/reactions(\/|$)/.test(pathname)) return "reactions";
   if (/^\/atlas(\/|$)/.test(pathname) || RESEARCH_LEAF.test(pathname)) return "atlas";
   return null;
 }

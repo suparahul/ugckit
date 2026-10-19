@@ -18,6 +18,8 @@ import type { Metadata } from "next";
 import { getPost, commas, shortDate, views, captionBody } from "@/lib/data";
 import { Cover, StatRow, StealThis, TagChips, TikTokLink } from "@/components/Bits";
 import Markdown from "@/components/Markdown";
+import { AddReaction } from "@/components/reactions/AddReaction";
+import { entriesOfPost, readTags } from "@/lib/reactions";
 import "./post.css";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -103,6 +105,8 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
 
         <div className="post__detail">
           <StatRow post={p} size="lg" />
+
+          {p.video ? <AddReaction video={p.video} tags={readTags().tags} existing={entriesOfPost("tiktok", p.id)} /> : null}
 
           {longHook && (
             <section className="post__section">

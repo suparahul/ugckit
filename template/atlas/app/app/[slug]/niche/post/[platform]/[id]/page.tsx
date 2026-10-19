@@ -20,6 +20,8 @@ import { nichePostHref, windowLabel, type NicheDetail } from "@/lib/niche-posts"
 import { isPlatform, PLATFORM_NAME, profileUrl } from "@/lib/platform";
 import { Cover, StatRow, StealThis, TikTokLink } from "@/components/Bits";
 import { NicheVideo } from "@/components/factory/NicheVideo";
+import { AddReaction } from "@/components/reactions/AddReaction";
+import { entriesOfPost, readTags } from "@/lib/reactions";
 import { PlatformIcon } from "@/components/Platform";
 import "@/app/post/[id]/post.css";
 
@@ -120,6 +122,8 @@ export default async function NichePostPage({ params }: { params: Params }) {
             <h2 className="eyebrow">Sound</h2>
             <p className="post__sound">{p.sound || "—"}</p>
           </section>
+
+          {p.mediaType === "video" ? <AddReaction video={p.video} tags={readTags().tags} existing={entriesOfPost(p.platform, p.id)} studyKey={`${p.platform}:${p.id}`} app={slug} /> : null}
 
           <section className="post__section">
             <h2 className="eyebrow">Platform</h2>
