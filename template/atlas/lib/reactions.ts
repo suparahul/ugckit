@@ -14,7 +14,7 @@
  *     "expression_beats": [{"start_s", "end_s", "face", "eyes", "head"}],   seconds from start_s
  *     "framing": {"framing", "camera_distance", "camera", "people", "room", "cuts", "face_hidden_s"},
  *     "speech": "none | mouths words | speaks", "burned_in_text": [{"text", "where", "start_s", "end_s", "kind"}],
- *     "hook_text", "tags": [], "fit": {"face_replace": {"ok", "why"}, "written": {"ok", "why"}},
+ *     "hook_text", "tags": [],
  *     "preview": "library/reactions/previews/<id>.jpg", "note", "added": {"by", "at", "from"},
  *     "set_by_you": [], "updated_at"}}}
  *
@@ -23,7 +23,9 @@
  * The shape is docs/character/reaction.example.json; the tags and the tags of
  * each hook job are docs/character/reaction-tags.json. Picking an entry for a
  * video appends one `reaction.pick` line to the app's production log; video-plan
- * reads it and writes the brief's reaction_reference.
+ * reads it and writes the brief's reaction_reference. Every reaction is made by
+ * motion copy: the character copies the motion of the range, so an entry has no
+ * route fit, and a visible face is not a requirement.
  */
 
 import { createHash } from "node:crypto";
@@ -34,7 +36,6 @@ import { basename, dirname, join, normalize, sep } from "node:path";
 import { APPS_DIR, CHARACTER_DIR, ROOT, readJson, readText } from "./root.ts";
 import { matches, terms } from "./search.ts";
 
-export type Fit = { ok: boolean | null; why: string };
 export type ExpressionBeat = { start_s: number; end_s: number; face: string; eyes: string; head: string };
 export type Framing = { framing?: string | null; camera_distance?: string | null; camera?: string | null; people?: number | null; room?: string | null; cuts?: number | null; face_hidden_s?: number | null };
 export type Entry = {
@@ -50,7 +51,6 @@ export type Entry = {
   burned_in_text: { text: string; where: string | null; start_s?: number; end_s?: number; kind?: string }[];
   hook_text: string | null;
   tags: string[];
-  fit: { face_replace?: Fit; written?: Fit };
   preview: string | null;
   note: string;
   added: { by: "you" | "agent"; at: string; from: string };
@@ -66,29 +66,6 @@ export const LIB_FILE = join(LIB_DIR, "reactions.json");
 const TAGS_FILE = join(ROOT, "docs", "character", "reaction-tags.json");
 
 /* ------------------------------------------------------------------ pure */
-
-/** The same rule as reactions.py compute_fit: face replace wants one face in view, silent, no cut, 1 to 30 s. */
-export function computeFit(e: Pick<Entry, "framing" | "expression_beats" | "speech" | "length_s">): { face_replace: Fit; written: Fit } {
-  const fr = e.framing ?? {};
-  const beats = e.expression_beats ?? [];
-  const ln = e.length_s;
-  const unknown = ([["speech", e.speech], ["people", fr.people], ["cuts", fr.cuts], ["face_hidden_s", fr.face_hidden_s]] as const).filter(([, v]) => v === null || v === undefined).map(([k]) => k);
-  let face: Fit;
-  if (unknown.length) face = { ok: null, why: `not described yet: ${unknown.join(", ")}` };
-  else {
-    const no: string[] = [];
-    if (fr.people !== 1) no.push(`${fr.people} people in the frame`);
-    if (e.speech !== "none") no.push(`speech: ${e.speech}`);
-    if (fr.cuts) no.push(`${fr.cuts} cut(s) inside the range`);
-    if (typeof fr.face_hidden_s === "number" && fr.face_hidden_s > 0.3) no.push(`the face is hidden or the eyes closed for ${fr.face_hidden_s} s`);
-    if (typeof ln === "number" && (ln < 1 || ln > 30)) no.push(`${ln} s long`);
-    face = { ok: !no.length, why: no.length ? no.join("; ") : `one face, silent, no cut, ${ln} s` };
-  }
-  const written: Fit = e.speech === "speaks" ? { ok: false, why: "the person speaks; a reaction hook is never spoken" } : !beats.length ? { ok: null, why: "no expression beats yet" } : { ok: true, why: `${beats.length} expression beat(s)` };
-  return { face_replace: face, written };
-}
-
-export const fitWord = (f: Fit | undefined) => (f?.ok === true ? "fits" : f?.ok === false ? "no" : "not known yet");
 
 export const entryId = (platform: string, postId: string, startS: number) => `rx-${platform}-${postId}-${Math.round(startS * 10)}`;
 
@@ -124,7 +101,7 @@ export const servedPostPath = (p: string) => (p.startsWith("research/") || /^app
 /** The app a post belongs to: research/<slug>/… or apps/<slug>/…. */
 export const appOfPost = (postDir: string) => postDir.split("/")[1] ?? "";
 
-export type Filter = { tag?: string; job?: string; fit?: "face_replace" | "written" | ""; maxS?: number | null; status?: string; app?: string; unused?: boolean; q?: string };
+export type Filter = { tag?: string; job?: string; maxS?: number | null; status?: string; app?: string; unused?: boolean; q?: string };
 
 /** The words a search looks in: the handle, the tags, the note, the hook and the burned-in text, the beats. */
 export const searchText = (e: Pick<Entry, "id" | "source" | "tags" | "note" | "hook_text" | "burned_in_text" | "expression_beats">) =>
@@ -133,20 +110,19 @@ export const searchText = (e: Pick<Entry, "id" | "source" | "tags" | "note" | "h
 /** The Atlas's search (lib/search.ts): every word, and every "quoted phrase", somewhere in the entry's text. */
 export const matchesSearch = (text: string, q: string | undefined) => !q || matches(terms(q), [text]);
 
-/** The entries a filter keeps, best first: kept, then the tags matched, then face replace fits, then views (reactions.py ranked). */
+/** The entries a filter keeps, best first: kept, then the tags matched, then views (reactions.py ranked). */
 export function filterEntries(entries: Entry[], f: Filter, jobs: Record<string, string[]>, uses: Record<string, string[]> = {}): Entry[] {
   const want = new Set<string>([...(f.tag ? [f.tag] : []), ...(f.job ? jobs[f.job] ?? [] : [])]);
   const out = entries.filter((e) => {
     if (f.status ? e.status !== f.status : e.status === "retired") return false;
     if (want.size && !e.tags.some((t) => want.has(t))) return false;
-    if (f.fit && e.fit?.[f.fit]?.ok !== true) return false;
     if (f.maxS && e.length_s > f.maxS) return false;
     if (f.app && appOfPost(e.source.post_dir) !== f.app) return false;
     if (f.unused && (uses[e.id]?.length ?? 0) > 0) return false;
     if (f.q && !matchesSearch(searchText(e), f.q)) return false;
     return true;
   });
-  const score = (e: Entry): number[] => [e.status === "kept" ? 1 : 0, e.tags.filter((t) => want.has(t)).length, e.fit?.face_replace?.ok === true ? 1 : 0, e.source.views ?? 0];
+  const score = (e: Entry): number[] => [e.status === "kept" ? 1 : 0, e.tags.filter((t) => want.has(t)).length, e.source.views ?? 0];
   return out.sort((a, b) => {
     const x = score(a), y = score(b);
     for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return y[i] - x[i];
@@ -187,7 +163,6 @@ export function applyChange(e: Entry, c: Change, tags: string[], at: string, vid
     next.note = c.note.slice(0, 1000);
     mine("note");
   }
-  next.fit = computeFit(next);
   next.updated_at = at;
   return next;
 }
@@ -218,15 +193,13 @@ export function sourceOf(video: string, notes: string | null, postJson: string |
 
 /** A new entry the user added from a post page: kept, by you, with only what the user gave. */
 export function newEntry(src: Entry["source"], startS: number, endS: number, tags: string[], note: string, at: string): Entry {
-  const e: Entry = {
+  return {
     id: entryId(src.platform, src.post_id, startS), status: "kept", source: src,
     start_s: Math.round(startS * 100) / 100, end_s: Math.round(endS * 100) / 100, length_s: Math.round((endS - startS) * 100) / 100,
     expression_beats: [], framing: { framing: null, camera_distance: null, camera: null, people: null, room: null, cuts: null, face_hidden_s: null },
-    speech: null, burned_in_text: [], hook_text: null, tags: [...new Set(tags)], fit: {}, preview: null, note,
+    speech: null, burned_in_text: [], hook_text: null, tags: [...new Set(tags)], preview: null, note,
     added: { by: "you", at, from: "atlas" }, set_by_you: ["status", "start_s", "end_s", "tags", ...(note ? ["note"] : [])], updated_at: at,
   };
-  e.fit = computeFit(e);
-  return e;
 }
 
 /* -------------------------------------------------------------- the files */
@@ -382,20 +355,19 @@ export function entriesOfPost(platform: string, postId: string): { id: string; s
 }
 
 /** How many entries each option of each filter would show, the other filters as they are: the counts beside the options. */
-export type FacetCounts = { tag: Record<string, number>; job: Record<string, number>; fit: Record<string, number>; max: Record<string, number>; status: Record<string, number>; app: Record<string, number>; unused: number; any: Record<string, number> };
+export type FacetCounts = { tag: Record<string, number>; job: Record<string, number>; max: Record<string, number>; status: Record<string, number>; app: Record<string, number>; unused: number; any: Record<string, number> };
 
 export function facetCounts(entries: Entry[], f: Filter, jobs: Record<string, string[]>, tags: string[], apps: string[], uses: Record<string, string[]> = {}): FacetCounts {
   const n = (patch: Filter) => filterEntries(entries, { ...f, ...patch }, jobs, uses).length;
   return {
     tag: Object.fromEntries(tags.map((t) => [t, n({ tag: t })])),
     job: Object.fromEntries(Object.keys(jobs).map((j) => [j, n({ job: j })])),
-    fit: { face_replace: n({ fit: "face_replace" }), written: n({ fit: "written" }) },
     max: Object.fromEntries([2, 3, 5, 10].map((m) => [String(m), n({ maxS: m })])),
     status: Object.fromEntries(STATUSES.map((s) => [s, n({ status: s })])),
     app: Object.fromEntries(apps.map((a) => [a, n({ app: a })])),
     unused: n({ unused: true }),
     /* Each filter set back to "any": what removing it would show. */
-    any: { tag: n({ tag: "" }), job: n({ job: "" }), fit: n({ fit: "" }), max: n({ maxS: null }), status: n({ status: "" }), app: n({ app: "" }), unused: n({ unused: false }), q: n({ q: "" }) },
+    any: { tag: n({ tag: "" }), job: n({ job: "" }), max: n({ maxS: null }), status: n({ status: "" }), app: n({ app: "" }), unused: n({ unused: false }), q: n({ q: "" }) },
   };
 }
 
@@ -416,10 +388,6 @@ export type ReactionCard = {
   tags: string[];
   beats: { start_s: number; end_s: number; face: string; eyes: string; head: string }[];
   burnedIn: string[];
-  faceReplace: Fit | null;
-  written: Fit | null;
-  /** generation_input of the plan's reaction_refs item, when the card comes from a plan. */
-  planRoute: string | null;
   /** The post in the Atlas, and the post on its platform. */
   postHref: string | null;
   url: string | null;
@@ -443,7 +411,6 @@ export function cardOfEntry(e: Entry): ReactionCard {
     entryId: e.id, status: e.status, handle: s.handle, start: e.start_s, end: e.end_s, video: mediaUrl(s.video),
     preview: e.preview ? `/api/reactions/preview/${e.id}` : null, tags: e.tags ?? [], beats: e.expression_beats ?? [],
     burnedIn: (e.burned_in_text ?? []).map((b) => `“${b.text}”${b.where ? `, ${b.where}` : ""}`),
-    faceReplace: e.fit?.face_replace ?? null, written: e.fit?.written ?? null, planRoute: null,
     postHref: atlasPostHref(s.post_dir, s.platform, s.post_id), url: s.url, sameIn: null,
   };
 }
@@ -466,11 +433,10 @@ function postPicture(dir: string): string | null {
 export function reactionCardOf(r: any, beats: ReactionCard["beats"] = [], lib: Library = readLibrary()): ReactionCard | null {
   if (!r || typeof r !== "object") return null;
   const e = validEntryId(r.library_id) ? lib.entries[r.library_id] : undefined;
-  const route = text(r.generation_input);
   if (e) {
     const c = cardOfEntry(e);
     const s = num(r.start_s), z = num(r.end_s);
-    return { ...c, planRoute: route, ...(r.library_differs && s !== null && z !== null ? { start: s, end: z } : {}) };
+    return { ...c, ...(r.library_differs && s !== null && z !== null ? { start: s, end: z } : {}) };
   }
   const dir = String(r.post_dir ?? "");
   const video = text(r.video) ?? text(r.video_path);
@@ -483,7 +449,6 @@ export function reactionCardOf(r: any, beats: ReactionCard["beats"] = [], lib: L
   return {
     entryId: null, status: null, handle: String(r.handle ?? "?"), start, end, video: video ? mediaUrl(video) : null,
     preview: dir ? postPicture(dir) : null, tags: same?.tags ?? [], beats, burnedIn: bt ? [bt] : [],
-    faceReplace: same?.fit?.face_replace ?? null, written: same?.fit?.written ?? null, planRoute: route,
     postHref: dir && postId ? atlasPostHref(dir, platform, postId) : null,
     url: postId && r.handle ? `https://www.tiktok.com/@${String(r.handle).replace(/^@/, "")}/video/${postId}` : null, sameIn: same?.id ?? null,
   };
@@ -512,8 +477,6 @@ export type GridCard = {
   end: number;
   length: number;
   tags: string[];
-  faceReplace: Fit | null;
-  written: Fit | null;
   preview: string | null;
   video: string | null;
   handle: string;
@@ -531,7 +494,6 @@ export type GridCard = {
 export function gridCardOf(e: Entry, uses: Record<string, string[]>): GridCard {
   return {
     id: e.id, status: e.status, start: e.start_s, end: e.end_s, length: e.length_s, tags: e.tags ?? [],
-    faceReplace: e.fit?.face_replace ?? null, written: e.fit?.written ?? null,
     preview: e.preview ? `/api/reactions/preview/${e.id}` : null, video: mediaUrl(e.source.video),
     handle: e.source.handle, views: e.source.views, app: appOfPost(e.source.post_dir),
     beats: e.expression_beats?.length ?? 0, hookText: e.hook_text, note: e.note ?? "", uses: uses[e.id] ?? [], by: e.added?.by ?? "agent",

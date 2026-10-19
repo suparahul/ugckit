@@ -3,7 +3,7 @@
 /**
  * Switch reaction, on a video's post page (stage 1 and stage 2): a panel at the right
  * of the page with the reaction library (GET /api/reactions), the filters of the
- * Reactions page (search, route fit, tag, hook job), and per card its preview sheet
+ * Reactions page (search, tag, hook job), and per card its preview sheet
  * and its range looping while the card is in view. Use this reaction writes the
  * reaction.pick line (POST /api/reactions/pick with the post), closes the panel and
  * refreshes the page, whose reaction card then shows "picked, not in the plan yet".
@@ -21,7 +21,6 @@ import { matches, terms } from "@/lib/search";
 type Lib = { cards: GridCard[]; tags: string[]; hook_jobs: Record<string, string[]> };
 
 const PAGE = 24;
-const fitText = (f: GridCard["faceReplace"]) => (f?.ok === true ? "face replace fits" : f?.ok === false ? `face replace: no — ${f.why}` : "face replace: not known yet");
 
 /** The range of the post's video, looping while the card is on screen; nothing loads before. */
 function LoopInView({ src, start, end, label }: { src: string; start: number; end: number; label: string }) {
@@ -61,7 +60,6 @@ export function SwitchReaction({ app, video, post, job, gated, current, picked }
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [fit, setFit] = useState<"" | "face_replace" | "written">("");
   const [tag, setTag] = useState("");
   const [hookJob, setHookJob] = useState(job ?? "");
   const [shown, setShown] = useState(PAGE);
@@ -83,24 +81,22 @@ export function SwitchReaction({ app, video, post, job, gated, current, picked }
     if (was.current && !open) opener.current?.focus({ preventScroll: true });
     was.current = open;
   }, [open]);
-  useEffect(() => setShown(PAGE), [q, fit, tag, hookJob]);
+  useEffect(() => setShown(PAGE), [q, tag, hookJob]);
 
   /* The same rules as the Reactions page (lib/reactions.ts filterEntries), on the cards in the browser. */
-  type F = { q: string; fit: string; tag: string; job: string };
+  type F = { q: string; tag: string; job: string };
   const pass = (c: GridCard, f: F) => {
     if (!lib) return false;
     const want = new Set([...(f.tag ? [f.tag] : []), ...(f.job ? lib.hook_jobs[f.job] ?? [] : [])]);
     return (!want.size || c.tags.some((t) => want.has(t)))
-      && (!f.fit || (f.fit === "face_replace" ? c.faceReplace?.ok === true : c.written?.ok === true))
       && (!f.q.trim() || matches(terms(f.q), [c.text]));
   };
-  const now: F = { q, fit, tag, job: hookJob };
-  const cards = useMemo(() => (lib ? lib.cards.filter((c) => pass(c, now)) : []), [lib, q, fit, tag, hookJob]); // eslint-disable-line react-hooks/exhaustive-deps
+  const now: F = { q, tag, job: hookJob };
+  const cards = useMemo(() => (lib ? lib.cards.filter((c) => pass(c, now)) : []), [lib, q, tag, hookJob]); // eslint-disable-line react-hooks/exhaustive-deps
   /* How many each option would show, the other filters as they are. */
   const n = (patch: Partial<F>) => (lib ? lib.cards.filter((c) => pass(c, { ...now, ...patch })).length : 0);
   const active: { words: string; clear: () => void }[] = [
     ...(q ? [{ words: `search “${q}”`, clear: () => setQ("") }] : []),
-    ...(fit ? [{ words: fit === "face_replace" ? "face replace fits" : "written route fits", clear: () => setFit("") }] : []),
     ...(tag ? [{ words: `tag ${tag}`, clear: () => setTag("") }] : []),
     ...(hookJob ? [{ words: `hook job ${hookJob.replace(/_/g, " ")}`, clear: () => setHookJob("") }] : []),
   ];
@@ -136,13 +132,6 @@ export function SwitchReaction({ app, video, post, job, gated, current, picked }
             )}
             <div className="rxd__filters">
               <label>Search<input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="handle, tag, text" /></label>
-              <label>Route
-                <select value={fit} onChange={(e) => setFit(e.target.value as typeof fit)}>
-                  <option value="">any</option>
-                  <option value="face_replace">face replace fits ({n({ fit: "face_replace" })})</option>
-                  <option value="written">written route fits ({n({ fit: "written" })})</option>
-                </select>
-              </label>
               <label>Tag
                 <select value={tag} onChange={(e) => setTag(e.target.value)}>
                   <option value="">any</option>
@@ -159,7 +148,7 @@ export function SwitchReaction({ app, video, post, job, gated, current, picked }
             <p className="rx-active" role="status" aria-live="polite">
               <b className="tabular rxd__count">{lib ? `${cards.length} of ${lib.cards.length}` : "reading the library…"}</b>{lib ? " shown" : null}
               {active.map((a) => <button key={a.words} type="button" className="rx-chip" onClick={a.clear}>{a.words} ×</button>)}
-              {active.length > 1 ? <button type="button" className="rx-chip rx-chip--clear" onClick={() => { setQ(""); setFit(""); setTag(""); setHookJob(""); }}>Clear all</button> : null}
+              {active.length > 1 ? <button type="button" className="rx-chip rx-chip--clear" onClick={() => { setQ(""); setTag(""); setHookJob(""); }}>Clear all</button> : null}
             </p>
             {err ? <p className="rx-msg" role="alert">{err}</p> : null}
             <ul className="rxd__list">
@@ -175,7 +164,6 @@ export function SwitchReaction({ app, video, post, job, gated, current, picked }
                     <div className="rxd__body">
                       <p className="rx-card__head"><Link href={`/reactions/${c.id}`} target="_blank">{c.handle}</Link> · <span className="tabular">{c.length} s</span> · {c.status === "kept" ? "kept" : "proposed by the agent"}</p>
                       <p className="rx-card__tags">{c.tags.length ? c.tags.join(" · ") : "no tags"}</p>
-                      <p className="rx-card__fit">{fitText(c.faceReplace)}</p>
                       <p className="rx-card__meta">{c.beats ? `${c.beats} expression beat${c.beats === 1 ? "" : "s"}` : "no beats yet"}{c.uses.length ? ` · used in ${c.uses.length}` : ""}</p>
                       <button type="button" className="rx-btn" disabled={busy !== null || isCurrent} onClick={() => use(c.id)}>
                         {isCurrent ? "In the plan" : busy === c.id ? "Saving…" : isPicked ? "Picked · use it again" : gated ? "Use this reaction and send the plan back" : "Use this reaction"}

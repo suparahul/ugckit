@@ -1,7 +1,7 @@
 /**
  * One reaction as a card (lib/reactions.ts ReactionCard): the range playing in a loop
  * from the source post, the preview sheet, the handle, the tags, the expression beats,
- * the burned-in text and the route fit, with a link to its /reactions entry. Stage 1 and
+ * the burned-in text and the method (motion copy), with a link to its /reactions entry. Stage 1 and
  * stage 2 show it for the brief's reaction_reference and for a pick that video-plan has
  * not copied yet; the timeline shows it on the reaction checkpoint (compact). No file
  * access here: the Timeline is a client component.
@@ -9,11 +9,10 @@
 
 import Link from "next/link";
 
-import type { Fit, ReactionCard } from "@/lib/reactions";
+import type { ReactionCard } from "@/lib/reactions";
 import { RangePlayer } from "./RangePlayer";
 import "@/app/reactions/reactions.css";
 
-const word = (f: Fit | null) => (f?.ok === true ? "fits" : f?.ok === false ? "no" : "not known");
 const secs = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, ""));
 
 export function ReactionCardView({ c, label, compact = false }: { c: ReactionCard; label: string; compact?: boolean }) {
@@ -38,10 +37,7 @@ export function ReactionCardView({ c, label, compact = false }: { c: ReactionCar
         </p>
         {!c.entryId && c.sameIn ? <p className="rxc__hint">The library has this post: <Link href={`/reactions/${c.sameIn}`}>{c.sameIn}</Link>.</p> : null}
         <p className="rxc__tags">{c.tags.length ? c.tags.join(" · ") : "no tags"}</p>
-        <p className="rxc__fit">
-          Face replace: {word(c.faceReplace)}{c.faceReplace?.why ? ` — ${c.faceReplace.why}` : ""}. Written route: {word(c.written)}{c.written?.why ? ` — ${c.written.why}` : ""}.
-          {c.planRoute ? ` The plan uses: ${c.planRoute === "face_replace" ? "face replace" : c.planRoute === "none" ? "the written route" : c.planRoute}.` : ""}
-        </p>
+        <p className="rxc__method">Method: motion copy. The character copies the motion of this range.</p>
         {compact ? <details className="rxc__more"><summary>Expression beats ({c.beats.length})</summary>{beats}</details> : beats}
         <p className="rxc__text">Burned-in text: {c.burnedIn.length ? c.burnedIn.join(" · ") : "none written"}</p>
         <p className="rxc__links">

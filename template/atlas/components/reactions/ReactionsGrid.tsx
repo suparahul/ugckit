@@ -23,8 +23,6 @@ export type Card = GridCard;
 
 export type PickFor = { app: string; video: string; job: string | null; picked: string | null } | null;
 
-const fitText = (f: Card["faceReplace"]) => (f?.ok === true ? "face replace: fits" : f?.ok === false ? `face replace: no — ${f.why}` : "face replace: not known yet");
-
 const STATUS_WORD: Record<string, string> = { kept: "kept", proposed: "proposed", retired: "retired" };
 
 export function ReactionsGrid({ cards, total, tags, jobs, apps, pick, counts }: { cards: Card[]; total: number; tags: string[]; jobs: string[]; apps: string[]; pick: PickFor; counts: FacetCounts }) {
@@ -52,7 +50,6 @@ export function ReactionsGrid({ cards, total, tags, jobs, apps, pick, counts }: 
     ...(val("q") ? [{ k: "q", words: `search “${val("q")}”`, back: counts.any.q }] : []),
     ...(val("tag") ? [{ k: "tag", words: `tag ${val("tag")}`, back: counts.any.tag }] : []),
     ...(jobNow ? [{ k: "job", words: `hook job ${jobNow.replace(/_/g, " ")}`, back: counts.any.job }] : []),
-    ...(val("fit") ? [{ k: "fit", words: val("fit") === "face_replace" ? "face replace fits" : "written route fits", back: counts.any.fit }] : []),
     ...(val("max") ? [{ k: "max", words: `${val("max")} s or shorter`, back: counts.any.max }] : []),
     ...(val("status") ? [{ k: "status", words: STATUS_WORD[val("status")] ?? val("status"), back: counts.any.status }] : []),
     ...(val("from") ? [{ k: "from", words: `from ${val("from")}`, back: counts.any.app }] : []),
@@ -109,14 +106,6 @@ export function ReactionsGrid({ cards, total, tags, jobs, apps, pick, counts }: 
           </select>
         </label>
         <label>
-          Route
-          <select value={val("fit")} onChange={(e) => set("fit", e.target.value)}>
-            <option value="">any</option>
-            <option value="face_replace">face replace fits{c(counts.fit.face_replace)}</option>
-            <option value="written">written route fits{c(counts.fit.written)}</option>
-          </select>
-        </label>
-        <label>
           Longest
           <select value={val("max")} onChange={(e) => set("max", e.target.value)}>
             <option value="">any length</option>
@@ -168,7 +157,6 @@ export function ReactionsGrid({ cards, total, tags, jobs, apps, pick, counts }: 
                   <Link href={`/reactions/${c.id}`}>{c.handle}</Link> · <span className="tabular">{c.length} s</span> · {c.status === "kept" ? "kept" : c.status === "retired" ? "retired" : "proposed by the agent"}
                 </p>
                 <p className="rx-card__tags">{c.tags.length ? c.tags.join(" · ") : "no tags"}</p>
-                <p className="rx-card__fit">{fitText(c.faceReplace)}</p>
                 <p className="rx-card__meta">
                   {c.beats ? `${c.beats} expression beat${c.beats === 1 ? "" : "s"}` : "no beats yet"}
                   {c.uses.length ? ` · used in ${c.uses.length} video${c.uses.length === 1 ? "" : "s"}` : " · not used"}

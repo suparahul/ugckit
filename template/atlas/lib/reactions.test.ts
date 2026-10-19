@@ -1,6 +1,6 @@
 /**
- * The reaction library (lib/reactions.ts): the fit (the same rule as
- * reactions.py), the user's changes named in set_by_you, the filter and its
+ * The reaction library (lib/reactions.ts): no route fit (every reaction is
+ * made by motion copy), the user's changes named in set_by_you, the filter and its
  * order, the /media paths both ways, an entry added from a post, and the
  * reaction.pick line. One temporary workspace, no network.
  * Run with `npm test` (node --test).
@@ -23,12 +23,13 @@ const described = (e: ReturnType<typeof rx.newEntry>) => ({ ...e, speech: "none"
 
 test("the reaction card: a library entry by library_id, else the reference, the post's picture and the plan's beats", () => {
   const e = { ...described(rx.newEntry(src, 0.5, 2.5, ["regret"], "", AT)), id: "rx-tiktok-7600000000000000001-5", preview: "library/reactions/previews/x.jpg" };
-  const lib = { version: 1 as const, entries: { [e.id]: { ...e, fit: rx.computeFit({ ...e, length_s: 2 }) } } };
+  const lib = { version: 1 as const, entries: { [e.id]: e } };
   const fromLib = rx.reactionCardOf({ library_id: e.id, generation_input: "face_replace" }, [], lib)!;
   assert.equal(fromLib.entryId, e.id);
   assert.equal(fromLib.preview, `/api/reactions/preview/${e.id}`);
   assert.equal(fromLib.video, "/media/demo/brand/some.handle/7600000000000000001/video.mp4");
-  assert.deepEqual([fromLib.start, fromLib.end, fromLib.planRoute, fromLib.faceReplace?.ok], [0.5, 2.5, "face_replace", true]);
+  assert.deepEqual([fromLib.start, fromLib.end], [0.5, 2.5]);
+  assert.ok(!("faceReplace" in fromLib) && !("planRoute" in fromLib), "the card names no route fit");
   assert.equal(fromLib.postHref, "/post/7600000000000000001");
   const differs = rx.reactionCardOf({ library_id: e.id, library_differs: "a shorter range", start_s: 1, end_s: 2 }, [], lib)!;
   assert.deepEqual([differs.start, differs.end], [1, 2]);
@@ -49,17 +50,17 @@ test("the reaction card: a library entry by library_id, else the reference, the 
 });
 
 test("the search and the counts beside each filter option", () => {
-  const mk = (id: string, tags: string[], fr: boolean, len: number, handle: string, note = "") => ({ ...described(rx.newEntry({ ...src, handle }, 0, len, tags, note, AT)), id, length_s: len, fit: { face_replace: { ok: fr, why: "" }, written: { ok: true, why: "" } } });
-  const es = [mk("rx-tiktok-1-0", ["shock"], true, 2, "@a.one", "kitten hisses"), mk("rx-tiktok-2-0", ["regret"], false, 4, "@b.two"), mk("rx-tiktok-3-0", ["shock", "regret"], true, 3, "@c.three")];
+  const mk = (id: string, tags: string[], len: number, handle: string, note = "") => ({ ...described(rx.newEntry({ ...src, handle }, 0, len, tags, note, AT)), id, length_s: len });
+  const es = [mk("rx-tiktok-1-0", ["shock"], 2, "@a.one", "kitten hisses"), mk("rx-tiktok-2-0", ["regret"], 4, "@b.two"), mk("rx-tiktok-3-0", ["shock", "regret"], 3, "@c.three")];
   const jobs = { discovery_regret: ["regret"] };
   assert.deepEqual(rx.filterEntries(es, { q: "KITTEN" }, jobs).map((e) => e.id), ["rx-tiktok-1-0"], "the note, any case");
   assert.deepEqual(rx.filterEntries(es, { q: "c.three regret" }, jobs).map((e) => e.id), ["rx-tiktok-3-0"], "every word must match");
-  const n = rx.facetCounts(es, { fit: "face_replace" }, jobs, ["shock", "regret"], ["demo"]);
-  assert.deepEqual(n.tag, { shock: 2, regret: 1 }, "a tag counts with the route filter in force");
-  assert.deepEqual(n.fit, { face_replace: 2, written: 3 });
+  const n = rx.facetCounts(es, { maxS: 3 }, jobs, ["shock", "regret"], ["demo"]);
+  assert.deepEqual(n.tag, { shock: 2, regret: 1 }, "a tag counts with the length filter in force");
+  assert.ok(!("fit" in n), "no route filter");
   assert.equal(n.job.discovery_regret, 1);
-  assert.deepEqual(n.max, { "2": 1, "3": 2, "5": 2, "10": 2 });
-  assert.equal(n.any.fit, 3, "removing the route filter gives all three back");
+  assert.deepEqual(n.max, { "2": 1, "3": 2, "5": 3, "10": 3 });
+  assert.equal(n.any.max, 3, "removing the length filter gives all three back");
   assert.equal(n.status.kept, 2, "an entry added from a post page is kept");
   assert.deepEqual(rx.filterEntries(es, { q: '"kitten hisses"' }, jobs).map((e) => e.id), ["rx-tiktok-1-0"], "a quoted phrase");
 });
@@ -73,17 +74,13 @@ test("sourceOf reads the post folder and its notes", () => {
   assert.equal(src.notes, "research/demo/brand/some.handle/7600000000000000001/notes.md");
 });
 
-test("computeFit: unknown until described; face replace refuses two people, speech, a cut, a hidden face", () => {
+test("no route fit: a new or changed entry gets no fit field, and a hidden face hides no entry", () => {
   const e = rx.newEntry(src, 0, 2, ["surprise"], "", AT);
-  assert.equal(e.fit.face_replace?.ok, null);
-  const d = described(e);
-  assert.equal(rx.computeFit(d).face_replace.ok, true);
-  assert.equal(rx.computeFit({ ...d, framing: { people: 2, cuts: 0, face_hidden_s: 0 } }).face_replace.ok, false);
-  assert.equal(rx.computeFit({ ...d, speech: "speaks" }).face_replace.ok, false);
-  assert.equal(rx.computeFit({ ...d, speech: "speaks" }).written.ok, false);
-  assert.equal(rx.computeFit({ ...d, framing: { people: 1, cuts: 1, face_hidden_s: 0 } }).face_replace.ok, false);
-  assert.equal(rx.computeFit({ ...d, framing: { people: 1, cuts: 0, face_hidden_s: 0.8 } }).face_replace.ok, false);
-  assert.equal(rx.computeFit({ ...d, length_s: 0.5 }).face_replace.ok, false);
+  assert.ok(!("fit" in e));
+  const changed = rx.applyChange(described(e), { tags: ["regret"] }, TAGS, AT);
+  assert.ok(typeof changed !== "string" && !("fit" in changed));
+  const hidden = { ...described(e), framing: { people: 2, cuts: 1, face_hidden_s: 1.5 } };
+  assert.equal(rx.filterEntries([hidden], {}, {}).length, 1);
 });
 
 test("newEntry from a post page is kept, by you, with only the user's fields", () => {
@@ -114,8 +111,8 @@ test("applyChange names each field in set_by_you and refuses a bad range or tag"
 
 test("filterEntries hides retired, matches the hook job's tags, and puts kept first", () => {
   const base = described(rx.newEntry(src, 0, 2, ["surprise"], "", AT));
-  const a = { ...base, id: "rx-tiktok-1-0", status: "proposed" as const, tags: ["regret"], fit: rx.computeFit(base) };
-  const b = { ...base, id: "rx-tiktok-2-0", status: "kept" as const, tags: ["regret"], fit: rx.computeFit(base) };
+  const a = { ...base, id: "rx-tiktok-1-0", status: "proposed" as const, tags: ["regret"] };
+  const b = { ...base, id: "rx-tiktok-2-0", status: "kept" as const, tags: ["regret"] };
   const c = { ...base, id: "rx-tiktok-3-0", status: "retired" as const, tags: ["regret"] };
   const d = { ...base, id: "rx-tiktok-4-0", status: "proposed" as const, tags: ["shock"] };
   const jobs = { discovery_regret: ["regret"] };

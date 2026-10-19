@@ -32,7 +32,7 @@ export default async function ReactionsPage({ searchParams }: { searchParams: Se
   const job = q.job !== undefined ? one(q.job) : pick?.job ?? "";
 
   const max = Number(one(q.max));
-  const filter: Filter = { tag: one(q.tag), job, fit: one(q.fit) as "face_replace" | "written" | "", maxS: Number.isFinite(max) && max > 0 ? max : null, status: one(q.status), app: one(q.from), unused: one(q.unused) === "1", q: one(q.q) };
+  const filter: Filter = { tag: one(q.tag), job, maxS: Number.isFinite(max) && max > 0 ? max : null, status: one(q.status), app: one(q.from), unused: one(q.unused) === "1", q: one(q.q) };
   const shown = filterEntries(entries, filter, hook_jobs, uses);
   const apps = [...new Set(entries.map((e) => appOfPost(e.source.post_dir)))].sort();
   const counts = facetCounts(entries, filter, hook_jobs, tags, apps, uses);

@@ -25,8 +25,7 @@
 .rx-card__body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 4px; }
 .rx-card__head { margin: 0; font: 500 0.9rem var(--sans); color: var(--ink); }
 .rx-card__head a { color: inherit; }
-.rx-card__tags, .rx-card__fit, .rx-card__meta { margin: 0; font: 400 0.82rem var(--sans); color: var(--ink-2); }
-.rx-card__fit { color: var(--ink-3); }
+.rx-card__tags, .rx-card__meta { margin: 0; font: 400 0.82rem var(--sans); color: var(--ink-2); }
 .rx-card .rx-btn { margin-top: 6px; align-self: flex-start; }
 
 .rx-btn {
@@ -79,7 +78,7 @@
 .rxc__body { min-width: 0; display: flex; flex-direction: column; gap: 5px; font: 400 0.86rem var(--sans); color: var(--ink); }
 .rxc__body p { margin: 0; }
 .rxc__head a, .rxc__links a, .rxc__hint a { color: var(--ink); text-decoration: underline; }
-.rxc__tags, .rxc__fit, .rxc__text, .rxc__hint, .rxc__none { color: var(--ink-2); }
+.rxc__tags, .rxc__method, .rxc__text, .rxc__hint, .rxc__none { color: var(--ink-2); }
 .rxc__more summary { cursor: pointer; color: var(--ink-2); }
 .rxc--compact { grid-template-columns: minmax(0, 1fr); padding: 8px; margin: 0; }
 .rxc--compact .rxc__player { max-height: 220px; }

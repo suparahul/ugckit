@@ -9,7 +9,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 
-import { atlasPostHref, fitWord, mediaUrl, planningVideos, readLibrary, readTags, usesOf, validEntryId } from "@/lib/reactions";
+import { atlasPostHref, mediaUrl, planningVideos, readLibrary, readTags, usesOf, validEntryId } from "@/lib/reactions";
 import { EntryEditor } from "@/components/reactions/EntryEditor";
 import "@/app/post/[id]/post.css";
 import "../reactions.css";
@@ -87,9 +87,8 @@ export default async function ReactionPage({ params }: { params: Params }) {
           </section>
 
           <section className="post__section">
-            <h2 className="eyebrow">Route</h2>
-            <p className="post__desc">Face replace: {fitWord(e.fit?.face_replace)}{e.fit?.face_replace?.why ? ` — ${e.fit.face_replace.why}` : ""}.</p>
-            <p className="post__desc">Written route: {fitWord(e.fit?.written)}{e.fit?.written?.why ? ` — ${e.fit.written.why}` : ""}.</p>
+            <h2 className="eyebrow">Method</h2>
+            <p className="post__desc">Motion copy: the character copies the motion of this range. A visible face is not a requirement.</p>
           </section>
 
           <section className="post__section">
