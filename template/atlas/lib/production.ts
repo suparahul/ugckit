@@ -29,7 +29,8 @@ import { declaredPlatforms } from "./accounts.ts";
 import { PLATFORMS, PLATFORM_NAME, linePlatform, platformOf, primaryOf, slideLimit, type Platform } from "./platform.ts";
 import { directBlock } from "./video-post.ts";
 import { shownCards } from "./callout.ts";
-import { readVideo, videoPlanPoint, type VideoState } from "./video.ts";
+import { readVideo, timelinePlan, videoPlanPoint, type VideoState } from "./video.ts";
+import { timeline, videoStages } from "./video-stages.ts";
 import { productionStep, readProduction } from "./video-production.ts";
 import type { Kind, VideoIdea } from "./video-row.ts";
 import { backfillOutcome, currentOfLine, mergeOutcome, sameOutcome, type CurrentOutcome, type Fetched, type OutcomeMarks } from "./outcome.ts";
@@ -272,6 +273,13 @@ export type EventKind =
   | "composite.approve"
   | "cut.approve"
   | "cut.sendback"
+  /* Gate B's other items and the send-backs of the stages plan (research/ai-ugc/ATLAS-VIDEO-STAGES-PLAN.md § 7):
+   * data.asset_id (a supplied file) or data.take (a narration take), by its sha256; a composite sent back. */
+  | "source.approve"
+  | "source.reject"
+  | "narration.approve"
+  | "narration.reject"
+  | "composite.sendback"
   | "slide.upload"
   | "slide.choose"
   | "slide.approve"
@@ -816,6 +824,12 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
     ? pointState(log, "final.approve", "final.sendback", video.final?.sha256 ?? null)
     : pointState(log, "final.approve", "final.sendback", deck?.hash ?? null, (at) => !!lastSlideDecision && lastSlideDecision > at);
 
+  /* Every stage of a video, and the timeline of its beats (lib/video-stages.ts). */
+  if (video) {
+    video.stages = videoStages({ ...video, planPoint: plan, finalPoint: final, production: video.production ?? null });
+    video.timeline = timeline({ ...timelinePlan(video, slug), production: video.production ?? null, final: video.final });
+  }
+
   const outEv = last(log.filter((e) => e.kind === "outcomes"));
   const outcomes = outEv ? (outEv.data as Record<string, string | number> | undefined) ?? null : null;
   const exportEv = last(log.filter((e) => e.kind === "export"));
@@ -994,7 +1008,7 @@ export function primaryAction(s: PostState): { kind: EventKind | "posted" | "out
     case "idea": return { kind: "idea.approve", label: "Approve idea", disabled: null };
     case "planned": return { kind: null, label: "", disabled: null };
     /* Reached only after a send-back: the button clears it by hand; a rewritten deck clears it alone. */
-    case "plan": return { kind: "plan.approve", label: "Approve plan", disabled: s.video && !s.video.review?.digest ? "REVIEW.md has no content digest yet" : null };
+    case "plan": return { kind: "plan.approve", label: "Approve plan", disabled: s.video && !s.video.review?.digest ? "REVIEW.md has no content digest yet" : s.video?.ready?.current && s.video.ready.blocking.length ? `${s.video.ready.blocking.length} blocking input${s.video.ready.blocking.length === 1 ? "" : "s"}: ${s.video.ready.blocking[0]}` : null };
     case "final": return { kind: "final.approve", label: "Approve for posting", disabled: finalBlock(s) };
     case "ready": return { kind: "posted", label: "Mark posted", disabled: null };
     case "posted": return { kind: "outcomes", label: "Record outcomes", disabled: null };

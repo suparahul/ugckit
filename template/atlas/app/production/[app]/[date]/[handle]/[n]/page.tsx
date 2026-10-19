@@ -52,6 +52,9 @@ export default async function ProductionPost({ params, searchParams }: { params:
   const mode = asPlan ? "planning" : state.mode;
   const slideNo = Number(Array.isArray(sp.slide) ? sp.slide[0] : sp.slide) || 1;
   const overlayOff = (Array.isArray(sp.overlay) ? sp.overlay[0] : sp.overlay) === "0";
+  /* A video's stage panel (?stage=1..8) and the segment card open in it (?seg=<nn>-<type>). */
+  const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]![0] : sp[k]) as string | undefined;
+  const videoView = { stage: Number(one("stage")) || undefined, seg: /^\d\d-[a-z]$/.test(one("seg") ?? "") ? one("seg") : undefined, base: postPath(row) };
   const base = postPath(row);
   /* Two platforms: the legs under the title, and the read follows the chosen platform. */
   const two = hasSecondPlatform([state]) || Object.keys(state.legs ?? {}).some((p) => p !== "tiktok");
@@ -143,7 +146,7 @@ export default async function ProductionPost({ params, searchParams }: { params:
       </header>
 
       <div className="post-body">
-        {mode === "planning" ? <PlanningMode state={state} readOnly={asPlan} src={src} slideNo={slideNo} /> : <ProducedMode state={state} slideNo={slideNo} src={src} overlayOff={overlayOff} readOnly={next.who === "agent"} />}
+        {mode === "planning" ? <PlanningMode state={state} readOnly={asPlan} src={src} slideNo={slideNo} view={videoView} /> : <ProducedMode state={state} slideNo={slideNo} src={src} overlayOff={overlayOff} readOnly={next.who === "agent"} view={videoView} />}
         <AnatomyRail state={state} src={src} />
         <DecisionLog log={state.log} />
       </div>

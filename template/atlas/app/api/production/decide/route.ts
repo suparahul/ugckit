@@ -24,8 +24,14 @@
  *                        regenerate is the yes to one more run, at data.cost_usd)
  *   composite.approve    a phone segment's composite, by its sha256
  *   cut.approve          gate C: the assembled file by its sha256 and the export;
- *                        cut.sendback
- * The server reads every hash and cost from the files, never from the client.
+ *                        cut.sendback (data.segment: regenerate that segment, at data.cost_usd)
+ *   storyboard.sendback  data.segments: redo only those keyframes
+ *   composite.sendback   the composite is wrong (the note says how)
+ *   source.approve       gate B for a supplied file (data.asset_id), by its sha256; source.reject
+ *   narration.approve    gate B for a narration take (data.take), with the natural-voice
+ *                        check, its narrator and lines; narration.reject
+ * The server reads every hash and cost from the files, never from the client
+ * (research/ai-ugc/ATLAS-VIDEO-STAGES-PLAN.md § 7).
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -36,6 +42,7 @@ import { allStates, appendEvent, finalBlock, parseLayout, slideHashes, validSlug
 const KINDS = new Set<EventKind>([
   "idea.approve", "idea.sendback", "plan.approve", "plan.sendback", "final.approve", "final.sendback",
   "storyboard.approve", "storyboard.sendback", "take.approve", "take.reject", "composite.approve", "cut.approve", "cut.sendback",
+  "composite.sendback", "source.approve", "source.reject", "narration.approve", "narration.reject",
   "slide.choose", "slide.approve", "slide.reject", "slide.note", "slide.text", "slide.layout", "slide.unlock", "posted", "outcomes", "kill", "unkill", "task.tick", "task.untick",
   /* One leg of a post taken off, or put back: data.platform names it. */
   "leg.drop", "leg.add",
@@ -46,7 +53,7 @@ const IDENTITY = new Set<EventKind>(["persona.approve", "persona.sendback", "ref
 /* The kinds whose data.platform must name a platform: required on a leg line, optional on account.connect. */
 const LEG = new Set<EventKind>(["leg.drop", "leg.add"]);
 
-const NEEDS_NOTE = new Set<EventKind>(["idea.sendback", "plan.sendback", "final.sendback", "storyboard.sendback", "take.reject", "cut.sendback", "slide.reject", "slide.note", "kill", "persona.sendback", "reference.reject"]);
+const NEEDS_NOTE = new Set<EventKind>(["idea.sendback", "plan.sendback", "final.sendback", "storyboard.sendback", "take.reject", "cut.sendback", "composite.sendback", "source.reject", "narration.reject", "slide.reject", "slide.note", "kill", "persona.sendback", "reference.reject"]);
 
 export async function POST(request: NextRequest) {
   let body: Partial<Event> & { app?: string };
@@ -134,7 +141,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ ok: true, event: e });
 }
 
-const PRODUCTION = new Set<EventKind>(["storyboard.approve", "storyboard.sendback", "take.approve", "take.reject", "composite.approve", "cut.approve", "cut.sendback"]);
+const PRODUCTION = new Set<EventKind>(["storyboard.approve", "storyboard.sendback", "take.approve", "take.reject", "composite.approve", "cut.approve", "cut.sendback", "composite.sendback", "source.approve", "source.reject", "narration.approve", "narration.reject"]);
 /* review.py final refuses an approval when one of these failed on the assembled file. */
 const BLOCKS_CUT = (k: string) => k.startsWith("overlays") || k.startsWith("supplied");
 
@@ -148,7 +155,28 @@ function productionLine(state: PostState | undefined, kind: EventKind, sent: Rec
     const own = p.segments.filter((s) => s.generated && !s.sharedFrom);
     const missing = own.filter((s) => s.needsKeyframe && !s.keyframe).map((s) => s.name);
     if (kind === "storyboard.approve" && missing.length) return { error: `No keyframe yet for ${missing.join(", ")}.` };
-    return { data: { video, keyframes: p.keyframes, ...(kind === "storyboard.approve" ? { cost_usd: p.cost } : {}) } };
+    /* A send-back may name the keyframes to redo; only the ones that exist. */
+    const want = Array.isArray(sent.segments) ? sent.segments.map(String) : [];
+    const bad = want.filter((n) => !own.some((s) => s.name === n && s.needsKeyframe));
+    if (bad.length) return { error: `No keyframe to redo for ${bad.join(", ")}.` };
+    return { data: { video, keyframes: p.keyframes, ...(kind === "storyboard.approve" ? { cost_usd: p.cost } : {}), ...(kind === "storyboard.sendback" && want.length ? { segments: want } : {}) } };
+  }
+  if (kind === "source.approve" || kind === "source.reject") {
+    const x = p.sources.find((s) => s.id === sent.asset_id);
+    if (!x) return { error: "No such supplied source in this video." };
+    if (!x.sha256 || !x.file) return { error: `${x.id}: the file is not on disk.` };
+    return { data: { video, asset_id: x.id, file: x.file, sha256: x.sha256 } };
+  }
+  if (kind === "narration.approve" || kind === "narration.reject") {
+    const x = p.narration.find((s) => s.take === sent.take);
+    if (!x) return { error: "No such narration take in this video." };
+    if (!x.sha256 || !x.file) return { error: `No narration/${x.take}.wav yet.` };
+    if (kind === "narration.approve") {
+      const ticked = Array.isArray(sent.checks) ? sent.checks.map(String) : [];
+      if (!ticked.includes("natural_voice")) return { error: "Tick the natural-voice check first." };
+      if (!x.lines.length || !x.narrator) return { error: "No voiceover line of the plan names this take's narrator." };
+    }
+    return { data: { video, take: x.take, file: x.file, sha256: x.sha256, narrator: x.narrator, lines: x.lines, ...(kind === "narration.approve" ? { checks: { natural_voice: "pass" } } : {}) } };
   }
   if (kind === "cut.approve" || kind === "cut.sendback") {
     const a = p.assembly;
@@ -161,12 +189,15 @@ function productionLine(state: PostState | undefined, kind: EventKind, sent: Rec
       if (blocks.length) return { error: `Failed on the cut: ${blocks.join(", ")}. Send it back.` };
     }
     const exp = sent.export === "grain" && a.grain ? "grain" : "default";
-    return { data: { video, file: a.file, sha256: a.sha256, ...(kind === "cut.approve" ? { export: exp } : {}) } };
+    /* A send-back may name one segment to regenerate: the user's yes to one more run at its computed cost. */
+    const rs = kind === "cut.sendback" && typeof sent.segment === "string" ? p.segments.find((s) => s.name === sent.segment && s.generated && !s.sharedFrom) : null;
+    if (kind === "cut.sendback" && typeof sent.segment === "string" && !rs) return { error: `No generated segment ${sent.segment} of this video.` };
+    return { data: { video, file: a.file, sha256: a.sha256, ...(kind === "cut.approve" ? { export: exp } : {}), ...(rs ? { segment: rs.name, cost_usd: rs.cost } : {}) } };
   }
   const seg = p.segments.find((s) => s.name === sent.segment);
   if (!seg) return { error: "No such segment." };
   if (seg.sharedFrom) return { error: `${seg.name} is ${seg.sharedFrom}'s segment: decide it on that video.` };
-  if (kind === "composite.approve") {
+  if (kind === "composite.approve" || kind === "composite.sendback") {
     if (!seg.composite) return { error: `No composite of ${seg.name} yet.` };
     return { data: { video, segment: seg.name, file: seg.composite.file, sha256: seg.composite.sha256 } };
   }

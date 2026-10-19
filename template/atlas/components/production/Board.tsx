@@ -203,8 +203,10 @@ export function Cell({ s, time }: { s: PostState; time?: string }) {
   if (s.waiting) cls.push("is-waiting");
   if (s.stage === "killed") cls.push("is-killed");
   const pic = firstPicture(s);
+  /* A video's tile names its stage: the number and the word of the stage it is at (lib/video-stages.ts). */
+  const vs = s.video?.stages ? s.video.stages.stages[s.video.stages.current - 1] : null;
   const word = s.video
-    ? (s.stage === "idea" ? "idea" : s.stage === "planned" ? "script" : s.stage === "plan" ? "plan" : s.video.final ? "video ✓" : "video")
+    ? (s.stage === "idea" ? "idea" : vs ? `${vs.n} · ${vs.short}${vs.state === "done" ? " ✓" : ""}` : s.stage === "planned" ? "script" : s.stage === "plan" ? "plan" : s.video.final ? "video ✓" : "video")
     : s.stage === "idea" ? "idea" : s.stage === "planned" ? "deck" : s.stage === "plan" ? "plan" : s.stage === "final" ? "pictures" : "deck";
   const nb = s.posted ? numbersOf(s) : null;
   const z = (v: number) => (v === 0 ? "is-zero" : undefined);
@@ -213,7 +215,7 @@ export function Cell({ s, time }: { s: PostState; time?: string }) {
       <span className={`cell__thumb${pic ? "" : " is-empty"}`} aria-hidden="true">{pic ? <img src={pic} alt="" /> : <span className="cell__nopic">{word}</span>}</span>
       <span className="cell__handle">{s.row.slot}{time ? ` · ${time}` : ""}</span>
       <CellText topic={s.row.topic} format={`${s.row.video ? `video${s.row.video.type ? ` · ${s.row.video.type}` : ""}` : `${cardText(s.row)}${s.deck ? ` · ${s.deck.slides.length} slides` : ""}`} · ${s.dimension}`} />
-      <span className="cell__state"><Marks state={s} /><StateWord s={s} /></span>
+      <span className="cell__state"><Marks state={s} /><StateWord s={s} />{vs && !pic ? null : vs ? <small className="cell__stage">{vs.n} · {vs.short}</small> : null}</span>
       {nb ? <span className="cell__read" aria-label={`${n(nb.views)} views, ${nb.saves} saves, ${nb.shares} shares`}><b>{n(nb.views)}</b><span className={z(nb.saves)}>{nb.saves} {nb.saves === 1 ? "save" : "saves"}</span><span className={z(nb.shares)}>{nb.shares} {nb.shares === 1 ? "share" : "shares"}</span></span> : null}
       <LegSplit s={s} className="cell__split" />
     </Link>

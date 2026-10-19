@@ -1187,3 +1187,86 @@
 .vprod__form--col { display: flex; flex-direction: column; align-items: stretch; margin-top: 8px; max-width: 520px; }
 .vprod__again { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
 .vprod__comp { margin-top: 10px; padding-left: 12px; border-left: 2px solid var(--rule); }
+
+/* The stages of a character video (VideoStages, ATLAS-VIDEO-STAGES-PLAN.md § 4): the "Now" line, the rail, the segment table. */
+.vst { margin: 18px 0 14px; display: flex; flex-direction: column; gap: 12px; }
+.vst__now { margin: 0; font-size: 14px; color: var(--ink); display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+.vst__spent { font-size: 12px; color: var(--ink-3); }
+.vst__rail { list-style: none; margin: 0; padding: 0 0 4px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; }
+.vst__step { flex: 1 0 96px; min-width: 96px; }
+.vst__step a { display: flex; flex-direction: column; gap: 2px; height: 100%; padding: 7px 9px; border: 1px solid var(--rule); border-radius: 6px; color: var(--ink-2); text-decoration: none; background: var(--paper-hi); }
+.vst__step a:hover { border-color: var(--rule-2); }
+.vst__step.is-open a { border-color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--ink-2); }
+.vst__n { font-size: 11px; color: var(--ink-3); }
+.vst__name { font-size: 13px; font-weight: 600; color: var(--ink); }
+.vst__state { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.vst__step.is-not-reached a { opacity: 0.62; }
+.vst__step.is-you .vst__state, .vst__step.is-blocked .vst__state { color: var(--ink); font-weight: 600; }
+.vst__notes { margin: 0; padding: 8px 12px 8px 26px; border: 1px dashed var(--rule-2); border-radius: 6px; font-size: 12.5px; color: var(--ink-2); }
+.vst__table { display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; font-size: 12.5px; }
+.vst__row { display: grid; grid-template-columns: 1.4fr 1.3fr repeat(4, 0.8fr) 1fr; gap: 8px; padding: 7px 10px; border-top: 1px solid var(--rule); color: var(--ink-2); align-items: baseline; }
+.vst__row:first-child { border-top: 0; }
+.vst__row--head { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.05em; background: var(--paper-hi); }
+.vst__row.is-open { box-shadow: inset 3px 0 0 var(--ink-2); }
+.vst__row span { min-width: 0; overflow-wrap: anywhere; }
+.vst__row [data-label="Beats"] a { margin-right: 8px; }
+
+/* The stage panel: the timeline on the left, the stage on the right. */
+.vst__panel { display: grid; grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); gap: 22px; margin: 6px 0 24px; align-items: start; }
+.vst__tl { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
+.vst__main { min-width: 0; }
+.vst__ph { margin: 0 0 10px; font-size: 16px; font-weight: 600; color: var(--ink); }
+.vst__ph small { font-size: 12.5px; font-weight: 400; color: var(--ink-3); margin-left: 6px; }
+.vst__brief { font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.vst__brief ul { margin: 4px 0 10px; padding-left: 18px; }
+.vst__brief li.is-bad { color: var(--ink); font-weight: 600; }
+.vst__slot { margin: 12px 0; padding: 10px 12px; border: 1px dashed var(--rule-2); border-radius: 6px; }
+.vst__slot-h { margin: 0 0 6px; font-size: 13px; }
+.vst__ref { display: block; width: 160px; max-width: 100%; aspect-ratio: 9 / 16; background: #000; margin: 6px 0; }
+.vprod__sub { margin: 14px 0 6px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.vprod__cards { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.vprod__card { padding-top: 8px; border-top: 1px dashed var(--rule); }
+.vprod__card:first-child { border-top: 0; padding-top: 0; }
+.vprod__facts, .vprod__said { margin: 2px 0 6px; font-size: 12.5px; color: var(--ink-3); }
+.vprod__said { color: var(--ink-2); font-style: italic; }
+.vprod__media img.is-sheet { aspect-ratio: auto; object-fit: contain; }
+.vprod__audio { display: block; width: min(100%, 420px); margin: 6px 0; }
+.vprod__checklist { margin: 6px 0; padding-left: 18px; font-size: 12.5px; color: var(--ink-2); }
+.vprod__checklist li.is-bad { color: var(--ink); font-weight: 600; }
+.vprod__panels { display: flex; flex-wrap: wrap; gap: 12px; margin: 6px 0; }
+.vprod__frame916 { position: relative; width: 120px; aspect-ratio: 9 / 16; border: 1px solid var(--rule-2); background: var(--paper-hi); }
+.vprod__rect { position: absolute; display: grid; place-items: center; border: 1px solid var(--ink-3); font-size: 10.5px; color: var(--ink-2); }
+.vprod__plist { margin: 0; padding-left: 16px; font-size: 12.5px; color: var(--ink-2); }
+
+/* The timeline (Timeline, § 4.1): no colour code; words say everything, the open segment has a plain border. */
+.tl { display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; color: var(--ink-2); }
+.tl__src, .tl__empty { margin: 0; font-size: 11.5px; color: var(--ink-3); }
+.tl__player { margin: 0; }
+.tl__player video { display: block; width: 100%; max-width: 220px; aspect-ratio: 9 / 16; background: #000; }
+.tl__player figcaption { font-size: 11px; color: var(--ink-3); }
+.tl__strip { position: relative; }
+.tl__marker { position: absolute; left: -6px; right: 0; height: 0; border-top: 2px solid var(--ink); pointer-events: none; transition: top 0.2s linear; }
+.tl__list { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--rule-2); }
+.tl__cp { padding: 6px 0 8px 12px; border-bottom: 1px solid var(--rule); border: 1px solid transparent; border-bottom-color: var(--rule); }
+.tl__cp.is-open { border: 1px solid var(--ink-2); border-radius: 4px; }
+.tl__head { margin: 0 0 6px; font-size: 12px; color: var(--ink); }
+.tl__time { padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--ink); text-decoration: underline; cursor: pointer; }
+.tl__body { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; }
+.tl__pic { margin: 0 0 4px; }
+.tl__pic img, .tl__pic video { display: block; width: 92px; aspect-ratio: 9 / 16; object-fit: cover; background: #000; border: 1px solid var(--rule); }
+.tl__pic figcaption { font-size: 10.5px; line-height: 1.3; color: var(--ink-3); overflow-wrap: anywhere; }
+.tl__nopic { margin: 0; width: 92px; aspect-ratio: 9 / 16; display: grid; place-items: center; padding: 4px; border: 1px dashed var(--rule-2); font-size: 10.5px; text-align: center; color: var(--ink-3); }
+.tl__earlier summary { cursor: pointer; font-size: 10.5px; color: var(--ink-3); }
+.tl__lines { margin: 0; display: flex; flex-direction: column; gap: 3px; }
+.tl__lines div { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 6px; }
+.tl__lines dt { font-size: 10.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; padding-top: 1px; }
+.tl__lines dd { margin: 0; overflow-wrap: anywhere; }
+.tl__text { display: block; }
+
+@media (max-width: 860px) {
+  .vst__panel { grid-template-columns: 1fr; }
+  .vst__tl { position: static; max-height: none; }
+  .vst__row { grid-template-columns: 1fr 1fr; }
+  .vst__row--head { display: none; }
+  .vst__row span[data-label]::before { content: attr(data-label) ": "; color: var(--ink-3); font-size: 11px; }
+}

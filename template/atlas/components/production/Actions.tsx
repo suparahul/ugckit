@@ -61,6 +61,11 @@ const KIND_WORD: Record<string, string> = {
   "composite.approve": "composite approved",
   "cut.approve": "cut approved (gate C)",
   "cut.sendback": "cut sent back",
+  "composite.sendback": "composite sent back",
+  "source.approve": "source approved (gate B)",
+  "source.reject": "source rejected",
+  "narration.approve": "narration take approved (gate B)",
+  "narration.reject": "narration take rejected",
   "slide.upload": "picture uploaded",
   "slide.choose": "picture chosen",
   "slide.approve": "picture approved",
@@ -300,7 +305,7 @@ export function DecisionLog({ log }: { log: Event[] }) {
         {lines.map((e, i) => (
           <li key={e.at + i}>
             <time dateTime={e.at}>{stamp(e.at)}</time>
-            <span className="k">{KIND_WORD[e.kind] ?? e.kind}{e.slide ? ` · slide ${e.slide}` : ""}{typeof e.data?.segment === "string" ? ` · ${e.data.segment}` : ""}{e.actor === "demo" ? <span className="state__demo">test</span> : e.actor ? <span className="state__demo">agent</span> : null}</span>
+            <span className="k">{KIND_WORD[e.kind] ?? e.kind}{e.slide ? ` · slide ${e.slide}` : ""}{typeof e.data?.segment === "string" ? ` · ${e.data.segment}` : ""}{typeof e.data?.asset_id === "string" ? ` · ${e.data.asset_id}` : ""}{typeof e.data?.take === "string" ? ` · ${e.data.take}` : ""}{e.actor === "demo" ? <span className="state__demo">test</span> : e.actor ? <span className="state__demo">agent</span> : null}</span>
             <span>{e.note ? <em>“{e.note}”</em> : (e.kind === "postbridge.sent" || e.kind === "posting.sent") ? `Post Bridge post ${e.data?.id ?? ""}${e.data?.mode === "direct" ? ` · direct, scheduled ${String(e.data?.scheduledAt ?? "").slice(0, 16).replace("T", " ")} UTC` : ""}` : e.kind === "posting.failed" ? `${e.data?.platform === "instagram" ? "Instagram" : "TikTok"}: ${String(e.data?.error ?? "")}` : e.kind === "outcome.sync" ? `${e.data?.platform === "instagram" ? "Instagram, " : ""}${e.data?.source === "monid" ? "Monid" : "Post Bridge"}: ${Number(e.data?.views ?? 0).toLocaleString("en-US")} views · ${e.data?.likes ?? 0} likes · ${e.data?.comments ?? 0} comments${e.data?.saves != null ? ` · ${e.data.saves} saves` : ""} · ${e.data?.shares ?? 0} shares` : e.data?.url ? String(e.data.url) : ""}</span>
           </li>
         ))}

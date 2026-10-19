@@ -1,6 +1,6 @@
 /**
  * Streams files straight out of ../research, the served parts of ../apps, and
- * a video post's delivered file (../pipeline/character/<video>/final/<video>.mp4).
+ * the served parts of a character video (../pipeline/character/<video>/; lib/media-paths.ts).
  *
  * research/ is the source of truth and is read IN PLACE — nothing is ever copied
  * into public/. Scrapes are writing into that tree while the app is running, so
@@ -15,28 +15,15 @@ import { createReadStream, statSync } from "node:fs";
 import { join, normalize, resolve, sep } from "node:path";
 import type { NextRequest } from "next/server";
 
+import { APP_SERVED, FINAL_SERVED } from "@/lib/media-paths";
 import { APPS_DIR, CHARACTER_DIR, RESEARCH_DIR } from "@/lib/root";
 
 const MEDIA_ROOT = resolve(RESEARCH_DIR);
-/* apps/<slug>/… is served too, read-only: the app's icon, a handle's
- * references, the niche covers (TikTok's and Instagram's) and the scrolled
- * batches. Only those folders. */
+/* apps/<slug>/… and pipeline/character/<video>/… are served only in the folders
+ * lib/media-paths.ts names: the pictures and files the user judges, never a plan,
+ * an approval, a shot, a prompt or a JSON file. */
 const APPS_ROOT = resolve(APPS_DIR);
-const APP_SERVED = /^[^/]+\/(icon\.(jpg|jpeg|png|webp)$|handles\/[^/]+\/references\/|niche\/(covers|batches|instagram\/covers)\/)/;
-/* pipeline/character/<video>/… serves only the pictures and the files the user judges in the
- * Atlas: the delivered file; the keyframes and the storyboard (gate A); each segment's takes,
- * its reference clip and its composites (gate B); the assembled cut (gate C). No plan, no
- * approval, no shot, no prompt, no JSON. */
 const CHARACTER_ROOT = resolve(CHARACTER_DIR);
-const FINAL_SERVED = new RegExp(
-  "^([a-z0-9][a-z0-9-]*)/(" +
-    "final/\\1\\.mp4" +
-    "|keyframes/(\\d\\d-[a-z]\\.png|storyboard\\.jpg)" +
-    "|segments/\\d\\d-[a-z]/(generated|composite)/[\\w.-]+\\.mp4" +
-    "|segments/\\d\\d-[a-z]/source/reference\\.mp4" +
-    "|assembly/[\\w.-]+\\.mp4" +
-    ")$",
-);
 
 const TYPES: Record<string, string> = {
   jpg: "image/jpeg",
@@ -45,6 +32,9 @@ const TYPES: Record<string, string> = {
   webp: "image/webp",
   gif: "image/gif",
   mp4: "video/mp4",
+  mov: "video/quicktime",
+  wav: "audio/wav",
+  mp3: "audio/mpeg",
   m4a: "audio/mp4",
   md: "text/markdown; charset=utf-8",
   tsv: "text/tab-separated-values; charset=utf-8",

@@ -1,0 +1,212 @@
+/**
+ * The eight stages and the timeline of a character video (lib/video-stages.ts), one
+ * fixture per video type of ATLAS-VIDEO-STAGES-PLAN.md § 6, and the case of a real video
+ * whose approvals were written by hand while state.json stayed behind. A temporary
+ * workspace (ATLAS_ROOT) holds every file; the real models.json gives the prices.
+ */
+
+import assert from "node:assert/strict";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { test } from "node:test";
+import { fileURLToPath } from "node:url";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const WS = mkdtempSync(join(tmpdir(), "atlas-vstages-ws-"));
+process.env.ATLAS_ROOT = WS;
+mkdirSync(join(WS, "scripts", "character"), { recursive: true });
+copyFileSync(join(HERE, "..", "..", "scripts", "character", "models.json"), join(WS, "scripts", "character", "models.json"));
+
+const { readProduction, sha256Of } = await import("./video-production.ts");
+const { videoStages, timeline } = await import("./video-stages.ts");
+const { served } = await import("./media-paths.ts");
+
+const LOCK = "c".repeat(64);
+const w = (p: string, body: unknown) => {
+  const abs = join(WS, p);
+  mkdirSync(dirname(abs), { recursive: true });
+  writeFileSync(abs, typeof body === "string" ? body : JSON.stringify(body));
+};
+const open = { status: "open" as const, at: null, note: null };
+const approved = { status: "approved" as const, at: null, note: null };
+/* A locked video's stage input, with its production read from the files. */
+const locked = (id: string, extra: Partial<Parameters<typeof videoStages>[0]> = {}) => {
+  const p = readProduction(id, [], LOCK);
+  return {
+    p,
+    v: videoStages({ id, brief: true, draft: { revision: 1 }, review: { revision: 1, digest: "d".repeat(64) }, lock: { revision: 1, digest: LOCK }, planPoint: approved, ready: null, production: p, final: null, finalPoint: open, manual: false, ...extra }),
+  };
+};
+const word = (v: ReturnType<typeof videoStages>, n: number) => v.stages[n - 1].state;
+const reset = () => rmSync(join(WS, "pipeline"), { recursive: true, force: true });
+
+test("the face-replace reaction of 2026-10-14: hand-written approvals, state.json behind, then the cut", () => {
+  reset();
+  const id = "rx-2026-10-14-reaction-x";
+  const vd = `pipeline/character/${id}`;
+  w(`${vd}/plan.json`, { app: "app", handle: "@rx", characters: ["nora@v1"], reaction_refs: [{ id: "r1", generation_input: "face_replace", start_s: 0, end_s: 2, video_path: "research/app/x/1/video.mp4", handle: "creator" }],
+    beats: [{ id: "b0", role: "hook", start_s: 0, end_s: 2, lines: [], action: "her face reacts, silent", performance: "silent_action", framing: "face", reaction: { ref_id: "r1" } }],
+    overlays: [{ id: "o1", text: "I just found this??", start_s: 0, end_s: 2, placement: "top" }], format: { length_s: 2 } });
+  w(`${vd}/video.json`, { segments: [{ n: 1, type: "X", beat_ids: ["b0"] }] });
+  w(`${vd}/shots/01-x.json`, { face_replace: { ref_id: "r1" }, video: { duration_seconds: null } });
+  w(`${vd}/keyframes/01-x.png`, "kf");
+  w(`${vd}/segments/01-x/source/reference.mp4`, "ref");
+  w(`${vd}/segments/01-x/generated/a.mp4`, "take a");
+  w(`${vd}/segments/01-x/generated/qc/identity-a.json`, { result: "FAIL", why: "padding" });
+  const kf = sha256Of(join(WS, vd, "keyframes/01-x.png"))!;
+  w(`${vd}/approval.json`, {
+    gate_a_storyboard: { decision: "approve", words: "ok", date: "2026-10-14", keyframes_sha256: { "01-x": kf } },
+    gate_b_segments: [{ project: `${id}.01-x`, file: "generated/a.mp4", decision: "approve", words: "good enough", date: "2026-10-14", checks: {} }],
+  });
+  w("pipeline/character/state.json", { videos: { [id]: { stages: { shots: { status: "pending" }, generate: { status: "done" }, review: { status: "running", note: "0 of 1 approved" } }, costs: [{ usd: 0.34 }, { usd: 0.34 }] } } });
+  let { p, v } = locked(id);
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7, 8].map((n) => word(v, n)), ["done", "done", "done", "done", "done", "n/a", "agent", "not reached"]);
+  assert.equal(v.current, 7);
+  assert.equal(v.now, "Cut: assembling (assemble.sh).");
+  assert.equal(p.spent, 0.68);
+  assert.ok(v.notes.some((n) => n.startsWith("state.json says shots pending")), "state.json is behind gate A");
+  assert.ok(v.notes.some((n) => n.startsWith("state.json says review running")), "state.json is behind gate B");
+  assert.ok(v.notes.some((n) => n.includes("no identity gate PASS")), "a hand-written face-replace approval");
+  /* The timeline: one checkpoint, the approved take as its picture, the keyframe and the reference one click away. */
+  const tl = timeline({ plan: { ...JSON.parse(JSON.stringify({ app: "app", handle: "@rx", characters: ["nora@v1"], reaction_refs: [{ id: "r1", start_s: 0, end_s: 2, video_path: "research/app/x/1/video.mp4", handle: "creator" }], beats: [{ id: "b0", role: "hook", start_s: 0, end_s: 2, lines: [], action: "her face reacts, silent", performance: "silent_action", framing: "face", reaction: { ref_id: "r1" } }], overlays: [{ id: "o1", text: "I just found this??", start_s: 0, end_s: 2, placement: "top" }], format: { length_s: 2 } })) }, source: "plan.json", production: p, final: null });
+  const c = tl.checkpoints[0];
+  assert.equal(c.range, "0.0–2.0 s");
+  assert.equal(c.segment, "01-x");
+  assert.equal(c.picture?.label, "take 1, approved");
+  assert.deepEqual(c.earlier.map((e) => e.label), ["keyframe, approved", "reference, @creator at 0.0 s"]);
+  assert.deepEqual(c.text.map((t) => t.text), ["I just found this??"]);
+  assert.equal(c.sound, "silent");
+  assert.equal(c.app, "not on screen");
+  /* The cut, approved: stage 8 waits for the delivery. */
+  w(`${vd}/assembly/${id}.mp4`, "cut");
+  w(`${vd}/assembly/assembly.json`, { file: `${vd}/assembly/${id}.mp4`, plan_sha256: LOCK, checks: {} });
+  ({ v } = locked(id));
+  assert.equal(word(v, 7), "you");
+  const sha = sha256Of(join(WS, `${vd}/assembly/${id}.mp4`));
+  w(`${vd}/approval.json`, { gate_a_storyboard: { decision: "approve", words: "ok", date: "2026-10-14", keyframes_sha256: { "01-x": kf } }, gate_b_segments: [{ project: `${id}.01-x`, file: "generated/a.mp4", decision: "approve", date: "2026-10-14" }], gate_c_final: { decision: "approve", file: `${vd}/assembly/${id}.mp4`, sha256: sha, date: "2026-10-15" } });
+  ({ v } = locked(id));
+  assert.equal(word(v, 7), "done");
+  assert.equal(v.now, "Deliver: being delivered (deliver.sh).");
+  ({ v } = locked(id, { final: { sha256: "f".repeat(64) } }));
+  assert.equal(v.now, "Deliver: delivered: approve it for posting.");
+  assert.equal(locked(id, { final: { sha256: "f".repeat(64) }, finalPoint: approved }).v.who, "done");
+});
+
+test("a talking head with app insertion: the plate, then the composite at stage 6; the screen on the timeline", () => {
+  reset();
+  const id = "th-2026-10-20-talk";
+  const vd = `pipeline/character/${id}`;
+  const plan = { app: "app", handle: "@th", characters: ["nora@v1"], script: [{ id: "l1", speaker: "nora", line: "Here is the plan." }],
+    beats: [{ id: "b1", role: "step", start_s: 0, end_s: 3, lines: ["l1"], performance: "on_camera", framing: "face" }, { id: "b2", role: "proof", start_s: 3, end_s: 5, lines: [], app_on_screen: true, screen_id: "plan-screen", framing: "phone" }],
+    hero_strings: { "plan-screen": "Your care plan" }, format: { length_s: 5 } };
+  w(`${vd}/plan.json`, plan);
+  w(`${vd}/video.json`, { segments: [{ n: 1, type: "T", beat_ids: ["b1"] }, { n: 2, type: "O", beat_ids: ["b2"] }] });
+  w(`${vd}/shots/01-t.json`, { video: { duration_seconds: 5 } });
+  w(`${vd}/shots/02-o.json`, { video: { duration_seconds: 5 } });
+  w(`${vd}/keyframes/01-t.png`, "k1");
+  w(`${vd}/keyframes/02-o.png`, "k2");
+  w("apps/app/screens/screens.json", { screens: [{ id: "plan-screen", file: "plan-screen.png", hero: { text: "Your care plan" } }] });
+  w("apps/app/screens/plan-screen.png", "png");
+  w("pipeline/character/state.json", { model: { slug: "x", price_per_s: 0.08, duration_s: 5 }, videos: {} });
+  let { v } = locked(id);
+  assert.equal(word(v, 3), "you", "the storyboard waits for gate A");
+  assert.equal(v.now, "Keyframes: the storyboard and $0.80 of first runs wait for you.");
+  const k = { "01-t": sha256Of(join(WS, vd, "keyframes/01-t.png")), "02-o": sha256Of(join(WS, vd, "keyframes/02-o.png")) };
+  w(`${vd}/segments/01-t/generated/t.mp4`, "t");
+  w(`${vd}/segments/02-o/generated/o.mp4`, "o");
+  w(`${vd}/approval.json`, { gate_a_storyboard: { decision: "approve", date: "2026-10-20", keyframes_sha256: k },
+    gate_b_segments: [{ project: `${id}.01-t`, file: "generated/t.mp4", decision: "approve", date: "2026-10-20" }, { project: `${id}.02-o`, file: "generated/o.mp4", decision: "approve", date: "2026-10-20" }] });
+  ({ v } = locked(id));
+  assert.equal(word(v, 5), "done");
+  assert.equal(word(v, 6), "agent", "the plate is approved; the composite is not made yet");
+  w(`${vd}/segments/02-o/composite/o-comp.mp4`, "comp");
+  w(`${vd}/segments/02-o/composite/qc/gates.json`, { file: "o-comp.mp4", results: [{ gate: "green", result: "PASS" }] });
+  w(`${vd}/segments/02-o/composite/qc/corner-sheet.png`, "sheet");
+  const r = locked(id);
+  assert.equal(word(r.v, 6), "you");
+  assert.equal(r.p.segments[1].composite?.sheets[0].label, "corner sheet");
+  /* The timeline: the spoken line with its speaker, and the screen at the beat where the app comes in. */
+  const tl = timeline({ plan, source: "plan.json", production: r.p, final: null });
+  assert.equal(tl.checkpoints[0].sound, "nora: “Here is the plan.”");
+  assert.equal(tl.checkpoints[1].app, "screen plan-screen, “Your care plan”");
+  assert.ok(tl.checkpoints[1].earlier.some((e) => e.label === "screen plan-screen"), "the screen is one click away behind the take");
+});
+
+test("a pet-only video with a narration take: stage 5 waits for the take; the subject picture before production", () => {
+  reset();
+  const id = "pet-2026-10-21-cat";
+  const vd = `pipeline/character/${id}`;
+  const plan = { app: "app", handle: "@pet", editorial: { narrator_ref: "nar" }, script: [{ id: "l1", speaker: "vo", line: "She knows the box." }],
+    beats: [{ id: "b1", role: "item", start_s: 0, end_s: 4, lines: ["l1"], performance: "voiceover", framing: "subject_only", subject_ids: ["mochi"], action: "the cat walks to the box" }], format: { length_s: 4 } };
+  w(`${vd}/plan.json`, plan);
+  w(`${vd}/video.json`, { segments: [{ n: 1, type: "B", beat_ids: ["b1"], audio_from: "narration:nar-1" }] });
+  w(`${vd}/shots/01-b.json`, { framing_kind: "subject_only", video: { duration_seconds: 5 } });
+  w(`${vd}/keyframes/01-b.png`, "kb");
+  w(`${vd}/segments/01-b/generated/b.mp4`, "b");
+  w(`${vd}/approval.json`, { gate_a_storyboard: { decision: "approve", date: "2026-10-21" }, gate_b_segments: [{ project: `${id}.01-b`, file: "generated/b.mp4", decision: "approve", date: "2026-10-21" }] });
+  w("apps/app/handles/pet/references/subject-mochi.png", "cat");
+  let { p, v } = locked(id);
+  assert.equal(p.narration[0].file, null);
+  assert.equal(word(v, 5), "agent", "the narration take is not in narration/ yet");
+  w(`${vd}/narration/nar-1.wav`, "voice");
+  ({ p, v } = locked(id));
+  assert.deepEqual(p.narration[0].lines, ["l1"]);
+  assert.equal(p.narration[0].narrator, "nar");
+  assert.equal(word(v, 5), "you");
+  assert.equal(v.now, "Review: waiting for you: nar-1.");
+  /* Before any take: the subject's picture, never the character's face (subject only). */
+  const tl = timeline({ plan, source: "plan.draft.json", production: null, final: null });
+  assert.equal(tl.checkpoints[0].picture?.label, "subject mochi");
+  assert.equal(tl.checkpoints[0].sound, "voiceover (nar): “She knows the box.”");
+});
+
+test("supplied media and panels: no generation, stage 4 n/a, the source waits at stage 5", () => {
+  reset();
+  const id = "demo-2026-10-22-live";
+  const vd = `pipeline/character/${id}`;
+  w(`${vd}/plan.json`, { app: "app", assets: [{ id: "a1", kind: "clip", path: `${vd}/supplied/a1.mp4`, trim_s: [1, 4] }], beats: [{ id: "b1", start_s: 0, end_s: 3, source_asset_ids: ["a1"], layout: "panels" }] });
+  w(`${vd}/supplied/a1.mp4`, "clip");
+  w(`${vd}/video.json`, { segments: [{ n: 1, type: "C", beat_ids: ["b1"], asset_id: "a1", source_range_s: [1, 4] }, { n: 2, type: "M", beat_ids: [], panels: [{ id: "p1", asset_id: "a1", rect: [0, 0, 1, 0.5] }] }] });
+  const { p, v } = locked(id);
+  assert.deepEqual([3, 4, 5].map((n) => word(v, n)), ["done", "n/a", "you"]);
+  assert.equal(p.sources[0].id, "a1");
+  assert.deepEqual(p.sources[0].segments, ["01-c", "02-m"]);
+  assert.ok(p.sources[0].url?.startsWith(`/media/pipeline/character/${id}/supplied/a1.mp4`));
+  assert.equal(p.segments[1].panels[0].what, "supplied a1");
+});
+
+test("a continuous take: the seam names the clip it opens on", () => {
+  reset();
+  const id = "cont-2026-10-23-two";
+  const vd = `pipeline/character/${id}`;
+  w(`${vd}/plan.json`, { app: "app", beats: [{ id: "b1", start_s: 0, end_s: 3 }, { id: "b2", start_s: 3, end_s: 6 }] });
+  w(`${vd}/video.json`, { segments: [{ n: 1, type: "T", beat_ids: ["b1"] }, { n: 2, type: "T", beat_ids: ["b2"] }] });
+  w(`${vd}/shots/02-t.json`, { continuity: { from: "01-t" } });
+  w(`${vd}/segments/01-t/last-frame.png`, "lf");
+  const { p } = locked(id);
+  assert.equal(p.segments[1].seam?.from, "01-t");
+  assert.ok(p.segments[1].seam?.lastFrame);
+  assert.equal(p.segments[1].seam?.verified, false, "capabilities.json does not verify continuity in this workspace");
+});
+
+test("before the lock: plan, then the approval blocked by an input; a sheet video made outside the pipeline", () => {
+  const base = { id: "v", brief: true, draft: { revision: 2 }, review: { revision: 2, digest: "a".repeat(64) }, lock: null, planPoint: open, production: null, final: null, finalPoint: open, manual: false };
+  let v = videoStages({ ...base, review: { revision: 1, digest: "a".repeat(64) }, ready: null });
+  assert.equal(v.now, "Plan: REVIEW.md of revision 2 is being written (video_plan.py review).");
+  v = videoStages({ ...base, ready: { revision: 2, digest: "a".repeat(64), blocking: ["screen s1: not in screens.json"], dependencies: [], current: true } });
+  assert.equal(word(v, 2), "blocked");
+  assert.equal(v.now, "Approved: 1 blocking input: screen s1: not in screens.json.");
+  v = videoStages({ ...base, ready: null, planPoint: { status: "sentback", at: null, note: "another hook" } });
+  assert.equal(v.now, "Approved: sent back — “another hook”.");
+  v = videoStages({ ...base, brief: false, draft: null, review: null, ready: null, manual: true, final: { sha256: "f".repeat(64) } });
+  assert.deepEqual(v.stages.map((s) => s.state), ["n/a", "n/a", "n/a", "n/a", "n/a", "n/a", "n/a", "you"]);
+});
+
+test("the media route serves the pictures the stages show, and never a plan, a prompt or a JSON file", () => {
+  for (const ok of ["pipeline/character/v-1/keyframes/03-h-end.png", "pipeline/character/v-1/segments/01-x/source/first-frame.png", "pipeline/character/v-1/segments/01-t/last-frame.png",
+    "pipeline/character/v-1/segments/02-o/composite/qc/corner-sheet.png", "pipeline/character/v-1/narration/n-1.wav", "pipeline/character/v-1/supplied/a/b.mp4", "pipeline/character/v-1/assembly/contact-sheet.png", "apps/app/screens/s.png"])
+    assert.ok(served(ok), ok);
+  for (const no of ["pipeline/character/v-1/plan.json", "pipeline/character/v-1/segments/01-t/prompt.txt", "pipeline/character/v-1/approval.json", "pipeline/character/v-1/segments/01-x/generated/qc/identity-a.json", "pipeline/character/v-1/supplied/../plan.json", "apps/app/screens/screens.json"])
+    assert.ok(!served(no), no);
+});

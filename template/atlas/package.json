@@ -9,7 +9,7 @@
     "dev:fast": "next dev -p 3210",
     "build": "npm run index && next build",
     "start": "next start -p 3210",
-    "test": "node --test lib/outcome.test.ts lib/monid-archive.test.ts lib/when.test.ts lib/postbridge.test.ts lib/tiktok-link.test.ts lib/accounts.test.ts lib/production.test.ts lib/niche-posts.test.ts lib/niche-win.test.ts lib/text.test.ts lib/niche-detail.test.ts lib/read.test.ts lib/video.test.ts lib/video-post.test.ts lib/callout.test.ts lib/search.test.ts lib/camera-cover.test.ts lib/niche-marks.test.ts lib/post-filters.test.ts lib/video-production.test.ts lib/reactions.test.ts"
+    "test": "node --test lib/outcome.test.ts lib/monid-archive.test.ts lib/when.test.ts lib/postbridge.test.ts lib/tiktok-link.test.ts lib/accounts.test.ts lib/production.test.ts lib/niche-posts.test.ts lib/niche-win.test.ts lib/text.test.ts lib/niche-detail.test.ts lib/read.test.ts lib/video.test.ts lib/video-post.test.ts lib/callout.test.ts lib/search.test.ts lib/camera-cover.test.ts lib/niche-marks.test.ts lib/post-filters.test.ts lib/video-production.test.ts lib/reactions.test.ts lib/video-stages.test.ts"
   },
   "dependencies": {
     "next": "15.5.4",
