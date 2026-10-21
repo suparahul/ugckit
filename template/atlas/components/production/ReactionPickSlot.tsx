@@ -54,7 +54,6 @@ export function ReactionPickSlot({ video, app, post, current, locked = false, jo
           </>
         ) : <p className="rx__lead">The character copies the motion of this clip. No expression beats are written yet.</p>
       ) : null}
-      {current?.burnedInText || c?.burnedIn.length ? <p className="sr__hint">Burned-in text in the clip: {current?.burnedInText ?? c!.burnedIn.join(" · ")}</p> : null}
       {pending ? <ReactionCardView c={cardOfEntry(pending)} label="Picked, not in the plan yet: video-plan copies it into the brief on its next run" /> : null}
       {picked && !pending && picked !== current?.libraryId ? <p className="sr__hint">Picked {picked}, which is not in the library any more.</p> : null}
       {/* A div, not a p: the Switch reaction dialog holds blocks. */}

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { planChanges } from "./plan-changes.ts";
+import { planChanges, rowWas, technicalChanges } from "./plan-changes.ts";
 
 const locked = {
   revision: 1,
@@ -42,4 +42,23 @@ test("no plan, or the same plan under another revision and source row: nothing c
   assert.deepEqual(planChanges(null, locked), []);
   const same = { ...locked, revision: 2, source: { row: "| 36 | 10-21 |" } };
   assert.deepEqual(planChanges(locked, same), []);
+});
+
+test("the technical changes, each once; the old row beside the new row, only where they differ", () => {
+  const draft = JSON.parse(JSON.stringify(locked));
+  draft.revision = 2;
+  draft.source = { row: "| 36 | 10-21 |", section: "Posts, 10-21", post: "2026-10-21/latte/1" };
+  draft.reaction_refs = [{ id: "r1", video_sha256: "b" }];
+  const withRef = { ...locked, reaction_refs: [{ id: "r1", video_sha256: "a" }] };
+  assert.deepEqual(technicalChanges(withRef, draft), ["the revision number", "the source row of PLAN.md", "the post key", "a checksum"]);
+  assert.deepEqual(technicalChanges(locked, locked), []);
+  const row = { range: "0.0–3.0 s", sees: "Nicole looks up, tired and soft.", text: [{ text: "old hook", placement: "top", range: "0.0–3.0 s" }], sound: "silent", app: "not on screen", hero: null, story: null };
+  assert.equal(rowWas(row, row), null);
+  assert.deepEqual(rowWas(row, null), { new: true });
+  const next = { ...row, sees: "Nicole looks up, worn out.", text: [{ text: "new hook", placement: "top", range: "0.0–4.0 s" }] };
+  assert.deepEqual(rowWas(next, row), { sees: "Nicole looks up, tired and soft.", text: [{ text: "old hook", placement: "top", range: "0.0–3.0 s" }] });
+  const app = { ...row, text: [], story: { steps: [{ what: "the screen appears", reads: ["What we saw", "Latte hid."] }, { what: "the screen holds", reads: [] }] } };
+  const app2 = { ...app, hero: "Sit with her.", story: { steps: [{ what: "the screen appears", reads: ["What we saw", "Latte hid again."] }, { what: "the screen holds", reads: [] }, { what: "a tap", reads: ["Continue"] }] } };
+  assert.deepEqual(rowWas(app2, app), { hero: null, steps: [{ what: "the screen appears", reads: ["What we saw", "Latte hid."] }, null, { what: "", reads: [] }] });
+  assert.deepEqual(rowWas(app, app2), { hero: "Sit with her.", steps: [{ what: "the screen appears", reads: ["What we saw", "Latte hid again."] }, null], stepsGone: [{ what: "a tap", reads: ["Continue"] }] });
 });

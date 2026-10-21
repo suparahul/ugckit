@@ -1290,9 +1290,19 @@
 .bar__notes li.is-bad::before { content: "✕"; left: 0; }
 .bar .next__notes { margin: 8px 0 0; }
 .bar__hint { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-3); }
-/* A stale plan: what changed since the lock, one line each, then what to tell the agent. */
+/* A stale plan: the changed rows are marked in the document; the technical changes fold into one line in the bar. */
 .bar__changes { width: 100%; }
-.bar__changes .bar__notes li::before { content: "–"; color: var(--ink-3); }
+.bar__changes a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.bar__fold { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.bar__fold summary { cursor: pointer; }
+.row.is-changed { box-shadow: inset 3px 0 0 var(--ember); padding-left: 12px; }
+.row.is-changed.is-open { box-shadow: inset 3px 0 0 var(--ember), inset 6px 0 0 var(--paper), inset 9px 0 0 var(--ink-2); padding-left: 18px; }
+.row__changed { color: var(--ember-deep) !important; font-weight: 600 !important; }
+.row__was { margin: -4px 0 10px; padding: 4px 10px; border-left: 2px solid var(--ember); background: var(--paper-hi); font-size: 13px; line-height: 1.5; color: var(--ink-2); overflow-wrap: anywhere; }
+.row__was b { font-weight: 600; color: var(--ember-deep); }
+.row__t .row__was { display: block; margin: 4px 0 0; padding: 2px 6px; font-size: 12px; }
+.row__steps .row__was { margin: 4px 0 0; }
+.row__steps li.is-gone > b { color: var(--ember-deep); }
 
 /* The rows: time | content | media. The only list of the video's parts. */
 .doc { margin: 0; padding: 0; list-style: none; }

@@ -74,8 +74,6 @@ export function plainProblem(line: string): string {
     return `The file ${quote(m[1])} is not pinned yet: the agent pins it, then reviews again.`;
   if ((m = line.match(/^asset (\S+): no permission_ref/)))
     return `The file ${quote(m[1])} has no permission on record.`;
-  if ((m = line.match(/^reaction ref (\S+): burned-in text in the clip \((.+?), ([^)]+)\)\. (.*)$/)))
-    return `The reaction clip has burned-in text (${m[2]}, ${m[3]}). Keep this clip: the text does not reach the video. Or pick a clean clip.`;
   if ((m = line.match(/^reaction ref (\S+): post (\S+) is not in the workspace/)))
     return `The reaction's post ${m[2]} is not in the workspace.`;
   if ((m = line.match(/^reaction ref (\S+): the video of post (\S+) is not downloaded/)))

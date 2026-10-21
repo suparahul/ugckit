@@ -889,9 +889,9 @@ def readiness(plan, plan_path):
             block.append(f"reaction ref {rid}: no video_sha256 (video_plan.py pin, then review again)")
         elif r["video_sha256"] != sha256_file(os.path.join(ROOT, vp)):
             block.append(f"reaction ref {rid}: {vp} changed since it was pinned")
-        if rx_mode(r) == "motion_copy" and r.get("burned_in_text"):
-            dep.append(f"reaction ref {rid}: burned-in text in the clip ({r['burned_in_text']}). Production crops "
-                       "text at an edge; text mid-frame is blurred and a soft patch stays. Or choose a clean clip")
+        # Burned-in text in the clip is not a dependency (2026-10-21): the motion routes take only the
+        # motion (shots.py masks it before generation), and the written route takes no clip. Only the
+        # replace route sends the original clip; shots.py reference notes that there, where the route is known.
     # Facts, against the brief.
     brief, _ = brief_of(plan_path)
     if brief:

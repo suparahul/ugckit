@@ -11,10 +11,6 @@ test("ready.json lines read as plain sentences: no path, no backtick, what to do
   );
   assert.equal(plainProblem("hero string of leo-2026-10-20-night-meowing-entry: copied from the real screen once it is indexed"), "The hero text of screen “leo-2026-10-20-night-meowing-entry” is taken from the real screen once it is recorded.");
   assert.equal(plainProblem("asset entry-recording: no file yet (screen, app_recording)"), "The file “entry-recording” (screen, app recording) is not there yet.");
-  assert.equal(
-    plainProblem("reaction ref rx1: burned-in text in the clip (\"i'm leaving for PARIS\", centre). Production masks it; on the animate route the clip gives only the motion, so neither the text nor the mask reaches the video. Or choose a clean clip"),
-    "The reaction clip has burned-in text (\"i'm leaving for PARIS\", centre). Keep this clip: the text does not reach the video. Or pick a clean clip.",
-  );
   assert.equal(plainProblem("character nora@v1: not live (the twenty-generation gate)"), "The character nora@v1 not live (the twenty-generation gate).");
   assert.equal(plainProblem("motion_copy: not runnable yet; needed by 01-x"), "Motion copy cannot run yet; needed by 01-x.");
   /* Unknown lines are cleaned and kept whole. */
@@ -100,5 +96,4 @@ test("a click the agent has not recorded: one line with the time, and what is wa
   const stale = videoStatus(view("plan", "you", "changed after the lock: revision 2 waits for you, locked revision 1; accept it and re-lock, or send it back"));
   assert.equal(stale.who, "you");
   assert.equal(stale.text, "The plan changed after the lock. Accept the change and re-lock, or send it back with a note.");
-  assert.equal(plainProblem("reaction ref rx1: burned-in text in the clip (\"pov: your ex texts at 3AM\", centre). Production crops text at an edge; text mid-frame is blurred and a soft patch stays. Or choose a clean clip"), "The reaction clip has burned-in text (\"pov: your ex texts at 3AM\", centre). Keep this clip: the text does not reach the video. Or pick a clean clip.");
 });

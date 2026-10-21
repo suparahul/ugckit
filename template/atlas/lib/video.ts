@@ -182,7 +182,9 @@ export function briefSummaryOf(b: any, plan: any = null): BriefSummary | null {
 function readyOf(pd: string, digest: string | null): Ready | null {
   const j = readJson(join(pd, "ready.json"));
   if (!j) return null;
-  return { revision: num(j.revision), digest: typeof j.digest === "string" ? j.digest : null, blocking: (j.blocking ?? []).map(String), dependencies: (j.dependencies ?? []).map(String), current: !!digest && j.digest === digest };
+  /* Older ready.json files carry a note on burned-in text in the reaction clip; the motion route takes only the motion, so it is not shown (2026-10-21). */
+  const burned = (x: string) => /^reaction ref \S+: burned-in text in the clip/.test(x);
+  return { revision: num(j.revision), digest: typeof j.digest === "string" ? j.digest : null, blocking: (j.blocking ?? []).map(String).filter((x: string) => !burned(x)), dependencies: (j.dependencies ?? []).map(String).filter((x: string) => !burned(x)), current: !!digest && j.digest === digest };
 }
 
 export function readVideo(row: Pick<PlanRow, "slug" | "key" | "handle" | "date"> & { videoId?: string | null }): VideoState {
@@ -224,14 +226,19 @@ export function readVideo(row: Pick<PlanRow, "slug" | "key" | "handle" | "date">
   };
 }
 
-/** The plan the timeline reads: the locked plan.json, else the current draft (plan.draft.json); read here, never kept in the state the client receives. */
-export function timelinePlan(v: VideoState, slug: string): { plan: any; source: "plan.json" | "plan.draft.json" | null } {
+/**
+ * The plan the timeline reads: the locked plan.json, else the current draft (plan.draft.json); read here, never
+ * kept in the state the client receives. A stale plan (the draft is a newer revision than the lock) reads the
+ * draft, the revision the user is asked to accept, with the locked plan beside it for the comparison.
+ */
+export function timelinePlan(v: VideoState, slug: string): { plan: any; source: "plan.json" | "plan.draft.json" | null; locked?: any } {
   if (!v.id) return { plan: null, source: null };
+  const d = readJson(join(plansDir(slug), v.id, "plan.draft.json"));
   if (v.lock) {
     const j = readJson(join(CHARACTER_DIR, v.id, "plan.json"));
+    if (j && d && v.draft && v.draft.revision > v.lock.revision) return { plan: d, source: "plan.draft.json", locked: j };
     if (j) return { plan: j, source: "plan.json" };
   }
-  const d = readJson(join(plansDir(slug), v.id, "plan.draft.json"));
   return d ? { plan: d, source: "plan.draft.json" } : { plan: null, source: null };
 }
 

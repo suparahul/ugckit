@@ -81,6 +81,9 @@ function DecisionBar({ state, stage, bar, beats, base }: { state: PostState; sta
   const text = click && click.current && !click.recorded ? pendingLine(click, s.key) : st.text;
   /* A stale plan: the lock is the agent's; what changed since it is listed under the bar (lib/plan-changes.ts). */
   const stale = stage === 1 && !!v.lock && !!v.draft && v.draft.revision > v.lock.revision && s.state !== "done";
+  const tl = v.timeline ?? null;
+  const changedRows = tl?.was ? tl.checkpoints.filter((c) => c.was) : [];
+  const captionChanged = !!tl?.was && ("caption" in tl.was || "music" in tl.was);
   /* Gate B and the composite decide per row: the bar says what waits and points at the first. */
   const waiting = (stage === 4 || stage === 5) && s.state === "you" ? s.words.replace(/^waiting for you: /, "").split(", ") : [];
   const cost = stage === 2 && current && (s.state === "you" || s.state === "stale") && p && p.cost !== null && !/\$/.test(st.text) ? ` Approving starts the first runs: ${usd(p.cost)}.` : stage === 3 && p?.spent ? ` Spent so far: ${usd(p.spent)}.` : "";
@@ -97,8 +100,12 @@ function DecisionBar({ state, stage, bar, beats, base }: { state: PostState; sta
       </div>
       {stale ? (
         <div className="bar__changes">
-          <p className="bar__hint">Revision {v.draft!.revision} of the plan differs from locked revision {v.lock!.revision}{v.lock!.date ? ` (${v.lock!.date})` : ""}:</p>
-          {v.changes.length ? <ul className="bar__notes">{v.changes.map((c) => <li key={c}>{c}</li>)}</ul> : <p className="bar__hint">Only bookkeeping changed: the source row, the date.</p>}
+          <p className="bar__hint">
+            Revision {v.draft!.revision} of the plan differs from locked revision {v.lock!.revision}{v.lock!.date ? ` (${v.lock!.date})` : ""}.{" "}
+            {changedRows.length ? <>The changed parts are marked below, the old beside the new: {changedRows.map((c, i) => <span key={c.id}>{i ? ", " : ""}<a href={`#tl-${c.id}`}>{c.range}</a></span>)}{captionChanged ? <>, <a href="#tl-caption">the caption</a></> : null}.</> : captionChanged ? <>The caption changed: it is marked below.</> : <>No part of the video changed.</>}
+            {tl?.was?.removed.length ? ` Parts of the locked plan that are gone: ${tl.was.removed.join("; ")}.` : ""}
+          </p>
+          {tl?.was?.technical.length ? <details className="bar__fold"><summary>Technical changes only: {tl.was.technical.join(", ")}</summary><p className="bar__hint">Bookkeeping, not the video: nothing to review in it.</p></details> : null}
           <p className="bar__hint">The lock itself is written by the agent. After you accept, tell it: “lock {v.id} from the Atlas”.</p>
         </div>
       ) : null}
@@ -118,6 +125,9 @@ const SOURCE_WORDS = {
 const MUST_WORDS: Record<string, string> = { read: "the viewer must read it", recognise: "the viewer must recognise it", recognize: "the viewer must recognise it" };
 const quiet = (sound: string) => sound === "silent" || sound === "no line" || /^(silent|no line) · music:/.test(sound);
 
+/** The locked plan's value beside the draft's: one quiet line, "was: …". */
+const Was = ({ head, children }: { head?: string; children: ReactNode }) => <p className="row__was"><b>was{head ? `, ${head}` : ""}:</b> {children}</p>;
+
 /** One part of the video: the time, what the viewer sees and reads, the media of the open stage. */
 function BeatRow({ state, c, overlays, seg, first, stage, open, reaction }: { state: PostState; c: Checkpoint; overlays: Checkpoint["text"]; seg: Segment | null; first: boolean; stage: number; open: boolean; reaction: ReactNode }) {
   const v = state.video!;
@@ -126,19 +136,26 @@ function BeatRow({ state, c, overlays, seg, first, stage, open, reaction }: { st
   const story = c.story;
   const kind = [role ? cap(role) : story ? "The app" : "A part", story?.screens.length ? story.screens.join(", ") : null].filter(Boolean).join(" · ");
   const src = story ? (story.source ? SOURCE_WORDS[story.source] : null) : null;
+  const w = c.was;
+  const oldSees = w?.sees !== undefined ? (w.sees === "not written" ? null : w.sees.replace(/ · framing: \w+$/, "")) : undefined;
   return (
-    <li className={`row${open ? " is-open" : ""}${story ? " is-app" : ""}`} id={`tl-${c.id}`} data-seg={c.segment ?? undefined}>
+    <li className={`row${open ? " is-open" : ""}${story ? " is-app" : ""}${w ? " is-changed" : ""}`} id={`tl-${c.id}`} data-seg={c.segment ?? undefined}>
       <div className="row__t">
         <b className="tabular">{c.range}</b>
+        {w?.range ? <Was>{w.range}</Was> : null}
         {role ?? (story ? "the app" : null)}
         {c.segment ? <span className="row__code">{c.segment}</span> : null}
       </div>
       <div className="row__c">
-        <p className="row__kind">{kind}{c.viewerMust && MUST_WORDS[c.viewerMust] ? <small>{MUST_WORDS[c.viewerMust]}</small> : null}</p>
+        <p className="row__kind">{kind}{c.viewerMust && MUST_WORDS[c.viewerMust] ? <small>{MUST_WORDS[c.viewerMust]}</small> : null}{w?.new ? <small className="row__changed">new in revision {v.draft?.revision ?? "?"}</small> : w ? <small className="row__changed">changed in revision {v.draft?.revision ?? "?"}</small> : null}</p>
         {overlays.map((t, i) => <p key={i} className="row__on">“{t.text}”<small>on screen{t.placement ? `, ${t.placement}` : ""}, {t.range}</small></p>)}
+        {w?.text ? (w.text.length ? w.text.map((t, i) => <Was key={`w${i}`} head="the words on screen">“{t.text}”, {t.range}</Was>) : <Was head="the words on screen">none</Was>) : null}
         {story ? <p className="row__src">{src ? <><b>{src[0]}</b>{src[1]}</> : "How the app is shown is not said yet."}</p> : null}
         {sees ? <p className="row__sees">{sees}</p> : <p className="row__sees is-blank">Nothing written yet.</p>}
+        {oldSees !== undefined ? <Was head="what the viewer sees">{oldSees ?? "nothing written"}</Was> : null}
         {!quiet(c.sound) ? <p className="row__sound">{c.sound}</p> : null}
+        {w?.sound !== undefined ? <Was head="the sound">{w.sound}</Was> : null}
+        {w?.app !== undefined ? <Was head="the app">{w.app}</Was> : null}
         {reaction}
         {story ? (
           story.steps.length ? (
@@ -148,14 +165,17 @@ function BeatRow({ state, c, overlays, seg, first, stage, open, reaction }: { st
                   <b className="tabular">{secs(c.start + x.at)} s</b>
                   <div>
                     <span>{x.what}</span>
-                    {x.reads.length ? <div className="row__reads">{x.reads.map((w, j) => <span key={j}>“{w}”</span>)}</div> : null}
+                    {x.reads.length ? <div className="row__reads">{x.reads.map((r, j) => <span key={j}>“{r}”</span>)}</div> : null}
+                    {w?.steps?.[i] ? (w.steps[i]!.what ? <Was head="this step">{w.steps[i]!.what}{w.steps[i]!.reads.length ? <>: {w.steps[i]!.reads.map((r) => `“${r}”`).join(", ")}</> : null}</Was> : <Was head="this step">not in the locked plan</Was>) : null}
                   </div>
                 </li>
               ))}
+              {w?.stepsGone?.map((x, i) => <li key={`g${i}`} className="is-gone"><b className="tabular">gone</b><div><Was head="a step of the locked plan">{x.what}{x.reads.length ? <>: {x.reads.map((r) => `“${r}”`).join(", ")}</> : null}</Was></div></li>)}
             </ol>
           ) : <p className="sr__hint">The screen story is not written yet.</p>
         ) : null}
         {c.hero ? <p className="row__hero">The result, word for word: <b>“{c.hero}”</b></p> : null}
+        {w?.hero !== undefined ? <Was head="the result">{w.hero ? `“${w.hero}”` : "none"}</Was> : null}
       </div>
       <div className="row__m">
         <RowMedia stage={stage} c={c} seg={seg} first={first} p={v.production ?? null} post={state.row.key} live={!state.killed} />
@@ -167,18 +187,23 @@ function BeatRow({ state, c, overlays, seg, first, stage, open, reaction }: { st
 /** The caption, the tags and the sound, as the viewer reads them: the last row. */
 function CaptionRow({ state }: { state: PostState }) {
   const v = state.video!;
-  const written = v.plan ?? v.timeline ?? null;
+  const was = v.timeline?.was ?? null;
+  const written = was ? v.timeline : v.plan ?? v.timeline ?? null;
   if (!written) return null;
   const caption = written.caption && !/^<.*>$/.test(written.caption) ? written.caption : null;
+  const changed = !!was && ("caption" in was || "music" in was);
   return (
-    <li className="row row--caption">
+    <li className={`row row--caption${changed ? " is-changed" : ""}`} id="tl-caption">
       <div className="row__t"><b>Caption</b>what the viewer reads under the video</div>
       <div className="row__c">
+        {changed ? <p className="row__kind"><small className="row__changed">changed in revision {v.draft?.revision ?? "?"}</small></p> : null}
         <p className="row__caption">
           {caption ?? <span className="is-blank">no caption in the plan</span>}{" "}
           {(state.row.tags ?? []).map((h) => <span key={h} className="tag">{h} </span>)}
         </p>
+        {was && "caption" in was ? <Was head="the caption">{was.caption && !/^<.*>$/.test(was.caption) ? was.caption : "none"}</Was> : null}
         <p className="row__music"><SoundIcon />{written.music && !/^<.*>$/.test(written.music) ? written.music : "sound not chosen"}</p>
+        {was && "music" in was ? <Was head="the sound">{was.music && !/^<.*>$/.test(was.music) ? was.music : "not chosen"}</Was> : null}
       </div>
       <div className="row__m" />
     </li>

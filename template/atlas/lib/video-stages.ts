@@ -25,6 +25,7 @@ import { join } from "node:path";
 
 import { MOTION_HARD } from "./accept-fail.ts";
 import { mediaUrl } from "./media-paths.ts";
+import { rowWas, technicalChanges, type Was } from "./plan-changes.ts";
 import { planBeatsOf, reactionCardOf, type ReactionCard } from "./reactions.ts";
 import type { PointState } from "./production.ts";
 import { APPS_DIR, ROOT } from "./root.ts";
@@ -238,10 +239,14 @@ export type Checkpoint = {
   noPicture: string | null;
   /** The reaction of a beat with a reaction reference, as its card (lib/reactions.ts). */
   reaction: ReactionCard | null;
+  /** The locked plan's row where the draft's row differs (a stale plan): the old value beside the new one. */
+  was: Was | null;
 };
 export type Timeline = { length: number; checkpoints: Checkpoint[]; player: { url: string; label: string } | null; source: "plan.json" | "plan.draft.json" | null;
   /** The caption and the music note of the plan the strip reads (the draft before the lock), as written. */
-  caption: string | null; music: string | null };
+  caption: string | null; music: string | null;
+  /** A stale plan: the strip reads the draft, and this holds what the locked plan had where it differs. */
+  was: { lockedRevision: number | null; caption?: string | null; music?: string | null; technical: string[]; removed: string[] } | null };
 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const secs = (n: number) => (Number.isInteger(n) ? `${n}.0` : n.toFixed(1));
@@ -254,6 +259,8 @@ export type TimelineInput = {
   production: Production | null;
   /** The delivered file, after gate C. */
   final: { url: string } | null;
+  /** The locked plan, when the plan the strip reads is a newer draft (stale): each row is compared with it. */
+  locked?: any;
 };
 
 const ACTION_WORDS: Record<string, string> = { appear: "the screen appears", tap: "a tap on", result: "the result shows", hold: "the screen holds", scroll: "a scroll", type: "typing", swipe: "a swipe" };
@@ -276,7 +283,7 @@ function storyOf(b: any): Story {
 }
 
 /** The checkpoints of the strip: one per beat, in time order (§ 4.1). */
-export function timeline({ plan, source, production: p, final }: TimelineInput): Timeline {
+export function timeline({ plan, source, production: p, final, locked = null }: TimelineInput): Timeline {
   const beats: any[] = [...(plan?.beats ?? [])].sort((a, b) => (num(a.start_s) ?? 0) - (num(b.start_s) ?? 0));
   const slug = String(plan?.app ?? "");
   const hdir = String(plan?.handle ?? "").replace(/^@/, "");
@@ -368,11 +375,32 @@ export function timeline({ plan, source, production: p, final }: TimelineInput):
       : seg?.type === "C" || (b.source_asset_ids ?? []).length ? "no picture: the supplied file is not on disk or not served"
       : "no picture: text only, or nothing on disk yet";
     return { id, start, end, range: rangeOf(start, end), role: b.role && !/^<.*>$/.test(b.role) ? String(b.role) : null, segment: seg?.name ?? null, sees, text, sound, app, story, hero: hero ? String(hero) : null, viewerMust: typeof b.viewer_must === "string" ? b.viewer_must : null, picture: pics[0] ?? null, earlier: pics.slice(1), noPicture,
-      reaction: ref ? reactionCardOf(ref, planBeatsOf(plan, String(ref.id), num(ref.start_s) ?? 0)) : null };
+      reaction: ref ? reactionCardOf(ref, planBeatsOf(plan, String(ref.id), num(ref.start_s) ?? 0)) : null, was: null };
   });
+
+  /* A stale plan: the same strip of the locked plan, and what each row had where the draft's row differs. */
+  const caption = typeof plan?.publishing_note?.caption === "string" ? plan.publishing_note.caption : null;
+  const musicNote = typeof plan?.publishing_note?.music_note === "string" ? plan.publishing_note.music_note : null;
+  const old = locked ? timeline({ plan: locked, source: "plan.json", production: p, final }) : null;
+  /* The words on screen are compared where the document shows them: once, in the first row they are on screen in. */
+  const ownText = (cs: Checkpoint[]) => { const seen = new Set<string>(); return new Map(cs.map((c) => { const own = c.text.filter((t) => !seen.has(t.text)); own.forEach((t) => seen.add(t.text)); return [c.id, own]; })); };
+  if (old) {
+    const nw = ownText(checkpoints), ow = ownText(old.checkpoints);
+    for (const c of checkpoints) {
+      const o = old.checkpoints.find((x) => x.id === c.id) ?? null;
+      c.was = rowWas({ ...c, text: nw.get(c.id) ?? [] }, o ? { ...o, text: ow.get(o.id) ?? [] } : null);
+    }
+  }
+  const was: Timeline["was"] = old ? {
+    lockedRevision: num(locked.revision),
+    ...(old.caption !== caption ? { caption: old.caption } : {}),
+    ...(old.music !== musicNote ? { music: old.music } : {}),
+    technical: technicalChanges(locked, plan),
+    removed: old.checkpoints.filter((o) => !checkpoints.some((c) => c.id === o.id)).map((o) => `${o.range}${o.role ? `, ${o.role}` : ""}`),
+  } : null;
 
   /* Gate C and after: the whole strip plays the cut. */
   const a = p?.assembly;
   const player = final ? { url: final.url, label: "the delivered file" } : a && !a.stale ? { url: a.url, label: "the cut" } : null;
-  return { length, checkpoints, player, source, caption: typeof plan?.publishing_note?.caption === "string" ? plan.publishing_note.caption : null, music: typeof plan?.publishing_note?.music_note === "string" ? plan.publishing_note.music_note : null };
+  return { length, checkpoints, player, source, caption, music: musicNote, was };
 }

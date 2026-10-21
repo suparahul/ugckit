@@ -324,3 +324,30 @@ test("a stale plan: the user's turn at the plan, the stages after it wait for th
   assert.equal(v.stages[0].state, "done");
   assert.equal(v.stages[1].state, "you", "re-locked: the storyboard waits again");
 });
+
+test("a stale plan: the strip reads the draft, and each row keeps what the locked plan had where it differs", () => {
+  const locked = { revision: 1, format: { length_s: 20 }, beats: [
+    { id: "b1", role: "attention", start_s: 0, end_s: 3, action: "Nicole looks up, tired and soft.", performance: "silent_action" },
+    { id: "b2", role: "reveal", start_s: 3, end_s: 20, app_on_screen: true, screen_id: "s1", demo_source: "motion_design", screen_story: { screens: ["Reveal"], steps: [{ at_s: 0, screen: "Reveal", action: "result", shows: ["What we saw", "Latte hid."] }] } },
+    { id: "b3", role: "cta", start_s: 18, end_s: 20, action: "a card", performance: "silent_action" }],
+    overlays: [{ id: "o1", role: "hook", text: "my kitten's first night home", start_s: 0, end_s: 3, placement: "top" }],
+    hero_strings: { s1: "Give her time." }, publishing_note: { caption: "her first night #cats", music_note: "a library track" }, source: { row: "| 35 |" } };
+  const draft = JSON.parse(JSON.stringify(locked));
+  draft.revision = 2; draft.source = { row: "| 36 |" };
+  draft.beats[0].action = "Nicole looks up, worn out after days.";
+  draft.beats[1].screen_story.steps[0].shows = ["What we saw", "Latte hid again."];
+  draft.beats.splice(2, 1);
+  draft.overlays[0].text = "struggling with my new kitten for days"; draft.overlays[0].end_s = 4;
+  draft.hero_strings.s1 = "Sit in the same room.";
+  draft.publishing_note.caption = "days of hiding #cats";
+  const tl = timeline({ plan: draft, source: "plan.draft.json", production: null, final: null, locked });
+  assert.equal(tl.source, "plan.draft.json");
+  assert.deepEqual(tl.checkpoints.map((c) => c.text.map((t) => t.text)), [["struggling with my new kitten for days"], ["struggling with my new kitten for days"]], "an overlay meets every beat it runs into; the document shows it once");
+  assert.deepEqual(tl.checkpoints[0].was, { sees: "Nicole looks up, tired and soft.", text: [{ text: "my kitten's first night home", placement: "top", range: "0.0–3.0 s" }] });
+  assert.deepEqual(tl.checkpoints[1].was, { hero: "Give her time.", steps: [{ what: "the result shows", reads: ["What we saw", "Latte hid."] }] });
+  assert.equal(tl.caption, "days of hiding #cats");
+  assert.deepEqual(tl.was, { lockedRevision: 1, caption: "her first night #cats", technical: ["the revision number", "the source row of PLAN.md"], removed: ["18.0–20.0 s, cta"] });
+  const same = timeline({ plan: locked, source: "plan.json", production: null, final: null });
+  assert.equal(same.was, null);
+  assert.ok(same.checkpoints.every((c) => c.was === null));
+});
