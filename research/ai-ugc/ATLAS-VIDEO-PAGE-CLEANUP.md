@@ -175,3 +175,93 @@ Code: `lib/plain-words.ts` (`groupBeats`, `purposeLine`; tested), `components/pr
 (one card per segment, no pictures in the cards), `VideoProduction.tsx` (the panels),
 `VideoView.tsx` (passes the beats to the panels), `app/production.css`. Nothing a button sends
 changes; the decide route is not touched.
+
+## 6. One document (2026-10-21, the redesign; mockup first)
+
+The page so far was built from blocks that each describe the same video: a plan box with the
+button, a strip of beats under it, stage panels that repeat the plan. At the storyboard stage
+the new thing (the keyframe) was lost among the repeats, and the strip gave each beat too little
+room to read. This section starts again from one idea.
+
+**The video is one document, read top to bottom. Every stage adds to it.**
+
+### 6.1 The layout
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│ @hannah.catmom · main persona                                           ⋯ menu   │
+│ leaving my cat with a sitter tomorrow and I JUST found this                      │
+│ Day 36 · AM · video · 20 s · reaction      Plan ● · Keyframes · Generate · … (7) │
+├══════════════════════════════════════════════════════════════════════════════════┤
+│ DECISION BAR (sticky)  Approve the plan, revision 1, or send it back with a note. │
+│                        warnings: 1 before production      [Approve plan] [Send back…] │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│ 0.0–3.25 s │ THE HOOK · the words on screen, big                │ media of the   │
+│ the hook   │ what the viewer sees, in full                      │ current stage  │
+│            │ the reaction, compact (handle, range, the beats)   │ for this part  │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│ 3.25–8.25 s│ THE APP · Routine Reminders · rebuilt and animated │ quiet line, or │
+│ the app    │ step 1 at 3.25 s: the screen appears · reads “…”   │ the render     │
+│ appears    │ step 2 at 4.75 s: …                                │                │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│ 8.25–20 s  │ THE RESULT · Routine Task Cards · the steps        │                │
+│ the result │ The result, word for word: “5 of 5 done”           │                │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│ caption    │ the caption, the tags, the sound                   │                │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│ ▸ Details · the plan as written, the segments, the files, the checks             │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+Full width. No box in the middle. No second list of beats anywhere: the rows are the only list
+of the video's parts, and every stage reads the same rows.
+
+### 6.2 The row anatomy
+
+A row is one part of the video in time order: the hook, the reaction (when it is its own
+part), each app screen, the card, the close, then the caption. A row has three columns:
+
+| column | holds |
+|---|---|
+| time (left, 110 px) | the range, the role in words ("the hook", "the app appears", "the result"), and the segment code small |
+| content (middle, the rest) | the words on screen in full; what the viewer sees, in full; for an app part, the source in one line ("rebuilt from the app's real screens and animated" or "a real screen recording"), then every step with its time and the strings the viewer reads at that step; for the result, the hero string word for word; the sound when there is one |
+| media (right, 300 px) | what the current stage adds for this part, or one quiet line saying why there is nothing |
+
+The row keeps its content from stage to stage. Only the media column changes. Technical fields
+(framing, references, file names, digests, the gates' detail) are not in the row; they are in
+Details at the end.
+
+### 6.3 What each stage shows in the media column
+
+| stage | hook / reaction part | app parts (screen, card) | supplied parts | the bar |
+|---|---|---|---|---|
+| 1 Plan | the reference clip, paused at its start, with the handle and range; or "no reference chosen" | nothing ("the picture comes with the keyframes" in grey) | the supplied file | Approve the plan, revision N · Send back… · the blocking inputs count when it is off |
+| 2 Keyframes | the keyframe, large; the reference pose small under it, labelled; "Redo this keyframe…" | "The app screen needs no keyframe: it is rebuilt at the cut." (quiet) | "Supplied: no keyframe." | Approve the storyboard · the first runs cost $N · Send back… |
+| 3 Generate | the keyframe, dimmed, with "generating… $N computed" | quiet | quiet | no decision: "The agent generates 01-x ($0.50 computed)." |
+| 4 Review | the take, with the reference clip and the keyframe small beside it; the identity gate line; the checks; Approve this take / Reject… in the row | the motion render with its gates; Approve / Reject in the row | the source with Approve / Reject | "N items wait for you" with a jump to the first; no bar buttons (the decisions are per row) |
+| 5 Composite | the approved take, quiet | the composite with Approve / Send back in the row | quiet | "N composites wait for you" with a jump |
+| 6 Cut | one full-width row above the parts: the cut, playing; each part's media shows its approved take or composite, and a "play from 3.25 s" link that jumps the player | the same | the same | Approve the cut · Send back… · Regenerate one segment… |
+| 7 Deliver | the same as the cut, with the delivered file in the top row | the same | the same | Approve for posting · Send back… · the posting rail (drafts, direct) · the reads strip once posted |
+
+A part a stage does not touch stays in view with its content and one grey line in the media
+column. Nothing is folded in a row; the only fold on the page is Details.
+
+### 6.4 The decision bar
+
+One bar per stage, sticky at the top under the head. It holds, in one line: what you are
+deciding ("Approve the storyboard: 1 keyframe"), the cost when there is one ("Approving starts
+the first runs: $0.50"), and the buttons (Approve, Send back…). When the stage's decisions are
+per row (review, composite), the bar says what waits and links down to it. When nothing waits
+for the user, the bar says whose turn it is and what the agent does, with no buttons. Kill this
+post and the view switches stay in the ⋯ menu of the head.
+
+Problems that block the decision sit directly under the bar, blocking first, one sentence each.
+
+### 6.5 The mockup
+
+Static HTML with the real content of two videos, served on http://localhost:3212:
+
+- `hannah-plan.html`: Hannah 10-21 AM at the plan stage (the reference clip in the hook row, the two motion-designed app parts with every step and string, the hero string, the caption).
+- `latte-keyframes.html`: Latte 10-21 AM at the keyframe stage (the real keyframe and the reference pose in the hook row, the two app parts quiet, the bar with the $0.50).
+
+The mockup source is in `research/ai-ugc/mockup/` (serve the folder with any static server). Screenshots at 1,440 px: `cleanup-screenshots/mockup/`. The Atlas code does not change until the mockup is approved.
