@@ -263,7 +263,7 @@ Separate from the anatomy. Today P1 makes T talking segments without the app, an
 | `bridge.live` | a real input clip paired with the app recording that read it, with measured times | `live_use` |
 | `bridge.reaction` | a silent generated face of an approved character, performed from a real reference reaction | hook channel `reaction`, any beat with a `reaction` block |
 | `bridge.motion_copy` | the approved character's first frame, moved by the reference clip, trimmed | every reaction reference (`generation_input: "motion_copy"`, the default) |
-| `bridge.motion_design` | the app's real screens rebuilt in code and animated, rendered full screen at 1080x1920; never a model | a full-screen app beat (R or P) whose screen no recording shows (`demo_source: "motion_design"`, with its reason and `screen_story`) |
+| `bridge.motion_design` | the app's real screens rebuilt in code and animated, rendered full screen at 1080x1920, or as the bare phone screen for a phone plate or a panel (2026-10-21); never a model | an app beat whose screen no recording shows (`demo_source: "motion_design"`, with its reason and `screen_story`): R or P, a phone's screen (O, G, S, H, F, C with a filmed phone) or an M panel |
 
 Never call a value runnable before its capability exists. Never replace a requested real cat with generated footage. Never relabel a silent action as talking to pass a check.
 

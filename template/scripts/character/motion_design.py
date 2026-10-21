@@ -3,11 +3,20 @@
 for an R or P segment whose beats have demo_source motion_design (scripts/character/demo.py).
 Free, local: a headless Chromium and ffmpeg. Never a video model (founder, 2026-10-19).
 
+On a phone or in a panel (2026-10-21, the user's choice): a phone segment (O, G, S, H, F, or a
+C clip that films a phone) or an M segment whose beats are motion-designed gets the same
+render at fit `screen`: the bare phone screen at its own aspect, 1080 wide. After gate B
+(review.py motion), `fill` writes the phone's insert.json with the render as its source, and
+composite.sh lays it into the green screen as it lays a real recording; an M panel that names
+the screen takes the render at assembly.
+
     motion_design.py start  <video> <seg>    the segment's motion/ folder: story.json from the
                                              plan, the page template, assets/ and assets.json
     motion_design.py render <video> <seg>    motion/render.mp4 (motion_render.mjs), its stills at
                                              the end of every step, and render.json
     motion_design.py check  <video> <seg>    the gates, into motion/gates.json
+    motion_design.py fill   <video> <seg>    a phone segment: its insert.json from the approved
+                                             render (then composite.sh, as for a recording)
     motion_design.py show   <video>          every motion-designed segment: story, render, gates,
                                              approval
 
@@ -23,7 +32,8 @@ The folder is pipeline/character/<video>/segments/<seg>/motion/:
 
 The gates (all must pass before review.py motion approves the render at gate B):
   current       render.json matches the page, the assets, assets.json and the plan's story now
-  format        1080x1920, 30 fps, at least the story's seconds
+  format        1080x1920 (fit screen: 1080 wide, the screen's own height), 30 fps, at least
+                the story's seconds
   local_only    no request left the machine, and no web address in the page's files
   assets        every file in assets/ is listed, from the app, a plan asset or a fixed subject,
                 with no file from a generation (generated/, keyframes/)
@@ -46,6 +56,10 @@ import ocr  # noqa: E402
 TEMPLATE = os.path.join(ROOT, "docs", "character", "motion-design.example.html")
 RENDERER = os.path.join(HERE, "motion_render.mjs")
 GATES = ("current", "format", "local_only", "assets", "story_text", "text_read", "hero", "page")
+# The segments a motion-designed screen can fill: full screen (R, P), the green screen of a
+# phone (O, G, S, H, F; C with a filmed phone), or a panel (M).
+FULL = ("R", "P")
+PHONE = ("O", "G", "S", "H", "F")
 URL = re.compile(r"(?:https?:)?//(?!www\.w3\.org/)[a-z0-9.-]+\.[a-z]{2,}", re.I)
 # The text a status bar always shows: it is the phone, not the app.
 CHROME_TEXT = re.compile(r"^(\d{1,2}:\d{2}|\d{1,3}%|5g|4g|lte)$", re.I)
@@ -98,11 +112,15 @@ def story_of(video, seg):
     s = dict(segments(video)).get(seg)
     if not s:
         sys.exit(f"{seg} is not a segment of {video}'s video.json")
-    if str(s.get("type")).upper() not in ("R", "P"):
-        sys.exit(f"{seg} is a {s.get('type')} segment: motion design is an R or P segment")
+    t = str(s.get("type")).upper()
+    if t not in FULL + PHONE + ("M",) and not (t == "C" and s.get("insert")):
+        sys.exit(f"{seg} is a {s.get('type')} segment: motion design fills an R or P segment, a phone's screen "
+                 "(O, G, S, H, F, or C with a filmed phone) or a panel (M); the app is never in a generated action")
     st = demo.segment_story(plan, s.get("beat_ids") or [])
     if not st:
         sys.exit(f"{seg}: none of its beats has demo_source motion_design (it lays in a real recording)")
+    if t not in FULL:
+        st = {**st, "fit": demo.SCREEN_FIT}
     return plan, s, st
 
 
@@ -253,8 +271,13 @@ def gates(video, seg, plan, st):
     fr = vs.get("avg_frame_rate", "0/1").split("/")
     fps = float(fr[0]) / float(fr[1] or 1) if len(fr) == 2 and float(fr[1] or 0) else 0
     dur = float((pr.get("format") or {}).get("duration") or 0)
-    ok = vs.get("width") == 1080 and vs.get("height") == 1920 and abs(fps - 30) < 0.01 and dur >= st["seconds"] - 0.05
-    add("format", ok, f"{vs.get('width')}x{vs.get('height')}, {fps:g} fps, {dur:.2f} s (the story: {st['seconds']:g} s)")
+    want_h = 1920
+    if st.get("fit") == demo.SCREEN_FIT:
+        pt = run.get("screen_pt") or [0, 0]
+        want_h = round(1080 * pt[1] / pt[0] / 2) * 2 if pt[0] else None
+    ok = vs.get("width") == 1080 and vs.get("height") == want_h and abs(fps - 30) < 0.01 and dur >= st["seconds"] - 0.05
+    add("format", ok, f"{vs.get('width')}x{vs.get('height')} (1080x{want_h}), {fps:g} fps, {dur:.2f} s "
+        f"(the story: {st['seconds']:g} s)")
     # local_only
     found = []
     for p in page_files(md):
@@ -361,6 +384,41 @@ def cmd_check(video, seg):
     sys.exit(1 if failed else 0)
 
 
+# ---------------------------------------------------------------- fill
+def cmd_fill(video, seg):
+    """A phone segment's insert.json from its approved render: the source composite.sh lays
+    into the green screen, as screens.py fill does from a library recording. The render runs
+    at its own speed from the plate's start (the story's seconds are the segment's); the
+    story's taps, scrolls and swipes are the beats, measured again on the plate."""
+    import screens
+    plan, s, st = story_of(video, seg)
+    t = str(s.get("type")).upper()
+    if t not in PHONE + ("C",):
+        sys.exit(f"{seg} is a {t} segment: fill is for a phone's screen (an M panel takes the render at assembly, "
+                 "an R or P is the render)")
+    rec, row = approved(video, seg)
+    if not rec:
+        sys.exit(f"{seg}: {row}")
+    pt, ip, spec, dur = screens.insert_target(video, seg)
+    g = state(video, seg)[1] or {}
+    hero = g.get("hero") or {}
+    srow = {"id": st["screen_id"], "kind": "recording", "duration_s": st["seconds"], "patches": [],
+            "events": [{"t": float(x["at_s"]), "gesture": x["action"], "label": x.get("target") or x["action"]}
+                       for x in st["steps"] if x.get("action") in screens.GESTURES],
+            "hero": {"text": st.get("hero"), "rect_source_px": hero.get("rect"), "app_t": hero.get("t"),
+                     "needs": "large type" if st.get("hero") else None}}
+    kind, src = "recording", os.path.relpath(rec, ROOT)
+    if pt == "S":
+        # S shows one still: the render at the hero's step (else its last), kept beside it.
+        k = hero_step(st)
+        at = step_times(st)[k if k is not None else -1]
+        still = os.path.join(mdir(video, seg), "stills", "s-still.png")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{at:.3f}", "-i", rec, "-frames:v", "1", still], check=True)
+        kind, src = "still", os.path.relpath(still, ROOT)
+    spec["motion_design"] = {"render": os.path.relpath(rec, ROOT), "sha256": row["sha256"]}
+    screens.fill_spec(ip, spec, pt, st["screen_id"], kind, src, srow, dur)
+
+
 def state(video, seg):
     """(render sha256 or None, gates dict or None, approval row or None) of one segment, for
     review.py and assemble.py. The approval counts only for the render on disk now."""
@@ -391,8 +449,6 @@ def approved(video, seg):
 def cmd_show(video):
     n = 0
     for name, s in segments(video):
-        if str(s.get("type")).upper() not in ("R", "P"):
-            continue
         plan = load(os.path.join(vdir(video), "plan.json"))
         st = demo.segment_story(plan, s.get("beat_ids") or [])
         if not st:
@@ -410,13 +466,13 @@ def cmd_show(video):
 
 def main():
     a = sys.argv[1:]
-    if not a or a[0] not in ("start", "render", "check", "show"):
+    if not a or a[0] not in ("start", "render", "check", "fill", "show"):
         sys.exit(__doc__)
     if a[0] == "show" and len(a) == 2:
         return cmd_show(a[1])
     if len(a) != 3:
         sys.exit(__doc__)
-    {"start": cmd_start, "render": cmd_render, "check": cmd_check}[a[0]](a[1], a[2])
+    {"start": cmd_start, "render": cmd_render, "check": cmd_check, "fill": cmd_fill}[a[0]](a[1], a[2])
 
 
 if __name__ == "__main__":

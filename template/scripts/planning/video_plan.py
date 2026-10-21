@@ -1155,10 +1155,14 @@ def write_review(draft_path):
             ds = b.get("demo_source")
             if ds == "motion_design":
                 st = b.get("screen_story") or {}
+                where = ("rendered full screen at 1080x1920. It fills the frame and looks more like a promotion than "
+                         "a hand holding a phone" if b.get("framing") == "app_screen" else
+                         "rendered as the bare phone screen and laid into the phone or the panel like a recording. A "
+                         "drawn screen in a filmed hand can look pasted on: check the composite closely")
                 w(f"Beat {b.get('id')} ({fmt_t(b['start_s'], b['end_s'])}), screen `{b.get('screen_id')}`: **motion design**. "
-                  "The app's real screens rebuilt in code and animated, rendered full screen at 1080x1920 "
-                  "(`scripts/character/motion_design.py`); no video model, no recording. It fills the frame and looks more "
-                  f"like a promotion than a hand holding a phone. Why not a real recording: {b.get('demo_source_reason')}")
+                  f"The app's real screens rebuilt in code and animated, {where} "
+                  "(`scripts/character/motion_design.py`; no video model, no recording). "
+                  f"Why not a real recording: {b.get('demo_source_reason')}")
                 w("")
                 w(f"- Screens (PRODUCT-SCREENS.md): {', '.join(st.get('screens') or []) or '—'}. Rebuilt from: "
                   f"{'; '.join(st.get('rebuilt_from') or []) or '—'}. Fit: {st.get('fit') or 'pad'}.")

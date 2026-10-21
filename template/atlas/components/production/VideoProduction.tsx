@@ -13,6 +13,7 @@
 
 import { useState } from "react";
 
+import { cutAccepts, motionAccepts } from "@/lib/accept-fail";
 import type { Click, Motion, Narration, Production, Segment, Source, Take } from "@/lib/video-production";
 import { useDecide } from "./Actions";
 
@@ -63,6 +64,12 @@ function SendBack({ label, busy, onSend, placeholder }: { label: string; busy: b
       <button type="button" className="rail__kill" onClick={() => setOpen(false)}>cancel</button>
     </span>
   );
+}
+
+/** A failed measured gate, approved at the user's discretion (2026-10-21): the note is required, and the
+ * agent records the gate, its result and the words (review.py --accept-fail). */
+function ApproveAnyway({ gates, busy, onSend }: { gates: string[]; busy: boolean; onSend: (note: string) => Promise<string | null> }) {
+  return <SendBack label="Approve anyway…" busy={busy} placeholder={`Why you approve it although ${gates.join(", ")} did not pass. Your words are recorded with the gate.`} onSend={onSend} />;
 }
 
 function Err({ e }: { e: string | null }) {
@@ -246,7 +253,8 @@ function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Produc
           <div className="sr__actions">
             <button type="button" className="pill pill--go" disabled={busy || !idOk || s.checks.some((c) => !ticked.includes(c))} onClick={() => send("take.approve", { checks: ticked })}>Approve this take{pick ? ` (take ${s.takes.length - s.takes.findIndex((x) => x.file === pick)})` : ""}</button>
             {!rejecting ? <button type="button" className="pill" disabled={busy} onClick={() => setRejecting(true)}>Reject…</button> : null}
-            {!idOk ? <span className="rail__why is-bad">{t.identity ? "the identity gate did not pass: tell the agent in words if you accept it" : "the identity gate has not run"}</span> : null}
+            {!idOk && t.identity ? <ApproveAnyway gates={["the identity gate"]} busy={busy || s.checks.some((c) => !ticked.includes(c))} onSend={(n) => send("take.approve", { checks: ticked, accept_fail: ["identity"] }, n)} /> : null}
+            {!idOk ? <span className="rail__why is-bad">{t.identity ? "the identity gate did not pass: reject the take, or approve anyway with your note" : "the identity gate has not run"}</span> : null}
           </div>
           {rejecting ? (
             <div className="vprod__form vprod__form--col">
@@ -284,13 +292,16 @@ function MotionDesign({ post, s, m, live }: { post: string; s: Segment; m: Motio
   const [eye, setEye] = useState<string[]>([]);
   const pending = m.click?.current && !m.click.recorded;
   const need = m.notRun.map((g) => (g === "text_read" ? "text" : g));
-  const run = (kind: "motion.approve" | "motion.reject", note?: string) =>
-    decide({ post, kind, ...(note ? { note } : {}), data: { segment: s.name, ...(kind === "motion.approve" ? { checks: eye } : {}) } as any }).then((r) => { setErr(r); return r; });
+  /* What "Approve anyway" covers: the failed gates (never a stale render), and a gate not run that is not ticked. */
+  const { stale, accept: anyway } = motionAccepts(m, eye);
+  const run = (kind: "motion.approve" | "motion.reject", note?: string, accept?: string[]) =>
+    decide({ post, kind, ...(note ? { note } : {}), data: { segment: s.name, ...(kind === "motion.approve" ? { checks: eye, ...(accept?.length ? { accept_fail: accept } : {}) } : {}) } as any }).then((r) => { setErr(r); return r; });
   return (
     <div className="vprod__motion">
       <p className="vprod__words">
-        Motion design: the app&apos;s real screens rebuilt in code and animated, rendered here at 1080x1920 (motion_design.py), never by a video model.
-        It fills the frame, so it looks more like a promotion than a hand holding a phone.{m.reason ? <> Why not a real recording: <em>{m.reason}</em></> : null}
+        Motion design: the app&apos;s real screens rebuilt in code and animated (motion_design.py), never by a video model.{" "}
+        {m.fit === "screen" ? "Rendered as the bare phone screen and laid into the phone or the panel like a recording; a drawn screen in a filmed hand can look pasted on, so check the composite closely."
+          : "Rendered at 1080x1920. It fills the frame, so it looks more like a promotion than a hand holding a phone."}{m.reason ? <> Why not a real recording: <em>{m.reason}</em></> : null}
       </p>
       <p className="sr__hint">Screens: {m.screens.join(", ") || "none named"} · rebuilt from {m.rebuiltFrom.join("; ") || "nothing named"} · fit {m.fit} · {m.seconds} s{m.hero ? ` · hero “${m.hero}”` : ""}</p>
       <ol className="vprod__steps tabular" aria-label="The screen story">
@@ -318,7 +329,8 @@ function MotionDesign({ post, s, m, live }: { post: string; s: Segment; m: Motio
           <div className="sr__actions">
             <button type="button" className="pill pill--go" disabled={busy || !!m.failed.length || need.some((c) => !eye.includes(c))} onClick={() => run("motion.approve")}>Approve this motion design</button>
             <SendBack label="Reject…" busy={busy} placeholder="What is wrong: a screen, a word, the timing." onSend={(n) => run("motion.reject", n)} />
-            {m.failed.length ? <span className="rail__why">failed gates: {m.failed.join(", ")}</span> : null}
+            {anyway.length ? <ApproveAnyway gates={anyway} busy={busy} onSend={(n) => run("motion.approve", n, anyway)} /> : null}
+            {m.failed.length ? <span className="rail__why">{stale ? "the render is not of the page and the story now: the agent renders and checks again" : `failed gates: ${m.failed.join(", ")}`}</span> : null}
           </div>
         </>
       ) : null}
@@ -363,8 +375,8 @@ function NarrationCard({ post, x, live }: { post: string; x: Narration; live: bo
   const [err, setErr] = useState<string | null>(null);
   const [natural, setNatural] = useState(false);
   const pending = x.click?.current && !x.click.recorded;
-  const run = (kind: "narration.approve" | "narration.reject", note?: string) =>
-    decide({ post, kind, ...(note ? { note } : {}), data: { take: x.take, ...(kind === "narration.approve" ? { checks: natural ? ["natural_voice"] : [] } : {}) } as any }).then((r) => { setErr(r); return r; });
+  const run = (kind: "narration.approve" | "narration.reject", note?: string, accept?: string[]) =>
+    decide({ post, kind, ...(note ? { note } : {}), data: { take: x.take, ...(kind === "narration.approve" ? { checks: natural ? ["natural_voice"] : [], ...(accept?.length ? { accept_fail: accept } : {}) } : {}) } as any }).then((r) => { setErr(r); return r; });
   return (
     <li className="vprod__seg">
       <p className="vprod__segh tabular"><b>narration {x.take}</b>{x.narrator ? ` · ${x.narrator}` : ""} · under {x.segments.join(", ")}
@@ -382,6 +394,7 @@ function NarrationCard({ post, x, live }: { post: string; x: Narration; live: bo
           </fieldset>
           <div className="sr__actions">
             <button type="button" className="pill pill--go" disabled={busy || !natural || !x.lines.length} onClick={() => run("narration.approve")}>Approve this take</button>
+            {!natural && x.lines.length ? <ApproveAnyway gates={["the natural-voice check"]} busy={busy} onSend={(n) => run("narration.approve", n, ["voice"])} /> : null}
             <SendBack label="Reject…" busy={busy} placeholder="What is wrong with this take." onSend={(n) => run("narration.reject", n)} />
             {!x.lines.length ? <span className="rail__why">no voiceover line of the plan uses this take</span> : null}
           </div>
@@ -474,6 +487,8 @@ export function CutPanel({ post, p, live }: { post: string; p: Production; live:
   const own = p.segments.filter((s) => s.generated && !s.sharedFrom);
   const open = own.filter((s) => !s.approved).map((s) => s.name);
   const rs = own.find((s) => s.name === regen) ?? null;
+  /* review.py final: a changed supplied file always blocks; a failed overlay check may be approved anyway with a note. */
+  const { blocked: supplied, overlays } = cutAccepts(a?.failed ?? []);
   return (
     <section className="vprod__stage" aria-label="The cut, gate C">
       <h3 className="vprod__h">The cut <small>gate C · character-assemble, then character-deliver</small>
@@ -498,8 +513,10 @@ export function CutPanel({ post, p, live }: { post: string; p: Production; live:
         <>
           <div className="sr__actions">
             {a.grain ? <label className="vprod__again"><input type="checkbox" checked={grain} onChange={(e) => setGrain(e.target.checked)} /> deliver the grain export</label> : null}
-            <button type="button" className="pill pill--go" disabled={busy || a.stale || open.length > 0} onClick={() => decide({ post, kind: "cut.approve", data: { export: grain ? "grain" : "default" } }).then(setErr)}>Approve the cut</button>
+            <button type="button" className="pill pill--go" disabled={busy || a.stale || open.length > 0 || supplied.length > 0 || overlays.length > 0} onClick={() => decide({ post, kind: "cut.approve", data: { export: grain ? "grain" : "default" } }).then(setErr)}>Approve the cut</button>
+            {overlays.length && !supplied.length && !a.stale && !open.length ? <ApproveAnyway gates={overlays} busy={busy} onSend={(n) => decide({ post, kind: "cut.approve", note: n, data: { export: grain ? "grain" : "default", accept_fail: ["overlays"] } as any }).then((r) => { setErr(r); return r; })} /> : null}
             {open.length ? <span className="rail__why">not every segment is approved: {open.join(", ")}</span> : null}
+            {supplied.length ? <span className="rail__why is-bad">the cut is not the plan&apos;s: {supplied.join(", ")}</span> : overlays.length ? <span className="rail__why is-bad">failed on the cut: {overlays.join(", ")}</span> : null}
             <SendBack label="Send back…" busy={busy} onSend={(n) => decide({ post, kind: "cut.sendback", note: n, data: {} }).then((r) => { setErr(r); return r; })} />
           </div>
           {own.length ? (

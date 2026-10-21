@@ -86,7 +86,9 @@ it.** The checklist (the user sees the same list):
   whatever the face looks like at a glance: the retired edit route scored 0.18 to the
   character and 0.90 to the reference. The face models (about 39 MB) are fetched once into
   `scripts/character/face-models/` and checked by sha256. `qc.py` prints the same gate, and
-  `review.py` runs it again and refuses an approval on a FAIL (or when it could not run). Then `review.py`
+  `review.py` runs it again and refuses an approval on a FAIL (or when it could not run),
+  unless the user approves it anyway: `--accept-fail identity` with their words (the Atlas:
+  "Approve anyway" with a note), recorded in approval.json. Then `review.py`
   approves it only with
   `--check identity=pass --check no_source_identity=pass --check silent=pass`. On the
   `motion`, `replace` and `animate` routes the file is within 0.25 s of the clip the model

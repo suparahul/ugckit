@@ -232,6 +232,31 @@ test("motion design: no generation; the render, its gates and gate B at stage 5;
   assert.equal(tl0.checkpoints[1].app, "screen tail-reading by motion design, “Relaxed tail”");
 });
 
+test("motion design on a phone and approve anyway: the bare screen; a failed gate waits for the user, a stale render for the agent", () => {
+  reset();
+  const id = "md-2026-10-24-phone";
+  const vd = `pipeline/character/${id}`;
+  const story = { screens: ["Tail Reading"], rebuilt_from: ["code src/screens/TailReading.tsx"], fit: "pad",
+    steps: [{ at_s: 0, screen: "Tail Reading", action: "appear", target: null, shows: ["Tail reading"] }] };
+  const plan = { app: "app", handle: "@md", format: { length_s: 4 }, app_insertion: true, hero_strings: {},
+    beats: [{ id: "b1", role: "use_reveal", start_s: 0, end_s: 4, framing: "hands_only", app_on_screen: true, screen_id: "tail-reading",
+      viewer_must: "recognise", demo_source: "motion_design", demo_source_reason: "the user chose it", screen_story: story }] };
+  w(`${vd}/plan.json`, plan);
+  w(`${vd}/video.json`, { segments: [{ n: 1, type: "G", beat_ids: ["b1"] }, { n: 2, type: "R", beat_ids: ["b1"], screen_id: "tail-reading" }] });
+  let { p, v } = locked(id);
+  assert.equal(p.segments[0].motion?.fit, "screen", "a phone's screen is rendered bare, at its own aspect");
+  assert.equal(p.segments[1].motion?.fit, "pad", "full screen keeps the story's fit");
+  w(`${vd}/video.json`, { segments: [{ n: 2, type: "R", beat_ids: ["b1"], screen_id: "tail-reading" }] });
+  w(`${vd}/segments/02-r/motion/render.mp4`, "render");
+  const sha = sha256Of(join(WS, vd, "segments/02-r/motion/render.mp4"))!;
+  w(`${vd}/segments/02-r/motion/gates.json`, { sha256: sha, results: [{ gate: "story_text", result: "FAIL", detail: "not in the story: 'Try premium'" }] });
+  ({ p, v } = locked(id));
+  assert.ok(v.now.includes("02-r (motion design)"), "a failed gate: the user rejects it or approves anyway");
+  w(`${vd}/segments/02-r/motion/gates.json`, { sha256: sha, results: [{ gate: "current", result: "FAIL", detail: "the story changed" }] });
+  ({ p, v } = locked(id));
+  assert.ok(!v.now.includes("02-r (motion design)"), "a stale render goes back to the agent");
+});
+
 test("a continuous take: the seam names the clip it opens on", () => {
   reset();
   const id = "cont-2026-10-23-two";

@@ -116,9 +116,10 @@ Lowercase, digits and hyphens. It is the folder name here and under `pipeline/ch
      in code from `PRODUCT-SCREENS.md` and the app's code and in-app text, animated and
      rendered full screen at 1080x1920 (`character-motion`). It needs no recording, so it is
      the least effort for the user, but it fills the frame and looks more like a promotion
-     than a hand holding a phone. Only for a full-screen app beat (framing `app_screen`,
-     an R or P segment); only for a screen `PRODUCT-SCREENS.md` describes; never on a phone
-     plate or in a panel. For the result of a `live_use` video it is the user's choice
+     than a hand holding a phone. Only for a screen `PRODUCT-SCREENS.md` describes. Full
+     screen (framing `app_screen`, R or P) by default; on a phone plate or in a panel it is
+     the user's choice (2026-10-21): say the trade-off (a drawn screen in a filmed hand can
+     look pasted on) and record it. For the result of a `live_use` video it is the user's choice
      (2026-10-21): say the trade-off (it looks more like an advert than a real recording)
      and record it; the bridge only notes it. A live_use video with a generated input and
      no paired recording is allowed the same way.

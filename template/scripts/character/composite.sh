@@ -7,7 +7,8 @@
 # Only for a plan with app_insertion true and a phone segment (O, G, S, H, F, or a C
 # segment whose supplied clip films a phone: its plate is source/plate.mp4 from
 # shots.py supplied, with the gates of its insert mode) whose segments/<seg>/insert.json
-# names its source (the screens skill). The plate is the one
+# names its source (the screens skill; or, for a motion-designed screen, motion_design.py
+# fill: the render approved at gate B, by its sha256, refused when it changed). The plate is the one
 # approved at gate B (approval.json), else the newest in generated/. Writes
 # segments/<seg>/composite/<seg>-composite-<stamp>.mp4 at 1080x1920 and its track in
 # composite/work/<stamp>/, then runs the insertion gates (qc.py --composite).
@@ -23,9 +24,9 @@ SPEC="$SDIR/insert.json"
 PROPOSE=0
 if [ "${1:-}" = "--propose-grade" ]; then PROPOSE=1; shift; fi
 
-"$PY" - "$VDIR" "$SEG" "$SPEC" <<'PYEOF' || exit 1
+"$PY" - "$VDIR" "$SEG" "$SPEC" "$HERE" <<'PYEOF' || exit 1
 import json, os, sys
-vdir, seg, spec = sys.argv[1:4]
+vdir, seg, spec, here = sys.argv[1:5]
 plan = json.load(open(os.path.join(vdir, "plan.json"))) if os.path.exists(os.path.join(vdir, "plan.json")) else {}
 if plan.get("app_insertion") is not True:
     sys.exit("the plan has no app insertion: there is no screen stage (P4 is n/a)")
@@ -40,6 +41,16 @@ if not os.path.exists(spec):
 s = json.load(open(spec))
 if not s.get("source"):
     sys.exit("insert.json has no source: fill it from apps/<slug>/screens/screens.json (scripts/character/screens.py fill)")
+md = s.get("motion_design")
+if md:
+    # A motion-designed screen: the render approved at gate B, the one fill named.
+    sys.path.insert(0, here)
+    import motion_design
+    rec, row = motion_design.approved(os.path.basename(vdir), seg)
+    if not rec:
+        sys.exit(f"the motion-designed screen of {seg}: {row}")
+    if row.get("sha256") != md.get("sha256"):
+        sys.exit(f"insert.json names another render of {seg} than the approved one: motion_design.py fill again")
 PYEOF
 
 PLATE=${1:-}

@@ -11,7 +11,8 @@
  *   review       gate B: approval.json gate_b_segments; the Atlas `take.approve` and
  *                `take.reject` lines (a reject with `regenerate` is the yes to one more run).
  *                A motion-copy take shows its identity gate (generated/qc/identity-*.json).
- *                A motion-designed R or P (demo_source motion_design): its render,
+ *                A motion-designed R or P (demo_source motion_design), or a phone's screen
+ *                or an M panel by motion design (2026-10-21, fit screen): its render,
  *                motion/render.mp4 (motion_design.py), its gates and stills, approved in
  *                gate_b_motion; the Atlas `motion.approve` and `motion.reject` lines
  *   composite    a phone segment's composite/*.mp4 (composite.sh) and its gates; the Atlas
@@ -365,7 +366,9 @@ export function readProduction(id: string, log: Pick<Event, "kind" | "at" | "not
     const lf = from ? join(vd, "segments", from, "last-frame.png") : null;
     const seed = approved ? num(row?.checks?.seed_diff) : null;
     const a = type === "C" && s.asset_id ? assets.get(s.asset_id) : null;
-    const story = type === "R" || type === "P" ? segmentStory(plan, (s.beat_ids ?? []).map(String)) : null;
+    /* A motion-designed screen: full screen (R, P), a phone's screen or a panel (fit screen: the bare phone screen). */
+    const story0 = segmentStory(plan, (s.beat_ids ?? []).map(String));
+    const story = story0 && type !== "R" && type !== "P" ? { ...story0, fit: "screen" } : story0;
     let motion: Motion | null = null;
     if (story) {
       const md = join(sd, "motion");

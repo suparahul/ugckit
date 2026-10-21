@@ -142,6 +142,8 @@ Mark the cut points on the frozen script first, then give each segment its lines
   beat's `demo_source` says which picture: a real `recording` or `still` of the screen
   library, laid in at assembly, or `motion_design` (founder, 2026-10-19): the app's real
   screens rebuilt in code and rendered locally from the beat's `screen_story`. A
+  motion-designed screen may also fill a phone's green screen or an M panel (the user's
+  choice, 2026-10-21: `motion_design.py fill` after gate B, then `composite.sh`). A
   motion-designed R or P has no trim (it is rendered to its beats' seconds), one
   `screen_id`, and one demo source for all its beats. After `shots.py validate`, run
   `motion_design.py start <video> <seg>` for it and hand it to `character-motion`; it

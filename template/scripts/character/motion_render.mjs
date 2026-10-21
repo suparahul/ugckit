@@ -6,7 +6,7 @@
  * every animation on the page is computed from one clock, so each frame calls
  * window.seek(ms) and takes a screenshot.
  *
- *   node motion_render.mjs <index.html> <out.mp4> --seconds <s> [--fit pad|crop]
+ *   node motion_render.mjs <index.html> <out.mp4> --seconds <s> [--fit pad|crop|screen]
  *        [--probe t1,t2,...] [--hero-at <t>] [--json <render-run.json>]
  *
  * The page's contract (docs/character/motion-design.example.html):
@@ -20,7 +20,10 @@
  * Output: 1080x1920, 30 fps, H.264 (crf 14, yuv420p), no sound. --fit pad (the default)
  * scales the screen to 1920 high and pads the sides with the page's own background colour,
  * as the two posts were; --fit crop scales it to 1080 wide and crops the height around the
- * hero element (else the centre). --probe writes, for each time, the page's visible text
+ * hero element (else the centre). --fit screen (a phone plate or a panel, 2026-10-21) is the
+ * bare phone screen at its own aspect, 1080 wide (e.g. 1080x2338 for 390x844 points), with
+ * no padding: the source composite.sh lays into a phone, or assemble.py into a panel, as it
+ * lays a real screen recording. --probe writes, for each time, the page's visible text
  * lines; --hero-at writes where the [data-hero] element is in the output frame at that time.
  *
  * playwright-core: $PLAYWRIGHT_CORE (its folder), else atlas/node_modules/playwright-core,
@@ -37,20 +40,21 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..", "..");
-const W = 1080, H = 1920, FPS = 30;
+const W = 1080, FPS = 30;
+let H = 1920;
 
 const args = process.argv.slice(2);
 const opt = (n, d = null) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : d; };
 const [page_, out] = args.filter((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--")));
 if (!page_ || !out || !opt("--seconds")) {
-  console.error("usage: node motion_render.mjs <index.html> <out.mp4> --seconds <s> [--fit pad|crop] [--probe t,..] [--hero-at t] [--json f]");
+  console.error("usage: node motion_render.mjs <index.html> <out.mp4> --seconds <s> [--fit pad|crop|screen] [--probe t,..] [--hero-at t] [--json f]");
   process.exit(2);
 }
 const SECONDS = Number(opt("--seconds"));
 const FIT = opt("--fit", "pad");
 const PROBE = (opt("--probe", "") || "").split(",").filter(Boolean).map(Number);
 const HERO_AT = opt("--hero-at") != null ? Number(opt("--hero-at")) : null;
-if (!(SECONDS > 0) || !["pad", "crop"].includes(FIT)) { console.error("--seconds is a number above 0; --fit is pad or crop"); process.exit(2); }
+if (!(SECONDS > 0) || !["pad", "crop", "screen"].includes(FIT)) { console.error("--seconds is a number above 0; --fit is pad, crop or screen"); process.exit(2); }
 
 function playwrightDir() {
   const tries = [process.env.PLAYWRIGHT_CORE, join(ROOT, "atlas", "node_modules", "playwright-core")];
@@ -116,6 +120,7 @@ const [wPt, hPt] = info.pt;
 const dpr = FIT === "pad" ? Math.min(H / hPt, W / wPt) : W / wPt;
 const vw = Math.ceil(wPt), vh = Math.ceil(hPt);
 const pxW = Math.round(wPt * dpr / 2) * 2, pxH = Math.round(hPt * dpr / 2) * 2;
+if (FIT === "screen") H = pxH;
 const rgb = (info.bg.match(/\d+(\.\d+)?/g) || ["0", "0", "0"]).slice(0, 3).map((x) => Math.round(Number(x)));
 const padColor = "0x" + rgb.map((x) => x.toString(16).padStart(2, "0")).join("").toUpperCase();
 
@@ -136,7 +141,9 @@ const hero = HERO_AT != null ? await heroAt(HERO_AT) : null;
 
 // The placement of the screen in the 1080x1920 frame.
 let place;
-if (FIT === "pad") {
+if (FIT === "screen") {
+  place = { vf: `scale=${pxW}:${pxH}`, dx: 0, dy: 0 };
+} else if (FIT === "pad") {
   const x = Math.round((W - pxW) / 2 / 2) * 2, y = Math.round((H - pxH) / 2 / 2) * 2;
   place = { vf: `scale=${pxW}:${pxH},pad=${W}:${H}:${x}:${y}:color=${padColor}`, dx: x, dy: y };
 } else {

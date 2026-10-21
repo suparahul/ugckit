@@ -27,6 +27,16 @@ line. "keep, but let the user override with a recorded reason": the gate stays t
 and the user can pass it with their words, as `review.py composite` and the plate insertion
 gates of `review.py segment` already do. "remove": the rule has no integrity side.
 
+## Status (updated 2026-10-21)
+
+| Item | Status |
+|---|---|
+| Motion design on a phone plate or in a panel (`demo.py` 134, `bridge.py` segment rule) | **Done.** A note. The render is the bare phone screen (fit `screen`); `motion_design.py fill` writes the phone's insert.json; `composite.sh` and assembly use the approved render; an M panel takes it at assembly. |
+| Approving a take that failed a measured gate (identity, OCR, motion-design gates, natural voice, gate C overlay checks) | **Done.** `review.py --accept-fail <gate>` with the user's words; the Atlas "Approve anyway" button with a required note. approval.json records the gate, its result and the words. Never accepted: a stale render (`current`), "overlays as planned", "supplied files unchanged", a stale cut. |
+| The app is never shown in a generated action (T, B, X) | **Kept by decision** (2026-10-21). |
+| A reaction is silent (`bridge.py` 746, 748, 801, 804, 1165; `shots.py` 594) | **Kept by decision** (2026-10-21). |
+| A reaction needs a reference clip, with the written route as the fallback (`bridge.py` 758) | **Kept by decision** (2026-10-21). |
+
 ## Summary
 
 | Area | Refusals | Group 2 | Group 1 |

@@ -19,10 +19,17 @@
                                     gate B for a narrator's take, narration/<take>.wav|mp3
     review.py motion <video> <seg> --decision approve|reject --words "<the user's words>"
               [--check text=pass] [--check hero=pass]
-                                    gate B for a motion-designed screen (an R or P segment whose
-                                    beats have demo_source motion_design): this exact render
+                                    gate B for a motion-designed screen (an R or P segment, a
+                                    phone's screen or an M panel whose beats have demo_source
+                                    motion_design): this exact render
                                     (its sha256), every gate of motion_design.py check passed;
                                     a gate NOT RUN (no OCR engine) needs the user's eye check
+    --accept-fail <gate>, on segment, motion, narration and final (repeatable): approve anyway a
+              take or file that failed a measured gate, at the user's discretion (2026-10-21). The
+              gate still runs and shows its result; approval.json records accepted_failures (the
+              gate, its result, the words). Gates: identity and ocr (a motion-copy take), voice
+              (a narrator's take), overlays (gate C), and each motion-design gate but current.
+              Never accepted: a stale render, a supplied file that changed, a stale cut.
     review.py storyboard <video> --decision approve|redo --words "<the user's words>"
                                     gate A (P1): the storyboard, every keyframe by its sha256
     review.py show <video>          every segment: generated, approved, composited
@@ -48,7 +55,8 @@ without the user's words. Gate C refuses an approval when the file is stale (the
 changed after assembly) or its overlays are not the plan's. An X segment by motion
 copy is approved only with --check identity=pass, no_source_identity=pass and silent=pass,
 a PASS or NO FACE of the identity gate (identity.py) on the file, a length within 0.25 s of
-its reference clip, and no text read by OCR. An X segment by the written fallback (a silent
+its reference clip, and no text read by OCR (a failed identity gate or OCR read is approved
+anyway only with --accept-fail identity or ocr and the user's words). An X segment by the written fallback (a silent
 reaction the user named after a failed motion take) is approved only with --check identity=pass, hands=pass, silent=pass and
 performance=pass, and only when the file is as long as the shot plans.
 
@@ -105,7 +113,7 @@ def save_approval(video, d):
     os.replace(tmp, p)
 
 
-def opts(a, multi=("--check",)):
+def opts(a, multi=("--check", "--accept-fail")):
     out, i = {}, 0
     while i < len(a):
         k = a[i]
@@ -118,6 +126,51 @@ def opts(a, multi=("--check",)):
         else:
             sys.exit(f"unexpected argument {k!r}\n{__doc__}")
     return out
+
+
+# The measured gates an approval may pass at the user's discretion (2026-10-21): the gate
+# still runs and its result is shown; --accept-fail <gate> with the user's words records the
+# override in approval.json (accepted_failures). Never accepted: a file that changed after it
+# was checked (a motion render that is not current, a supplied file that is not the plan's).
+ACCEPTABLE = {"identity": "the identity gate of a motion-copy take (identity.py)",
+              "ocr": "text read by OCR on a motion-copy take",
+              "voice": "the natural-voice check of a narrator's take",
+              "overlays": "the overlay checks of the assembled file (gate C)",
+              "format": "motion design: the render's size, rate or length",
+              "local_only": "motion design: a web address or a request out",
+              "assets": "motion design: a picture not from the app, the plan or the world",
+              "story_text": "motion design: text on the page that the story does not hold",
+              "text_read": "motion design: OCR does not read a step's strings (or did not run)",
+              "hero": "motion design: the hero string (or it was not read)",
+              "page": "motion design: the page had an error"}
+
+
+# The checks of the cut that are integrity, never accepted (assemble.py names them).
+INTEGRITY_CUT = ("overlays as planned", "supplied files unchanged")
+
+
+def accept_fail(o, rows, gate, result, detail, words, why):
+    """One failed measured gate: refused (exit with why), or approved anyway when the user
+    named it (--accept-fail <gate>), recorded in rows with the result and their words."""
+    known(o)
+    if gate not in o.get("--accept-fail", []):
+        sys.exit(f"{why}\n  or, at the user's discretion, approve anyway: --accept-fail {gate} with their words "
+                 "(the gate, its result and the words are recorded)")
+    rows.append({"gate": gate, "result": result, "detail": detail, "words": words, "date": today()})
+    print(f"warning: {gate} {result}{f' ({detail})' if detail else ''}: approved anyway on the user's words")
+
+
+def known(o):
+    for g in o.get("--accept-fail", []):
+        if g not in ACCEPTABLE:
+            sys.exit(f"--accept-fail {g!r}: one of {', '.join(ACCEPTABLE)}")
+
+
+def unused_accepts(o, rows):
+    known(o)
+    for g in o.get("--accept-fail", []):
+        if g not in {r["gate"] for r in rows}:
+            print(f"note: --accept-fail {g}: that gate did not fail here; nothing is recorded for it")
 
 
 def model_slug():
@@ -175,6 +228,15 @@ def atlas_file(path, e, what):
         sys.exit(f"{what} {os.path.relpath(path, ROOT)} changed after the click ({e['at'][:16]}): the user decides again")
 
 
+def atlas_accepts(e):
+    """--accept-fail of an Atlas "Approve anyway" line (data.accept_fail), which always carries
+    the user's note: their words for the override."""
+    gates = [str(g) for g in ((e.get("data") or {}).get("accept_fail") or [])]
+    if gates and not (e.get("note") or "").strip():
+        sys.exit("the Atlas approval accepts a failed gate but has no note: the user's words are required for it")
+    return [x for g in gates for x in ("--accept-fail", g)]
+
+
 def from_atlas(cmd, video, seg=None):
     """The Atlas line as this script's own arguments."""
     if cmd == "segment":
@@ -186,6 +248,7 @@ def from_atlas(cmd, video, seg=None):
                  or f"Approve this take of {seg} (clicked in the Atlas)"]
             for k, v in (dd.get("checks") or {}).items():
                 a += ["--check", f"{k}={v}"]
+            a += atlas_accepts(e)
         else:
             a = ["--decision", "regenerate" if dd.get("decision") != "reject" else "reject",
                  "--words", e.get("note") or "", "--class", e.get("note") or ""]
@@ -208,7 +271,7 @@ def from_atlas(cmd, video, seg=None):
         if e["kind"] == "cut.sendback":
             return ["--decision", "reject", "--words", e.get("note") or "", "--atlas-at", e["at"]]
         return ["--decision", "approve", "--words", (e.get("note") or "").strip() or "Approve the cut (clicked in the Atlas)",
-                "--export", dd.get("export") or "default", "--atlas-at", e["at"]]
+                "--export", dd.get("export") or "default", "--atlas-at", e["at"]] + atlas_accepts(e)
     if cmd == "storyboard":
         e = atlas_line(video, ("storyboard.approve", "storyboard.sendback"))
         if e["kind"] == "storyboard.sendback":
@@ -236,7 +299,7 @@ def from_atlas(cmd, video, seg=None):
              or f"Approve the motion design of {seg} (clicked in the Atlas)", "--atlas-at", e["at"]]
         for k, v in (dd.get("checks") or {}).items():
             a += ["--check", f"{k}={v}"]
-        return a
+        return a + atlas_accepts(e)
     if cmd == "narration":
         e = atlas_line(video, ("narration.approve", "narration.reject"), seg, key="take")
         dd = e.get("data") or {}
@@ -247,7 +310,7 @@ def from_atlas(cmd, video, seg=None):
         a += ["--decision", "approve", "--words", (e.get("note") or "").strip() or f"Approve the narration take {seg} (clicked in the Atlas)"]
         for k, v in (dd.get("checks") or {}).items():
             a += ["--check", f"{k}={v}"]
-        return a
+        return a + atlas_accepts(e)
     sys.exit(f"--from-atlas does not apply to {cmd}")
 
 
@@ -345,14 +408,15 @@ def latest_take(d, take):
 
 
 def motion_segments(video):
-    """The R and P segments whose beats are motion-designed: their render is approved at gate B."""
+    """The segments whose beats are motion-designed (R or P, a phone's screen, an M panel): their
+    render is approved at gate B."""
     p = os.path.join(vdir(video), "plan.json")
     if not os.path.exists(p):
         return []
     plan = json.load(open(p))
     import demo
     return [name for s, t, name, _ in video_segments(video)
-            if t in ("R", "P") and demo.segment_story(plan, s.get("beat_ids") or [])]
+            if demo.segment_story(plan, s.get("beat_ids") or [])]
 
 
 def needs(video):
@@ -473,17 +537,25 @@ def cmd_segment(video, seg, a):
             sys.exit(f"the identity gate needs opencv ({e}): run review.py with .venv/bin/python3")
         # NO FACE: no frame shows a face, so nothing is measured and the eye check decides
         # (founder, 2026-10-19: a visible face is not a requirement of motion copy).
+        acc = []
         if idr["result"] not in ("PASS", "NO FACE"):
-            sys.exit(f"identity gate {idr['result']}: {idr.get('why')} (qc/identity-*.json). A motion-copy reaction "
-                     "is not approved when a face it shows is measured as not the character's")
-        entry["checks"]["identity_gate"] = ("no face to measure: the eye check decides" if idr["result"] == "NO FACE"
+            accept_fail(o, acc, "identity", idr["result"], idr.get("why"), words,
+                        f"identity gate {idr['result']}: {idr.get('why')} (qc/identity-*.json). A face the take shows "
+                        "is measured as not the character's")
+        entry["checks"]["identity_gate"] = (f"accepted failure: {idr['result']}" if acc else
+                                            "no face to measure: the eye check decides" if idr["result"] == "NO FACE"
                                             else f"pass: median {idr['median_character']} to the character, "
                                                  f"{idr['median_reference']} to the reference")
         left = text_on(os.path.join(sdir, f), os.path.join(sdir, os.path.dirname(f), "qc"))
         if left:
-            sys.exit(f"OCR reads text on the file: {left} -- a burned-in caption, handle or watermark of the "
-                     "reference is left (a trace of the original creator)")
-        entry["checks"]["text_left"] = "none" if left is not None else "not read (no OCR engine)"
+            accept_fail(o, acc, "ocr", "FAIL", str(left)[:200], words,
+                        f"OCR reads text on the file: {left} -- a burned-in caption, handle or watermark of the "
+                        "reference may be left (a trace of the original creator)")
+        entry["checks"]["text_left"] = ("accepted: " + str(left)[:120]) if left else \
+            "none" if left is not None else "not read (no OCR engine)"
+        unused_accepts(o, acc)
+        if acc:
+            entry["accepted_failures"] = acc
         entry["motion_copy"] = {"ref_id": fr["id"], "post_id": fr.get("post_id"), "route": route}
     elif t == "X" and dec == "approve":
         miss = [k for k in REACTION_CHECKS if entry["checks"].get(k) != "pass"]
@@ -658,29 +730,36 @@ def cmd_motion(video, seg, a):
         if "=" in c:
             k, v = c.split("=", 1)
             eye[k] = v
-    checks = {}
+    checks, acc = {}, []
     if dec == "approve":
         if not g:
             sys.exit(f"no gates for this render: motion_design.py check {video} {seg}")
-        failed = [r["gate"] for r in g["results"] if r["result"] == "FAIL"]
-        if failed:
-            sys.exit(f"cannot approve: the gates failed ({', '.join(failed)}); change the page, render and check again")
         for r in g["results"]:
             checks[r["gate"]] = r["result"].lower().replace(" ", "_")
-            if r["result"] == "NOT RUN":
+            if r["result"] == "FAIL" and r["gate"] == "current":
+                sys.exit(f"cannot approve: the render is not of the page, the assets and the story now ({r['detail']}); "
+                         "render and check again (a stale render is never approved)")
+            if r["result"] == "FAIL":
+                accept_fail(o, acc, r["gate"], "FAIL", r.get("detail"), words,
+                            f"cannot approve: the gate {r['gate']} failed ({r.get('detail')}); change the page, render "
+                            "and check again")
+            elif r["result"] == "NOT RUN":
                 k = {"text_read": "text", "hero": "hero"}.get(r["gate"], r["gate"])
                 if eye.get(k) != "pass":
-                    sys.exit(f"cannot approve: {r['gate']} was not run ({r['detail']}); the user reads the stills "
-                             f"and says so: --check {k}=pass")
+                    accept_fail(o, acc, r["gate"], "NOT RUN", r.get("detail"), words,
+                                f"cannot approve: {r['gate']} was not run ({r['detail']}); the user reads the stills "
+                                f"and says so: --check {k}=pass")
+        unused_accepts(o, acc)
     checks.update(eye)
     d = load_approval(video)
     d.setdefault("gate_b_motion", []).append({
         "segment": seg, "screen_id": st.get("screen_id"), "file": "motion/render.mp4", "sha256": sha,
         "story_sha256": motion_design.sha256_json(st), "decision": dec, "words": words, "date": today(),
-        "checks": checks, "hero": (g or {}).get("hero"),
+        "checks": checks, "hero": (g or {}).get("hero"), **({"accepted_failures": acc} if acc else {}),
         **({"atlas_line_at": o["--atlas-at"]} if o.get("--atlas-at") else {})})
     save_approval(video, d)
-    print(f"gate B motion design: {seg} {dec} (motion/render.mp4, sha256 {sha[:12]})")
+    print(f"gate B motion design: {seg} {dec} (motion/render.mp4, sha256 {sha[:12]})"
+          + (f", approved anyway: {', '.join(r['gate'] for r in acc)}" if acc else ""))
     update_review_state(video)
 
 
@@ -713,15 +792,19 @@ def cmd_narration(video, take, a):
     if not lines or set(lines) - allowed:
         sys.exit(f"--lines names the voiceover lines of {nid}: {', '.join(sorted(allowed)) or 'none in the plan'}")
     checks = dict(c.split("=", 1) for c in o.get("--check", []) if "=" in c)
+    acc = []
     if dec == "approve" and checks.get("natural_voice") != "pass":
-        sys.exit("a synthetic narrator's take is approved only after the natural-voice check: natural breaths, "
-                 "varied pauses, no 2 s window under 5 semitones (qc.py - - <take>), room sound, no flat TTS "
-                 "cadence; record it with --check natural_voice=pass")
+        accept_fail(o, acc, "voice", checks.get("natural_voice") or "not passed", None, words,
+                    "a synthetic narrator's take is approved after the natural-voice check: natural breaths, "
+                    "varied pauses, no 2 s window under 5 semitones (qc.py - - <take>), room sound, no flat TTS "
+                    "cadence; record it with --check natural_voice=pass")
+    if dec == "approve":
+        unused_accepts(o, acc)
     d = load_approval(video)
     d.setdefault("gate_b_narration", []).append({
         "take": take, "file": os.path.relpath(files[0], vdir(video)), "sha256": bridge.sha256_file(files[0]),
         "narrator": nid, "voice_ref": nar.get("voice_ref"), "lines": lines, "decision": dec,
-        "words": words, "date": today(), "checks": checks,
+        "words": words, "date": today(), "checks": checks, **({"accepted_failures": acc} if acc else {}),
         **({"atlas_line_at": o["--atlas-at"]} if o.get("--atlas-at") else {})})
     save_approval(video, d)
     print(f"gate B narration: {take} ({nid}, {', '.join(lines)}) {dec}")
@@ -774,19 +857,28 @@ def cmd_final(video, a):
         sys.exit("no assembly/assembly.json -- run scripts/character/assemble.sh first")
     m = json.load(open(man))
     plan = plan_of(video)
+    acc = []
     if dec == "approve" and bridge.is_v2(plan):
         if m.get("plan_sha256") != bridge.digest(plan):
             sys.exit("the file was assembled from another revision of the plan: assemble again before gate C")
-        failed = [k for k, c in (m.get("checks") or {}).items()
-                  if k.startswith(("overlays", "supplied")) and c.get("result") == "FAIL"]
+        # Integrity, never accepted: the overlays are not the plan's, or a supplied file changed.
+        failed = [k for k, c in (m.get("checks") or {}).items() if k in INTEGRITY_CUT and c.get("result") == "FAIL"]
         if failed:
-            sys.exit(f"cannot approve: {', '.join(failed)} failed on the final file (assembly.json)")
+            sys.exit(f"cannot approve: {', '.join(failed)} failed on the final file (assembly.json): the cut is not "
+                     "the plan's; assemble again")
+        failed = [k for k, c in (m.get("checks") or {}).items()
+                  if k.startswith("overlays") and k not in INTEGRITY_CUT and c.get("result") == "FAIL"]
+        if failed:
+            accept_fail(o, acc, "overlays", "FAIL", ", ".join(failed), words,
+                        f"cannot approve: {', '.join(failed)} failed on the final file (assembly.json)")
+    if dec == "approve":
+        unused_accepts(o, acc)
     d = load_approval(video)
     g = d.get("gate_c_final") or {}
     g.update({"decision": dec if dec != "regenerate" else f"regenerate segment {o.get('--segment', '?')}",
               "words": words, "date": today(), "file": m.get("file"),
               "export_choice": o.get("--export", "default"),
-              "final_checks": m.get("checks"),
+              "final_checks": m.get("checks"), "accepted_failures": acc or None,
               "sha256": bridge.sha256_file(os.path.join(ROOT, m["file"])) if m.get("file") and os.path.exists(os.path.join(ROOT, m["file"])) else None,
               "atlas_line_at": o.get("--atlas-at")})
     if dec == "regenerate" and o.get("--cost") not in (None, "None"):
@@ -853,16 +945,18 @@ def cmd_show(video):
                 continue
         elif t == "M":
             print(f"  {name:<8} M  panels {', '.join(str(p.get('id')) for p in s.get('panels') or [])}")
-            continue
-        elif t in ("R", "P") and name in motion_segments(video):
+            if name not in motion_segments(video):
+                continue
+        if name in motion_segments(video):
             import motion_design
             sha, g, e = motion_design.state(video, name)
             print(f"  {name:<8} {t}  motion design: " + ("not rendered" if not sha else
                   ("rendered, " + ("checked" if g else "not checked") + "; " +
                    (f"{e['decision']} {e['date']}" + ("" if e.get("sha256") == sha else " (another render)")
                     if e else "not reviewed"))))
-            continue
-        elif t not in GENERATED:
+            if t in ("R", "P", "M"):
+                continue
+        if t not in GENERATED:
             print(f"  {name:<8} {t}  not generated (built at assembly)")
             continue
         v, seg, sd = project_dir(proj)

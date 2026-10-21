@@ -29,6 +29,13 @@ The beat's `screen_story` is what the render shows, and nothing else:
 the frame's height on the screen's own background, as the first two motion-designed posts were
 (2026-10-14); crop fills the width and crops the height around the hero element.
 
+On a phone or in a panel (2026-10-21, the user's choice): a motion-designed beat may also be the
+screen of a phone plate (O, G, S, H, F, or a C clip that films a phone) or of a panel (M). The
+render is then the bare phone screen at its own aspect (fit `screen`, set here, whatever the
+story says), approved at gate B like a full-screen one, and laid into the phone by composite.sh
+(`motion_design.py fill` writes its insert.json) or into the panel by assemble.py, as a real
+recording is. The check notes the trade-off; it never refuses it.
+
 Used by bridge.py (the production check of the plan), video_plan.py (the planning check),
 motion_design.py (the render and its gates), review.py and assemble.py.
 """
@@ -37,6 +44,8 @@ import difflib, json, os, re
 SOURCES = ("recording", "still", "motion_design")
 ACTIONS = ("appear", "tap", "scroll", "swipe", "type", "result", "hold")
 FITS = ("pad", "crop")
+# A render for a phone plate or a panel: the bare screen at its own aspect (motion_render.mjs --fit screen).
+SCREEN_FIT = "screen"
 # Where a picture inside a motion-designed screen may come from: the app itself (its code,
 # fonts, icons, its own screenshots), a supplied asset of the plan (the owner's real clip or
 # photo), or a fixed subject's approved picture in the handle's world.
@@ -129,10 +138,13 @@ def check_beat(root, plan, b, rows, bad, note, screens=None):
         if b.get("screen_story") is not None:
             bad(f"{tag}: a screen_story belongs to demo_source motion_design, not {ds}")
         return
-    # Motion design.
-    if b.get("framing") != "app_screen":
-        bad(f"{tag}: motion design is rendered full screen: framing app_screen (an R or P segment); a phone "
-            "plate or a panel shows a real recording")
+    # Motion design. Full screen (framing app_screen, R or P), or the screen of a phone plate or a
+    # panel: the user's choice (2026-10-21), noted with its trade-off.
+    full = b.get("framing") == "app_screen"
+    if not full:
+        note(f"{tag}: motion design on a phone or in a panel (framing {b.get('framing')}), the user's choice: "
+             "the render is laid into the phone's green screen or the panel like a recording; a drawn screen "
+             "in a filmed hand can look pasted on, so check the composite closely")
     if placeholder(b.get("demo_source_reason")):
         bad(f"{tag}: motion design needs demo_source_reason: why no real recording shows this screen")
     if placeholder(sid):
@@ -144,7 +156,7 @@ def check_beat(root, plan, b, rows, bad, note, screens=None):
     elif recordings(rows):
         note(f"{tag}: motion design, while the screen library holds {', '.join(recordings(rows))}; "
              f"the reason: {b.get('demo_source_reason')}")
-    if b.get("source_asset_ids"):
+    if full and b.get("source_asset_ids"):
         bad(f"{tag}: a motion-designed screen is rendered, not supplied (no source_asset_ids)")
     st = b.get("screen_story")
     if not isinstance(st, dict):
@@ -229,10 +241,11 @@ def segment_story(plan, beat_ids):
         screens += [x for x in st.get("screens") or [] if x not in screens]
         rebuilt += [x for x in st.get("rebuilt_from") or [] if x not in rebuilt]
     sid = mb[0].get("screen_id")
+    full = all(b.get("framing") == "app_screen" for b in mb)
     return {"screen_id": sid, "beats": [b.get("id") for b in bb],
             "seconds": round(sum((b.get("end_s") or 0) - (b.get("start_s") or 0) for b in bb), 3),
             "screens": screens, "rebuilt_from": rebuilt, "steps": steps,
-            "fit": (mb[0].get("screen_story") or {}).get("fit") or "pad",
+            "fit": ((mb[0].get("screen_story") or {}).get("fit") or "pad") if full else SCREEN_FIT,
             "hero": (plan.get("hero_strings") or {}).get(sid),
             "reasons": [b.get("demo_source_reason") for b in mb]}
 

@@ -1,6 +1,6 @@
 ---
 name: character-motion
-description: P2 of the character pipeline for a motion-designed app screen — an R or P segment whose beats have demo_source motion_design. Rebuild the app's real screens in HTML and CSS from PRODUCT-SCREENS.md and the app's own code and in-app text, animate the plan's screen story (taps, scrolls, the result appearing), render it locally at 1080x1920, run the gates, and show the user the render for gate B. Free, local; never a video model, never an invented screen or word.
+description: P2 of the character pipeline for a motion-designed app screen — an R or P segment, a phone's screen or an M panel whose beats have demo_source motion_design. Rebuild the app's real screens in HTML and CSS from PRODUCT-SCREENS.md and the app's own code and in-app text, animate the plan's screen story (taps, scrolls, the result appearing), render it locally at 1080x1920, run the gates, and show the user the render for gate B. Free, local; never a video model, never an invented screen or word.
 ---
 
 # P2 — a motion-designed app screen
@@ -95,6 +95,19 @@ story, OCR of each step's strings on its still, the hero string on the `data-her
 and no page error. Fix the page and render again until no gate fails. With no OCR engine,
 `text_read` and `hero` are NOT RUN: the user reads the stills.
 
+## On a phone or in a panel
+
+The user may put the motion-designed screen on a phone plate (O, G, S, H, F, or a C clip that
+films a phone) or in an M panel (2026-10-21). The steps are the same; the render is the bare
+phone screen at its own aspect (fit `screen`, 1080 wide; `start` says so). After gate B:
+
+    motion_design.py fill <video> <nn>-<type>      # a phone: insert.json from the approved render
+
+then `composite.sh` and `review.py composite` as for a real recording (`character-composite`).
+An M panel that names the screen takes the approved render at assembly. A render approved
+again after the composite needs `fill` and `composite.sh` again; assembly refuses the old
+composite. Say the trade-off once: a drawn screen in a filmed hand can look pasted on.
+
 ## 5. Gate B
 
 Show the user the render and its stills, beside the story's steps (the Atlas shows all of
@@ -102,7 +115,9 @@ it at stage 5; `motion.approve` and `motion.reject` are their clicks). Record th
 
     review.py motion <video> <seg> --decision approve --words "<their words>" [--check text=pass --check hero=pass]
 
-or `--from-atlas`. The approval is of this render's sha256; a new render needs a new
+or `--from-atlas`. A failed gate is the user's to accept: `--accept-fail <gate>` with their
+words (the Atlas: "Approve anyway" with a note); `current` (a stale render) never is. The
+approval is of this render's sha256; a new render needs a new
 approval. A reject says what to change: change the page (never the story) and render again.
 Assembly (`character-assemble`) lays the approved render in as it is, with the P bubble when
 the segment is P.

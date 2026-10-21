@@ -386,8 +386,10 @@ what is missing (`ready`) and writes the lock. Free.
   A character not `live` is a part-A dependency; planning never starts casting.
 - **The app demo has three sources** (founder, 2026-10-19): a real recording, a real still,
   or motion design (the app's real screens rebuilt in code and rendered). `video-plan`
-  chooses one per screen, a real recording first; motion design only for a full-screen app
-  beat whose screen `PRODUCT-SCREENS.md` describes and no recording shows, with the reason.
+  chooses one per screen, a real recording first; motion design for a screen
+  `PRODUCT-SCREENS.md` describes and no recording shows, with the reason: full screen, or
+  (the user's choice, 2026-10-21) on a phone or in a panel, rendered as the bare phone
+  screen and laid in like a recording.
   `video-script` writes its `screen_story`: every step and every in-app string, word for
   word, which is all the render may show.
 - **A reaction is silent and real** (user decision, 2026-10-03). A reaction hook is never
@@ -409,7 +411,9 @@ what is missing (`ready`) and writes the lock. Free.
   its computed cost, gate A; each take with its identity gate, gate B; each composite; the
   cut, gate C; each click is recorded by `scripts/character/review.py storyboard|segment|
   composite|final ... --from-atlas`, which checks the file's sha256 against the click and
-  runs every gate; a storyboard approval, or a reject with "Generate it again", is the
+  runs every gate; a failed measured gate is the user's to accept ("Approve anyway" with a
+  required note, `--accept-fail <gate>`: the gate, its result and the words are recorded in
+  approval.json; a stale render, a changed supplied file and a stale cut never are); a storyboard approval, or a reject with "Generate it again", is the
   user's yes to the computed cost of those runs), final (the delivered file, **Approve for
   posting**), then the slideshow's
   send (the `post` skill, "A video post": the one file, its checksum, `publishing_note.caption`
@@ -470,7 +474,10 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
   A real recording is preferred: motion design fills the frame and looks more like a
   promotion than a hand holding a phone, so the plan picks it only where no recording
   shows the screen and says why (`demo_source_reason`); the bridge refuses it for a
-  screen the library records and on a phone plate or a panel. In a `live_use` video it is
+  screen the library records. On a phone plate or in a panel it is the user's choice
+  (2026-10-21), noted: the render is the bare phone screen (fit `screen`), `motion_design.py
+  fill` makes it the phone's insert source for `composite.sh`, and assembly lays it into an
+  M panel; a drawn screen in a filmed hand can look pasted on. In a `live_use` video it is
   the user's choice (2026-10-21): the bridge notes that motion design looks more like an
   advert than a real recording, and a live_use video with a generated input and no paired
   recording is made too, with a note; the kit never refuses a format. Its

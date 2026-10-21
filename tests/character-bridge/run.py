@@ -683,10 +683,43 @@ def motion_copy(assemble_on):
     expect(f"{v_}: gate B passes a take with no face to the next check (identity NO FACE)",
            rv[:8] + ["generated/01-x-dirty.mp4"] + rv[9:] + ok_checks, ok=False, contains="OCR reads text")
     stub_identity("FAIL")
-    expect(f"{v_}: gate B refuses an identity FAIL", rv + ok_checks, ok=False, contains="identity gate FAIL")
+    expect(f"{v_}: gate B refuses an identity FAIL, and names the override", rv + ok_checks, ok=False,
+           contains="--accept-fail identity")
+    # Approve anyway (2026-10-21): the gate still runs; the user's words and the result are recorded.
+    keep_ap = open(ap).read() if os.path.exists(ap) else None
+    expect(f"{v_}: gate B approves an identity FAIL anyway, on the user's words",
+           rv[:-1] + ["It is her; the light fooled the gate.", "--accept-fail", "identity"] + ok_checks,
+           contains="approved anyway on the user's words")
+    e = [x for x in rj(ap)["gate_b_segments"] if x.get("project") == f"{v_}.01-x"][-1]
+    af = (e.get("accepted_failures") or [{}])[0]
+    ok = e["decision"] == "approve" and af.get("gate") == "identity" and af.get("result") == "FAIL" \
+        and af.get("words") == "It is her; the light fooled the gate." and e["checks"].get("identity_gate") == "accepted failure: FAIL"
+    RESULTS.append((f"{v_}: approval.json records the accepted identity failure", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  {v_}: approval.json records the accepted identity failure {af}")
+    atlas("take.approve", {"segment": "01-x", "file": "generated/01-x-take1.mp4", "sha256": sha(take), "accept_fail": ["identity"],
+                           "checks": {"identity": "pass", "no_source_identity": "pass", "silent": "pass"}},
+          at="2026-10-20T10:50:00.000Z")
+    expect(f"{v_}: an Atlas approve-anyway line with no note is refused", [PY, f"{SC}/review.py", "segment", v_, "01-x",
+           "--from-atlas"], ok=False, contains="has no note")
+    atlas("take.approve", {"segment": "01-x", "file": "generated/01-x-take1.mp4", "sha256": sha(take), "accept_fail": ["identity"],
+                           "checks": {"identity": "pass", "no_source_identity": "pass", "silent": "pass"}},
+          note="Keep it, the gate is wrong here.", at="2026-10-20T10:51:00.000Z")
+    expect(f"{v_}: the Atlas approve-anyway line becomes --accept-fail identity", [PY, f"{SC}/review.py", "segment", v_,
+           "01-x", "--from-atlas"], contains="approved anyway on the user's words")
+    if keep_ap is None:
+        os.remove(ap)
+    else:
+        open(ap, "w").write(keep_ap)
     stub_identity("PASS")
     expect(f"{v_}: gate B refuses a file with the creator's caption and handle",
-           rv[:8] + ["generated/01-x-dirty.mp4"] + rv[9:] + ok_checks, ok=False, contains="OCR reads text")
+           rv[:8] + ["generated/01-x-dirty.mp4"] + rv[9:] + ok_checks, ok=False, contains="--accept-fail ocr")
+    keep_ap = open(ap).read() if os.path.exists(ap) else None
+    expect(f"{v_}: gate B approves it anyway with --accept-fail ocr",
+           rv[:8] + ["generated/01-x-dirty.mp4"] + rv[9:] + ok_checks + ["--accept-fail", "ocr"], contains="ocr FAIL")
+    if keep_ap is None:
+        os.remove(ap)
+    else:
+        open(ap, "w").write(keep_ap)
     os.remove(dirty)
     long_ = os.path.join(sd, "generated", "01-x-long.mp4")
     clip(long_, 5, "smptebars", 120, size="720x1280")
@@ -1180,6 +1213,54 @@ def atlas_narration(video, take, text, lines):
            [PY, f"{SC}/review.py", "narration", video, take, "--from-atlas"], contains=f"gate B narration: {take}")
 
 
+def gate_c_anyway(video):
+    """Gate C with a failed overlay check (2026-10-21): refused, then approved anyway on the user's
+    words; the overlays not the plan's are never accepted."""
+    vd = p("pipeline", "character", video)
+    keep = {f: open(os.path.join(vd, f)).read() for f in ("assembly/assembly.json", "approval.json")}
+    man = rj(os.path.join(vd, "assembly", "assembly.json"))
+    man["checks"]["overlays readable"] = {"result": "FAIL", "detail": "the paragraph is up 1.2 s; it needs 2.4 s"}
+    wj(os.path.join(vd, "assembly", "assembly.json"), man)
+    fin = [PY, f"{SC}/review.py", "final", video, "--decision", "approve", "--words", "Fast is fine, it is a teaser."]
+    expect(f"{video}: gate C refuses a failed overlay check, and names the override", fin, ok=False,
+           contains="--accept-fail overlays")
+    expect(f"{video}: gate C approves it anyway with --accept-fail overlays", fin + ["--accept-fail", "overlays"],
+           contains="gate C: " + video + " approve")
+    af = (rj(os.path.join(vd, "approval.json"))["gate_c_final"].get("accepted_failures") or [{}])[0]
+    ok = af.get("gate") == "overlays" and af.get("result") == "FAIL" and af.get("words") == "Fast is fine, it is a teaser."
+    RESULTS.append((f"{video}: gate_c_final records the accepted overlay failure", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  {video}: gate_c_final records the accepted overlay failure {af}")
+    man["checks"]["overlays as planned"] = {"result": "FAIL", "detail": "video.json overlays are not the plan's"}
+    wj(os.path.join(vd, "assembly", "assembly.json"), man)
+    expect(f"{video}: overlays not the plan's are never approved anyway", fin + ["--accept-fail", "overlays"], ok=False,
+           contains="the cut is not the plan's")
+    for f, t in keep.items():
+        open(os.path.join(vd, f), "w").write(t)
+
+
+def narration_anyway(video, take, text, lines):
+    """A narrator's take without the natural-voice check: refused, then approved anyway on the user's words."""
+    f = p("pipeline", "character", video, "narration", f"{take}.wav")
+    speech(f, text)
+    ap = p("pipeline", "character", video, "approval.json")
+    keep = open(ap).read() if os.path.exists(ap) else None
+    base = [PY, f"{SC}/review.py", "narration", video, take, "--narrator", "calm", "--lines", lines, "--decision", "approve",
+            "--words", "The flat read is the joke."]
+    expect(f"{video}: narration without the natural-voice check is refused, and names the override", base, ok=False,
+           contains="--accept-fail voice")
+    expect(f"{video}: narration approved anyway with --accept-fail voice", base + ["--accept-fail", "voice"],
+           contains=f"gate B narration: {take}")
+    row = rj(ap)["gate_b_narration"][-1]
+    af = (row.get("accepted_failures") or [{}])[0]
+    ok = af.get("gate") == "voice" and af.get("words") == "The flat read is the joke."
+    RESULTS.append((f"{video}: the narration row records the accepted voice check", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  {video}: the narration row records the accepted voice check {af}")
+    if keep is None:
+        os.remove(ap)
+    else:
+        open(ap, "w").write(keep)
+
+
 def narration_take(video, take, text, lines):
     f = p("pipeline", "character", video, "narration", f"{take}.wav")
     speech(f, text)
@@ -1312,11 +1393,9 @@ def motion_design_test(assemble_on):
            contains="looks more like an advert")
     mutate(v, "a live_use video with a motion-designed result, through shots.py validate",
            plan_fn=lambda q: q["editorial"].update(filming_format="live_use"), ok=True)
-    mutate(v, "motion design on a phone plate",
-           plan_fn=lambda q: q["beats"][1].update(framing="hands_only"), cmd="plan",
-           contains="rendered full screen")
     mutate(v, "a motion-designed beat in a generated segment",
-           video_fn=lambda x: x["segments"][1].update(type="B", project=f"{v}.02-b"), contains="R or P segment")
+           video_fn=lambda x: x["segments"][1].update(type="B", project=f"{v}.02-b"),
+           contains="the app is never in a generated action")
     expect(f"{v}: generate.sh refuses the app screen", ["bash", f"{SC}/generate.sh", v, "02-r"], ok=False,
            contains="a video model never generates an app screen")
     expect(f"{v}: motion_design.py start", [PY, f"{SC}/motion_design.py", "start", v, "02-r"],
@@ -1334,8 +1413,20 @@ def motion_design_test(assemble_on):
         return
     expect(f"{v}: the gates refuse an invented interface line", [PY, f"{SC}/motion_design.py", "check", v, "02-r"],
            ok=False, contains="not in the story: ")
-    expect(f"{v}: gate B refuses the failed render", [PY, f"{SC}/review.py", "motion", v, "02-r", "--decision", "approve",
-                                                       "--words", "Looks good."], ok=False, contains="gates failed")
+    expect(f"{v}: gate B refuses the failed render, and names the override", [PY, f"{SC}/review.py", "motion", v, "02-r",
+           "--decision", "approve", "--words", "Looks good."], ok=False, contains="--accept-fail story_text")
+    eye = ["--check", "text=pass", "--check", "hero=pass"]
+    expect(f"{v}: --accept-fail names a known gate", [PY, f"{SC}/review.py", "motion", v, "02-r", "--decision", "approve",
+           "--words", "Keep it.", "--accept-fail", "vibes"] + eye, ok=False, contains="--accept-fail 'vibes'")
+    expect(f"{v}: gate B approves the failed render anyway, on the user's words",
+           [PY, f"{SC}/review.py", "motion", v, "02-r", "--decision", "approve", "--words", "The extra line is fine.",
+            "--accept-fail", "story_text"] + eye, contains="approved anyway: story_text")
+    row = rj(p("pipeline", "character", v, "approval.json"))["gate_b_motion"][-1]
+    af = (row.get("accepted_failures") or [{}])[0]
+    ok = row["decision"] == "approve" and af.get("gate") == "story_text" and af.get("result") == "FAIL" \
+        and af.get("words") == "The extra line is fine." and "Try premium free" in str(af.get("detail"))
+    RESULTS.append((f"{v}: approval.json records the gate, its result and the words", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  {v}: approval.json records the gate, its result and the words {af}")
     # The page of the story, word for word.
     open(os.path.join(md, "index.html"), "w").write(MD_PAGE.replace("EXTRA", ""))
     expect(f"{v}: render", [PY, f"{SC}/motion_design.py", "render", v, "02-r"])
@@ -1357,6 +1448,9 @@ def motion_design_test(assemble_on):
     ok = "stray.png is not in assets.json" in out and "changed since the render" in out
     RESULTS.append((f"{v}: ... and name the picture and the stale render", ok))
     print(f"{'PASS' if ok else 'FAIL'}  {v}: ... and name the picture and the stale render")
+    expect(f"{v}: a stale render is never approved anyway", [PY, f"{SC}/review.py", "motion", v, "02-r", "--decision",
+           "approve", "--words", "Ship it.", "--accept-fail", "local_only", "--accept-fail", "assets"] + eye,
+           ok=False, contains="a stale render is never approved")
     open(os.path.join(md, "index.html"), "w").write(keep)
     os.remove(os.path.join(md, "assets", "stray.png"))
     expect(f"{v}: the gates pass again", [PY, f"{SC}/motion_design.py", "check", v, "02-r"])
@@ -1379,6 +1473,114 @@ def motion_design_test(assemble_on):
         f.write(b"\0")
     expect(f"{v}: assembly refuses a render that is not the approved one", ["bash", f"{SC}/assemble.sh", v], ok=False,
            contains="the approved render is not the one on disk")
+
+
+MD_STORY = {"screens": ["Tail Reading"], "rebuilt_from": ["code src/screens/TailReading.tsx"], "fit": "pad", "steps": [
+    {"at_s": 0, "screen": "Tail Reading", "action": "appear", "target": None, "shows": ["Tail reading", "Upload a clip"]},
+    {"at_s": 1.5, "screen": "Tail Reading", "action": "tap", "target": "Upload a clip", "shows": ["Tail reading", "Upload a clip"]},
+    {"at_s": 2.5, "screen": "Tail Reading", "action": "result", "target": None,
+     "shows": ["Tail reading", "Relaxed tail", "Held high, a slow sway."]}]}
+
+
+def md_render(v, seg, label):
+    """Start, write the story's page, render, check and approve one motion-designed segment.
+    False when the machine cannot render (no browser): the caller skips the rest."""
+    expect(f"{v}: motion_design.py start {seg}", [PY, f"{SC}/motion_design.py", "start", v, seg], contains="fit screen")
+    md = p("pipeline", "character", v, "segments", seg, "motion")
+    open(os.path.join(md, "index.html"), "w").write(MD_PAGE.replace("EXTRA", ""))
+    out = expect(f"{v}: render {seg} ({label})", [PY, f"{SC}/motion_design.py", "render", v, seg])
+    if "no playwright-core" in out or "no Chrome" in out or "needs node" in out:
+        print(f"SKIP  {v}: the render needs node, playwright-core and Chrome")
+        return False
+    pr = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+                         "-of", "csv=p=0", os.path.join(md, "render.mp4")], capture_output=True, text=True).stdout.strip()
+    RESULTS.append((f"{v}: the {label} render is the bare screen, 1080x2338", pr == "1080,2338"))
+    print(f"{'PASS' if pr == '1080,2338' else 'FAIL'}  {v}: the {label} render is the bare screen, 1080x2338 ({pr})")
+    expect(f"{v}: every gate passes on {seg}", [PY, f"{SC}/motion_design.py", "check", v, seg], contains="no gate failed")
+    g = rj(os.path.join(md, "gates.json"))
+    eye = ["--check", "text=pass", "--check", "hero=pass"] if any(r["result"] == "NOT RUN" for r in g["results"]) else []
+    expect(f"{v}: gate B approves the {label} render", [PY, f"{SC}/review.py", "motion", v, seg, "--decision", "approve",
+           "--words", "That is the app."] + eye, contains=f"gate B motion design: {seg} approve")
+    return True
+
+
+def motion_phone_test(assemble_on):
+    """Motion design on a phone (2026-10-21): the filmed phone of v2-filmed-phone shows a
+    motion-designed screen. The render (fit screen) is approved at gate B, `fill` writes the
+    insert.json, composite.sh lays it into the green screen, and assembly uses the composite."""
+    v = "v2-phone-motion"
+    pl = fixture("v2-filmed-phone")
+    pl["video_id"] = v
+    pl["beats"][0].update(screen_id="tail-reading", demo_source="motion_design",
+                          demo_source_reason="the user chose the rebuilt screen", screen_story=MD_STORY)
+    pl["hero_strings"] = {"tail-reading": "Relaxed tail"}
+    pl = lock(pl)
+    checks(v)
+    expect(f"{v}: the plan check notes motion design on a phone", [PY, f"{SC}/bridge.py", "plan", v],
+           contains="motion design on a phone or in a panel")
+    video_json(pl, [{"n": 1, "type": "C", "asset_id": "phone-clip", "source_range_s": [0, 5], "beat_ids": ["b1"],
+                     "script_lines": [], "insert": {"mode": "in-hand", "screen_id": "tail-reading"}}])
+    validate(v)
+    expect(f"{v}: shots.py supplied (the plate)", [PY, f"{SC}/shots.py", "supplied", v])
+    expect(f"{v}: fill refuses a render not approved yet", [PY, f"{SC}/motion_design.py", "fill", v, "01-c"], ok=False,
+           contains="no motion/render.mp4")
+    if not md_render(v, "01-c", "phone"):
+        return
+    expect(f"{v}: motion_design.py fill", [PY, f"{SC}/motion_design.py", "fill", v, "01-c"], contains="in-hand, recording")
+    ins = rj(p("pipeline", "character", v, "segments", "01-c", "insert.json"))
+    ok = ins.get("source", "").endswith("segments/01-c/motion/render.mp4") and ins.get("source_kind") == "recording" \
+        and (ins.get("motion_design") or {}).get("sha256") and (ins.get("hero") or {}).get("text") == "Relaxed tail" \
+        and [b["label"] for b in ins.get("beats") or []] == ["start", "Upload a clip", "end"]
+    RESULTS.append((f"{v}: insert.json takes the approved render, its hero and its tap", bool(ok)))
+    print(f"{'PASS' if ok else 'FAIL'}  {v}: insert.json takes the approved render, its hero and its tap")
+    plate = p("pipeline", "character", v, "segments", "01-c", "source", "plate.mp4")
+    expect(f"{v}: qc.py on the plate", [PY, f"{SC}/qc.py", v, "01-c", plate])
+    approve_sources(v, pl)
+    expect(f"{v}: gate B on the plate", [PY, f"{SC}/review.py", "segment", v, "01-c", "--decision", "approve",
+                                         "--file", "source/plate.mp4", "--words", "Plate is good."])
+    if not assemble_on:
+        return
+    expect(f"{v}: composite.sh lays the render into the phone", ["bash", f"{SC}/composite.sh", v, "01-c"])
+    cd = p("pipeline", "character", v, "segments", "01-c", "composite")
+    comp = sorted(f for f in os.listdir(cd) if f.endswith(".mp4"))
+    expect(f"{v}: review.py composite", [PY, f"{SC}/review.py", "composite", v, "01-c", "--file", f"composite/{comp[-1]}",
+                                         "--words", "Composite ok."])
+    assemble(v, assemble_on)
+    # The render is approved again after the composite: the composite and assembly refuse the old one.
+    rp = p("pipeline", "character", v, "segments", "01-c", "motion", "render.mp4")
+    with open(rp, "ab") as f:
+        f.write(b"\0")
+    expect(f"{v}: composite.sh refuses a render that is not the approved one", ["bash", f"{SC}/composite.sh", v, "01-c"],
+           ok=False, contains="the approved render is not the one on disk")
+    expect(f"{v}: assembly refuses the composite of an old render", ["bash", f"{SC}/assemble.sh", v], ok=False,
+           contains="the motion-designed screen in the phone")
+
+
+def motion_panel_test(assemble_on):
+    """Motion design in a panel (2026-10-21): the real clip beside the rebuilt screen, one M segment."""
+    v = "v2-panel-motion"
+    pl = fixture("v2-motion-design")
+    pl["video_id"] = v
+    b = pl["beats"][1]
+    b.update(framing="hands_only", layout="split_screen", source_asset_ids=["milo-clip"],
+             panels=[{"id": "cat", "asset_id": "milo-clip", "source_range_s": [1, 6], "rect": [0, 0, 0.5, 1], "crop": "cover",
+                      "sync_offset_s": 0},
+                     {"id": "app", "screen_id": "tail-reading", "rect": [0.5, 0, 0.5, 1], "crop": "cover", "sync_offset_s": 0}])
+    pl = lock(pl)
+    checks(v)
+    video_json(pl, [{"n": 1, "type": "C", "asset_id": "milo-clip", "source_range_s": [1, 5], "beat_ids": ["b1"],
+                     "script_lines": []},
+                    {"n": 2, "type": "M", "beat_ids": ["b2"], "script_lines": [], "panels": [
+                        {"id": "cat", "asset_id": "milo-clip", "source_range_s": [1, 6], "rect": [0, 0, 0.5, 1], "crop": "cover",
+                         "sync_offset_s": 0},
+                        {"id": "app", "screen_id": "tail-reading", "rect": [0.5, 0, 0.5, 1], "crop": "cover", "sync_offset_s": 0}]}])
+    validate(v)
+    mutate(v, "a motion-designed beat whose M segment names no panel of its screen",
+           video_fn=lambda x: x["segments"][1]["panels"][1].update(screen_id="scan-result"), contains="a panel names its screen_id")
+    if not md_render(v, "02-m", "panel"):
+        return
+    approve_sources(v, pl)
+    assemble(v, assemble_on)
 
 
 def main():
@@ -1566,6 +1768,7 @@ def main():
                      "script_lines": [], "fit": "pad"}])
     validate("v2-split")
     approve_sources("v2-split", pl)
+    narration_anyway("v2-split", "n1", pl["script"][0]["line"], "l1")
     narration_take("v2-split", "n1", pl["script"][0]["line"], "l1")
     assemble("v2-split", assemble_on)
     mutate("v2-split", "overlapping split-screen panels",
@@ -1584,6 +1787,8 @@ def main():
     validate("v2-diary")
     approve_sources("v2-diary", pl)
     assemble("v2-diary", assemble_on)
+    if assemble_on:
+        gate_c_anyway("v2-diary")
     mutate("v2-diary", "a paragraph too short to read",
            plan_fn=lambda q: q["overlays"][2].update(end_s=8), cmd="plan", contains="to be read")
     mutate("v2-diary", "a day counter that is not the series day",
@@ -1706,6 +1911,8 @@ def main():
     # ---- v2: one take over two clips: 02-b opens on the last frame of 01-b
     continuity_test(assemble_on)
     motion_design_test(assemble_on)
+    motion_phone_test(assemble_on)
+    motion_panel_test(assemble_on)
 
     print()
     bad = [l for l, ok in RESULTS if not ok]

@@ -27,7 +27,8 @@ failed motion take. The research file itself is never attached.
 
 A full-screen app beat (R or P) shows a real recording, a real still, or a motion-designed
 rebuild of the app's real screens (demo_source, founder 2026-10-19: demo.py), rendered
-locally by motion_design.py and never by a video model.
+locally by motion_design.py and never by a video model. The same render may fill a phone's
+screen or a panel (the user's choice, 2026-10-21), noted, never refused.
 """
 import hashlib, json, os, re, subprocess, sys
 
@@ -1267,9 +1268,18 @@ def check_segment_against_beats(plan, it, bmap, lines, assets, narrators, subjec
                 out.bad(f"{name}: a motion-designed screen is rendered to its beats' length; no trim")
             if len({b.get("screen_id") for b in app_beats}) > 1:
                 out.bad(f"{name}: one motion-designed screen_id per segment")
+    # A motion-designed screen fills R or P, a phone's screen (O, G, S, H, F, or C with a filmed
+    # phone) or a panel (M): the user's choice (2026-10-21). Never a generated action (T, B, X).
     for b in app_beats:
-        if demo.is_motion(b) and ty not in ("R", "P"):
-            out.bad(f"{name}: beat {b.get('id')} is motion-designed, rendered full screen: an R or P segment")
+        if not demo.is_motion(b) or ty in ("R", "P", "O", "G", "S", "H", "F") or (ty == "C" and s.get("insert")):
+            continue
+        if ty == "M":
+            if b.get("screen_id") not in {p.get("screen_id") for p in s.get("panels") or []}:
+                out.bad(f"{name}: beat {b.get('id')} is motion-designed: a panel names its screen_id "
+                        f"{b.get('screen_id')!r}")
+            continue
+        out.bad(f"{name}: beat {b.get('id')} is motion-designed: R or P, a phone's screen (O, G, S, H, F, or C "
+                "with a filmed phone) or an M panel; the app is never in a generated action")
     if ty in ("O", "G", "S", "H", "F") and app_beats:
         sid = (shot.get("phone") or {}).get("screen_id")
         if sid not in {b.get("screen_id") for b in app_beats}:

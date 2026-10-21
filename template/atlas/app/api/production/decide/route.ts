@@ -33,6 +33,11 @@
  *   motion.approve       gate B for a motion-designed screen (data.segment): its render by its
  *                        sha256, every gate of motion_design.py check passed, a gate not run
  *                        (OCR) ticked by eye; motion.reject
+ * "Approve anyway" (2026-10-21): take.approve, motion.approve, narration.approve and cut.approve
+ * may carry data.accept_fail, the measured gates the user approves although they failed
+ * (identity; each motion-design gate but current; voice; overlays). The note is required: it
+ * is the user's words, and review.py --from-atlas records the override (--accept-fail). A
+ * stale render, a changed supplied file and a stale cut are never accepted.
  * The server reads every hash and cost from the files, never from the client
  * (research/ai-ugc/ATLAS-VIDEO-STAGES-PLAN.md § 7).
  */
@@ -41,6 +46,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { isPlatform } from "@/lib/platform";
 import { allStates, appendEvent, finalBlock, parseLayout, slideHashes, validSlug, type Event, type EventKind, type PostState } from "@/lib/production";
+import { cutAccepts, motionAccepts } from "@/lib/accept-fail";
 import { identityOk } from "@/lib/video-production";
 
 const KINDS = new Set<EventKind>([
@@ -108,7 +114,7 @@ export async function POST(request: NextRequest) {
   }
   if (state?.video && body.kind === "plan.sendback") data = { ...(data ?? {}), video: state.video.id, revision: state.video.draft?.revision ?? null };
   if (PRODUCTION.has(body.kind)) {
-    const r = productionLine(state, body.kind, data ?? {});
+    const r = productionLine(state, body.kind, data ?? {}, note);
     if ("error" in r) return NextResponse.json({ error: r.error }, { status: 400 });
     data = r.data;
   }
@@ -147,10 +153,13 @@ export async function POST(request: NextRequest) {
 
 const PRODUCTION = new Set<EventKind>(["storyboard.approve", "storyboard.sendback", "take.approve", "take.reject", "composite.approve", "cut.approve", "cut.sendback", "composite.sendback", "source.approve", "source.reject", "narration.approve", "narration.reject", "motion.approve", "motion.reject"]);
 /* review.py final refuses an approval when one of these failed on the assembled file. */
-const BLOCKS_CUT = (k: string) => k.startsWith("overlays") || k.startsWith("supplied");
+/* The failed gates the user accepts on an "Approve anyway" line (data.accept_fail). */
+const acceptsOf = (sent: Record<string, unknown>) => (Array.isArray(sent.accept_fail) ? sent.accept_fail.map(String) : []);
 
 /** The data of one production line, from the files on disk; or why it cannot be written yet. */
-function productionLine(state: PostState | undefined, kind: EventKind, sent: Record<string, unknown>): { data: Record<string, any> } | { error: string } {
+function productionLine(state: PostState | undefined, kind: EventKind, sent: Record<string, unknown>, note = ""): { data: Record<string, any> } | { error: string } {
+  const accepts = acceptsOf(sent);
+  if (accepts.length && !note) return { error: "Approve anyway needs your note: say why you accept the failed gate." };
   const v = state?.video;
   const p = v?.production;
   if (!v?.id || !v.lock || !p) return { error: "This video's plan is not locked yet." };
@@ -175,12 +184,13 @@ function productionLine(state: PostState | undefined, kind: EventKind, sent: Rec
     const x = p.narration.find((s) => s.take === sent.take);
     if (!x) return { error: "No such narration take in this video." };
     if (!x.sha256 || !x.file) return { error: `No narration/${x.take}.wav yet.` };
+    const natural = Array.isArray(sent.checks) && sent.checks.map(String).includes("natural_voice");
     if (kind === "narration.approve") {
-      const ticked = Array.isArray(sent.checks) ? sent.checks.map(String) : [];
-      if (!ticked.includes("natural_voice")) return { error: "Tick the natural-voice check first." };
+      if (!natural && !accepts.includes("voice")) return { error: "Tick the natural-voice check first, or approve anyway with your note." };
       if (!x.lines.length || !x.narrator) return { error: "No voiceover line of the plan names this take's narrator." };
     }
-    return { data: { video, take: x.take, file: x.file, sha256: x.sha256, narrator: x.narrator, lines: x.lines, ...(kind === "narration.approve" ? { checks: { natural_voice: "pass" } } : {}) } };
+    return { data: { video, take: x.take, file: x.file, sha256: x.sha256, narrator: x.narrator, lines: x.lines,
+      ...(kind === "narration.approve" ? (natural ? { checks: { natural_voice: "pass" } } : { accept_fail: ["voice"] }) : {}) } };
   }
   if (kind === "cut.approve" || kind === "cut.sendback") {
     const a = p.assembly;
@@ -189,14 +199,16 @@ function productionLine(state: PostState | undefined, kind: EventKind, sent: Rec
       const open = p.segments.filter((s) => (s.generated && !s.sharedFrom && !s.approved) || (s.motion && !s.motion.approved)).map((s) => s.name);
       if (open.length) return { error: `Not every segment is approved: ${open.join(", ")}.` };
       if (a.stale) return { error: "The cut was assembled from another revision of the plan: the agent assembles again first." };
-      const blocks = a.failed.filter(BLOCKS_CUT);
-      if (blocks.length) return { error: `Failed on the cut: ${blocks.join(", ")}. Send it back.` };
+      const { blocked, overlays } = cutAccepts(a.failed);
+      if (blocked.length) return { error: `Failed on the cut: ${blocked.join(", ")}: the cut is not the plan's. The agent assembles again.` };
+      if (overlays.length && !accepts.includes("overlays")) return { error: `Failed on the cut: ${overlays.join(", ")}. Send it back, or approve anyway with your note.` };
     }
     const exp = sent.export === "grain" && a.grain ? "grain" : "default";
     /* A send-back may name one segment to regenerate: the user's yes to one more run at its computed cost. */
     const rs = kind === "cut.sendback" && typeof sent.segment === "string" ? p.segments.find((s) => s.name === sent.segment && s.generated && !s.sharedFrom) : null;
     if (kind === "cut.sendback" && typeof sent.segment === "string" && !rs) return { error: `No generated segment ${sent.segment} of this video.` };
-    return { data: { video, file: a.file, sha256: a.sha256, ...(kind === "cut.approve" ? { export: exp } : {}), ...(rs ? { segment: rs.name, cost_usd: rs.cost } : {}) } };
+    const accepted = kind === "cut.approve" && cutAccepts(a.failed).overlays.length ? { accept_fail: ["overlays"] } : {};
+    return { data: { video, file: a.file, sha256: a.sha256, ...(kind === "cut.approve" ? { export: exp, ...accepted } : {}), ...(rs ? { segment: rs.name, cost_usd: rs.cost } : {}) } };
   }
   const seg = p.segments.find((s) => s.name === sent.segment);
   if (!seg) return { error: "No such segment." };
@@ -207,12 +219,12 @@ function productionLine(state: PostState | undefined, kind: EventKind, sent: Rec
     if (!m.render) return { error: `No render of ${seg.name} yet: the agent runs motion_design.py render.` };
     if (kind === "motion.reject") return { data: { video, segment: seg.name, file: "motion/render.mp4", sha256: m.render.sha256 } };
     if (!m.gates) return { error: "The gates have not run on this render: the agent runs motion_design.py check." };
-    if (m.failed.length) return { error: `Failed gates: ${m.failed.join(", ")}. Reject it, or the agent fixes the page first.` };
     const ticked = Array.isArray(sent.checks) ? sent.checks.map(String) : [];
-    const need = m.notRun.map((g) => (g === "text_read" ? "text" : g));
-    const miss = need.filter((c) => !ticked.includes(c));
-    if (miss.length) return { error: `Read the stills and tick: ${miss.join(", ")}.` };
-    return { data: { video, segment: seg.name, file: "motion/render.mp4", sha256: m.render.sha256, ...(need.length ? { checks: Object.fromEntries(need.map((c) => [c, "pass"])) } : {}) } };
+    const { stale, seen, accept: acc } = motionAccepts(m, ticked);
+    if (stale) return { error: "The render is not of the page and the story now: the agent renders and checks again." };
+    const open = acc.filter((g) => !accepts.includes(g));
+    if (open.length) return { error: `Not passed: ${open.join(", ")}. Reject it, tick what you read on the stills, or approve anyway with your note.` };
+    return { data: { video, segment: seg.name, file: "motion/render.mp4", sha256: m.render.sha256, ...(seen.length ? { checks: Object.fromEntries(seen.map((c) => [c, "pass"])) } : {}), ...(acc.length ? { accept_fail: acc } : {}) } };
   }
   if (kind === "composite.approve" || kind === "composite.sendback") {
     if (!seg.composite) return { error: `No composite of ${seg.name} yet.` };
@@ -227,10 +239,11 @@ function productionLine(state: PostState | undefined, kind: EventKind, sent: Rec
   /* take.approve: the identity gate first on a motion-copy take, then every check review.py needs. */
   if (seg.motionCopy) {
     if (!take.identity) return { error: "The identity gate has not run on this take: the agent runs scripts/character/identity.py first." };
-    if (!identityOk(take.identity.result)) return { error: `The identity gate says ${take.identity.result}${take.identity.why ? `: ${take.identity.why}` : ""}. Reject this take.` };
+    if (!identityOk(take.identity.result) && !accepts.includes("identity")) return { error: `The identity gate says ${take.identity.result}${take.identity.why ? `: ${take.identity.why}` : ""}. Reject this take, or approve anyway with your note.` };
   }
   const ticked = Array.isArray(sent.checks) ? sent.checks.map(String) : [];
   const miss = seg.checks.filter((c) => !ticked.includes(c));
   if (miss.length) return { error: `Tick every check first: ${miss.join(", ")}.` };
-  return { data: { video, segment: seg.name, file: take.file, sha256: take.sha256, checks: Object.fromEntries(seg.checks.map((c) => [c, "pass"])) } };
+  const idFail = !!seg.motionCopy && !identityOk(take.identity?.result);
+  return { data: { video, segment: seg.name, file: take.file, sha256: take.sha256, checks: Object.fromEntries(seg.checks.map((c) => [c, "pass"])), ...(idFail ? { accept_fail: ["identity"] } : {}) } };
 }

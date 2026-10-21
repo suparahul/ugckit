@@ -147,8 +147,8 @@ expect("a screen PRODUCT-SCREENS.md does not describe: refused",
        ok=False, contains="not a heading")
 expect("no PRODUCT-SCREENS.md: refused", lambda: vp.demo.check_beat(vp.ROOT, {"app": "nope"}, md_beat(), {},
        lambda m: sys.exit(m), lambda m: None, None), ok=False, contains="PRODUCT-SCREENS.md does not exist")
-expect("motion design on a phone plate: refused", lambda: demo_check(md_beat(framing="hands_only")), ok=False,
-       contains="rendered full screen")
+expect("motion design on a phone plate: allowed with a note (the user's choice)",
+       lambda: demo_check(md_beat(framing="hands_only")), contains="motion design on a phone or in a panel")
 expect("a step after the beat's end: refused", lambda: demo_check(md_beat(end_s=6)), ok=False, contains="inside its 2 s")
 expect("a hero string the story does not show: refused", lambda: demo_check(md_beat(), hero="Happy"), ok=False,
        contains="not one of the strings")

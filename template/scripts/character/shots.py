@@ -524,7 +524,6 @@ def cmd_validate(video):
                 bad(f"{name}: a C segment names the supplied asset it shows (asset_id)")
             if seg.get("insert") and placeholder((seg.get("insert") or {}).get("screen_id")):
                 bad(f"{name}: a filmed phone's insert names its screen_id")
-            continue
         if t == "M":
             ps = seg.get("panels") or []
             if len(ps) < 2:
@@ -534,6 +533,11 @@ def cmd_validate(video):
                 if len(srcs) != 1:
                     bad(f"{name}: panel {p.get('id')} names one source: asset_id, project (an approved "
                         "B segment) or screen_id")
+        if t in PHONE + ["C", "M"] and demo.segment_story(plan, seg.get("beat_ids") or []):
+            note(f"{name}: its screen by motion design (the user's choice): motion_design.py start, render, check, "
+                 "review.py motion, then " + ("the panel takes the render at assembly" if t == "M" else
+                                              "motion_design.py fill and composite.sh, as for a recording"))
+        if t in ("C", "M"):
             continue
         shot = shots.get(name)
         if shot is None:

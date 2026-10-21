@@ -24,6 +24,11 @@ For every segment of pipeline/character/<video>/video.json, in order:
                                 gate B (motion_design.py, review.py motion), by its checksum,
                                 laid in as it is (already 1080x1920, no crop, no punch-in), for
                                 the beats' seconds; P adds the bubble the same way
+  a phone or panel by motion    (2026-10-21) the same approved render at fit screen: in a
+  design                        phone, through its composite (motion_design.py fill, then
+                                composite.sh); in an M panel that names the screen, as a
+                                screen recording is. A render approved after the composite
+                                stops assembly (fill and composite again)
 Then: trim (a talking segment from 0.15 s before its first word to 0.2 s after its last,
 by faster-whisper word times; otherwise `trim`, or the shot's trim_to_seconds), upscale
 once with lanczos to 1080x1920 (a composite is already there), `punch_in`, one loudness
@@ -430,6 +435,32 @@ def build_m(it, out, dur, audio, fade):
     run(cmd)
 
 
+def frame_size(f):
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+                        "-of", "csv=p=0", f], capture_output=True, text=True)
+    try:
+        return [int(x) for x in r.stdout.strip().split(",")[:2]]
+    except ValueError:
+        return None
+
+
+def designed_stale(video, name, sd):
+    """Why a phone's composite of a motion-designed screen is not the approved render's, or None.
+    motion_design.py fill names the render in insert.json; a render approved again after it
+    needs fill and composite.sh again."""
+    ip = os.path.join(sd, "insert.json")
+    md = (load(ip).get("motion_design") if os.path.exists(ip) else None)
+    if not md:
+        return None
+    rec, row = motion_design.approved(video, name)
+    if not rec:
+        return f"{name}: the motion-designed screen in the phone: {row}"
+    if row.get("sha256") != md.get("sha256"):
+        return (f"{name}: the composite lays in another render than the approved one: motion_design.py fill, "
+                "composite.sh and review.py composite again")
+    return None
+
+
 def panel_hero(p, row, t0):
     """Where a screen panel's hero element lands in the frame, and when (cover fit, centred)."""
     hero = (row or {}).get("hero") or {}
@@ -549,6 +580,10 @@ def main():
                     continue
                 f = e["composite"]["file"]
                 item["hero"] = e["composite"].get("hero")
+                why = designed_stale(video, name, sd)
+                if why:
+                    bad(why)
+                    continue
             item["src"] = os.path.join(sd, f)
             shot_p = os.path.join(CH, pv, "shots", f"{pseg}.json")
             item["trim_to"] = ((load(shot_p).get("video") or {}).get("trim_to_seconds")
@@ -598,6 +633,10 @@ def main():
                     continue
                 item["composite"] = os.path.join(sd, e["composite"]["file"])
                 item["hero"] = e["composite"].get("hero")
+                why = designed_stale(video, name, sd)
+                if why:
+                    bad(why)
+                    continue
         elif t == "M":
             panels = []
             for p in s.get("panels") or []:
@@ -620,6 +659,17 @@ def main():
                         continue
                     f = os.path.join(sd, e["file"])
                     q.update({"src": f, "range": p.get("source_range_s") or [0.0, duration(f)]})
+                elif p.get("screen_id") and (demo.segment_story(plan, s.get("beat_ids") or []) or {}).get(
+                        "screen_id") == p["screen_id"]:
+                    # A motion-designed screen in a panel (2026-10-21): the render approved at gate B.
+                    rec, row = motion_design.approved(video, name)
+                    if not rec:
+                        bad(f"{name}: panel {p.get('id')}: motion design: {row}")
+                        continue
+                    h = row.get("hero") or {}
+                    q.update({"src": rec, "range": p.get("source_range_s") or [0.0, duration(rec)],
+                              "row": {"size": frame_size(rec), "hero": {"rect_source_px": h.get("rect"), "t": h.get("t"),
+                                                                        "text": h.get("text")}}})
                 elif p.get("screen_id"):
                     row, rec = screen_row(plan["app"], p["screen_id"])
                     if not row or not rec or not os.path.exists(rec):

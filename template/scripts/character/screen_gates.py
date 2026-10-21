@@ -442,7 +442,13 @@ def hero_ocr(rep, tr, spec, cap, quads, fps, t, hl, out):
         rep.note("OCR: no hero string in insert.json; n/a")
         return None
     fs = sorted(quads)
-    if t == "F" and tr.get("release") is not None:
+    bs = spec.get("beats") or []
+    if hero.get("app_t") is not None and len(bs) >= 2:
+        # The hero's own time in the source (a motion-designed render shows it only from its
+        # step on), on the plate through the beats.
+        pt = float(np.interp(float(hero["app_t"]), [b["app_t"] for b in bs], [b["plate_t"] for b in bs]))
+        f = min(fs, key=lambda x: abs(x - pt * fps))
+    elif t == "F" and tr.get("release") is not None:
         f = min(fs[-1], tr["release"] + int(0.5 * fps))
     elif t == "H" and len(hl) >= 2:
         f = (hl[-1][0] + hl[-1][1]) // 2

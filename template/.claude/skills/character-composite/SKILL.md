@@ -27,7 +27,9 @@ composite is kept in `composite/work/<stamp>/` for the gates and for assembly.
 
 ## 1. Fill the insert
 
-`insert.json` comes from the screen row (`screens` skill: `screens.py fill`). Check:
+`insert.json` comes from the screen row (`screens` skill: `screens.py fill`), or, for a
+motion-designed screen, from its approved render (`motion_design.py fill`: composite.sh
+refuses a render that is not the approved one). Check:
 
 - **`source_kind`**: `recording` (time-warped through the beats), `still` (one
   screenshot: the S mode and rung 1 of the gesture ladder), or `finger-driven` (F: the

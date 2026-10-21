@@ -245,32 +245,7 @@ def cmd_fill(slug, sid, video, seg):
     row = next((r for r in lib["screens"] if r["id"] == sid), None)
     if row is None:
         sys.exit(f"no screen {sid} in apps/{slug}/screens/screens.json")
-    t = seg.split("-")[-1].upper()
-    vdir = os.path.join(ROOT, "pipeline", "character", video)
-    ip = os.path.join(vdir, "segments", seg, "insert.json")
-    if t == "C":
-        # A filmed phone in supplied footage: the type of its insert mode, the length of
-        # its plate (shots.py supplied wrote both).
-        if not os.path.exists(ip):
-            sys.exit(f"no segments/{seg}/insert.json -- run scripts/character/shots.py supplied {video} first")
-        c = json.load(open(ip))
-        t = next((k for k, m in TYPE_MODE.items() if m == c.get("mode")), None)
-        if t is None:
-            sys.exit(f"insert.json mode {c.get('mode')!r} is not one of {', '.join(TYPE_MODE.values())}")
-    if t not in TYPE_MODE:
-        sys.exit(f"{seg} is not a phone segment (O, G, S, H, F, or C with a filmed phone)")
-    plan = json.load(open(os.path.join(vdir, "plan.json")))
-    if plan.get("app_insertion") is not True:
-        sys.exit("the plan has no app insertion")
-    shot_p = os.path.join(vdir, "shots", f"{seg}.json")
-    shot = json.load(open(shot_p)) if os.path.exists(shot_p) else {}
-    dur = float((shot.get("video") or {}).get("duration_seconds") or 0)
-    if not dur and seg.endswith("-c"):
-        dur = float((json.load(open(ip)).get("plate_window") or [0, 0])[1])
-    if not dur:
-        sys.exit(f"no shots/{seg}.json with video.duration_seconds: the plate window comes from it")
-    os.makedirs(os.path.dirname(ip), exist_ok=True)
-    spec = json.load(open(ip)) if os.path.exists(ip) else {}
+    t, ip, spec, dur = insert_target(video, seg)
     rel = os.path.relpath(os.path.join(sdir(slug), row["file"]), ROOT)
     st_ = row.get("stills") or {}
     gestures = [e for e in row.get("events") or [] if e.get("gesture") in GESTURES]
@@ -298,6 +273,46 @@ def cmd_fill(slug, sid, video, seg):
         src = [os.path.relpath(os.path.join(sdir(slug), st_[k]), ROOT) for k in ("start", "end")]
     else:
         kind, src = "recording", rel
+    fill_spec(ip, spec, t, sid, kind, src, row, dur)
+
+
+def insert_target(video, seg):
+    """(phone type, insert.json path, its spec so far, plate seconds) of a phone segment, or
+    exit with why it has none. Shared by cmd_fill and motion_design.py fill."""
+    t = seg.split("-")[-1].upper()
+    vdir = os.path.join(ROOT, "pipeline", "character", video)
+    ip = os.path.join(vdir, "segments", seg, "insert.json")
+    if t == "C":
+        # A filmed phone in supplied footage: the type of its insert mode, the length of
+        # its plate (shots.py supplied wrote both).
+        if not os.path.exists(ip):
+            sys.exit(f"no segments/{seg}/insert.json -- run scripts/character/shots.py supplied {video} first")
+        c = json.load(open(ip))
+        t = next((k for k, m in TYPE_MODE.items() if m == c.get("mode")), None)
+        if t is None:
+            sys.exit(f"insert.json mode {c.get('mode')!r} is not one of {', '.join(TYPE_MODE.values())}")
+    if t not in TYPE_MODE:
+        sys.exit(f"{seg} is not a phone segment (O, G, S, H, F, or C with a filmed phone)")
+    plan = json.load(open(os.path.join(vdir, "plan.json")))
+    if plan.get("app_insertion") is not True:
+        sys.exit("the plan has no app insertion")
+    shot_p = os.path.join(vdir, "shots", f"{seg}.json")
+    shot = json.load(open(shot_p)) if os.path.exists(shot_p) else {}
+    dur = float((shot.get("video") or {}).get("duration_seconds") or 0)
+    if not dur and seg.endswith("-c"):
+        dur = float((json.load(open(ip)).get("plate_window") or [0, 0])[1])
+    if not dur:
+        sys.exit(f"no shots/{seg}.json with video.duration_seconds: the plate window comes from it")
+    os.makedirs(os.path.dirname(ip), exist_ok=True)
+    spec = json.load(open(ip)) if os.path.exists(ip) else {}
+    return t, ip, spec, dur
+
+
+def fill_spec(ip, spec, t, sid, kind, src, row, dur):
+    """Write insert.json from a screen row: a library row, or the row motion_design.py fill
+    makes from an approved render (its events are the story's taps, scrolls and swipes)."""
+    st_ = row.get("stills") or {}
+    gestures = [e for e in row.get("events") or [] if e.get("gesture") in GESTURES]
     spec.update({"mode": TYPE_MODE[t], "screen_id": sid, "source": src, "source_kind": kind})
     spec.setdefault("plate_window", [0.0, dur])
     w0, w1 = spec["plate_window"]
@@ -325,7 +340,8 @@ def cmd_fill(slug, sid, video, seg):
     # another picture: its OCR reads the whole screen instead.
     rect = h.get("rect_source_px") if kind == "recording" or (t == "S" and row["kind"] == "recording"
                                                                and not (st_.get("end") or st_.get("start"))) else None
-    spec["hero"] = {"text": h.get("text"), "rect_source_px": rect, "needs": h.get("needs")}
+    spec["hero"] = {"text": h.get("text"), "rect_source_px": rect, "needs": h.get("needs"),
+                    **({"app_t": h["app_t"]} if h.get("app_t") is not None else {})}
     spec["legibility"] = {"min_screen_width_px_at_1080": NEEDS.get(h.get("needs"), 0),
                           "ocr_must_read_hero": h.get("needs") in ("large type", "body text")}
     spec.setdefault("key", {"color": [0, 177, 64], "hue_tol": 26, "sat_min": 55, "val_min": 35, "dark_max": 105})

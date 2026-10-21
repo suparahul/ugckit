@@ -61,7 +61,8 @@ The slideshow path's pages, the rest of the Organic Factory UI, read `apps/<slug
     and the delivered file, the production is under the frame: the storyboard and its
     computed cost (Approve storyboard, Send back: gate A), each segment's takes with the
     reference clip, the keyframe and the identity gate (Approve this take with its checks,
-    Reject with what failed and "Generate it again": gate B), each phone segment's
+    Reject with what failed and "Generate it again": gate B; "Approve anyway" with a required
+    note when a measured gate failed), each phone segment's
     composite (Approve composite) and the cut (Approve the cut, Send back: gate C). Each
     click is a line in the log; the agent records it with `review.py ... --from-atlas` and
     takes the next step. The sentence under the title says whose turn it is.

@@ -147,7 +147,7 @@ export function videoStages(x: StagesInput): StagesView {
     const waiting = own.filter((s) => !s.approved && undecidedTake(s)).map((s) => s.name)
       .concat(p.sources.filter((s) => !s.approved && s.sha256 && !s.click?.current).map((s) => s.id))
       .concat(p.narration.filter((s) => !s.approved && s.sha256 && !s.click?.current).map((s) => s.take))
-      .concat(motions.filter((s) => !s.motion!.approved && s.motion!.gates && !s.motion!.failed.length && !s.motion!.click?.current).map((s) => `${s.name} (motion design)`));
+      .concat(motions.filter((s) => !s.motion!.approved && s.motion!.gates && !s.motion!.failed.includes("current") && !s.motion!.click?.current).map((s) => `${s.name} (motion design)`));
     const lastReject = own.find((s) => !s.approved && s.gateB && s.gateB.decision !== "approve" && !undecidedTake(s));
     out.review = !items ? st("n/a", "nothing for gate B")
       : okItems === items ? st("done", `${items} item${items === 1 ? "" : "s"} approved`)
