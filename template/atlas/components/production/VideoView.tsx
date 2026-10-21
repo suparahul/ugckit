@@ -197,10 +197,10 @@ export function VideoView({ state, view, rail, railStage }: { state: PostState; 
     : stage === 2 ? <ApprovalStage state={state} />
     : stage === 8 ? <DeliverStage state={state} />
     : !p ? <p className="sr__hint">This stage starts once the plan is locked.</p>
-    : stage === 3 ? <StoryboardPanel post={row.key} p={p} live={live} seg={seg} />
+    : stage === 3 ? <StoryboardPanel post={row.key} p={p} live={live} seg={seg} tl={v.timeline ?? null} />
     : stage === 6 ? <CompositePanel post={row.key} p={p} live={live} seg={seg} />
     : stage === 7 ? <CutPanel post={row.key} p={p} live={live} />
-    : <TakesPanel post={row.key} p={p} live={live} seg={seg} />;
+    : <TakesPanel post={row.key} p={p} live={live} seg={seg} tl={v.timeline ?? null} />;
 
   return (
     <>

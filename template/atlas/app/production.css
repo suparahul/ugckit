@@ -1276,9 +1276,6 @@
 .vtl__h small { margin-left: 8px; font-size: 12.5px; font-weight: 400; color: var(--ink-3); }
 .tl { display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; color: var(--ink-2); }
 .tl__empty { margin: 0; font-size: 12.5px; color: var(--ink-3); }
-.tl__player { margin: 0; display: flex; align-items: flex-end; gap: 10px; }
-.tl__player video { display: block; width: 160px; aspect-ratio: 9 / 16; background: #000; border-radius: 4px; }
-.tl__player figcaption { font-size: 11px; color: var(--ink-3); }
 .tl__strip { position: relative; }
 .tl__marker { position: absolute; top: -6px; bottom: -2px; width: 0; border-left: 2px solid var(--ember); pointer-events: none; transition: left 0.2s linear; }
 .tl__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
@@ -1319,3 +1316,15 @@
 .vdetails .vreview h1 { font-size: 20px; letter-spacing: -0.01em; margin: 0 0 8px; }
 .vdetails .vreview h1 code { font-size: 0.8em; }
 .vdetails .vst__table { max-width: 900px; }
+
+/* The stage panels, one pass (ATLAS-VIDEO-PAGE-CLEANUP.md § 5): the decision object, one line of purpose, the rest folded. */
+.vprod__purpose { margin: 0 0 6px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.vprod__media figure.is-small { width: 96px; }
+.vprod__older > :not(summary) { margin-top: 6px; }
+.vprod__older .vprod__media { margin-top: 8px; }
+/* The strip without pictures: a ribbon of beats while the panel shows the media. */
+.tl__cp { padding: 6px 8px; border: 0; border-left: 2px solid var(--rule); border-radius: 0; }
+.tl__cp.is-open { border-left-color: var(--ink-2); }
+.tl__beats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; line-height: 1.45; color: var(--ink-2); }
+.tl__beats b { font-weight: 600; color: var(--ink); }
+.tl__more > dl + dl { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--rule); }

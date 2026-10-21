@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { plainBlock, plainProblem, roleWord, shortLine, videoStatus } from "./plain-words.ts";
+import { groupBeats, plainBlock, plainProblem, purposeLine, roleWord, shortLine, videoStatus } from "./plain-words.ts";
 import type { StagesView } from "./video-stages.ts";
 
 test("ready.json lines read as plain sentences: no path, no backtick, what to do", () => {
@@ -58,4 +58,22 @@ test("the status sentence: whose turn, what to do, in the user's words", () => {
   assert.equal(videoStatus(view("deliver", "you", "delivered: approve it for posting")).text, "Watch the video. Approve it for posting, or send it back with a note.");
   assert.deepEqual(videoStatus(view("deliver", "done", "approved for posting", "done")), { who: "done", head: "Done", text: "Delivered and approved for posting." });
   assert.equal(videoStatus(view("plan", "agent", "REVIEW.md of revision 2 is being written (video_plan.py review)")).text, "The agent writes the review of the plan.");
+});
+
+test("consecutive beats of one segment become one card; a beat with no segment stays alone", () => {
+  const beats = [
+    { id: "b1", start: 0, end: 2.8, segment: "01-x", role: "attention" },
+    { id: "b2", start: 2.8, end: 6.2, segment: "02-r", role: "use_reveal" },
+    { id: "b3", start: 6.2, end: 20, segment: "02-r", role: "result" },
+    { id: "b4", start: 20, end: 21, segment: null, role: "cta" },
+    { id: "b5", start: 21, end: 22, segment: null, role: "cta" },
+  ];
+  const g = groupBeats(beats);
+  assert.deepEqual(g.map((x) => [x.id, x.start, x.end, x.segment, x.beats.length]), [["b1", 0, 2.8, "01-x", 1], ["b2", 2.8, 20, "02-r", 2], ["b4", 20, 21, null, 1], ["b5", 21, 22, null, 1]]);
+});
+
+test("the purpose line: the roles in words, then the first sentence the viewer sees", () => {
+  assert.equal(purposeLine([{ role: "use_reveal", sees: "Full screen: the Catwise reveal. · framing: app_screen" }, { role: "result", sees: "The card lands." }]), "The app appears, then the result: Full screen: the Catwise reveal.");
+  assert.equal(purposeLine([{ role: "attention", sees: "not written" }]), "The hook");
+  assert.equal(purposeLine([]), null);
 });

@@ -2,20 +2,24 @@
 
 /**
  * The video, beat by beat (research/ai-ugc/ATLAS-VIDEO-STAGES-PLAN.md § 4.1, redrawn in
- * ATLAS-VIDEO-PAGE-CLEANUP.md § 3): one card per beat of the plan, left to right, 0 s first.
- * Each card shows one picture that is already on disk (a still, or a paused frame of a video
- * on disk; nothing is extracted), the time range, the role in words, and the first sentence
- * of what the viewer sees. The whole description, the on-screen text, the sound, the app,
- * the earlier pictures and the segment open under "more". No colour code: the open segment's
- * cards have a plain border. From gate C the strip follows the player of the stage panel
- * (data-cut-player), or its own when the panel has none: a click on a card's time jumps there.
+ * ATLAS-VIDEO-PAGE-CLEANUP.md § 3): one card per segment, left to right, 0 s first; the
+ * beats of one segment share the card, so one clip is never shown twice as two things.
+ * A card shows the time range, the roles in words, and the first sentence of each beat; the
+ * pictures (a still, or a paused frame of a video on disk; nothing is extracted) wait under
+ * "more" with the on-screen text, the sound, the app and the segment, because the stage panel
+ * shows the media that is decided there, and the plan stages show the reaction. When the stage
+ * panel has a player (data-cut-player: the cut, the delivered file), the strip follows it and
+ * a click on a card's time jumps there.
  */
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
-import { roleWord, shortLine } from "@/lib/plain-words";
+import { groupBeats, roleWord, shortLine } from "@/lib/plain-words";
 import type { Checkpoint, Picture, Timeline as TL } from "@/lib/video-stages";
+
+const secs = (n: number) => (Number.isInteger(n) ? `${n}.0` : n.toFixed(1));
+const rangeOf = (a: number, b: number) => `${secs(a)}–${secs(b)} s`;
 
 function Pic({ p, small }: { p: Picture; small?: boolean }) {
   const src = p.kind === "video" && p.at !== null ? `${p.url.split("#")[0]}#t=${p.at.toFixed(2)}` : p.url;
@@ -27,28 +31,43 @@ function Pic({ p, small }: { p: Picture; small?: boolean }) {
   );
 }
 
-function Card({ c, open, href, onTime }: { c: Checkpoint; open: boolean; href: string | null; onTime: ((t: number) => void) | null }) {
-  const role = roleWord(c.role);
-  const sees = c.sees === "not written" ? null : c.sees.replace(/ · framing: \w+$/, "");
+const seesOf = (c: Checkpoint) => (c.sees === "not written" ? null : c.sees.replace(/ · framing: \w+$/, ""));
+
+type Group = ReturnType<typeof groupBeats<Checkpoint>>[number];
+
+function Card({ g, open, href, onTime }: { g: Group; open: boolean; href: string | null; onTime: ((t: number) => void) | null }) {
+  const roles = [...new Set(g.beats.map((b) => roleWord(b.role)).filter(Boolean))];
+  const first = g.beats[0];
+  const range = rangeOf(g.start, g.end);
+  /* Every picture of the card: the first beat's, then the ones it replaced, then the other beats'. */
+  const pics = g.beats.flatMap((b) => [...(b.picture ? [b.picture] : []), ...b.earlier]);
   return (
-    <li id={`tl-${c.id}`} className={`tl__cp${open ? " is-open" : ""}`}>
-      {c.picture ? <Pic p={c.picture} /> : <p className="tl__nopic" title={c.noPicture ?? undefined}>no picture yet</p>}
+    <li id={`tl-${g.id}`} className={`tl__cp${open ? " is-open" : ""}`}>
       <p className="tl__head tabular">
-        {onTime ? <button type="button" className="tl__time" onClick={() => onTime(c.start)} title="Play from here">{c.range}</button> : <b>{c.range}</b>}
-        {role ? <span className="tl__role"> · {role}</span> : null}
+        {onTime ? <button type="button" className="tl__time" onClick={() => onTime(g.start)} title="Play from here">{range}</button> : <b>{range}</b>}
+        {roles.length ? <span className="tl__role"> · {roles.join(", then ")}</span> : null}
       </p>
-      <p className="tl__sees">{sees ? shortLine(sees) : <span className="is-blank">nothing written yet</span>}</p>
+      {g.beats.length === 1 ? (
+        <p className="tl__sees">{seesOf(first) ? shortLine(seesOf(first)!) : <span className="is-blank">nothing written yet</span>}</p>
+      ) : (
+        <ul className="tl__beats">
+          {g.beats.map((b) => <li key={b.id}><b className="tabular">{b.range}</b> {seesOf(b) ? shortLine(seesOf(b)!, 90) : <span className="is-blank">nothing written yet</span>}</li>)}
+        </ul>
+      )}
       <details className="tl__more">
         <summary>more</summary>
-        <dl className="tl__lines">
-          {sees ? <div><dt>sees</dt><dd>{sees}</dd></div> : null}
-          <div><dt>text</dt><dd>{c.text.length ? c.text.map((t, i) => <span key={i} className="tl__text">“{t.text}”{t.placement ? ` (${t.placement}, ${t.range})` : ` (${t.range})`}</span>) : "none"}</dd></div>
-          <div><dt>sound</dt><dd>{c.sound}</dd></div>
-          <div><dt>app</dt><dd>{c.app}</dd></div>
-          {c.segment ? <div><dt>segment</dt><dd>{href ? <Link href={href}>{c.segment}</Link> : c.segment}</dd></div> : null}
-          {!c.picture && c.noPicture ? <div><dt>picture</dt><dd>{c.noPicture}</dd></div> : null}
-        </dl>
-        {c.earlier.length ? <div className="tl__earlier">{c.earlier.map((e) => <Pic key={`${e.url}${e.at}`} p={e} small />)}</div> : null}
+        {g.beats.map((b) => (
+          <dl className="tl__lines" key={b.id}>
+            {g.beats.length > 1 ? <div><dt>beat</dt><dd className="tabular">{b.range}{roleWord(b.role) ? ` · ${roleWord(b.role)}` : ""}</dd></div> : null}
+            {seesOf(b) ? <div><dt>sees</dt><dd>{seesOf(b)}</dd></div> : null}
+            <div><dt>text</dt><dd>{b.text.length ? b.text.map((t, i) => <span key={i} className="tl__text">“{t.text}”{t.placement ? ` (${t.placement}, ${t.range})` : ` (${t.range})`}</span>) : "none"}</dd></div>
+            <div><dt>sound</dt><dd>{b.sound}</dd></div>
+            <div><dt>app</dt><dd>{b.app}</dd></div>
+            {!b.picture && b.noPicture ? <div><dt>picture</dt><dd>{b.noPicture}</dd></div> : null}
+          </dl>
+        ))}
+        {g.segment ? <dl className="tl__lines"><div><dt>segment</dt><dd>{href ? <Link href={href}>{g.segment}</Link> : g.segment}</dd></div></dl> : null}
+        {pics.length ? <div className="tl__earlier">{pics.map((e) => <Pic key={`${e.url}${e.at}${e.label}`} p={e} small />)}</div> : null}
       </details>
     </li>
   );
@@ -56,7 +75,6 @@ function Card({ c, open, href, onTime }: { c: Checkpoint; open: boolean; href: s
 
 export function Timeline({ tl, openSeg, base, stage }: { tl: TL; openSeg: string | null; base: string; stage: number }) {
   const segHref = (seg: string) => `${base}?stage=${stage}&seg=${seg}#stages`;
-  const own = useRef<HTMLVideoElement>(null);
   const [t, setT] = useState(0);
   const [external, setExternal] = useState<HTMLVideoElement | null>(null);
   /* The stage panel's player, when it has one: the strip follows it and jumps it. */
@@ -69,21 +87,15 @@ export function Timeline({ tl, openSeg, base, stage }: { tl: TL; openSeg: string
     return () => el.removeEventListener("timeupdate", on);
   }, [tl.player?.url]);
   if (!tl.checkpoints.length) return <p className="tl__empty">No beats yet: the strip fills when the script is written.</p>;
-  const player = external ?? own.current;
-  const jump = tl.player ? (s: number) => { const v = external ?? own.current; if (v) { v.currentTime = s; void v.play().catch(() => undefined); } } : null;
+  const jump = external ? (s: number) => { external.currentTime = s; void external.play().catch(() => undefined); } : null;
   const at = tl.length ? Math.min(1, t / tl.length) : 0;
+  const groups = groupBeats(tl.checkpoints);
   return (
-    <div className={`tl${tl.player ? " has-player" : ""}`}>
-      {tl.player && !external ? (
-        <figure className="tl__player">
-          <video ref={own} src={tl.player.url} controls playsInline preload="metadata" onTimeUpdate={(e) => setT(e.currentTarget.currentTime)} aria-label={tl.player.label} />
-          <figcaption className="tabular">{tl.player.label} · {t.toFixed(1)} s</figcaption>
-        </figure>
-      ) : null}
+    <div className={`tl${external ? " has-player" : ""}`}>
       <div className="tl__strip">
-        {tl.player && player && t > 0 ? <span className="tl__marker" style={{ left: `${at * 100}%` }} aria-hidden="true" /> : null}
+        {external && t > 0 ? <span className="tl__marker" style={{ left: `${at * 100}%` }} aria-hidden="true" /> : null}
         <ol className="tl__list">
-          {tl.checkpoints.map((c) => <Card key={c.id} c={c} open={!!openSeg && c.segment === openSeg} href={c.segment ? segHref(c.segment) : null} onTime={jump} />)}
+          {groups.map((g) => <Card key={g.id} g={g} open={!!openSeg && g.segment === openSeg} href={g.segment ? segHref(g.segment) : null} onTime={jump} />)}
         </ol>
       </div>
     </div>

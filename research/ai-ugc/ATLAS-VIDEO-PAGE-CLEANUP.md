@@ -137,3 +137,41 @@ is "Approve" (`lib/video-stages.ts`); the two tests that asserted "Approved:" sa
 Not done: the slideshow page keeps its decision bar (only Kill this post moved into the ⋯ menu);
 REVIEW.md itself is unchanged and still raw inside Details; the Next.js dev overlay in the
 screenshots is the dev server's, not the page's.
+
+## 5. The stage panels, one pass (2026-10-21, second round)
+
+The rule: a stage panel shows what the user decides in that stage, plus the context needed to
+decide; everything else folds or waits for its own stage. And no file is shown twice on one page
+as if it were two things.
+
+What each panel shows now, and what moved:
+
+| stage | in view | folded (one click away) | gone from here |
+|---|---|---|---|
+| 3 Keyframes (gate A) | one card per generated shot: the keyframe, one plain line of what the shot is for, the cost a run, "Redo this keyframe"; the reference pose, small, labelled "Reference pose: the keyframe should match this pose"; one quiet line for the segments that need no keyframe; the cost line; Approve / Send back | "About this shot" (timing, framing, references, subjects, lines); "The decision as recorded" (the gate's words); the storyboard sheet as a link, only with two or more keyframes | the storyboard image (it repeated the keyframe); the card of the screen segment with its empty frame |
+| 4–5 Takes (gate B) | the take in focus, the reference clip, the approved keyframe, the seam frame; the identity gate; the checks and Approve / Reject; the motion design's render and its gates while the decision is open | "About this shot, and the decision as recorded"; the contact sheet; the panels of a panel segment; "How it was made" (the screens, the story, the stills, the gates once approved) | the pose picture (the reference clip's first frame, shown beside the clip itself); the screen recording card with "Nothing to approve before the cut" (now one quiet line); the long motion-design paragraph |
+| 6 Composite | the composite, then the approved take it is built on; Approve / Send back | the contact sheets | — |
+| 7 Cut | the cut (the strip follows it), the checks and the watch-it-whole line while the decision is open; Approve / Send back / Regenerate one segment | "The file, the contact sheet, the checks and the decision as recorded" once approved | the file name and checksum in the caption |
+| The video (the strip) | one card per segment that spans its beats: the range, the roles in words, one line per beat | "more": every beat's text, sound, app, the segment link, and every picture | the pictures in the cards (they repeated the panel's keyframe, the reaction clip, the delivered video); the strip's own player (the panel's player leads) |
+
+Two reading fixes on the way: a segment with an approved take now shows that take in focus
+(before, an older undecided take took the focus and the panel asked you to approve it), and the
+approved tag says "approved: take 2", not the file name.
+
+Measured at 1,280 px wide (`cleanup-screenshots/stages/`, before and after):
+
+| page | before | after |
+|---|---|---|
+| Latte 10-21 AM, gate A | 2,406 px | 1,778 px |
+| Mango 10-21 AM, gate A | 2,427 px | 1,818 px |
+| Mango 10-19 (delivered), stage 3 | 2,853 px | 1,909 px |
+| Mango 10-19, stage 4 | 3,497 px | 2,286 px |
+| Leo 10-19, stage 5 | 3,341 px | 2,243 px |
+| Mango 10-19, stage 6 | 1,933 px | 1,421 px |
+| Mango 10-19, stage 7 | 2,583 px | 1,841 px |
+| Mango 10-19, stage 8 | 2,067 px | 1,850 px |
+
+Code: `lib/plain-words.ts` (`groupBeats`, `purposeLine`; tested), `components/production/Timeline.tsx`
+(one card per segment, no pictures in the cards), `VideoProduction.tsx` (the panels),
+`VideoView.tsx` (passes the beats to the panels), `app/production.css`. Nothing a button sends
+changes; the decide route is not touched.

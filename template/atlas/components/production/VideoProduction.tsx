@@ -14,8 +14,13 @@
 import { useState } from "react";
 
 import { cutAccepts, motionAccepts } from "@/lib/accept-fail";
+import { purposeLine } from "@/lib/plain-words";
 import type { Click, Motion, Narration, Production, Segment, Source, Take } from "@/lib/video-production";
+import type { Timeline as TL } from "@/lib/video-stages";
 import { useDecide } from "./Actions";
+
+/** What a segment is for, in one line, from the beats of the plan it covers. */
+const purposeOf = (tl: TL | null | undefined, s: Segment) => purposeLine((tl?.checkpoints ?? []).filter((c) => c.segment === s.name));
 
 /* The identity gate passes a take: PASS, or NO FACE (no frame shows a face; the eye check decides). */
 const identityOk = (r: string | null | undefined) => r === "PASS" || r === "NO FACE";
@@ -84,38 +89,56 @@ function Err({ e }: { e: string | null }) {
 
 /* ------------------------------------------------------------ stage 3: gate A */
 
-export function StoryboardPanel({ post, p, live, seg }: { post: string; p: Production; live: boolean; seg: string | null }) {
+/** The segments that are not generated, in one quiet line: nothing to decide about them at this gate. */
+function BuiltLine({ rest, when }: { rest: Segment[]; when: string }) {
+  if (!rest.length) return null;
+  const words = rest.map((s) => `${KIND[s.type] ?? "Segment"} ${Number(s.name.slice(0, 2))} (${BUILT[s.type] ?? s.type})`);
+  return <p className="sr__hint">{words.join(", ")}: {rest.length === 1 ? "needs" : "need"} no keyframe. {when}</p>;
+}
+
+export function StoryboardPanel({ post, p, live, seg, tl }: { post: string; p: Production; live: boolean; seg: string | null; tl?: TL | null }) {
   const [decide, busy] = useDecide();
   const [err, setErr] = useState<string | null>(null);
   const own = p.segments.filter((s) => s.generated && !s.sharedFrom);
   const done = !own.length || (p.gateA?.decision === "approve" && p.gateA.current);
   const run = (kind: "storyboard.approve" | "storyboard.sendback", note?: string, segments?: string[]) =>
     decide({ post, kind, ...(note ? { note } : {}), data: (segments ? { segments } : {}) as any }).then((r) => { setErr(r); return r; });
-  const shown = seg ? p.segments.filter((s) => s.name === seg) : p.segments;
+  /* The cards: the generated shots only; the segments built at the cut are one line. */
+  const gen = p.segments.filter((s) => s.generated);
+  const shown = seg ? gen.filter((s) => s.name === seg) : gen;
+  const rest = seg ? p.segments.filter((s) => s.name === seg && !s.generated) : p.segments.filter((s) => !s.generated);
+  const keyed = own.filter((s) => s.keyframe).length;
   return (
     <section className="vprod__stage" aria-label="Shots and keyframes, gate A">
       <h3 className="vprod__h">Shots and keyframes
         <span className={`vprod__tag${done ? " is-done" : ""}`}>{done ? "approved" : p.gateA?.decision && p.gateA.decision !== "approve" ? p.gateA.decision : p.gateA?.decision === "approve" ? "keyframe changed since" : "not approved"}</span>
       </h3>
-      {p.gateA?.words ? <p className="vprod__words">Gate A: “{p.gateA.words}”{p.gateA.date ? ` (${p.gateA.date})` : ""}</p> : null}
-      {p.storyboard && !seg ? <a href={p.storyboard.url} target="_blank" rel="noreferrer"><img className="vprod__board" src={p.storyboard.url} alt="The storyboard" /></a> : null}
       <ul className="vprod__cards">
-        {shown.map((s) => (
-          <li key={s.name} className="vprod__card">
-            <p className="vprod__segh tabular"><SegName s={s} />{s.motionCopy ? ` · ${ROUTE_WORDS[s.motionCopy.route] ?? s.motionCopy.route}` : ""}{s.generated ? ` · ${usd(s.cost)} a run` : ""}</p>
-            <ShotFacts s={s} />
-            <div className="vprod__media">
-              {s.keyframe ? <figure><a href={s.keyframe.url} target="_blank" rel="noreferrer"><img src={s.keyframe.url} alt={`Keyframe ${s.name}`} /></a><figcaption>keyframe</figcaption></figure>
-                : <span className="vprod__nokey" title={s.asset?.id ?? s.screen?.id ?? undefined}>{!s.generated ? `no keyframe: ${BUILT[s.type] ?? s.type}${s.panels.length ? ` (${s.panels.length})` : ""}` : s.needsKeyframe ? "no keyframe yet" : "no keyframe: the clip leads"}</span>}
-              {s.endStill ? <figure><img src={s.endStill} alt={`End still ${s.name}`} /><figcaption>end still</figcaption></figure> : null}
-              {s.poseFrame ? <figure><img src={s.poseFrame} alt={`Pose picture ${s.name}`} /><figcaption>the pose picture (the clip&apos;s first frame)</figcaption></figure> : null}
-            </div>
-            {s.continues ? <p className="vprod__words">Opens on the last frame of {s.continues}, taken at its gate B.</p> : null}
-            {live && s.generated && s.needsKeyframe && s.keyframe && !s.sharedFrom ? <SendBack label="Redo this keyframe…" busy={busy} placeholder="What to change in this keyframe." onSend={(n) => run("storyboard.sendback", n, [s.name])} /> : null}
-          </li>
-        ))}
+        {shown.map((s) => {
+          const purpose = purposeOf(tl, s);
+          return (
+            <li key={s.name} className="vprod__card">
+              <p className="vprod__segh tabular"><SegName s={s} />{` · ${usd(s.cost)} a run`}{s.sharedFrom ? ` · shared with ${s.sharedFrom}` : ""}</p>
+              {purpose ? <p className="vprod__purpose">{purpose}</p> : null}
+              <div className="vprod__media">
+                {s.keyframe ? <figure><a href={s.keyframe.url} target="_blank" rel="noreferrer"><img src={s.keyframe.url} alt={`Keyframe ${s.name}`} /></a><figcaption>the keyframe{s.keyframe.at ? ` · ${stamp(s.keyframe.at)}` : ""}</figcaption></figure>
+                  : <span className="vprod__nokey">{s.needsKeyframe ? "no keyframe yet" : "no keyframe: the clip leads"}</span>}
+                {s.endStill ? <figure><img src={s.endStill} alt={`End still ${s.name}`} /><figcaption>the end still</figcaption></figure> : null}
+                {s.poseFrame ? <figure className="is-small"><img src={s.poseFrame} alt={`Reference pose ${s.name}`} /><figcaption>Reference pose: the keyframe should match this pose</figcaption></figure> : null}
+              </div>
+              {s.continues ? <p className="vprod__words">Opens on the last frame of {s.continues}, taken at its gate B.</p> : null}
+              {live && s.generated && s.needsKeyframe && s.keyframe && !s.sharedFrom ? <SendBack label="Redo this keyframe…" busy={busy} placeholder="What to change in this keyframe." onSend={(n) => run("storyboard.sendback", n, [s.name])} /> : null}
+              <details className="vprod__older"><summary>About this shot</summary><ShotFacts s={s} /></details>
+            </li>
+          );
+        })}
       </ul>
-      {own.length ? <p className="vprod__cost tabular">First runs: {usd(p.cost)} computed (list price × seconds){p.spent ? ` · spent so far ${usd(p.spent)}` : ""}</p> : <p className="sr__hint">No generated segment: nothing to approve here.</p>}
+      <BuiltLine rest={rest} when="It is laid in at the cut." />
+      {keyed >= 2 && p.storyboard && !seg ? <p className="sr__hint"><a href={p.storyboard.url} target="_blank" rel="noreferrer">Open the storyboard sheet</a>: every keyframe on one page.</p> : null}
+      {!own.length ? <p className="sr__hint">No generated segment: nothing to approve here.</p>
+        : done ? (p.spent ? <p className="vprod__cost tabular">Spent so far: {usd(p.spent)}.</p> : null)
+        : <p className="vprod__cost tabular">Approving starts the first runs: {usd(p.cost)} (list price × seconds){p.spent ? ` · spent so far ${usd(p.spent)}` : ""}.</p>}
+      {p.gateA?.words ? <details className="vprod__older"><summary>The decision as recorded</summary><p className="vprod__words">Gate A: “{p.gateA.words}”{p.gateA.date ? ` (${p.gateA.date})` : ""}</p></details> : null}
       <ClickLine c={p.gateAClick} what="the storyboard" />
       {live && own.length && !done ? (
         <div className="sr__actions">
@@ -149,11 +172,13 @@ function ShotFacts({ s }: { s: Segment }) {
 
 /* --------------------------------------------------- stages 4 and 5: gate B */
 
-/** The take in focus: the newest one nobody decided yet; else the approved one; else the newest. */
+/** The take in focus: the newest one nobody decided yet and that is newer than the approved one; else the approved one; else the newest. */
 const focusOf = (s: Segment): Take | null =>
-  s.takes.find((t) => t.file !== s.gateB?.file && !(s.click?.current && s.click.file === t.file)) ?? s.approved ?? s.takes[0] ?? null;
+  s.takes.find((t) => t.file !== s.gateB?.file && !(s.click?.current && s.click.file === t.file) && (!s.approved || t.at > s.approved.at)) ?? s.approved ?? s.takes[0] ?? null;
+/** "take 2": the take's number, newest last. */
+const takeNo = (s: Segment, file: string) => { const i = s.takes.findIndex((x) => x.file === file); return i < 0 ? base(file) : `take ${s.takes.length - i}`; };
 
-function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Production; live: boolean }) {
+function SegmentCard({ post, s, p, live, tl }: { post: string; s: Segment; p: Production; live: boolean; tl?: TL | null }) {
   const [decide, busy] = useDecide();
   const [err, setErr] = useState<string | null>(null);
   const [ticked, setTicked] = useState<string[]>([]);
@@ -170,7 +195,7 @@ function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Produc
     : s.motion ? (s.motion.approved ? "motion design approved" : !s.motion.render ? "motion design: not rendered yet"
       : !s.motion.gates ? "motion design: gates not run" : s.motion.failed.length ? `motion design: gates failed` : "motion design waiting for you")
     : !s.generated ? `${BUILT[s.type] ?? s.type}: built at assembly`
-    : s.approved ? `approved: ${base(s.approved.file)}`
+    : s.approved ? `approved: ${takeNo(s, s.approved.file)}`
     : !s.takes.length ? "no take yet"
     : decided ? (s.click?.kind === "take.reject" || (s.gateB && s.gateB.decision !== "approve") ? "rejected: a new take comes next" : "approved in the Atlas")
     : "take waiting for you";
@@ -184,26 +209,25 @@ function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Produc
         <SegName s={s} />{s.motionCopy ? ` · ${ROUTE_WORDS[s.motionCopy.route] ?? s.motionCopy.route}` : ""}{s.continues ? ` · continues ${s.continues}` : ""}{s.generated ? ` · ${usd(s.cost)} a run` : ""}
         <span className={`vprod__tag${s.approved || s.motion?.approved ? " is-done" : status === "take waiting for you" || status === "motion design waiting for you" ? " is-you" : ""}`}>{status}</span>
       </p>
-      <ShotFacts s={s} />
-      {s.gateB?.words ? <p className="vprod__words">Gate B ({s.gateB.decision}{s.gateB.file ? `, ${base(s.gateB.file)}` : ""}): “{s.gateB.words}”{s.gateB.failure ? ` · failed: ${s.gateB.failure}` : ""}</p> : null}
+      {purposeOf(tl, s) ? <p className="vprod__purpose">{purposeOf(tl, s)}</p> : null}
+      {/* The words of an open decision stay in view; a closed one folds. */}
+      {s.gateB?.words && !s.approved ? <p className="vprod__words">Gate B ({s.gateB.decision}{s.gateB.file ? `, ${base(s.gateB.file)}` : ""}): “{s.gateB.words}”{s.gateB.failure ? ` · failed: ${s.gateB.failure}` : ""}</p> : null}
 
-      {/* The take, beside what it is judged against. */}
+      {/* The take, beside what it is judged against: the reference clip, the approved keyframe, the seam. */}
       {t ? (
         <div className="vprod__media">
           <figure>
             <video src={t.url} controls playsInline preload="metadata" aria-label={`Take ${base(t.file)}`} />
-            <figcaption className="tabular">{base(t.file)} · {stamp(t.at)}{isApproved ? " · approved" : ""}</figcaption>
+            <figcaption className="tabular">{takeNo(s, t.file)} · {stamp(t.at)}{isApproved ? " · approved" : ""}</figcaption>
           </figure>
-          {s.motionCopy?.reference ? <figure><video src={s.motionCopy.reference} controls playsInline preload="metadata" muted aria-label="The reference clip" /><figcaption>the reference clip (the motion only)</figcaption></figure> : null}
-          {s.poseFrame ? <figure><img src={s.poseFrame} alt="The pose picture" /><figcaption>the pose picture</figcaption></figure> : null}
-          {s.keyframe ? <figure><img src={s.keyframe.url} alt={`Keyframe ${s.name}`} /><figcaption>the approved keyframe</figcaption></figure> : null}
+          {s.motionCopy?.reference ? <figure><video src={s.motionCopy.reference} controls playsInline preload="metadata" muted aria-label="The reference clip" /><figcaption>the reference clip: the take copies its motion</figcaption></figure> : null}
+          {s.keyframe ? <figure><img src={s.keyframe.url} alt={`Keyframe ${s.name}`} /><figcaption>the approved keyframe: the take starts here</figcaption></figure> : null}
           {s.seam ? (
             <figure>
               {s.seam.lastFrame ? <img src={s.seam.lastFrame} alt={`Last frame of ${s.seam.from}`} /> : <span className="vprod__nokey">no last frame of {s.seam.from} yet</span>}
               <figcaption>last frame of {s.seam.from}{s.seam.verified ? "" : " · UNVERIFIED"}</figcaption>
             </figure>
           ) : null}
-          {t.sheet ? <figure className="is-wide"><a href={t.sheet} target="_blank" rel="noreferrer"><img src={t.sheet} alt="Contact sheet" className="is-sheet" /></a><figcaption>contact sheet of the newest take (qc.py, 1 fps)</figcaption></figure> : null}
         </div>
       ) : null}
       {s.seam ? <p className="vprod__words">Continuity seam: {s.seam.seedDiff !== null ? `the first frame differs from the last frame of ${s.seam.from} by ${s.seam.seedDiff} (0 to 255)` : `measured at gate B (review.py: checks.seed_diff)`}{s.seam.verified ? "" : "; the model's continuity input is not verified by a paid run yet"}.</p> : null}
@@ -218,21 +242,19 @@ function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Produc
       {s.type === "T" ? <p className="sr__hint">Check the words against the frozen script above, and the voice against the character&apos;s voice reference.</p> : null}
       {s.type === "B" ? <p className="sr__hint">The people rule: {s.framing === "subject_only" ? "no person in the picture" : s.framing === "hands_only" ? "hands only, no face" : "as the shot says"}; count the subjects{s.subjects.length ? ` (${s.subjects.join(", ")})` : ""}.</p> : null}
 
-      {/* The types built at assembly. */}
-      {s.type === "C" && s.asset ? <p className="vprod__words">Supplied {s.asset.id}{s.asset.range ? `, ${s.asset.range.join("–")} s` : s.asset.still !== null ? `, still at ${s.asset.still} s` : ""}: {src ? (src.approved ? "approved at gate B" : "its source card is below") : "not in the plan's assets"}.</p> : null}
+      {/* The panels of a panel segment: laid in at the cut, so they fold. */}
       {s.type === "M" && s.panels.length ? (
-        <div className="vprod__panels" aria-label="The panels in the frame">
-          <div className="vprod__frame916">{s.panels.map((pn) => pn.rect && pn.rect.length === 4 ? <span key={pn.id} className="vprod__rect" style={{ left: `${pn.rect[0] * 100}%`, top: `${pn.rect[1] * 100}%`, width: `${pn.rect[2] * 100}%`, height: `${pn.rect[3] * 100}%` }}>{pn.id}</span> : null)}</div>
-          <ul className="vprod__plist">{s.panels.map((pn) => <li key={pn.id}><b>{pn.id}</b> · {pn.what}{pn.url ? <> · <a href={pn.url} target="_blank" rel="noreferrer">open</a></> : " · not served"}</li>)}</ul>
-        </div>
+        <details className="vprod__older">
+          <summary>The panels in the frame ({s.panels.length})</summary>
+          <div className="vprod__panels" aria-label="The panels in the frame">
+            <div className="vprod__frame916">{s.panels.map((pn) => pn.rect && pn.rect.length === 4 ? <span key={pn.id} className="vprod__rect" style={{ left: `${pn.rect[0] * 100}%`, top: `${pn.rect[1] * 100}%`, width: `${pn.rect[2] * 100}%`, height: `${pn.rect[3] * 100}%` }}>{pn.id}</span> : null)}</div>
+            <ul className="vprod__plist">{s.panels.map((pn) => <li key={pn.id}><b>{pn.id}</b> · {pn.what}{pn.url ? <> · <a href={pn.url} target="_blank" rel="noreferrer">open</a></> : " · not served"}</li>)}</ul>
+          </div>
+        </details>
       ) : null}
-      {s.motion ? <MotionDesign post={post} s={s} m={s.motion} live={live} /> : s.screen ? (
-        <div className="vprod__media">
-          {s.screen.url ? <figure><video src={s.screen.url} controls playsInline preload="metadata" muted aria-label={`Screen ${s.screen.id}`} /><figcaption>screen {s.screen.id}{s.screen.hero ? ` · hero “${s.screen.hero}”` : ""}</figcaption></figure> : <p className="sr__hint">Screen {s.screen.id}: not in the screen library yet.</p>}
-          <p className="sr__hint">Nothing to approve before the cut: the recording is checked at gate C.</p>
-        </div>
-      ) : null}
+      {s.motion ? <MotionDesign post={post} s={s} m={s.motion} live={live} /> : null}
       {nar ? <p className="vprod__words">Narration under it: take {nar.take} ({nar.approved ? "approved" : "its card is below"}).</p> : null}
+      {s.type === "C" && s.asset ? <p className="vprod__words">Supplied {s.asset.id}{s.asset.range ? `, ${s.asset.range.join("–")} s` : s.asset.still !== null ? `, still at ${s.asset.still} s` : ""}: {src ? (src.approved ? "approved at gate B" : "its source card is below") : "not in the plan's assets"}.</p> : null}
 
       {s.takes.length > 1 ? (
         <details className="vprod__older">
@@ -246,6 +268,14 @@ function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Produc
         </details>
       ) : null}
       <ClickLine c={s.click} what={`a take of ${s.name}`} />
+      {s.generated ? (
+        <details className="vprod__older">
+          <summary>About this shot{t?.sheet ? ", and the contact sheet" : ""}{s.gateB?.words && s.approved ? ", and the decision as recorded" : ""}</summary>
+          <ShotFacts s={s} />
+          {s.gateB?.words && s.approved ? <p className="vprod__words">Gate B ({s.gateB.decision}{s.gateB.file ? `, ${base(s.gateB.file)}` : ""}): “{s.gateB.words}”{s.gateB.failure ? ` · failed: ${s.gateB.failure}` : ""}</p> : null}
+          {t?.sheet ? <div className="vprod__media"><figure className="is-wide"><a href={t.sheet} target="_blank" rel="noreferrer"><img src={t.sheet} alt="Contact sheet" className="is-sheet" /></a><figcaption>contact sheet of this take (qc.py, 1 fps)</figcaption></figure></div> : null}
+        </details>
+      ) : null}
       {live && t && s.generated && !s.sharedFrom && !isApproved && !decided ? (
         <>
           {s.checks.length ? (
@@ -302,27 +332,35 @@ function MotionDesign({ post, s, m, live }: { post: string; s: Segment; m: Motio
   const { stale, accept: anyway } = motionAccepts(m, eye);
   const run = (kind: "motion.approve" | "motion.reject", note?: string, accept?: string[]) =>
     decide({ post, kind, ...(note ? { note } : {}), data: { segment: s.name, ...(kind === "motion.approve" ? { checks: eye, ...(accept?.length ? { accept_fail: accept } : {}) } : {}) } as any }).then((r) => { setErr(r); return r; });
+  const gates = m.gates ? (
+    <ul className="vprod__gates">{m.gates.map((g) => <li key={g.gate} className={g.result === "PASS" ? "is-ok" : g.result === "FAIL" ? "is-bad" : ""}><b>{g.result}</b> · {GATE_WORDS[g.gate] ?? g.gate}{g.detail ? ` — ${g.detail}` : ""}</li>)}</ul>
+  ) : m.render ? <p className="sr__hint">The gates have not run on this render (motion_design.py check).</p> : null;
+  const words = m.decision?.words ? <p className="vprod__words">Gate B ({m.decision.decision}): “{m.decision.words}”</p> : null;
   return (
     <div className="vprod__motion">
       <p className="vprod__words">
-        Motion design: the app&apos;s real screens rebuilt in code and animated (motion_design.py), never by a video model.{" "}
-        {m.fit === "screen" ? "Rendered as the bare phone screen and laid into the phone or the panel like a recording; a drawn screen in a filmed hand can look pasted on, so check the composite closely."
-          : "Rendered at 1080x1920. It fills the frame, so it looks more like a promotion than a hand holding a phone."}{m.reason ? <> Why not a real recording: <em>{m.reason}</em></> : null}
+        The app part is a motion design: the app&apos;s real screens, rebuilt in code and animated, never by a video model.
+        {m.fit === "screen" ? " It is laid into the phone or the panel like a recording; a drawn screen in a filmed hand can look pasted on, so check the composite closely." : " It fills the frame, so it looks more like a promotion than a hand holding a phone."}
       </p>
-      <p className="sr__hint">Screens: {m.screens.join(", ") || "none named"} · rebuilt from {m.rebuiltFrom.join("; ") || "nothing named"} · fit {m.fit} · {m.seconds} s{m.hero ? ` · hero “${m.hero}”` : ""}</p>
-      <ol className="vprod__steps tabular" aria-label="The screen story">
-        {m.steps.map((x, i) => <li key={i}><b>{x.at.toFixed(1)} s</b> · {x.action}{x.target ? ` ${x.target}` : ""} · {x.screen}: {x.shows.map((w) => `“${w}”`).join(" ")}</li>)}
-      </ol>
       {m.render ? (
         <div className="vprod__media">
-          <figure><video src={m.render.url} controls playsInline preload="metadata" muted aria-label={`Motion design of ${s.name}`} /><figcaption className="tabular">motion/render.mp4 · {stamp(m.render.at)}{m.approved ? " · approved" : ""}</figcaption></figure>
-          {m.stills.map((x, i) => <figure key={x.url}><img src={x.url} alt={`Step ${i + 1}`} /><figcaption className="tabular">step {i + 1} · {x.at.toFixed(1)} s</figcaption></figure>)}
+          <figure><video src={m.render.url} controls playsInline preload="metadata" muted aria-label={`Motion design of ${s.name}`} /><figcaption className="tabular">the render · {m.seconds} s · {stamp(m.render.at)}{m.approved ? " · approved" : ""}</figcaption></figure>
         </div>
-      ) : <p className="sr__hint">Not rendered yet: the agent writes the page from the app&apos;s real screens (character-motion), then runs motion_design.py render and check.</p>}
-      {m.gates ? (
-        <ul className="vprod__gates">{m.gates.map((g) => <li key={g.gate} className={g.result === "PASS" ? "is-ok" : g.result === "FAIL" ? "is-bad" : ""}><b>{g.result}</b> · {GATE_WORDS[g.gate] ?? g.gate}{g.detail ? ` — ${g.detail}` : ""}</li>)}</ul>
-      ) : m.render ? <p className="sr__hint">The gates have not run on this render (motion_design.py check).</p> : null}
-      {m.decision?.words ? <p className="vprod__words">Gate B ({m.decision.decision}): “{m.decision.words}”</p> : null}
+      ) : <p className="sr__hint">Not rendered yet: the agent writes the page from the app&apos;s real screens, then renders and checks it.</p>}
+      {/* The gates and the decision's words stay in view while the decision is open; closed, they fold. */}
+      {!m.approved ? gates : null}
+      {!m.approved ? words : null}
+      <details className="vprod__older">
+        <summary>How it was made: the screens, the story, the stills{m.approved ? ", the gates" : ""}</summary>
+        {m.reason ? <p className="vprod__words">Why not a real recording: <em>{m.reason}</em></p> : null}
+        <p className="sr__hint">Screens: {m.screens.join(", ") || "none named"} · rebuilt from {m.rebuiltFrom.join("; ") || "nothing named"} · fit {m.fit} · {m.seconds} s{m.hero ? ` · hero “${m.hero}”` : ""}</p>
+        <ol className="vprod__steps tabular" aria-label="The screen story">
+          {m.steps.map((x, i) => <li key={i}><b>{x.at.toFixed(1)} s</b> · {x.action}{x.target ? ` ${x.target}` : ""} · {x.screen}: {x.shows.map((w) => `“${w}”`).join(" ")}</li>)}
+        </ol>
+        {m.stills.length ? <div className="vprod__media">{m.stills.map((x, i) => <figure key={x.url} className="is-small"><img src={x.url} alt={`Step ${i + 1}`} /><figcaption className="tabular">step {i + 1} · {x.at.toFixed(1)} s</figcaption></figure>)}</div> : null}
+        {m.approved ? gates : null}
+        {m.approved ? words : null}
+      </details>
       <ClickLine c={m.click} what={`the motion design of ${s.name}`} />
       {live && m.render && m.gates && !m.approved && !pending ? (
         <>
@@ -410,8 +448,12 @@ function NarrationCard({ post, x, live }: { post: string; x: Narration; live: bo
   );
 }
 
-export function TakesPanel({ post, p, live, seg }: { post: string; p: Production; live: boolean; seg: string | null }) {
-  const segs = seg ? p.segments.filter((s) => s.name === seg) : p.segments;
+export function TakesPanel({ post, p, live, seg, tl }: { post: string; p: Production; live: boolean; seg: string | null; tl?: TL | null }) {
+  /* A card for every segment decided here: a generated take, a motion design, a panel frame. The rest is one line. */
+  const here = (s: Segment) => s.generated || !!s.motion || (s.type === "M" && s.panels.length > 0);
+  const all = seg ? p.segments.filter((s) => s.name === seg) : p.segments;
+  const segs = all.filter(here);
+  const rest = all.filter((s) => !here(s));
   return (
     <section className="vprod__stage" aria-label="Generate and review takes, gate B">
       <h3 className="vprod__h">Generate and review takes
@@ -419,8 +461,9 @@ export function TakesPanel({ post, p, live, seg }: { post: string; p: Production
       </h3>
       {p.state?.stages.generate?.status === "running" ? <p className="vprod__words">Generating now: {p.state.stages.generate.note ?? "a run"} (state.json).</p> : null}
       {p.state?.stages.generate?.status === "failed" ? <p className="rail__why is-bad">The last run failed: {p.state.stages.generate.note ?? "no note"} (state.json).</p> : null}
-      {segs.length ? <ol className="vprod__segs">{segs.map((s) => <SegmentCard key={s.name} post={post} s={s} p={p} live={live} />)}</ol>
-        : <p className="sr__hint">The segments appear here once the shots are written.</p>}
+      {segs.length ? <ol className="vprod__segs">{segs.map((s) => <SegmentCard key={s.name} post={post} s={s} p={p} live={live} tl={tl} />)}</ol>
+        : !rest.length ? <p className="sr__hint">The segments appear here once the shots are written.</p> : null}
+      <BuiltLine rest={rest} when="Nothing to decide here: it is checked at the cut." />
       {!seg && p.sources.length ? (
         <>
           <h4 className="vprod__sub">Supplied sources</h4>
@@ -451,10 +494,15 @@ function CompositeCard({ post, s, live }: { post: string; s: Segment; live: bool
         <span className={`vprod__tag${s.compositeApproved ? " is-done" : c && !pending && !back ? " is-you" : ""}`}>{s.compositeApproved ? "approved" : !s.approved ? "the plate is approved at gate B first" : !c ? "not made yet (composite.sh)" : pending ? "clicked: being recorded" : back ? "sent back" : "waiting for you"}</span>
       </p>
       <div className="vprod__media">
-        {s.approved ? <figure><video src={s.approved.url} controls playsInline preload="metadata" muted aria-label="The approved plate" /><figcaption>the approved plate</figcaption></figure> : null}
-        {c ? <figure><video src={c.url} controls playsInline preload="metadata" aria-label={`Composite of ${s.name}`} /><figcaption className="tabular">{base(c.file)} · gates {c.gates}</figcaption></figure> : null}
-        {c?.sheets.map((x) => <figure key={x.url}><a href={x.url} target="_blank" rel="noreferrer"><img src={x.url} alt={x.label} className="is-sheet" /></a><figcaption>{x.label}</figcaption></figure>)}
+        {c ? <figure><video src={c.url} controls playsInline preload="metadata" aria-label={`Composite of ${s.name}`} /><figcaption className="tabular">the composite · gates {c.gates}</figcaption></figure> : null}
+        {s.approved ? <figure><video src={s.approved.url} controls playsInline preload="metadata" muted aria-label="The approved plate" /><figcaption>the approved take: the plate the app is put into</figcaption></figure> : null}
       </div>
+      {c?.sheets.length ? (
+        <details className="vprod__older">
+          <summary>The contact sheets ({c.sheets.length})</summary>
+          <div className="vprod__media">{c.sheets.map((x) => <figure key={x.url} className="is-wide"><a href={x.url} target="_blank" rel="noreferrer"><img src={x.url} alt={x.label} className="is-sheet" /></a><figcaption>{x.label}</figcaption></figure>)}</div>
+        </details>
+      ) : null}
       <ClickLine c={s.compositeClick} what={`the composite of ${s.name}`} />
       {live && c && !s.compositeApproved && !pending && !back ? (
         <div className="sr__actions">
@@ -499,20 +547,29 @@ export function CutPanel({ post, p, live }: { post: string; p: Production; live:
       <h3 className="vprod__h">The cut
         <span className={`vprod__tag${done ? " is-done" : a && !pending ? " is-you" : ""}`}>{done ? "approved" : !a ? "not assembled yet" : a.stale ? "stale: assembled from another revision" : pending ? "clicked: being recorded" : "waiting for you"}</span>
       </h3>
-      {p.gateC?.words ? <p className="vprod__words">Gate C ({p.gateC.decision}): “{p.gateC.words}”{p.gateC.date ? ` (${p.gateC.date})` : ""}</p> : null}
+      {p.gateC?.words && !done ? <p className="vprod__words">Gate C ({p.gateC.decision}): “{p.gateC.words}”{p.gateC.date ? ` (${p.gateC.date})` : ""}</p> : null}
       {a ? (
         <div className="vprod__media">
           <figure className="is-wide">
-            <video src={grain && a.grain ? a.grain : a.url} controls playsInline preload="metadata" aria-label="The assembled cut" />
-            <figcaption className="tabular">{base(a.file)}{a.duration ? ` · ${a.duration.toFixed(1)} s` : ""} · sha256 {a.sha256.slice(0, 12)}</figcaption>
+            <video src={grain && a.grain ? a.grain : a.url} controls playsInline preload="metadata" aria-label="The assembled cut" data-cut-player="" />
+            <figcaption className="tabular">the cut{a.duration ? ` · ${a.duration.toFixed(1)} s` : ""}{a.stale ? " · assembled from another revision" : ""}</figcaption>
           </figure>
-          {a.sheet ? <figure className="is-wide"><a href={a.sheet} target="_blank" rel="noreferrer"><img src={a.sheet} alt="Contact sheet of the cut" className="is-sheet" /></a><figcaption>contact sheet</figcaption></figure> : null}
         </div>
       ) : <p className="sr__hint">The cut is assembled once every segment is approved.</p>}
-      {a?.checks.length ? (
+      {/* The checks gate the approval, so they stay in view until it is given; then they fold with the record. */}
+      {a?.checks.length && !done ? (
         <ul className="vprod__checklist">{a.checks.map((c) => <li key={c.name} className={c.result === "FAIL" ? "is-bad" : ""}><b>{c.name}</b> {c.result || "—"}{c.detail ? ` · ${c.detail}` : ""}</li>)}</ul>
       ) : null}
-      {a ? <p className="sr__hint">Watch it whole: the hero element and every overlay readable, the sound level, each cut, no green, no frame shown twice at a continuous cut.</p> : null}
+      {a && !done ? <p className="sr__hint">Watch it whole: the hero element and every overlay readable, the sound level, each cut, no green, no frame shown twice at a continuous cut.</p> : null}
+      {a ? (
+        <details className="vprod__older">
+          <summary>The file{a.sheet ? ", the contact sheet" : ""}{done ? ", the checks and the decision as recorded" : ""}</summary>
+          <p className="vprod__words tabular">{base(a.file)} · sha256 {a.sha256.slice(0, 12)}</p>
+          {a.sheet ? <div className="vprod__media"><figure className="is-wide"><a href={a.sheet} target="_blank" rel="noreferrer"><img src={a.sheet} alt="Contact sheet of the cut" className="is-sheet" /></a><figcaption>contact sheet</figcaption></figure></div> : null}
+          {done && a.checks.length ? <ul className="vprod__checklist">{a.checks.map((c) => <li key={c.name} className={c.result === "FAIL" ? "is-bad" : ""}><b>{c.name}</b> {c.result || "—"}{c.detail ? ` · ${c.detail}` : ""}</li>)}</ul> : null}
+          {done && p.gateC?.words ? <p className="vprod__words">Gate C ({p.gateC.decision}): “{p.gateC.words}”{p.gateC.date ? ` (${p.gateC.date})` : ""}</p> : null}
+        </details>
+      ) : null}
       <ClickLine c={p.cutClick} what={p.cutClick?.segment ? `the cut (regenerate ${p.cutClick.segment})` : "the cut"} />
       {live && a && !done && !pending ? (
         <>

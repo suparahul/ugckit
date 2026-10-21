@@ -170,3 +170,31 @@ export function plainBlock(reason: string | null): string | null {
   if (/REVIEW\.md has no content digest/.test(reason)) return "the plan has no review yet";
   return reason;
 }
+
+/* ------------------------------------------------------------------ the beats */
+
+/** One beat of the strip, as the grouping needs it: the segment it belongs to and its role. */
+export type BeatLike = { id: string; start: number; end: number; segment: string | null; role: string | null };
+
+/** The beats as cards: consecutive beats of one segment become one card that spans them,
+ * so one generated clip is never shown twice as if it were two things. A beat with no
+ * segment stays a card of its own. */
+export function groupBeats<B extends BeatLike>(beats: B[]): { id: string; start: number; end: number; segment: string | null; beats: B[] }[] {
+  const out: { id: string; start: number; end: number; segment: string | null; beats: B[] }[] = [];
+  for (const b of beats) {
+    const last = out[out.length - 1];
+    if (last && b.segment && last.segment === b.segment) { last.beats.push(b); last.end = Math.max(last.end, b.end); continue; }
+    out.push({ id: b.id, start: b.start, end: b.end, segment: b.segment, beats: [b] });
+  }
+  return out;
+}
+
+/** What a segment is for, in one line: the roles of its beats in words, then the first sentence of what the viewer sees. */
+export function purposeLine(beats: { role: string | null; sees: string }[]): string | null {
+  if (!beats.length) return null;
+  const roles = [...new Set(beats.map((b) => roleWord(b.role)).filter(Boolean))] as string[];
+  const sees = beats.map((b) => b.sees).find((s) => s && s !== "not written")?.replace(/ · framing: \w+$/, "") ?? null;
+  const head = roles.length ? roles[0].charAt(0).toUpperCase() + roles[0].slice(1) + (roles.length > 1 ? `, then ${roles.slice(1).join(", ")}` : "") : null;
+  if (!head && !sees) return null;
+  return [head, sees ? shortLine(sees, 140) : null].filter(Boolean).join(": ");
+}
