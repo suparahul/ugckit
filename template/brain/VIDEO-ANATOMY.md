@@ -73,7 +73,7 @@ Two text slots: one concrete situation ("four weeks of litter misses with a new 
 |---|---|---|---|
 | `talking_head` | a face speaks to camera | SCRIPT-LEARNINGS § 8 (claimed); founder plan, education "why" videos (planned) | runnable (T); 35–60 s is several T segments joined at sentence ends |
 | `hook_to_demo` | an attention beat (a face, a cat or a scene), then the real app | Potto, Roamy, Stronger (observed, product at about 2–6 s) | runnable with a generated face (T → R, P or a phone insertion); a supplied opener needs bridge C |
-| `live_use` | the real input is captured while the app reads it; the input and the result are both shown | founder plan, brand handle (planned) | bridge C + live |
+| `live_use` | the real input is captured while the app reads it; the input and the result are both shown. A generated input or a motion-designed result is the user's choice (2026-10-21): the bridge notes the trade-off (it reads as staged; motion design looks more like an advert) and never refuses it | founder plan, brand handle (planned) | bridge C + live |
 | `before_after` | state or approach A, then B; sequential or split screen | SCRIPT-LEARNINGS § 8 (claimed); founder plan, wrong way / right way (planned) | bridge B or C; split screen needs bridge composition |
 | `text_over_action` | an action with timed text, no speaker | UMax (observed); Vent Now, photo mode (observed, not video) | bridge B or C + composition |
 | `voiceover_action` | an action with a narrator's voice, no face speaking | SCRIPT-LEARNINGS § 9, demo with voice-over (claimed) | bridge B or C + narration |

@@ -470,7 +470,10 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
   A real recording is preferred: motion design fills the frame and looks more like a
   promotion than a hand holding a phone, so the plan picks it only where no recording
   shows the screen and says why (`demo_source_reason`); the bridge refuses it for a
-  screen the library records, on a phone plate or a panel, and for a live result. Its
+  screen the library records and on a phone plate or a panel. In a `live_use` video it is
+  the user's choice (2026-10-21): the bridge notes that motion design looks more like an
+  advert than a real recording, and a live_use video with a generated input and no paired
+  recording is made too, with a note; the kit never refuses a format. Its
   render passes its gates and is approved at gate B (`review.py motion`) by its sha256;
   assembly lays it in as it is. Every X with a
   reference is a **motion copy** (founder, 2026-10-19): the reference clip, trimmed to its

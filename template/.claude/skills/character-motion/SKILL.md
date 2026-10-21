@@ -15,7 +15,9 @@ real still of the screen library. It needs no recording, which is the least effo
 user, but it fills the frame and looks more like a promotion than a hand holding a phone. So
 the plan chose it, and said why, only where no real recording shows the screen
 (`demo_source_reason`, `video-plan` and `video-script`). This skill never chooses it: it
-builds what the locked plan says.
+builds what the locked plan says. That includes the result of a `live_use` video: the
+user's choice (2026-10-21); the bridge notes that it looks more like an advert than a real
+recording, and never refuses it.
 
 **The method of the first two motion-designed posts** (organic-factory, 2026-10-14: the
 Catwise reveal flow of `latte-3` and `hannah-3`, `apps/catwise/production/files/2026-10-14-*/demo/`):

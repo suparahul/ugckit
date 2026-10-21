@@ -90,6 +90,8 @@ the voice and the room agree across every join; no join inside a sentence; a
 continuous cut shows no jump and no repeated frame; the app's
 strings are real and readable where they must be; the captions match the frozen script
 and the house style; each overlay says the plan's words at the plan's time; each panel
-shows its source; a live demonstration shows the real input and its real result in step.
+shows its source; a live demonstration with a paired input shows the real input and its
+real result in step (a live_use video the user made with a generated input or motion design
+has no pairing to check).
 
 The next stage is `character-deliver` (gate C).

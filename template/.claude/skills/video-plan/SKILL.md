@@ -118,7 +118,10 @@ Lowercase, digits and hyphens. It is the folder name here and under `pipeline/ch
      the least effort for the user, but it fills the frame and looks more like a promotion
      than a hand holding a phone. Only for a full-screen app beat (framing `app_screen`,
      an R or P segment); only for a screen `PRODUCT-SCREENS.md` describes; never on a phone
-     plate, in a panel, or for a live result (that is a real recording).
+     plate or in a panel. For the result of a `live_use` video it is the user's choice
+     (2026-10-21): say the trade-off (it looks more like an advert than a real recording)
+     and record it; the bridge only notes it. A live_use video with a generated input and
+     no paired recording is allowed the same way.
   Write the choice in `screens_needed` (`demo_source`), and for motion design the reason in
   the user's terms in `demo_source_reason` ("no recording of the reveal flow yet; recording
   it needs a real upload"). A missing recording that the user could make is still listed

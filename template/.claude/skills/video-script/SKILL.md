@@ -92,7 +92,9 @@ reports every one.
   `recording` or `still` of the screen library, or `motion_design`. Write it on each app
   beat as `demo_source`, with the brief's `demo_source_reason` word for word for motion
   design. A real recording is always preferred; never change the brief's choice to motion
-  design here.
+  design here. In a `live_use` video the user may pick a generated input and a
+  motion-designed result (2026-10-21): write it, with no `paired_input_ref`; the bridge
+  notes the trade-off (it reads as staged and looks more like an advert) and never refuses it.
 - **A motion-designed beat** is framing `app_screen` (an R or P segment), with no source
   asset, and a `screen_id` of its own (never a library row's: `screens_needed` names it).
   Its `screen_story` is the whole screen, step by step; production renders exactly it and

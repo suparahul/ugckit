@@ -1212,9 +1212,9 @@ def assemble(video, assemble_on):
     return out
 
 
-def mutate(name, label, plan_fn=None, video_fn=None, cmd="validate", contains=None, relock=True):
-    """A broken copy of a fixture video, refused with the expected reason. The original is
-    restored after."""
+def mutate(name, label, plan_fn=None, video_fn=None, cmd="validate", contains=None, relock=True, ok=False):
+    """A broken copy of a fixture video, refused with the expected reason (or, with ok, a
+    choice of the user's, allowed with the expected note). The original is restored after."""
     vd = p("pipeline", "character", name)
     keep = {f: open(os.path.join(vd, f)).read() for f in ("plan.json", "video.json", "planning-approval.json")
             if os.path.exists(os.path.join(vd, f))}
@@ -1234,7 +1234,7 @@ def mutate(name, label, plan_fn=None, video_fn=None, cmd="validate", contains=No
             wj(os.path.join(vd, "video.json"), v)
         c = {"check": [PY, f"{SC}/shots.py", "check", name], "validate": [PY, f"{SC}/shots.py", "validate", name],
              "plan": [PY, f"{SC}/bridge.py", "plan", name]}.get(cmd, cmd) if isinstance(cmd, str) else cmd
-        expect(f"{name}: refuses {label}", c, ok=False, contains=contains)
+        expect(f"{name}: {'allows' if ok else 'refuses'} {label}", c, ok=ok, contains=contains)
     finally:
         for f, t in keep.items():
             open(os.path.join(vd, f), "w").write(t)
@@ -1307,6 +1307,11 @@ def motion_design_test(assemble_on):
     mutate(v, "a tap with no target",
            plan_fn=lambda q: q["beats"][1]["screen_story"]["steps"][1].update(target=None),
            cmd="plan", contains="names its target")
+    mutate(v, "a live_use video with a motion-designed result, with a note",
+           plan_fn=lambda q: q["editorial"].update(filming_format="live_use"), cmd="plan", ok=True,
+           contains="looks more like an advert")
+    mutate(v, "a live_use video with a motion-designed result, through shots.py validate",
+           plan_fn=lambda q: q["editorial"].update(filming_format="live_use"), ok=True)
     mutate(v, "motion design on a phone plate",
            plan_fn=lambda q: q["beats"][1].update(framing="hands_only"), cmd="plan",
            contains="rendered full screen")
@@ -1421,9 +1426,9 @@ def main():
            cmd="plan", contains="real animal")
     mutate("v2-live-cat", "a recording trim that misses the measured result",
            video_fn=lambda v: v["segments"][1].update(trim=[4, 6]), contains="does not show the result")
-    mutate("v2-live-cat", "live_use without a paired recording",
-           plan_fn=lambda q: q["assets"][1].update(paired_input_ref=None), cmd="plan",
-           contains="needs a real input clip")
+    mutate("v2-live-cat", "live_use without a paired recording, with a note",
+           plan_fn=lambda q: q["assets"][1].update(paired_input_ref=None), cmd="plan", ok=True,
+           contains="reads as a staged demonstration")
     mutate("v2-live-cat", "a plan edited after its approval",
            plan_fn=lambda q: q["overlays"][0].update(text="I filmed his tail and asked"), relock=False,
            cmd="check", contains="does not match the approved digest")

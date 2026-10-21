@@ -10,7 +10,7 @@ network. Not shipped (the installer copies template/ only).
     hook job, length) is kept verbatim in the brief, as a choice with status user;
   - the demo source of an app beat (scripts/character/demo.py, through video_plan.py): a real
     recording first, motion design only with its reason and a screen story of the app's real
-    screens.
+    screens; a live_use video with motion design is the user's choice, never blocked.
 
 Exit 1 when any expectation fails.
 """
@@ -162,6 +162,11 @@ expect("an old beat with no demo_source passes untouched",
        lambda: demo_check({"id": "b3", "app_on_screen": True, "framing": "app_screen", "screen_id": "scan-result"}))
 caps = vp.capabilities_needed({"beats": [md_beat()]})
 expect("motion design needs bridge.motion_design", lambda: list(caps), contains="bridge.motion_design")
+live = {"app": "catapp", "handle": "nora", "editorial": {"filming_format": "live_use"},
+        "beats": [md_beat()], "hero_strings": {"tail-reading": "Relaxed tail"}}
+expect("a live_use plan with a motion-designed screen: no screen-library block (the user's choice)",
+       lambda: "; ".join(vp.readiness(live, "plan.draft.json")[0]) or "nothing blocks",
+       contains="nothing blocks")
 st = vp.demo.segment_story({"beats": [{"id": "b1", "start_s": 0, "end_s": 4}, md_beat()], "hero_strings": {"tail-reading": "Relaxed tail"}},
                            ["b2"])
 expect("the segment's story: 5 s, the steps from its start, the hero",

@@ -931,14 +931,20 @@ def check_live(plan, beats, assets, ed, out):
         if not any(aid in (b.get("source_asset_ids") or []) for b in both) or \
            not any(pr.get("asset_id") in (b.get("source_asset_ids") or []) for b in both):
             out.bad(f"asset {aid}: the paired clip and recording are both shown (in the beats' source_asset_ids)")
+    # The format is the user's choice (2026-10-21): a live_use video with a generated input or a
+    # motion-designed result is made, with a note of the trade-off. Only a pairing it declares is checked.
     if ed.get("filming_format") == "live_use":
         if not paired:
-            out.bad("filming_format live_use needs a real input clip and its app recording, paired with the "
-                    "measured times (assets[].paired_input_ref)")
+            out.note("live_use with no real input clip paired to its app recording (assets[].paired_input_ref): "
+                     "the user's choice; it reads as a staged demonstration, not a real capture")
         for b in beats:
             for aid in b.get("source_asset_ids") or []:
                 if (assets.get(aid) or {}).get("kind") == "screen" and aid not in paired:
-                    out.bad(f"beat {b.get('id')}: in a live_use video the recording {aid} is paired with its input")
+                    out.note(f"beat {b.get('id')}: the recording {aid} is not paired with its input; the viewer "
+                             "does not see that this result came from that input")
+        if any(demo.is_motion(b) for b in beats):
+            out.note("live_use with a motion-designed screen: the user's choice; motion design looks more like "
+                     "an advert than a real recording")
 
 
 def check_planning_approval(plan, out):
@@ -1424,13 +1430,15 @@ def check_video_live(plan, timeline, assets, out):
                     "video.json, or in one M segment")
             continue
         c, r = cs[0], rs[0]
-        if any(demo.is_motion(b) for b in plan.get("beats") or [] if b.get("id") in r["beats"]):
-            out.bad(f"{r['name']}: a live result is the real recording, never motion design")
+        motion = any(demo.is_motion(b) for b in plan.get("beats") or [] if b.get("id") in r["beats"])
+        if motion:
+            out.note(f"{r['name']}: the live result is motion design, the user's choice; it looks more like an "
+                     "advert than the real recording")
         rng = c["seg"].get("source_range_s") or [0, 0]
         if not (rng[0] - 0.01 <= pr["input_t_s"] <= rng[1] + 0.01):
             out.bad(f"{c['name']}: the clip's range {rng} does not show the input at {pr['input_t_s']} s")
         tr = r["seg"].get("trim") or [0, 1e9]
-        if not (tr[0] - 0.01 <= pr["output_t_s"] <= tr[1] + 0.01):
+        if not motion and not (tr[0] - 0.01 <= pr["output_t_s"] <= tr[1] + 0.01):
             out.bad(f"{r['name']}: the recording's trim {tr} does not show the result at {pr['output_t_s']} s")
         if r["start"] < c["start"]:
             out.bad(f"{r['name']}: the result comes before its input ({c['name']})")
