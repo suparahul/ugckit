@@ -25,6 +25,7 @@ import type { PlanRow, PointState } from "./production.ts";
 import type { Production } from "./video-production.ts";
 import type { Ready, StagesView, Timeline } from "./video-stages.ts";
 import { mediaUrl } from "./media-paths.ts";
+import { planChanges } from "./plan-changes.ts";
 import { planBeatsOf, reactionCardOf, type ReactionCard } from "./reactions.ts";
 import { appDir, CHARACTER_DIR } from "./root.ts";
 
@@ -77,6 +78,8 @@ export type VideoState = {
   review: { revision: number | null; digest: string | null; text: string } | null;
   /** A real lock: planning-approval.json with the user's words, not a dry run, for plan.json's revision. */
   lock: { revision: number; digest: string; words: string; date: string | null } | null;
+  /** The changes from the locked plan to a newer draft, in words (lib/plan-changes.ts): empty unless the plan is stale. */
+  changes: string[];
   /** The locked plan, as the post page shows it. */
   plan: { lengthS: number | null; caption: string | null; music: string | null; beats: Beat[] } | null;
   /** The delivered file, after gate C. */
@@ -184,7 +187,7 @@ function readyOf(pd: string, digest: string | null): Ready | null {
 
 export function readVideo(row: Pick<PlanRow, "slug" | "key" | "handle" | "date"> & { videoId?: string | null }): VideoState {
   const id = videoIdOf(row);
-  const empty: VideoState = { id, brief: false, briefSummary: null, manual: false, draft: null, ready: null, review: null, lock: null, plan: null, final: null };
+  const empty: VideoState = { id, brief: false, briefSummary: null, manual: false, draft: null, ready: null, review: null, lock: null, plan: null, changes: [], final: null };
   if (!id) return empty;
   const pd = join(plansDir(row.slug), id);
   const vd = join(CHARACTER_DIR, id);
@@ -216,6 +219,7 @@ export function readVideo(row: Pick<PlanRow, "slug" | "key" | "handle" | "date">
     review: reviewT ? { ...head!, text: reviewT } : null,
     lock,
     plan: lock && planJ ? { lengthS: num(planJ.format?.length_s), caption: planJ.publishing_note?.caption ?? null, music: planJ.publishing_note?.music_note ?? null, beats: beatsOf(planJ, segmentsOf(vd)) } : null,
+    changes: lock && planJ && draftJ && Number(draftJ.revision ?? 0) > lock.revision ? planChanges(planJ, draftJ) : [],
     final,
   };
 }

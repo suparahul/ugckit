@@ -75,7 +75,7 @@ export function plainProblem(line: string): string {
   if ((m = line.match(/^asset (\S+): no permission_ref/)))
     return `The file ${quote(m[1])} has no permission on record.`;
   if ((m = line.match(/^reaction ref (\S+): burned-in text in the clip \((.+?), ([^)]+)\)\. (.*)$/)))
-    return `The reaction clip has burned-in text (${m[2]}, ${m[3]}). ${stop(m[4].replace(/on the animate route/, "on the motion route"))}`;
+    return `The reaction clip has burned-in text (${m[2]}, ${m[3]}). Keep this clip: the text does not reach the video. Or pick a clean clip.`;
   if ((m = line.match(/^reaction ref (\S+): post (\S+) is not in the workspace/)))
     return `The reaction's post ${m[2]} is not in the workspace.`;
   if ((m = line.match(/^reaction ref (\S+): the video of post (\S+) is not downloaded/)))
@@ -106,6 +106,23 @@ const HEAD: Record<Status["who"], string> = { you: "Waiting for you", agent: "Ag
 const usd = (s: string) => s.match(/\$\d+(?:\.\d+)?/)?.[0] ?? null;
 const n = (s: string) => Number(s.match(/^(\d+)/)?.[1] ?? 0);
 
+/** What the agent does once a click of a stage is on record, in words. */
+const AFTER: Record<string, string> = { plan: " and lock the plan", keyframes: " and generate the takes", cut: " and deliver the video" };
+
+/**
+ * The one line for a click the agent has not recorded yet: the decision and its time,
+ * then what is waited for. With no click (the stage model alone knows one was made),
+ * the same line without the time. The Atlas writes only a log line; the agent records
+ * it with review.py or video_plan.py --from-atlas, so nothing here is automatic.
+ */
+export function pendingLine(c: { kind: string; at: string; note?: string | null } | null, key: string, today = new Date().toISOString().slice(0, 10)): string {
+  const after = AFTER[key] ?? "";
+  if (!c) return `Waiting for the agent to record your decision${after}.`;
+  const verb = c.kind.endsWith(".reject") ? "Rejected" : c.kind.endsWith(".sendback") ? "Sent back" : "Approved";
+  const when = `${c.at.slice(0, 10) === today ? "" : `${c.at.slice(0, 10)} `}${c.at.slice(11, 16)}`;
+  return `${verb} at ${when}${c.note ? ` — “${c.note}”` : ""}. Waiting for the agent to record it${verb === "Approved" ? after : ""}.`;
+}
+
 /**
  * The one sentence under the title of a video post: whose turn it is and what to do, from
  * the stage model (lib/video-stages.ts). The stage's own words (`words`) are the agent's
@@ -120,13 +137,13 @@ export function videoStatus(v: StagesView): Status {
     case "plan":
       if (s.state === "agent") return say("agent", /brief/.test(w) ? "The agent writes the brief." : /script/.test(w) ? "The agent writes the script." : "The agent writes the review of the plan.");
       if (s.state === "blocked") { const k = n(w); return say("blocked", `${k} input${k === 1 ? " is" : "s are"} missing before the plan can be approved.`); }
-      if (s.state === "clicked") return say("agent", "You approved the plan. The agent locks it next.");
+      if (s.state === "clicked") return say("agent", pendingLine(null, "plan"));
       if (s.state === "sent back") return say("agent", "Sent back with your note. A new revision comes back here.");
-      if (s.state === "stale") return say("agent", "The plan changed after the lock. The agent locks the new revision.");
+      if (s.state === "stale" || /^changed after the lock/.test(w)) return say("you", "The plan changed after the lock. Accept the change and re-lock, or send it back with a note.");
       return say("you", "Approve the plan, or send it back with a note.");
     case "keyframes":
       if (s.state === "blocked") return say("blocked", plainProblem(w));
-      if (s.state === "clicked") return say("agent", "You approved the storyboard. The agent records it, then generates the takes.");
+      if (s.state === "clicked") return say("agent", pendingLine(null, "keyframes"));
       if (s.state === "sent back") return say("agent", "Sent back with your note. The keyframes come back here when they are redone.");
       if (s.state === "stale") return say("you", "A keyframe changed after you approved the storyboard. Approve it again.");
       if (s.state === "you") { const c = usd(w); return say("you", `Approve the storyboard${c ? ` and ${c} of first runs` : ""}, or send it back with a note.`); }
@@ -136,20 +153,20 @@ export function videoStatus(v: StagesView): Status {
       return say("agent", `The agent generates the takes${usd(w) ? ` (${usd(w)} computed)` : ""}.`);
     case "review": {
       if (s.state === "you") { const items = w.replace(/^waiting for you: /, "").split(", "); return say("you", `Review ${items.length === 1 ? "the take of" : `${items.length} takes:`} ${items.join(", ")}.`); }
-      if (s.state === "clicked") return say("agent", "Your decision is being recorded.");
+      if (s.state === "clicked") return say("agent", pendingLine(null, "review"));
       if (s.state === "sent back") return say("agent", "A take was rejected. The agent generates it again.");
       if (s.state === "blocked") return say("blocked", plainProblem(w));
       return say("agent", "The agent generates the takes that are still missing.");
     }
     case "composite":
       if (s.state === "you") return say("you", `Approve the composite of ${w.replace(/^waiting for you: /, "")}.`);
-      if (s.state === "clicked") return say("agent", "You approved the composite. The agent records it.");
+      if (s.state === "clicked") return say("agent", pendingLine(null, "composite"));
       if (s.state === "sent back") return say("agent", "The composite was sent back. The agent makes it again.");
       if (s.state === "blocked") return say("blocked", plainProblem(w));
       return say("agent", "The agent puts the app into the phone.");
     case "cut":
       if (s.state === "you") return say("you", "Watch the cut. Approve it, or send it back.");
-      if (s.state === "clicked") return say("agent", "Your decision on the cut is being recorded.");
+      if (s.state === "clicked") return say("agent", pendingLine(null, "cut"));
       if (s.state === "sent back") return say("agent", "The cut was sent back. The agent assembles it again.");
       if (s.state === "stale") return say("agent", "The plan changed after the cut. The agent assembles it again.");
       if (s.state === "blocked") return say("blocked", plainProblem(w));

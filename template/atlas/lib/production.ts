@@ -1011,7 +1011,7 @@ export function primaryAction(s: PostState): { kind: EventKind | "posted" | "out
     case "idea": return { kind: "idea.approve", label: "Approve idea", disabled: null };
     case "planned": return { kind: null, label: "", disabled: null };
     /* Reached only after a send-back: the button clears it by hand; a rewritten deck clears it alone. */
-    case "plan": return { kind: "plan.approve", label: "Approve plan", disabled: s.video && !s.video.review?.digest ? "REVIEW.md has no content digest yet" : s.video?.ready?.current && s.video.ready.blocking.length ? `${s.video.ready.blocking.length} blocking input${s.video.ready.blocking.length === 1 ? "" : "s"}: ${s.video.ready.blocking[0]}` : null };
+    case "plan": return { kind: "plan.approve", label: s.video && s.plan.status === "stale" ? "Accept the change and re-lock" : "Approve plan", disabled: s.video && !s.video.review?.digest ? "REVIEW.md has no content digest yet" : s.video?.ready?.current && s.video.ready.blocking.length ? `${s.video.ready.blocking.length} blocking input${s.video.ready.blocking.length === 1 ? "" : "s"}: ${s.video.ready.blocking[0]}` : null };
     case "final": return { kind: "final.approve", label: "Approve for posting", disabled: finalBlock(s) };
     case "ready": return { kind: "posted", label: "Mark posted", disabled: null };
     case "posted": return { kind: "outcomes", label: "Record outcomes", disabled: null };

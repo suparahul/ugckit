@@ -18,6 +18,7 @@ import { useState } from "react";
 import { cutAccepts, motionAccepts } from "@/lib/accept-fail";
 import type { Click, Motion, Narration, Production, Segment, Source, Take } from "@/lib/video-production";
 import type { Checkpoint, Picture } from "@/lib/video-stages";
+import { pendingLine } from "@/lib/plain-words";
 import { useDecide } from "./Actions";
 
 /* The identity gate passes a take: PASS, or NO FACE (no frame shows a face; the eye check decides). */
@@ -55,15 +56,19 @@ export function SegName({ s }: { s: Pick<Segment, "name" | "type"> }) {
 /** One quiet line in the media column: why there is nothing to see or decide here. */
 const Quiet = ({ children }: { children: React.ReactNode }) => <p className="row__quiet">{children}</p>;
 
-function ClickLine({ c, what }: { c: Click | null; what: string }) {
+/**
+ * The user's last click on an item. While the agent has not recorded it: one plain line, the decision and its time,
+ * and what is waited for (the buttons are hidden meanwhile). Recorded: nothing, the record itself shows. The file
+ * changed since the click: a warning. In the decision bar the bar's own sentence is that line, so only the warning shows.
+ */
+function ClickLine({ c, what, stage, bar = false }: { c: Click | null; what: string; stage: string; bar?: boolean }) {
   if (!c) return null;
-  const word = c.kind.endsWith(".approve") ? "approved" : c.kind.endsWith(".reject") ? "rejected" : "sent back";
-  return (
-    <p className="vprod__click">
-      You {word} {what} {stamp(c.at)}{c.note ? <> — <em>“{c.note}”</em></> : null}.{" "}
-      {!c.current ? "The file changed since: decide again." : c.recorded ? "Recorded." : "The agent records it next."}
-    </p>
-  );
+  if (!c.current) {
+    const word = c.kind.endsWith(".approve") ? "approved" : c.kind.endsWith(".reject") ? "rejected" : "sent back";
+    return <p className="vprod__click">You {word} {what} at {stamp(c.at)}{c.note ? <> — <em>“{c.note}”</em></> : null}; the file changed since. Decide again.</p>;
+  }
+  if (c.recorded || bar) return null;
+  return <p className="vprod__click is-pending">{pendingLine(c, stage)}</p>;
 }
 
 function SendBack({ label, busy, onSend, placeholder }: { label: string; busy: boolean; onSend: (note: string) => Promise<string | null>; placeholder?: string }) {
@@ -242,6 +247,7 @@ function TakeReview({ post, seg: s, p, live }: MediaProps & { seg: Segment }) {
   const [pick, setPick] = useState<string | null>(null);
   const t = (pick ? s.takes.find((x) => x.file === pick) : null) ?? focusOf(s);
   const decided = !!t && ((t.file === s.gateB?.file && !pick) || (s.click?.current && s.click.file === t.file));
+  const pendingClick = !!t && !!s.click?.current && !s.click.recorded && s.click.file === t.file;
   const isApproved = !!t && s.approved?.file === t.file;
   const idOk = !s.motionCopy || identityOk(t?.identity?.result);
   const status = s.approved ? `approved: ${takeNo(s, s.approved.file)}`
@@ -253,7 +259,7 @@ function TakeReview({ post, seg: s, p, live }: MediaProps & { seg: Segment }) {
   const nar = s.audioFrom?.startsWith("narration:") ? p?.narration.find((x) => x.take === s.audioFrom!.slice(10)) : null;
   return (
     <div className="take">
-      <p className="take__status"><span className={`vprod__tag${s.approved ? " is-done" : status === "waiting for you" ? " is-you" : ""}`}>{status}</span></p>
+      {!pendingClick ? <p className="take__status"><span className={`vprod__tag${s.approved ? " is-done" : status === "waiting for you" ? " is-you" : ""}`}>{status}</span></p> : null}
       {s.gateB?.words && !s.approved ? <p className="vprod__words">Gate B ({s.gateB.decision}{s.gateB.file ? `, ${base(s.gateB.file)}` : ""}): “{s.gateB.words}”{s.gateB.failure ? ` · failed: ${s.gateB.failure}` : ""}</p> : null}
       {t ? (
         <>
@@ -296,7 +302,7 @@ function TakeReview({ post, seg: s, p, live }: MediaProps & { seg: Segment }) {
           ))}</ul>
         </details>
       ) : null}
-      <ClickLine c={s.click} what={`a take of ${s.name}`} />
+      <ClickLine c={s.click} what={`a take of ${s.name}`} stage="review" />
       <details className="vprod__older">
         <summary>About this shot{t?.sheet ? ", and the contact sheet" : ""}{s.gateB?.words && s.approved ? ", and the decision as recorded" : ""}</summary>
         <ShotFacts s={s} />
@@ -367,7 +373,7 @@ function MotionDesign({ post, s, m, live }: { post: string; s: Segment; m: Motio
   const status = m.approved ? "approved" : !m.render ? "not rendered yet" : !m.gates ? "gates not run" : m.failed.length ? "gates failed" : pending ? "clicked: being recorded" : "waiting for you";
   return (
     <div className="take">
-      <p className="take__status"><span className={`vprod__tag${m.approved ? " is-done" : status === "waiting for you" ? " is-you" : ""}`}>motion design: {status}</span></p>
+      {!pending ? <p className="take__status"><span className={`vprod__tag${m.approved ? " is-done" : status === "waiting for you" ? " is-you" : ""}`}>motion design: {status}</span></p> : null}
       {m.render ? (
         <figure><video src={frame(m.render.url)} controls playsInline preload="metadata" muted aria-label={`Motion design of ${s.name}`} /><figcaption className="tabular">the render · {m.seconds} s · {stamp(m.render.at)}{m.approved ? " · approved" : ""}</figcaption></figure>
       ) : <Quiet>Not rendered yet: the agent writes the page from the app&apos;s real screens, then renders and checks it.</Quiet>}
@@ -383,7 +389,7 @@ function MotionDesign({ post, s, m, live }: { post: string; s: Segment; m: Motio
         {m.approved ? gates : null}
         {m.approved ? words : null}
       </details>
-      <ClickLine c={m.click} what={`the motion design of ${s.name}`} />
+      <ClickLine c={m.click} what={`the motion design of ${s.name}`} stage="review" />
       {live && m.render && m.gates && !m.approved && !pending ? (
         <>
           {need.length ? (
@@ -414,14 +420,14 @@ export function SourceReview({ post, x, live }: { post: string; x: Source; live:
     decide({ post, kind, ...(note ? { note } : {}), data: { asset_id: x.id } }).then((r) => { setErr(r); return r; });
   return (
     <div className="take">
-      <p className="take__status"><span className={`vprod__tag${x.approved ? " is-done" : x.sha256 && !pending ? " is-you" : ""}`}>{x.approved ? "approved" : !x.sha256 ? "file not on disk" : pending ? "clicked: being recorded" : "waiting for you"}</span></p>
+      {!pending ? <p className="take__status"><span className={`vprod__tag${x.approved ? " is-done" : x.sha256 ? " is-you" : ""}`}>{x.approved ? "approved" : !x.sha256 ? "file not on disk" : "waiting for you"}</span></p> : null}
       {x.url ? (
         <figure>{x.kind === "still" ? <img src={x.url} alt={x.id} /> : x.kind === "audio" ? <audio src={x.url} controls preload="metadata" /> : <video src={at(x.url, x.range?.[0])} controls playsInline preload="metadata" aria-label={x.id} />}
           <figcaption className="tabular">{x.id} · supplied {x.kind ?? "file"}{x.origin ? ` · ${x.origin}` : ""}{x.range ? ` · range ${x.range.join("–")} s` : ""} · used by {x.segments.join(", ")}</figcaption></figure>
       ) : <Quiet>{x.file ? `${x.file}: not served to the Atlas (put supplied files in pipeline/character/<video>/supplied/).` : "No file in the plan."}</Quiet>}
       {x.decision?.words ? <p className="vprod__words">Gate B ({x.decision.decision}): “{x.decision.words}”</p> : null}
       {!x.approved ? <p className="sr__hint">Look at the exact range. The agent checks the checksum, the permission and the range when it records your click.</p> : null}
-      <ClickLine c={x.click} what={`the source ${x.id}`} />
+      <ClickLine c={x.click} what={`the source ${x.id}`} stage="review" />
       {live && x.sha256 && !x.approved && !pending ? (
         <div className="sr__actions">
           <button type="button" className="pill pill--go" disabled={busy} onClick={() => run("source.approve")}>Approve this source</button>
@@ -443,10 +449,10 @@ export function NarrationReview({ post, x, live }: { post: string; x: Narration;
     decide({ post, kind, ...(note ? { note } : {}), data: { take: x.take, ...(kind === "narration.approve" ? { checks: natural ? ["natural_voice"] : [], ...(accept?.length ? { accept_fail: accept } : {}) } : {}) } as any }).then((r) => { setErr(r); return r; });
   return (
     <div className="take">
-      <p className="take__status"><span className={`vprod__tag${x.approved ? " is-done" : x.sha256 && !pending ? " is-you" : ""}`}>{x.approved ? "approved" : !x.sha256 ? `no narration/${x.take}.wav yet` : pending ? "clicked: being recorded" : "waiting for you"}</span></p>
+      {!pending ? <p className="take__status"><span className={`vprod__tag${x.approved ? " is-done" : x.sha256 ? " is-you" : ""}`}>{x.approved ? "approved" : !x.sha256 ? `no narration/${x.take}.wav yet` : "waiting for you"}</span></p> : null}
       {x.url ? <audio src={x.url} controls preload="metadata" className="vprod__audio" /> : <Quiet>The kit makes no voice: the take is put in pipeline/character/&lt;video&gt;/narration/ from the approved narrator voice.</Quiet>}
       {x.decision?.words ? <p className="vprod__words">Gate B ({x.decision.decision}): “{x.decision.words}”</p> : null}
-      <ClickLine c={x.click} what={`the narration take ${x.take}`} />
+      <ClickLine c={x.click} what={`the narration take ${x.take}`} stage="review" />
       {live && x.sha256 && !x.approved && !pending ? (
         <>
           <fieldset className="vprod__checks">
@@ -480,7 +486,7 @@ function CompositeMedia({ post, seg: s, live }: MediaProps & { seg: Segment }) {
   const status = s.compositeApproved ? "approved" : !s.approved ? "the plate is approved at the review first" : !c ? "not made yet (composite.sh)" : pending ? "clicked: being recorded" : back ? "sent back" : "waiting for you";
   return (
     <div className="take">
-      <p className="take__status"><span className={`vprod__tag${s.compositeApproved ? " is-done" : status === "waiting for you" ? " is-you" : ""}`}>{status}</span></p>
+      {!pending ? <p className="take__status"><span className={`vprod__tag${s.compositeApproved ? " is-done" : status === "waiting for you" ? " is-you" : ""}`}>{status}</span></p> : null}
       {c ? <figure><video src={frame(c.url)} controls playsInline preload="metadata" aria-label={`Composite of ${s.name}`} /><figcaption className="tabular">The composite: the app in the phone · gates {c.gates}</figcaption></figure> : null}
       {s.approved ? <figure className={c ? "is-small" : ""}><video src={frame(s.approved.url)} controls playsInline preload="metadata" muted aria-label="The approved plate" /><figcaption>the approved take: the plate the app is put into</figcaption></figure> : <Quiet>No plate yet: the take is approved at the review first.</Quiet>}
       {c?.sheets.length ? (
@@ -489,7 +495,7 @@ function CompositeMedia({ post, seg: s, live }: MediaProps & { seg: Segment }) {
           {c.sheets.map((x) => <figure key={x.url} className="is-wide"><a href={x.url} target="_blank" rel="noreferrer"><img src={x.url} alt={x.label} className="is-sheet" /></a><figcaption>{x.label}</figcaption></figure>)}
         </details>
       ) : null}
-      <ClickLine c={s.compositeClick} what={`the composite of ${s.name}`} />
+      <ClickLine c={s.compositeClick} what={`the composite of ${s.name}`} stage="composite" />
       {live && c && !s.compositeApproved && !pending && !back ? (
         <div className="sr__actions">
           <button type="button" className="pill pill--go" disabled={busy} onClick={() => decide({ post, kind: "composite.approve", data: { segment: s.name } }).then(setErr)}>Approve composite</button>
@@ -569,17 +575,19 @@ export function BarActions({ stage, post, p, live }: { stage: number; post: stri
   const own = p.segments.filter((s) => s.generated && !s.sharedFrom);
   if (stage === 2) {
     const done = !own.length || (p.gateA?.decision === "approve" && p.gateA.current);
+    /* A click the agent has not recorded: the bar's sentence says so; the buttons would only look as if the click did nothing. */
+    const pending = !!p.gateAClick?.current && !p.gateAClick.recorded;
     const run = (kind: "storyboard.approve" | "storyboard.sendback", note?: string) =>
       decide({ post, kind, ...(note ? { note } : {}), data: {} as any }).then((r) => { setErr(r); return r; });
     return (
       <div className="bar__act">
-        {live && own.length && !done ? (
+        {live && own.length && !done && !pending ? (
           <>
             <button type="button" className="btn" disabled={busy || own.some((s) => s.needsKeyframe && !s.keyframe)} onClick={() => run("storyboard.approve")}>Approve storyboard and {usd(p.cost)}</button>
             <SendBack label="Send back…" busy={busy} onSend={(n) => run("storyboard.sendback", n)} />
           </>
         ) : null}
-        <ClickLine c={p.gateAClick} what="the storyboard" />
+        <ClickLine c={p.gateAClick} what="the storyboard" stage="keyframes" bar />
         <Err e={err} />
       </div>
     );
@@ -624,7 +632,7 @@ export function BarActions({ stage, post, p, live }: { stage: number; post: stri
             ) : null}
           </>
         ) : null}
-        <ClickLine c={p.cutClick} what={p.cutClick?.segment ? `the cut (regenerate ${p.cutClick.segment})` : "the cut"} />
+        <ClickLine c={p.cutClick} what={p.cutClick?.segment ? `the cut (regenerate ${p.cutClick.segment})` : "the cut"} stage="cut" bar />
         <Err e={err} />
       </div>
     );

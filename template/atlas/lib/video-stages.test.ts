@@ -305,3 +305,22 @@ test("the media route serves the pictures the stages show, and never a plan, a p
   for (const no of ["pipeline/character/v-1/plan.json", "pipeline/character/v-1/segments/01-t/prompt.txt", "pipeline/character/v-1/approval.json", "pipeline/character/v-1/segments/01-x/generated/qc/identity-a.json", "pipeline/character/v-1/supplied/../plan.json", "apps/app/screens/screens.json"])
     assert.ok(!served(no), no);
 });
+
+test("a stale plan: the user's turn at the plan, the stages after it wait for the re-lock; accepted, the plan is clicked, not done", () => {
+  const lock = { revision: 1, digest: "a".repeat(64), words: "go", date: "2026-10-20" };
+  const prod = { segments: [{ name: "01-x", type: "X", generated: true, sharedFrom: null, keyframe: { url: "/k.png" }, needsKeyframe: true, approved: null, takes: [], click: null, phone: false, motion: null, composite: null, compositeApproved: false, compositeClick: null, gateB: null }], sources: [], narration: [], gateA: null, gateAClick: null, gateC: null, cutClick: null, assembly: null, keyframes: {}, cost: 0.5, spent: 0, notes: [], state: null, storyboard: null } as any;
+  const base = { id: "v", brief: true, draft: { revision: 2 }, review: { revision: 2, digest: "b".repeat(64) }, ready: null, lock, planPoint: { status: "stale", at: "2026-10-20", note: null }, production: prod, final: null, finalPoint: { status: "open", at: null, note: null }, manual: false } as any;
+  let v = videoStages(base);
+  assert.equal(v.stages[0].state, "you");
+  assert.equal(v.stages[0].words, "changed after the lock: revision 2 waits for you, locked revision 1; accept it and re-lock, or send it back");
+  assert.equal(v.current, 1);
+  assert.equal(v.who, "you");
+  assert.equal(v.stages[1].state, "not reached", "keyframes wait for the re-lock");
+  assert.equal(v.stages[1].words, "the changed plan is re-locked first");
+  v = videoStages({ ...base, planPoint: { status: "approved", at: "2026-10-21T17:07:00.000Z", note: null } });
+  assert.equal(v.stages[0].state, "clicked", "accepted in the Atlas: not done until the agent re-locks");
+  assert.equal(v.who, "agent");
+  v = videoStages({ ...base, planPoint: { status: "approved", at: null, note: null }, lock: { ...lock, revision: 2, digest: "b".repeat(64) } });
+  assert.equal(v.stages[0].state, "done");
+  assert.equal(v.stages[1].state, "you", "re-locked: the storyboard waits again");
+});

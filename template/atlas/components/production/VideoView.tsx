@@ -16,7 +16,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import Markdown from "@/components/Markdown";
-import { STATE_WORD, plainProblem, roleWord, stageLine, type Status } from "@/lib/plain-words";
+import { STATE_WORD, pendingLine, plainProblem, roleWord, stageLine, type Status } from "@/lib/plain-words";
 import type { PostState } from "@/lib/production";
 import type { Checkpoint } from "@/lib/video-stages";
 import type { Segment } from "@/lib/video-production";
@@ -72,6 +72,15 @@ function DecisionBar({ state, stage, bar, beats, base }: { state: PostState; sta
   const p = v.production ?? null;
   const current = stage === vs.current;
   const st: Status = current && bar?.status ? bar.status : stageLine(vs, stage);
+  /* A click of this stage the agent has not recorded: the bar's one line carries the decision and its time; the buttons are hidden meanwhile (VideoProduction). */
+  const click = s.state !== "clicked" ? null
+    : stage === 1 ? (state.plan.at ? { kind: "plan.approve", at: state.plan.at, note: null, current: true, recorded: false } : null)
+    : stage === 2 ? p?.gateAClick ?? null
+    : stage === 6 ? p?.cutClick ?? null
+    : null;
+  const text = click && click.current && !click.recorded ? pendingLine(click, s.key) : st.text;
+  /* A stale plan: the lock is the agent's; what changed since it is listed under the bar (lib/plan-changes.ts). */
+  const stale = stage === 1 && !!v.lock && !!v.draft && v.draft.revision > v.lock.revision && s.state !== "done";
   /* Gate B and the composite decide per row: the bar says what waits and points at the first. */
   const waiting = (stage === 4 || stage === 5) && s.state === "you" ? s.words.replace(/^waiting for you: /, "").split(", ") : [];
   const cost = stage === 2 && current && (s.state === "you" || s.state === "stale") && p && p.cost !== null && !/\$/.test(st.text) ? ` Approving starts the first runs: ${usd(p.cost)}.` : stage === 3 && p?.spent ? ` Spent so far: ${usd(p.spent)}.` : "";
@@ -80,12 +89,19 @@ function DecisionBar({ state, stage, bar, beats, base }: { state: PostState; sta
     <div className={`bar is-${st.who}`} id="decide" aria-label="The decision">
       <div className="bar__row">
         <span className="bar__turn">{st.head}</span>
-        <span className="bar__say">{st.text}{cost}</span>
+        <span className="bar__say">{text}{cost}</span>
         {waiting.length ? <a className="bar__jump" href={waitHref(waiting[0], beats)}>Go to {waiting.length === 1 ? "it" : "the first"} ↓</a> : null}
         {rail ? <div className="bar__act">{rail}</div> : null}
         {!rail && current && p && (stage === 2 || stage === 6) ? <BarActions stage={stage} post={state.row.key} p={p} live={!state.killed} /> : null}
         {!current ? <Link className="bar__now" href={`${base}?stage=${vs.current}#stages`}>Go to the current stage, {vs.stages[vs.current - 1].short}</Link> : null}
       </div>
+      {stale ? (
+        <div className="bar__changes">
+          <p className="bar__hint">Revision {v.draft!.revision} of the plan differs from locked revision {v.lock!.revision}{v.lock!.date ? ` (${v.lock!.date})` : ""}:</p>
+          {v.changes.length ? <ul className="bar__notes">{v.changes.map((c) => <li key={c}>{c}</li>)}</ul> : <p className="bar__hint">Only bookkeeping changed: the source row, the date.</p>}
+          <p className="bar__hint">The lock itself is written by the agent. After you accept, tell it: “lock {v.id} from the Atlas”.</p>
+        </div>
+      ) : null}
       {bar?.notes}
       {stage === 1 && v.review ? <Problems state={state} /> : null}
     </div>

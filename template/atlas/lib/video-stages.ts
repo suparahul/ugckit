@@ -83,18 +83,22 @@ export function videoStages(x: StagesInput): StagesView {
   const reviewed = !!x.review?.digest && (!x.draft || x.review.revision === x.draft.revision);
   const written = !!x.draft && reviewed;
   const blocking = x.ready?.current ? x.ready.blocking : [];
+  /* Locked for the draft's revision; else, with a lock and a newer draft, the plan is stale: the user accepts the change
+     (a plan.approve line for the new digest, "clicked") or sends it back, and the agent re-locks. The stages after it wait. */
+  const lockedNow = !!x.lock && (!x.draft || x.draft.revision <= x.lock.revision);
+  const planStale = !!x.lock && !lockedNow;
   out.plan = x.manual && !x.lock ? st("n/a", "made outside the pipeline")
-    : x.lock && (x.planPoint.status === "approved" || !x.draft) ? st("done", `approved: locked revision ${x.lock.revision}`)
-    : x.planPoint.status === "stale" ? st("stale", `locked revision ${x.lock?.revision}; the draft has a newer revision`)
-    : x.planPoint.status === "approved" ? st("clicked", "you approved the plan: the agent locks it (video_plan.py lock --from-atlas)")
+    : lockedNow ? st("done", `approved: locked revision ${x.lock!.revision}`)
+    : x.planPoint.status === "approved" ? st("clicked", planStale ? `you accepted revision ${x.draft!.revision}: the agent re-locks it (video_plan.py lock --from-atlas)` : "you approved the plan: the agent locks it (video_plan.py lock --from-atlas)")
     : x.planPoint.status === "sentback" ? st("sent back", `sent back${quote(x.planPoint.note)}`)
+    : planStale ? st("you", `changed after the lock: revision ${x.draft!.revision} waits for you, locked revision ${x.lock!.revision}; accept it and re-lock, or send it back`)
     : !x.brief && !x.draft ? st("agent", "the brief is being written (video-plan)")
     : !x.draft ? st("agent", "the script is being written (video-script)")
     : !written ? st("agent", `REVIEW.md of revision ${x.draft.revision} is being written (video_plan.py review)`)
     : blocking.length ? st("blocked", `${blocking.length} blocking input${blocking.length === 1 ? "" : "s"}: ${blocking[0]}`)
     : st("you", `revision ${x.review!.revision} waits for you: approve it, or send it back with a note`);
 
-  const locked = out.plan.state === "done" || out.plan.state === "stale";
+  const locked = out.plan.state === "done" || planStale;
   const failed = (k: StageKey): S | null => {
     const row = p?.state?.stages[STATE_STAGE[k] ?? ""];
     if (row?.status === "failed") return st("blocked", `state.json: failed${row.note ? ` — ${row.note}` : ""}`);
@@ -174,6 +178,13 @@ export function videoStages(x: StagesInput): StagesView {
       : p.gateC && p.gateC.current && p.gateC.decision !== "approve" ? st("sent back", `${p.gateC.decision}${quote(p.gateC.words)}`)
       : !ready7 ? st("not reached", "every segment is approved first")
       : st("you", "the cut waits for you");
+  }
+
+  /* A stale plan: what production made for the old revision stays, but no stage after the plan is anyone's turn until the re-lock. */
+  if (planStale) {
+    for (const k of ["keyframes", "generate", "review", "composite", "cut"] as StageKey[]) {
+      if (out[k] && out[k]!.state !== "done" && out[k]!.state !== "n/a") out[k] = st("not reached", "the changed plan is re-locked first");
+    }
   }
 
   /* 7 Deliver: the delivered file, then the Atlas posting gate. */
