@@ -54,7 +54,7 @@ export type StagesInput = {
 
 const NAMES: [StageKey, string, string][] = [
   ["plan", "Plan (brief and script)", "Plan"],
-  ["approval", "Plan approval", "Approved"],
+  ["approval", "Plan approval", "Approve"],
   ["keyframes", "Shots and keyframes (gate A)", "Keyframes"],
   ["generate", "Generate", "Generate"],
   ["review", "Review takes (gate B)", "Review"],

@@ -39,8 +39,8 @@ export function ReactionPickSlot({ video, app, post, current, locked = false, jo
   const pending = picked && picked !== current?.libraryId ? readLibrary().entries[picked] ?? null : null;
   return (
     <div className="vst__slot" id="choose-reaction" data-slot="choose-reaction">
-      <p className="vst__slot-h"><b>The reaction</b>{current ? ` · ${current.handle ?? "?"} · post ${current.post ?? "?"} · ${current.start ?? "?"}–${current.end ?? "?"} s` : " · none chosen yet"}</p>
-      {current?.card ? <ReactionCardView c={current.card} label={current.libraryId ? "In the plan · from the reaction library" : "In the plan · not from the library"} /> : <>{current?.burnedInText ? <p className="sr__hint">Burned-in text: {current.burnedInText}</p> : null}{children}</>}
+      <p className="vst__slot-h"><b>The reaction</b>{current ? ` · ${current.handle ?? "?"} · ${current.start ?? "?"}–${current.end ?? "?"} s` : " · none chosen yet"}</p>
+      {current?.card ? <ReactionCardView c={current.card} label={current.libraryId ? "In the plan · from the reaction library" : "In the plan · not from the library"} compact /> : <>{current?.burnedInText ? <p className="sr__hint">Burned-in text: {current.burnedInText}</p> : null}{children}</>}
       {pending ? <ReactionCardView c={cardOfEntry(pending)} label="Picked, not in the plan yet: video-plan copies it into the brief on its next run" /> : null}
       {picked && !pending && picked !== current?.libraryId ? <p className="sr__hint">Picked {picked}, which is not in the library any more.</p> : null}
       {/* A div, not a p: the Switch reaction dialog holds blocks. */}

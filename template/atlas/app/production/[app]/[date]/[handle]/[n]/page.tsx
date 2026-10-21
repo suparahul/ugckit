@@ -1,24 +1,29 @@
 /**
  * /production/<app>/<date>/<handle>/<n> — one post.
  *
- * The head says what this post is, what state it is in, and what happens next,
- * with the decision beside that sentence. The body follows the state: the deck
- * as written until the plan is approved, then the deck as it will appear. The
- * reference material (anatomy, rules, log) is folded closed under the body.
+ * The head says what this post is, what state it is in, and what happens next.
+ * A slideshow keeps the decision beside that sentence; a video with its stages
+ * read (research/ai-ugc/ATLAS-VIDEO-PAGE-CLEANUP.md) shows one plain status line
+ * and carries the decision into the head of its stage panel (VideoView). Kill
+ * this post is in the ⋯ menu of the meta line on both. The body follows the
+ * state: the deck as written until the plan is approved, then the deck as it
+ * will appear. The reference material (anatomy, rules, log) is folded closed
+ * under the body.
  */
 
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { DecisionLog, DecisionRail } from "@/components/production/Actions";
+import { DecisionLog, DecisionRail, KillMenu } from "@/components/production/Actions";
 import { Marks } from "@/components/production/Marks";
 import { StateWord } from "@/components/production/Board";
-import { AnatomyRail, curl, PlanningMode, ProducedMode, sourceLink } from "@/components/production/PostViews";
+import { AnatomyRail, curl, PlanningMode, ProducedMode, sourceLink, type VideoRail } from "@/components/production/PostViews";
 import { SendStatusLine } from "@/components/production/Bridge";
 import { bridgeInfo, postingNotes, sendWarning, withStatusWords } from "@/lib/postbridge-flow";
 import { allStates, dateParts, findRow, getProduction, nextStep, outcomesOpenAt, postingStep, postPath, postState, primaryAction, validSlug } from "@/lib/production";
 import { getZones } from "@/lib/when";
+import { plainBlock, videoStatus } from "@/lib/plain-words";
 import { handleByShort } from "@/lib/handles";
 import { Face } from "@/components/factory/Bits";
 import { Reads } from "@/components/factory/Reads";
@@ -62,6 +67,17 @@ export default async function ProductionPost({ params, searchParams }: { params:
   const igAccount = identity?.accounts.find((a) => a.platform === "instagram") ?? null;
   const primary = primaryAction(state);
   const next = nextStep(state);
+  /* A video with its stages read: one status sentence in the head, and the decision rail in the head of the
+     stage panel whose action it is (the plan at stage 2, the delivered file and the posting at stage 8). No rail
+     during production (stages 3 to 7): each panel holds its own buttons. */
+  const stages = state.video?.stages ?? null;
+  const inProduction = !!state.video && state.stage === "final" && !state.video.final && !!state.video.lock;
+  const videoStage = stages ? (state.stage === "idea" ? 1 : state.stage === "plan" || state.stage === "planned" ? 2 : inProduction ? null : 8) : null;
+  const status = stages && !state.killed && state.stage !== "ready" && state.stage !== "posted" && state.stage !== "read" && !(state.stage === "final" && state.video?.final)
+    ? (state.plan.status === "sentback" || (state.stage === "final" && state.final.status === "sentback") ? { who: "agent" as const, head: "Agent's turn", text: next.text } : videoStatus(stages))
+    : stages ? { who: next.who === "you" ? "you" as const : next.who === "agent" ? "agent" as const : "done" as const, head: next.who === "you" ? "Waiting for you" : next.who === "agent" ? "Agent's turn" : "Done", text: next.text }
+    : null;
+  const videoPrimary = state.video ? { ...primary, disabled: plainBlock(primary.disabled) } : primary;
   const dp = dateParts(row.date);
   const dayWord = `${dp.weekday.slice(0, 3)} ${dp.d} ${dp.month.slice(0, 3)}`;
   const src = sourceLink(row.source.id ? row.source : state.deck?.source ?? row.source);
@@ -85,6 +101,10 @@ export default async function ProductionPost({ params, searchParams }: { params:
     : state.stage === "final" && state.final.status === "sentback" ? state.final
     : null;
 
+  const videoRail: VideoRail | undefined = status
+    ? { rail: <DecisionRail state={state} primary={videoPrimary} outcomesOpen={outcomesOpenAt(state)} readOnly={next.who === "agent" || status.who === "agent"} bridge={bridge} warning={warning} zones={zones} noKill />, railStage: videoStage }
+    : undefined;
+
   return (
     <div className="page">
       <header className="post-head">
@@ -98,32 +118,48 @@ export default async function ProductionPost({ params, searchParams }: { params:
           <span className="post-head__who-text">{two && igAccount ? <><Account p="tiktok" name={row.handle} /><Account p="instagram" name={igAccount.account} /></> : <b>{row.handle}</b>}<small>{[identity?.role ?? row.role, identity ? (identity.connected ? "connected" : "not connected") : null].filter(Boolean).join(" · ")}</small></span>
         </Link>
         <h1 className={`post-head__topic${state.killed ? " is-killed" : ""}`}>{curl(row.topic)}</h1>
-        <p className="post-head__meta">
+        <div className="post-head__meta">
           <span>{row.slot}</span><span>·</span><span>{row.video ? ["video", row.video.type, row.video.length ? `${row.video.length} s` : null, "9:16"].filter(Boolean).join(" · ") : `${cardText(row)}${state.deck ? ` · ${state.deck.slides.length} slides · ${state.dimension}` : ""}`}</span>
           <Marks state={state} size="lg" />
-          <StateWord s={state} />
-          {mode === "planning" ? (
-            asPlan ? <Link className="post-head__mode" href={base}>back to the deck as it will appear</Link> : null
-          ) : (
-            <Link className="post-head__mode" href={`${base}?as=plan`}>view as plan</Link>
-          )}
-        </p>
-        {two ? <Legs s={state} href={`${base}${slideNo > 1 ? `?slide=${slideNo}` : ""}`} view={view} /> : null}
-        <div className="next" id="decision">
-          <div className="next__left">
-            <p className={`next__text is-${next.who}`}>
-              <span className="next__who">{next.who === "you" ? "Your turn" : next.who === "agent" ? "Agent's turn" : "Done"}</span>
-              {next.slide ? <Link href={`${base}?slide=${next.slide}`}>{next.text}</Link> : next.text}
-            </p>
-            {notes.length || step === "sent" ? (
-              <ul className="next__notes">
-                {step === "sent" && state.sent ? <SendStatusLine post={row.key} sent={state.sent} video={!!state.video} /> : null}
-                {notes.map((n) => <li key={n}>{n}</li>)}
-              </ul>
-            ) : null}
-          </div>
-          <DecisionRail state={state} primary={primary} outcomesOpen={outcomesOpenAt(state)} readOnly={next.who === "agent"} bridge={bridge} warning={warning} zones={zones} />
+          {status ? null : <StateWord s={state} />}
+          {!state.video && mode !== "planning" ? <Link className="post-head__mode" href={`${base}?as=plan`}>view as plan</Link> : null}
+          {!state.video && asPlan ? <Link className="post-head__mode" href={base}>back to the deck as it will appear</Link> : null}
+          <KillMenu state={state}>
+            {state.video && mode !== "planning" ? <Link className="menu__item" href={`${base}?as=plan`}>View as plan</Link> : null}
+            {state.video && asPlan ? <Link className="menu__item" href={base}>Back to the video</Link> : null}
+          </KillMenu>
         </div>
+        {status ? (
+          <p className={`post-head__status is-${status.who}`}>
+            <span className="post-head__turn">{status.head}</span>
+            {status.text}
+          </p>
+        ) : null}
+        {two ? <Legs s={state} href={`${base}${slideNo > 1 ? `?slide=${slideNo}` : ""}`} view={view} /> : null}
+        {status ? (
+          notes.length || step === "sent" ? (
+            <ul className="next__notes post-head__notes">
+              {step === "sent" && state.sent ? <SendStatusLine post={row.key} sent={state.sent} video={!!state.video} /> : null}
+              {notes.map((n) => <li key={n}>{n}</li>)}
+            </ul>
+          ) : null
+        ) : (
+          <div className="next" id="decision">
+            <div className="next__left">
+              <p className={`next__text is-${next.who}`}>
+                <span className="next__who">{next.who === "you" ? "Your turn" : next.who === "agent" ? "Agent's turn" : "Done"}</span>
+                {next.slide ? <Link href={`${base}?slide=${next.slide}`}>{next.text}</Link> : next.text}
+              </p>
+              {notes.length || step === "sent" ? (
+                <ul className="next__notes">
+                  {step === "sent" && state.sent ? <SendStatusLine post={row.key} sent={state.sent} video={!!state.video} /> : null}
+                  {notes.map((n) => <li key={n}>{n}</li>)}
+                </ul>
+              ) : null}
+            </div>
+            <DecisionRail state={state} primary={videoPrimary} outcomesOpen={outcomesOpenAt(state)} readOnly={next.who === "agent"} bridge={bridge} warning={warning} zones={zones} noKill />
+          </div>
+        )}
         <Reads s={state} view={view} />
         {openNote ? <p className="band">Sent back {openNote.at ? stamp(openNote.at) : ""} — <em>“{openNote.note}”</em></p> : null}
         {state.changed && !state.killed ? (
@@ -146,7 +182,7 @@ export default async function ProductionPost({ params, searchParams }: { params:
       </header>
 
       <div className="post-body">
-        {mode === "planning" ? <PlanningMode state={state} readOnly={asPlan} src={src} slideNo={slideNo} view={videoView} /> : <ProducedMode state={state} slideNo={slideNo} src={src} overlayOff={overlayOff} readOnly={next.who === "agent"} view={videoView} />}
+        {mode === "planning" ? <PlanningMode state={state} readOnly={asPlan} src={src} slideNo={slideNo} view={videoView} videoRail={videoRail} /> : <ProducedMode state={state} slideNo={slideNo} src={src} overlayOff={overlayOff} readOnly={next.who === "agent"} view={videoView} videoRail={videoRail} />}
         <AnatomyRail state={state} src={src} />
         <DecisionLog log={state.log} />
       </div>

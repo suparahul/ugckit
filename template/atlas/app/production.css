@@ -1121,36 +1121,14 @@
 
 /* ---------------------------------------------------------- video post (VideoView.tsx) */
 
-/* The 9:16 frame: the delivered file in a player, or the empty frame while the video is in production. */
-.vframe { background: #1f1a14; }
-.vframe__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
-.vframe__empty { position: absolute; inset: 0; margin: 0; padding: 0 12%; display: flex; flex-direction: column; justify-content: center; gap: 8px; text-align: center; font-size: 13px; line-height: 1.45; color: rgba(255, 253, 245, 0.85); }
-.vframe__empty small { font-family: var(--mono); font-size: 10.5px; color: rgba(255, 253, 245, 0.55); overflow-wrap: anywhere; }
-/* The locked plan's beats, in order. */
-.vbeats { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; }
-.vbeat { padding: 10px 0; border-top: 1px solid var(--rule); }
-.vbeat:first-child { border-top: 0; padding-top: 2px; }
-.vbeat p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
-.vbeat__h { font-size: 12px !important; color: var(--ink-3) !important; }
-.vbeat__h b { color: var(--ink-2); font-weight: 600; }
-.vbeat__said { margin-top: 3px !important; }
-.vbeat__who { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); margin-right: 6px; }
-.vbeat__action { margin-top: 3px !important; color: var(--ink-2) !important; }
-.vbeat__screen { margin-top: 3px !important; color: var(--ember-deep) !important; }
-.vbeat__prompt { margin-top: 6px; font-size: 12px; color: var(--ink-3); }
-.vbeat__prompt summary { cursor: pointer; }
-.vbeat__prompt pre { margin: 6px 0 0; padding: 8px 10px; white-space: pre-wrap; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; color: var(--ink-2); background: var(--paper-hi); border: 1px solid var(--rule); border-radius: 3px; max-height: 320px; overflow: auto; }
-/* REVIEW.md, the revision the user approves. */
+/* REVIEW.md, the revision the user approves, in Details. */
 .vreview { margin-top: 16px; max-width: 860px; font-size: 14px; line-height: 1.55; color: var(--ink); overflow-wrap: anywhere; }
 .vreview table { border-collapse: collapse; font-size: 12.5px; display: block; overflow-x: auto; }
 .vreview th, .vreview td { border: 1px solid var(--rule); padding: 4px 8px; text-align: left; vertical-align: top; }
 .vreview code { font-family: var(--mono); font-size: 0.9em; }
-@media (max-width: 720px) { .rep__body:has(.vframe) { grid-template-columns: 1fr; } }
 
 /* A locked video's production (VideoProduction): the storyboard, the takes, the cut. */
 .vprod { margin-top: 22px; display: flex; flex-direction: column; gap: 22px; }
-.vprod__record { margin-top: 18px; }
-.vprod__record > summary { cursor: pointer; font-size: 13px; color: var(--ink-2); }
 .vprod__stage { padding-top: 14px; border-top: 1px solid var(--rule); min-width: 0; }
 .vprod__h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0 0 10px; font-size: 15px; font-weight: 600; color: var(--ink); }
 .vprod__h small { font-size: 12px; font-weight: 400; color: var(--ink-3); }
@@ -1160,11 +1138,9 @@
 .vprod__tag.is-you { border-color: var(--ember); color: var(--ink); }
 .vprod__words, .vprod__click, .vprod__cost { margin: 4px 0; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); }
 .vprod__click { color: var(--ink-3); }
-.vprod__board { display: block; max-width: 100%; max-height: 360px; margin: 6px 0; border: 1px solid var(--rule); }
-.vprod__keys { list-style: none; margin: 6px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
-.vprod__keys li { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--ink-3); }
-.vprod__keys img { display: block; width: 72px; aspect-ratio: 9 / 16; object-fit: cover; border: 1px solid var(--rule); }
-.vprod__nokey { display: grid; place-items: center; width: 72px; aspect-ratio: 9 / 16; border: 1px dashed var(--rule-2); font-size: 10.5px; text-align: center; }
+.vprod__board { display: block; max-width: 100%; max-height: 260px; margin: 6px 0; border: 1px solid var(--rule); }
+.vprod__nokey { display: grid; place-items: center; width: 72px; aspect-ratio: 9 / 16; padding: 4px; border: 1px dashed var(--rule-2); font-size: 10.5px; line-height: 1.3; text-align: center; color: var(--ink-3); overflow-wrap: anywhere; }
+.vprod__code { font-family: var(--mono); font-size: 11px; font-weight: 400; color: var(--ink-4); }
 .vprod__segs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
 .vprod__seg { padding: 10px 0 0; border-top: 1px dashed var(--rule); min-width: 0; }
 .vprod__seg:first-child { border-top: 0; padding-top: 0; }
@@ -1186,22 +1162,19 @@
 .vprod__form { display: inline-flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; }
 .vprod__form--col { display: flex; flex-direction: column; align-items: stretch; margin-top: 8px; max-width: 520px; }
 .vprod__again { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
-.vprod__comp { margin-top: 10px; padding-left: 12px; border-left: 2px solid var(--rule); }
 
 /* The stages of a character video (VideoStages, ATLAS-VIDEO-STAGES-PLAN.md § 4): the "Now" line, the rail, the segment table. */
-.vst { margin: 18px 0 14px; display: flex; flex-direction: column; gap: 12px; }
-.vst__now { margin: 0; font-size: 14px; color: var(--ink); display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
-.vst__spent { font-size: 12px; color: var(--ink-3); }
-.vst__rail { list-style: none; margin: 0; padding: 0 0 4px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; }
-.vst__step { flex: 1 0 96px; min-width: 96px; }
-.vst__step a { display: flex; flex-direction: column; gap: 2px; height: 100%; padding: 7px 9px; border: 1px solid var(--rule); border-radius: 6px; color: var(--ink-2); text-decoration: none; background: var(--paper-hi); }
+.vst__rail { list-style: none; margin: 16px 0 0; padding: 0 0 4px; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: thin; }
+.vst__step { flex: 1 1 0; min-width: 84px; }
+.vst__step a { display: flex; flex-direction: column; gap: 1px; height: 100%; padding: 6px 9px; border: 1px solid var(--rule); border-radius: 5px; color: var(--ink-2); text-decoration: none; background: rgba(255, 253, 245, 0.35); }
 .vst__step a:hover { border-color: var(--rule-2); }
-.vst__step.is-open a { border-color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--ink-2); }
-.vst__n { font-size: 11px; color: var(--ink-3); }
+.vst__step.is-open a { border-color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--ink-2); background: var(--paper-hi); }
+.vst__n { font-size: 10.5px; color: var(--ink-4); font-variant-numeric: tabular-nums; }
 .vst__name { font-size: 13px; font-weight: 600; color: var(--ink); }
-.vst__state { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
-.vst__step.is-not-reached a { opacity: 0.62; }
-.vst__step.is-you .vst__state, .vst__step.is-blocked .vst__state { color: var(--ink); font-weight: 600; }
+.vst__state { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.vst__step.is-not-reached a { opacity: 0.55; }
+.vst__step.is-done .vst__state { color: #2f6b3a; }
+.vst__step.is-you .vst__state, .vst__step.is-blocked .vst__state { color: var(--ember-deep); font-weight: 600; }
 .vst__notes { margin: 0; padding: 8px 12px 8px 26px; border: 1px dashed var(--rule-2); border-radius: 6px; font-size: 12.5px; color: var(--ink-2); }
 .vst__table { display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; font-size: 12.5px; }
 .vst__row { display: grid; grid-template-columns: 1.4fr 1.3fr repeat(4, 0.8fr) 1fr; gap: 8px; padding: 7px 10px; border-top: 1px solid var(--rule); color: var(--ink-2); align-items: baseline; }
@@ -1211,13 +1184,13 @@
 .vst__row span { min-width: 0; overflow-wrap: anywhere; }
 .vst__row [data-label="Beats"] a { margin-right: 8px; }
 
-/* The stage panel: the timeline on the left, the stage on the right. */
-.vst__panel { display: grid; grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); gap: 22px; margin: 6px 0 24px; align-items: start; }
-.vst__tl { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
-.vst__main { min-width: 0; }
-.vst__ph { margin: 0 0 10px; font-size: 16px; font-weight: 600; color: var(--ink); }
-.vst__ph small { font-size: 12.5px; font-weight: 400; color: var(--ink-3); margin-left: 6px; }
-.vst__brief { font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.vst__brief { font-size: 13.5px; line-height: 1.55; color: var(--ink-2); max-width: 72ch; }
+.vst__brief > p { margin: 0 0 8px; }
+.vst__brief b { color: var(--ink); font-weight: 600; }
+.vst__hooks { margin: 4px 0 10px; padding-left: 18px; }
+.vst__hooks li { margin: 2px 0; color: var(--ink-3); }
+.vst__hooks li.is-on { color: var(--ink); }
+.vst__hooks small { color: var(--ink-3); }
 .vst__brief ul { margin: 4px 0 10px; padding-left: 18px; }
 .vst__brief li.is-bad { color: var(--ink); font-weight: 600; }
 .vst__slot { margin: 12px 0; padding: 10px 12px; border: 1px dashed var(--rule-2); border-radius: 6px; }
@@ -1243,35 +1216,106 @@
 .vprod__gates .is-ok b { color: #2f6b3a; }
 .vprod__gates .is-bad b { color: var(--ember); }
 
-/* The timeline (Timeline, § 4.1): no colour code; words say everything, the open segment has a plain border. */
-.tl { display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; color: var(--ink-2); }
-.tl__src, .tl__empty { margin: 0; font-size: 11.5px; color: var(--ink-3); }
-.tl__player { margin: 0; }
-.tl__player video { display: block; width: 100%; max-width: 220px; aspect-ratio: 9 / 16; background: #000; }
-.tl__player figcaption { font-size: 11px; color: var(--ink-3); }
-.tl__strip { position: relative; }
-.tl__marker { position: absolute; left: -6px; right: 0; height: 0; border-top: 2px solid var(--ink); pointer-events: none; transition: top 0.2s linear; }
-.tl__list { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--rule-2); }
-.tl__cp { padding: 6px 0 8px 12px; border-bottom: 1px solid var(--rule); border: 1px solid transparent; border-bottom-color: var(--rule); }
-.tl__cp.is-open { border: 1px solid var(--ink-2); border-radius: 4px; }
-.tl__head { margin: 0 0 6px; font-size: 12px; color: var(--ink); }
-.tl__time { padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--ink); text-decoration: underline; cursor: pointer; }
-.tl__body { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; }
-.tl__pic { margin: 0 0 4px; }
-.tl__pic img, .tl__pic video { display: block; width: 92px; aspect-ratio: 9 / 16; object-fit: cover; background: #000; border: 1px solid var(--rule); }
-.tl__pic figcaption { font-size: 10.5px; line-height: 1.3; color: var(--ink-3); overflow-wrap: anywhere; }
-.tl__nopic { margin: 0; width: 92px; aspect-ratio: 9 / 16; display: grid; place-items: center; padding: 4px; border: 1px dashed var(--rule-2); font-size: 10.5px; text-align: center; color: var(--ink-3); }
-.tl__earlier summary { cursor: pointer; font-size: 10.5px; color: var(--ink-3); }
-.tl__lines { margin: 0; display: flex; flex-direction: column; gap: 3px; }
-.tl__lines div { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 6px; }
-.tl__lines dt { font-size: 10.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; padding-top: 1px; }
-.tl__lines dd { margin: 0; overflow-wrap: anywhere; }
-.tl__text { display: block; }
-
 @media (max-width: 860px) {
-  .vst__panel { grid-template-columns: 1fr; }
-  .vst__tl { position: static; max-height: none; }
   .vst__row { grid-template-columns: 1fr 1fr; }
   .vst__row--head { display: none; }
   .vst__row span[data-label]::before { content: attr(data-label) ": "; color: var(--ink-3); font-size: 11px; }
 }
+
+/* ------------------------------------------------- the video post page, cleaned (ATLAS-VIDEO-PAGE-CLEANUP.md) */
+
+/* The one status sentence under the title. */
+.post-head__status { margin: 10px 0 0; font-size: 15px; line-height: 1.5; color: var(--ink); }
+.post-head__turn { display: inline-block; margin-right: 10px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); vertical-align: 1px; }
+.post-head__status.is-you .post-head__turn, .post-head__status.is-blocked .post-head__turn { color: var(--ember-deep); }
+.post-head__status.is-agent, .post-head__status.is-done { color: var(--ink-2); }
+.post-head__notes { margin-top: 6px; }
+
+/* The ⋯ menu at the end of the meta line: kill this post, view as plan. */
+.menu { position: relative; margin-left: auto; }
+.menu > summary { list-style: none; cursor: pointer; padding: 0 8px; border: 1px solid transparent; border-radius: 999px; font-size: 16px; line-height: 20px; color: var(--ink-3); user-select: none; }
+.menu > summary::-webkit-details-marker { display: none; }
+.menu > summary:hover, .menu[open] > summary { color: var(--ink); border-color: var(--rule-2); background: var(--paper-hi); }
+.menu > summary:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.menu__list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 180px; display: flex; flex-direction: column; gap: 2px; padding: 6px; border: 1px solid var(--rule-2); border-radius: 6px; background: #fffdf5; box-shadow: 0 6px 18px rgba(36, 29, 19, 0.12); }
+.menu__item { display: block; width: 100%; padding: 6px 10px; border: 0; border-radius: 4px; background: none; font: inherit; font-size: 13px; text-align: left; color: var(--ink); cursor: pointer; text-decoration: none; white-space: nowrap; }
+.menu__item:hover { background: var(--paper-hi); }
+.menu__item.is-bad { color: var(--ember-deep); }
+.menu__form { display: flex; flex-direction: column; gap: 6px; padding: 6px 4px; min-width: 240px; }
+.menu__form .note { height: 32px; min-height: 0; }
+
+/* The stage panel: the stage's action in the head, its content under it. */
+.vpanel { margin-top: 14px; padding: 14px 16px 16px; border: 1px solid var(--rule); border-radius: 6px; background: rgba(255, 253, 245, 0.5); }
+.vpanel__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px; margin-bottom: 10px; }
+.vpanel__h { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.vpanel__h small { font-size: 12.5px; font-weight: 400; color: var(--ink-3); }
+.vpanel__h small a { color: var(--ember-deep); }
+.vpanel__rail { margin-left: auto; }
+.vpanel__rail .rail__row { justify-content: flex-end; }
+.vpanel .vprod__stage { padding-top: 0; border-top: 0; }
+.vpanel .vprod__h { display: none; }
+.vpanel .vst__slot { margin: 10px 0 0; }
+
+/* The problems, once: what stops the approval first, then what production still needs. */
+.problems { margin: 0 0 12px; }
+.problems__h { margin: 8px 0 4px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
+.problems__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; max-width: 72ch; }
+.problems__list li { position: relative; padding-left: 20px; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
+.problems__list li::before { position: absolute; left: 0; top: 0; font-weight: 700; }
+.problems__list li.is-bad::before { content: "✕"; color: var(--ember-deep); }
+.problems__list li.is-warn::before { content: "!"; color: var(--ember-deep); left: 5px; }
+.problems__list li.is-warn { color: var(--ink-2); }
+
+/* The delivered file at stage 8. */
+.vdeliver { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px; }
+.vdeliver__video { display: block; width: 240px; max-width: 100%; aspect-ratio: 9 / 16; background: #000; border: 1px solid var(--rule); border-radius: 4px; }
+
+/* The video, beat by beat: a strip of cards, left to right. */
+.vtl { margin-top: 24px; }
+.vtl__h { margin: 0 0 10px; font-size: 15px; font-weight: 600; color: var(--ink); }
+.vtl__h small { margin-left: 8px; font-size: 12.5px; font-weight: 400; color: var(--ink-3); }
+.tl { display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; color: var(--ink-2); }
+.tl__empty { margin: 0; font-size: 12.5px; color: var(--ink-3); }
+.tl__player { margin: 0; display: flex; align-items: flex-end; gap: 10px; }
+.tl__player video { display: block; width: 160px; aspect-ratio: 9 / 16; background: #000; border-radius: 4px; }
+.tl__player figcaption { font-size: 11px; color: var(--ink-3); }
+.tl__strip { position: relative; }
+.tl__marker { position: absolute; top: -6px; bottom: -2px; width: 0; border-left: 2px solid var(--ember); pointer-events: none; transition: left 0.2s linear; }
+.tl__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.tl__cp { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px; border: 1px solid transparent; border-radius: 6px; }
+.tl__cp.is-open { border-color: var(--ink-2); background: var(--paper-hi); }
+.tl__pic { margin: 0; }
+.tl__pic img, .tl__pic video { display: block; width: 100%; max-width: 128px; aspect-ratio: 9 / 16; object-fit: cover; background: #000; border: 1px solid var(--rule); border-radius: 3px; }
+.tl__pic figcaption { margin-top: 3px; font-size: 10.5px; line-height: 1.3; color: var(--ink-4); overflow-wrap: anywhere; }
+.tl__pic.is-small img, .tl__pic.is-small video { max-width: 72px; }
+.tl__nopic { margin: 0; width: 100%; max-width: 128px; aspect-ratio: 9 / 16; display: grid; place-items: center; padding: 6px; border: 1px dashed var(--rule-2); border-radius: 3px; font-size: 10.5px; line-height: 1.35; text-align: center; color: var(--ink-3); }
+.tl__head { margin: 4px 0 0; font-size: 12.5px; color: var(--ink); }
+.tl__head b { font-weight: 700; }
+.tl__role { color: var(--ink-3); }
+.tl__time { padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.tl__sees { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
+.tl__more { font-size: 12px; color: var(--ink-3); }
+.tl__more > summary { cursor: pointer; list-style: none; color: var(--ink-3); text-decoration: underline; text-underline-offset: 3px; }
+.tl__more > summary::-webkit-details-marker { display: none; }
+.tl__more > summary:hover { color: var(--ember-deep); }
+.tl__lines { margin: 6px 0 0; display: flex; flex-direction: column; gap: 4px; }
+.tl__lines div { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 6px; }
+.tl__lines dt { font-size: 10.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; padding-top: 1px; }
+.tl__lines dd { margin: 0; overflow-wrap: anywhere; line-height: 1.45; color: var(--ink-2); }
+.tl__lines a { color: var(--ember-deep); }
+.tl__text { display: block; }
+.tl__earlier { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+
+/* The caption card, once the plan is locked. */
+.vcaption { margin-top: 20px; max-width: 640px; }
+
+/* Details: the plan as written, the segments, the brief, the files. */
+.vdetails { margin-top: 24px; }
+.vdetails__sec { margin: 6px 0 18px; }
+.vdetails__sec h2 { font-size: 11px; font-weight: 600; letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 8px; }
+.vdetails__rows { margin: 0; max-width: 760px; }
+.vdetails code { font-family: var(--mono); font-size: 0.9em; }
+.vdetails .vreview { margin-top: 0; }
+.vdetails .vreview h1 { font-size: 20px; letter-spacing: -0.01em; margin: 0 0 8px; }
+.vdetails .vreview h1 code { font-size: 0.8em; }
+.vdetails .vst__table { max-width: 900px; }

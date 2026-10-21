@@ -100,6 +100,7 @@ export function DecisionRail({
   bridge,
   warning,
   zones,
+  noKill,
 }: {
   state: PostState;
   primary: { kind: EventKind | "posted" | "outcomes" | null; label: string; disabled: string | null };
@@ -113,6 +114,8 @@ export function DecisionRail({
   warning?: string | null;
   /** The plan's posting and home zones, for the direct-post row. */
   zones: Zones;
+  /** The kill control is drawn elsewhere (KillMenu in the head): none here. */
+  noKill?: boolean;
 }) {
   const [decide, busy] = useDecide();
   const [note, setNote] = useState("");
@@ -137,10 +140,12 @@ export function DecisionRail({
     <aside className="rail" aria-label="Decision">
       <div className="rail__inner">
         {state.killed ? (
-          <div className="rail__row">
-            <span className="rail__why is-bad">Killed {stamp(state.killed.at)} — <em>“{state.killed.note}”</em></span>
-            <button type="button" className="rail__kill" disabled={busy} onClick={() => run({ post, kind: "unkill" })}>Un-kill this post</button>
-          </div>
+          noKill ? null : (
+            <div className="rail__row">
+              <span className="rail__why is-bad">Killed {stamp(state.killed.at)} — <em>“{state.killed.note}”</em></span>
+              <button type="button" className="rail__kill" disabled={busy} onClick={() => run({ post, kind: "unkill" })}>Un-kill this post</button>
+            </div>
+          )
         ) : primary.kind === "posted" ? (
           <PostingRail post={post} handle={state.row.handle} alsoInstagram={(state.platforms ?? []).includes("instagram") && !state.legs?.instagram?.dropped && !state.legs?.instagram?.sent} sent={state.sent} link={state.link} exported={state.exported} bridge={bridge ?? { account: null, why: "POST_BRIDGE_API_KEY is not set in .env", canSend: false }} warning={warning ?? null} busy={busy} onDecide={run} zones={zones} video={!!state.video} />
         ) : primary.kind === "outcomes" ? (
@@ -174,7 +179,7 @@ export function DecisionRail({
                 <button type="button" className="rail__kill" onClick={() => setSending(true)}>Send back</button>
               )
             ) : null}
-            {state.stage !== "read" ? (
+            {state.stage !== "read" && !noKill ? (
               killing ? (
                 <span className="rail__row rail__end">
                   <input className="note" style={{ width: 240, height: 32, minHeight: 0 }} placeholder="Why this post is killed." value={note} onChange={(e) => setNote(e.target.value)} aria-label="Kill note" />
@@ -190,6 +195,44 @@ export function DecisionRail({
         )}
       </div>
     </aside>
+  );
+}
+
+/**
+ * The small menu at the end of the post's meta line: kill this post (with its note), or
+ * un-kill it, and any extra link the page puts there (view as plan). The same line to the
+ * log as the rail's kill; the rail then draws none (noKill).
+ */
+export function KillMenu({ state, children }: { state: PostState; children?: React.ReactNode }) {
+  const [decide, busy] = useDecide();
+  const [note, setNote] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [killing, setKilling] = useState(false);
+  const post = state.row.key;
+  if (state.stage === "read" && !children) return null;
+  return (
+    <details className="menu" aria-label="More">
+      <summary aria-label="More actions" title="More">⋯</summary>
+      <div className="menu__list">
+        {children}
+        {state.killed ? (
+          <button type="button" className="menu__item" disabled={busy} onClick={() => decide({ post, kind: "unkill" }).then(setErr)}>Un-kill this post</button>
+        ) : state.stage !== "read" ? (
+          killing ? (
+            <span className="menu__form">
+              <input className="note" placeholder="Why this post is killed." value={note} onChange={(e) => setNote(e.target.value)} aria-label="Kill note" autoFocus />
+              <span className="sr__actions">
+                <button type="button" className="pill" disabled={busy || !note.trim()} onClick={() => decide({ post, kind: "kill", note }).then((r) => { setErr(r); if (!r) setKilling(false); })}>Kill</button>
+                <button type="button" className="rail__kill" onClick={() => { setKilling(false); setNote(""); }}>cancel</button>
+              </span>
+            </span>
+          ) : (
+            <button type="button" className="menu__item is-bad" onClick={() => setKilling(true)}>Kill this post…</button>
+          )
+        ) : null}
+        {err ? <span className="rail__err" role="alert">{err}</span> : null}
+      </div>
+    </details>
   );
 }
 

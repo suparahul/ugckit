@@ -34,13 +34,19 @@ const CHECK_WORDS: Record<string, string> = {
   follows_reference: "the reaction follows the clip's beats in order and time",
 };
 const ROUTE_WORDS: Record<string, string> = {
-  motion: "motion copy, motion route (Kling 3.0 Pro Motion Control)",
-  replace: "motion copy, replace route (Wan 2.2 Animate replace, the backup)",
-  animate: "motion copy, animate route (Wan 2.2 Animate move)",
-  guided: "motion copy, guided route (MiniMax H3, untested)",
+  motion: "motion copy",
+  replace: "motion copy, replace route (the backup)",
+  animate: "motion copy, animate route",
+  guided: "motion copy, guided route (untested)",
 };
 /* What a type is, in words, for a segment that is not generated. */
 const BUILT: Record<string, string> = { C: "supplied media", M: "panels", R: "the screen recording", P: "the screen recording, picture in picture" };
+/* What a segment is, in words: "Shot 1", "Screen 2"; the code (01-x) stays beside it, small. */
+const KIND: Record<string, string> = { X: "Reaction shot", B: "Shot", T: "Talking head", O: "Shot", C: "Supplied clip", M: "Panels", R: "Screen", P: "Screen in the phone" };
+export function SegName({ s }: { s: Pick<Segment, "name" | "type"> }) {
+  const n = Number(s.name.slice(0, 2));
+  return <><b>{KIND[s.type] ?? "Segment"} {n}</b> <span className="vprod__code">{s.name}</span></>;
+}
 
 function ClickLine({ c, what }: { c: Click | null; what: string }) {
   if (!c) return null;
@@ -48,7 +54,7 @@ function ClickLine({ c, what }: { c: Click | null; what: string }) {
   return (
     <p className="vprod__click">
       You {word} {what} in the Atlas {stamp(c.at)}{c.note ? <> — <em>“{c.note}”</em></> : null}.{" "}
-      {!c.current ? "The file changed since: decide again." : c.recorded ? "Recorded." : "The agent records it next (review.py --from-atlas)."}
+      {!c.current ? "The file changed since: decide again." : c.recorded ? "Recorded." : "The agent records it next."}
     </p>
   );
 }
@@ -88,7 +94,7 @@ export function StoryboardPanel({ post, p, live, seg }: { post: string; p: Produ
   const shown = seg ? p.segments.filter((s) => s.name === seg) : p.segments;
   return (
     <section className="vprod__stage" aria-label="Shots and keyframes, gate A">
-      <h3 className="vprod__h">Shots and keyframes <small>gate A · character-shots</small>
+      <h3 className="vprod__h">Shots and keyframes
         <span className={`vprod__tag${done ? " is-done" : ""}`}>{done ? "approved" : p.gateA?.decision && p.gateA.decision !== "approve" ? p.gateA.decision : p.gateA?.decision === "approve" ? "keyframe changed since" : "not approved"}</span>
       </h3>
       {p.gateA?.words ? <p className="vprod__words">Gate A: “{p.gateA.words}”{p.gateA.date ? ` (${p.gateA.date})` : ""}</p> : null}
@@ -96,11 +102,11 @@ export function StoryboardPanel({ post, p, live, seg }: { post: string; p: Produ
       <ul className="vprod__cards">
         {shown.map((s) => (
           <li key={s.name} className="vprod__card">
-            <p className="vprod__segh tabular"><b>{s.name}</b> · {s.type}{s.motionCopy ? ` · ${ROUTE_WORDS[s.motionCopy.route] ?? s.motionCopy.route}` : ""}{s.generated ? ` · ${usd(s.cost)} a run` : ""}</p>
+            <p className="vprod__segh tabular"><SegName s={s} />{s.motionCopy ? ` · ${ROUTE_WORDS[s.motionCopy.route] ?? s.motionCopy.route}` : ""}{s.generated ? ` · ${usd(s.cost)} a run` : ""}</p>
             <ShotFacts s={s} />
             <div className="vprod__media">
               {s.keyframe ? <figure><a href={s.keyframe.url} target="_blank" rel="noreferrer"><img src={s.keyframe.url} alt={`Keyframe ${s.name}`} /></a><figcaption>keyframe</figcaption></figure>
-                : <span className="vprod__nokey">{!s.generated ? `no keyframe: ${BUILT[s.type] ?? s.type}${s.asset ? ` ${s.asset.id}` : s.screen ? ` ${s.screen.id}` : s.panels.length ? ` (${s.panels.length})` : ""}` : s.needsKeyframe ? "no keyframe yet" : "no keyframe: the clip leads"}</span>}
+                : <span className="vprod__nokey" title={s.asset?.id ?? s.screen?.id ?? undefined}>{!s.generated ? `no keyframe: ${BUILT[s.type] ?? s.type}${s.panels.length ? ` (${s.panels.length})` : ""}` : s.needsKeyframe ? "no keyframe yet" : "no keyframe: the clip leads"}</span>}
               {s.endStill ? <figure><img src={s.endStill} alt={`End still ${s.name}`} /><figcaption>end still</figcaption></figure> : null}
               {s.poseFrame ? <figure><img src={s.poseFrame} alt={`Pose picture ${s.name}`} /><figcaption>the pose picture (the clip&apos;s first frame)</figcaption></figure> : null}
             </div>
@@ -109,7 +115,7 @@ export function StoryboardPanel({ post, p, live, seg }: { post: string; p: Produ
           </li>
         ))}
       </ul>
-      {own.length ? <p className="vprod__cost tabular">First runs: {usd(p.cost)} computed (list price × seconds, as generate.sh quotes it){p.spent ? ` · spent so far ${usd(p.spent)}` : ""}</p> : <p className="sr__hint">No generated segment: nothing to approve at gate A.</p>}
+      {own.length ? <p className="vprod__cost tabular">First runs: {usd(p.cost)} computed (list price × seconds){p.spent ? ` · spent so far ${usd(p.spent)}` : ""}</p> : <p className="sr__hint">No generated segment: nothing to approve here.</p>}
       <ClickLine c={p.gateAClick} what="the storyboard" />
       {live && own.length && !done ? (
         <div className="sr__actions">
@@ -175,7 +181,7 @@ function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Produc
   return (
     <li className="vprod__seg" id={`seg-${s.name}`}>
       <p className="vprod__segh tabular">
-        <b>{s.name}</b> · {s.type}{s.motionCopy ? ` · ${ROUTE_WORDS[s.motionCopy.route] ?? s.motionCopy.route}` : ""}{s.continues ? ` · continues ${s.continues}` : ""}{s.generated ? ` · ${usd(s.cost)} a run` : ""}
+        <SegName s={s} />{s.motionCopy ? ` · ${ROUTE_WORDS[s.motionCopy.route] ?? s.motionCopy.route}` : ""}{s.continues ? ` · continues ${s.continues}` : ""}{s.generated ? ` · ${usd(s.cost)} a run` : ""}
         <span className={`vprod__tag${s.approved || s.motion?.approved ? " is-done" : status === "take waiting for you" || status === "motion design waiting for you" ? " is-you" : ""}`}>{status}</span>
       </p>
       <ShotFacts s={s} />
@@ -408,13 +414,13 @@ export function TakesPanel({ post, p, live, seg }: { post: string; p: Production
   const segs = seg ? p.segments.filter((s) => s.name === seg) : p.segments;
   return (
     <section className="vprod__stage" aria-label="Generate and review takes, gate B">
-      <h3 className="vprod__h">Generate and review takes <small>gate B · character-generate, character-review</small>
+      <h3 className="vprod__h">Generate and review takes
         {p.spent ? <span className="vprod__tag tabular">spent so far {usd(p.spent)}</span> : null}
       </h3>
       {p.state?.stages.generate?.status === "running" ? <p className="vprod__words">Generating now: {p.state.stages.generate.note ?? "a run"} (state.json).</p> : null}
       {p.state?.stages.generate?.status === "failed" ? <p className="rail__why is-bad">The last run failed: {p.state.stages.generate.note ?? "no note"} (state.json).</p> : null}
       {segs.length ? <ol className="vprod__segs">{segs.map((s) => <SegmentCard key={s.name} post={post} s={s} p={p} live={live} />)}</ol>
-        : <p className="sr__hint">video.json lists the segments once character-shots writes it.</p>}
+        : <p className="sr__hint">The segments appear here once the shots are written.</p>}
       {!seg && p.sources.length ? (
         <>
           <h4 className="vprod__sub">Supplied sources</h4>
@@ -441,7 +447,7 @@ function CompositeCard({ post, s, live }: { post: string; s: Segment; live: bool
   const back = s.compositeClick?.current && s.compositeClick.kind === "composite.sendback";
   return (
     <li className="vprod__seg">
-      <p className="vprod__segh tabular"><b>{s.name}</b> · {s.type} · the app in the phone
+      <p className="vprod__segh tabular"><SegName s={s} /> · the app in the phone
         <span className={`vprod__tag${s.compositeApproved ? " is-done" : c && !pending && !back ? " is-you" : ""}`}>{s.compositeApproved ? "approved" : !s.approved ? "the plate is approved at gate B first" : !c ? "not made yet (composite.sh)" : pending ? "clicked: being recorded" : back ? "sent back" : "waiting for you"}</span>
       </p>
       <div className="vprod__media">
@@ -466,8 +472,8 @@ export function CompositePanel({ post, p, live, seg }: { post: string; p: Produc
   const phones = p.segments.filter((s) => s.phone && !s.sharedFrom && (!seg || s.name === seg));
   return (
     <section className="vprod__stage" aria-label="Composite">
-      <h3 className="vprod__h">Composite <small>the app in the phone · character-composite</small></h3>
-      {phones.length ? <ol className="vprod__segs">{phones.map((s) => <CompositeCard key={s.name} post={post} s={s} live={live} />)}</ol> : <p className="sr__hint">n/a: no app insertion in the plan.</p>}
+      <h3 className="vprod__h">Composite</h3>
+      {phones.length ? <ol className="vprod__segs">{phones.map((s) => <CompositeCard key={s.name} post={post} s={s} live={live} />)}</ol> : <p className="sr__hint">No app insertion in this plan: nothing to composite.</p>}
     </section>
   );
 }
@@ -490,7 +496,7 @@ export function CutPanel({ post, p, live }: { post: string; p: Production; live:
   const { blocked: supplied, overlays } = cutAccepts(a?.failed ?? []);
   return (
     <section className="vprod__stage" aria-label="The cut, gate C">
-      <h3 className="vprod__h">The cut <small>gate C · character-assemble, then character-deliver</small>
+      <h3 className="vprod__h">The cut
         <span className={`vprod__tag${done ? " is-done" : a && !pending ? " is-you" : ""}`}>{done ? "approved" : !a ? "not assembled yet" : a.stale ? "stale: assembled from another revision" : pending ? "clicked: being recorded" : "waiting for you"}</span>
       </h3>
       {p.gateC?.words ? <p className="vprod__words">Gate C ({p.gateC.decision}): “{p.gateC.words}”{p.gateC.date ? ` (${p.gateC.date})` : ""}</p> : null}
@@ -502,7 +508,7 @@ export function CutPanel({ post, p, live }: { post: string; p: Production; live:
           </figure>
           {a.sheet ? <figure className="is-wide"><a href={a.sheet} target="_blank" rel="noreferrer"><img src={a.sheet} alt="Contact sheet of the cut" className="is-sheet" /></a><figcaption>contact sheet</figcaption></figure> : null}
         </div>
-      ) : <p className="sr__hint">assemble.sh writes assembly/&lt;video&gt;.mp4 once every segment is approved.</p>}
+      ) : <p className="sr__hint">The cut is assembled once every segment is approved.</p>}
       {a?.checks.length ? (
         <ul className="vprod__checklist">{a.checks.map((c) => <li key={c.name} className={c.result === "FAIL" ? "is-bad" : ""}><b>{c.name}</b> {c.result || "—"}{c.detail ? ` · ${c.detail}` : ""}</li>)}</ul>
       ) : null}

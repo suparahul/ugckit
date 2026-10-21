@@ -277,9 +277,9 @@ test("before the lock: plan, then the approval blocked by an input; a sheet vide
   assert.equal(v.now, "Plan: REVIEW.md of revision 2 is being written (video_plan.py review).");
   v = videoStages({ ...base, ready: { revision: 2, digest: "a".repeat(64), blocking: ["screen s1: not in screens.json"], dependencies: [], current: true } });
   assert.equal(word(v, 2), "blocked");
-  assert.equal(v.now, "Approved: 1 blocking input: screen s1: not in screens.json.");
+  assert.equal(v.now, "Approve: 1 blocking input: screen s1: not in screens.json.");
   v = videoStages({ ...base, ready: null, planPoint: { status: "sentback", at: null, note: "another hook" } });
-  assert.equal(v.now, "Approved: sent back — “another hook”.");
+  assert.equal(v.now, "Approve: sent back — “another hook”.");
   v = videoStages({ ...base, brief: false, draft: null, review: null, ready: null, manual: true, final: { sha256: "f".repeat(64) } });
   assert.deepEqual(v.stages.map((s) => s.state), ["n/a", "n/a", "n/a", "n/a", "n/a", "n/a", "n/a", "you"]);
 });
