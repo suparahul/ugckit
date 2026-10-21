@@ -87,7 +87,7 @@ function Err({ e }: { e: string | null }) {
   return e ? <p className="rail__err" role="alert">{e}</p> : null;
 }
 
-/* ------------------------------------------------------------ stage 3: gate A */
+/* ------------------------------------------------------------ stage 2: gate A */
 
 /** The segments that are not generated, in one quiet line: nothing to decide about them at this gate. */
 function BuiltLine({ rest, when }: { rest: Segment[]; when: string }) {
@@ -170,7 +170,7 @@ function ShotFacts({ s }: { s: Segment }) {
   );
 }
 
-/* --------------------------------------------------- stages 4 and 5: gate B */
+/* --------------------------------------------------- stages 3 and 4: gate B */
 
 /** The take in focus: the newest one nobody decided yet and that is newer than the approved one; else the approved one; else the newest. */
 const focusOf = (s: Segment): Take | null =>
@@ -480,7 +480,7 @@ export function TakesPanel({ post, p, live, seg, tl }: { post: string; p: Produc
   );
 }
 
-/* ----------------------------------------------------------- stage 6: composite */
+/* ----------------------------------------------------------- stage 5: composite */
 
 function CompositeCard({ post, s, live }: { post: string; s: Segment; live: boolean }) {
   const [decide, busy] = useDecide();
@@ -526,7 +526,7 @@ export function CompositePanel({ post, p, live, seg }: { post: string; p: Produc
   );
 }
 
-/* ----------------------------------------------------------------- stage 7: the cut */
+/* ----------------------------------------------------------------- stage 6: the cut */
 
 export function CutPanel({ post, p, live }: { post: string; p: Production; live: boolean }) {
   const [decide, busy] = useDecide();

@@ -57,7 +57,7 @@ export default async function ProductionPost({ params, searchParams }: { params:
   const mode = asPlan ? "planning" : state.mode;
   const slideNo = Number(Array.isArray(sp.slide) ? sp.slide[0] : sp.slide) || 1;
   const overlayOff = (Array.isArray(sp.overlay) ? sp.overlay[0] : sp.overlay) === "0";
-  /* A video's stage panel (?stage=1..8) and the segment card open in it (?seg=<nn>-<type>). */
+  /* A video's stage panel (?stage=1..7) and the segment card open in it (?seg=<nn>-<type>). */
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]![0] : sp[k]) as string | undefined;
   const videoView = { stage: Number(one("stage")) || undefined, seg: /^\d\d-[a-z]$/.test(one("seg") ?? "") ? one("seg") : undefined, base: postPath(row) };
   const base = postPath(row);
@@ -68,11 +68,11 @@ export default async function ProductionPost({ params, searchParams }: { params:
   const primary = primaryAction(state);
   const next = nextStep(state);
   /* A video with its stages read: one status sentence in the head, and the decision rail in the head of the
-     stage panel whose action it is (the plan at stage 2, the delivered file and the posting at stage 8). No rail
-     during production (stages 3 to 7): each panel holds its own buttons. */
+     stage panel whose action it is (the plan at stage 1, the delivered file and the posting at stage 7). No rail
+     during production (stages 2 to 6): each panel holds its own buttons. */
   const stages = state.video?.stages ?? null;
   const inProduction = !!state.video && state.stage === "final" && !state.video.final && !!state.video.lock;
-  const videoStage = stages ? (state.stage === "idea" ? 1 : state.stage === "plan" || state.stage === "planned" ? 2 : inProduction ? null : 8) : null;
+  const videoStage = stages ? (state.stage === "idea" || state.stage === "plan" || state.stage === "planned" ? 1 : inProduction ? null : 7) : null;
   const status = stages && !state.killed && state.stage !== "ready" && state.stage !== "posted" && state.stage !== "read" && !(state.stage === "final" && state.video?.final)
     ? (state.plan.status === "sentback" || (state.stage === "final" && state.final.status === "sentback") ? { who: "agent" as const, head: "Agent's turn", text: next.text } : videoStatus(stages))
     : stages ? { who: next.who === "you" ? "you" as const : next.who === "agent" ? "agent" as const : "done" as const, head: next.who === "you" ? "Waiting for you" : next.who === "agent" ? "Agent's turn" : "Done", text: next.text }

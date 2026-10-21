@@ -83,7 +83,7 @@ export type VideoState = {
   final: { url: string; sha256: string; duration: number | null; delivered: string | null } | null;
   /** After the lock: the storyboard, the segments and their takes, the cut (lib/video-production.ts; postState fills it). */
   production?: Production | null;
-  /** The eight stages and the timeline (lib/video-stages.ts; postState fills them). */
+  /** The seven stages and the timeline (lib/video-stages.ts; postState fills them). */
   stages?: StagesView;
   timeline?: Timeline;
 };

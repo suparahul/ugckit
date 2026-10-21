@@ -3,12 +3,13 @@
  * § 3 and § 4.1). Two pure reads of the files lib/video.ts and lib/video-production.ts
  * already read:
  *
- *   videoStages()  the eight stages (plan, plan approval, shots and keyframes, generate,
- *                  review takes, composite, assemble, deliver), each with one state word
- *                  and one line, the current stage and its "Now" sentence. The files decide
- *                  the state: a gate is done when approval.json (or planning-approval.json)
- *                  records it for the file on disk now. state.json gives running and failed
- *                  only, and never overrides a gate.
+ *   videoStages()  the seven stages (plan, shots and keyframes, generate, review takes,
+ *                  composite, assemble, deliver), each with one state word and one line, the
+ *                  current stage and its "Now" sentence. The plan stage is one: the agent
+ *                  writes it, then it waits for the user (approve or send back), then it is
+ *                  approved and locked. The files decide the state: a gate is done when
+ *                  approval.json (or planning-approval.json) records it for the file on disk
+ *                  now. state.json gives running and failed only, and never overrides a gate.
  *   timeline()     one checkpoint per beat of the plan, top to bottom: the time range in
  *                  words, the role, the segment, what the viewer sees, the on-screen text,
  *                  the sound, the app; and one picture that is already on disk (a still, or
@@ -30,7 +31,7 @@ import { APPS_DIR, ROOT } from "./root.ts";
 import type { Production, Segment } from "./video-production.ts";
 
 export type StageState = "not reached" | "agent" | "you" | "clicked" | "sent back" | "blocked" | "stale" | "done" | "n/a";
-export type StageKey = "plan" | "approval" | "keyframes" | "generate" | "review" | "composite" | "cut" | "deliver";
+export type StageKey = "plan" | "keyframes" | "generate" | "review" | "composite" | "cut" | "deliver";
 export type Stage = { n: number; key: StageKey; name: string; short: string; state: StageState; words: string };
 export type StagesView = { stages: Stage[]; current: number; now: string; who: "you" | "agent" | "done"; notes: string[] };
 
@@ -53,8 +54,7 @@ export type StagesInput = {
 };
 
 const NAMES: [StageKey, string, string][] = [
-  ["plan", "Plan (brief and script)", "Plan"],
-  ["approval", "Plan approval", "Approve"],
+  ["plan", "Plan (brief, script, approval)", "Plan"],
   ["keyframes", "Shots and keyframes (gate A)", "Keyframes"],
   ["generate", "Generate", "Generate"],
   ["review", "Review takes (gate B)", "Review"],
@@ -79,27 +79,22 @@ export function videoStages(x: StagesInput): StagesView {
   const phones = own.filter((s) => s.phone);
   const out: Partial<Record<StageKey, S>> = {};
 
-  /* 1 Plan: a REVIEW.md with a digest for the draft's current revision. */
+  /* 1 Plan: written (a REVIEW.md with a digest for the draft's current revision), then approved (a real lock of plan.json's revision). */
   const reviewed = !!x.review?.digest && (!x.draft || x.review.revision === x.draft.revision);
-  out.plan = x.manual && !x.brief ? st("n/a", "made outside the pipeline")
-    : x.lock && !x.draft ? st("done", `locked revision ${x.lock.revision}`)
-    : !x.brief && !x.draft ? st("agent", "the brief is being written (video-plan)")
-    : !x.draft ? st("agent", "the script is being written (video-script)")
-    : !reviewed ? st("agent", `REVIEW.md of revision ${x.draft.revision} is being written (video_plan.py review)`)
-    : st("done", `revision ${x.review!.revision}, digest ${x.review!.digest!.slice(0, 12)}`);
-
-  /* 2 Plan approval: a real lock of plan.json's revision. */
+  const written = !!x.draft && reviewed;
   const blocking = x.ready?.current ? x.ready.blocking : [];
-  out.approval = x.manual && !x.lock ? st("n/a", "made outside the pipeline")
-    : x.lock && x.planPoint.status === "approved" ? st("done", `locked revision ${x.lock.revision}`)
+  out.plan = x.manual && !x.lock ? st("n/a", "made outside the pipeline")
+    : x.lock && (x.planPoint.status === "approved" || !x.draft) ? st("done", `approved: locked revision ${x.lock.revision}`)
     : x.planPoint.status === "stale" ? st("stale", `locked revision ${x.lock?.revision}; the draft has a newer revision`)
     : x.planPoint.status === "approved" ? st("clicked", "you approved the plan: the agent locks it (video_plan.py lock --from-atlas)")
     : x.planPoint.status === "sentback" ? st("sent back", `sent back${quote(x.planPoint.note)}`)
-    : out.plan.state !== "done" ? st("not reached", "the plan is not written yet")
+    : !x.brief && !x.draft ? st("agent", "the brief is being written (video-plan)")
+    : !x.draft ? st("agent", "the script is being written (video-script)")
+    : !written ? st("agent", `REVIEW.md of revision ${x.draft.revision} is being written (video_plan.py review)`)
     : blocking.length ? st("blocked", `${blocking.length} blocking input${blocking.length === 1 ? "" : "s"}: ${blocking[0]}`)
-    : st("you", "read the plan; approve it, or send it back with a note");
+    : st("you", `revision ${x.review!.revision} waits for you: approve it, or send it back with a note`);
 
-  const locked = out.approval.state === "done" || out.approval.state === "stale";
+  const locked = out.plan.state === "done" || out.plan.state === "stale";
   const failed = (k: StageKey): S | null => {
     const row = p?.state?.stages[STATE_STAGE[k] ?? ""];
     if (row?.status === "failed") return st("blocked", `state.json: failed${row.note ? ` — ${row.note}` : ""}`);
@@ -115,7 +110,7 @@ export function videoStages(x: StagesInput): StagesView {
   } else if (!locked || !p) {
     for (const k of ["keyframes", "generate", "review", "composite", "cut"] as StageKey[]) out[k] = st("not reached", "the plan is not locked yet");
   } else {
-    /* 3 Shots and keyframes, gate A. A character that is not live blocks it. */
+    /* 2 Shots and keyframes, gate A. A character that is not live blocks it. */
     const deps = (x.ready?.dependencies ?? []).filter((d) => /^(character|narrator) /.test(d));
     const gateADone = !own.length ? !!p.segments.length : p.gateA?.decision === "approve" && p.gateA.current;
     const c = p.gateAClick;
@@ -129,7 +124,7 @@ export function videoStages(x: StagesInput): StagesView {
       : deps.length ? st("blocked", deps[0])
       : st("you", `the storyboard and ${usd(p.cost)} of first runs wait for you`));
 
-    /* 4 Generate: a take for every generated segment (an approved one, or one gate B has not decided). */
+    /* 3 Generate: a take for every generated segment (an approved one, or one gate B has not decided). */
     const caps = (x.ready?.dependencies ?? []).filter((d) => d.includes("not runnable yet"));
     const toMake = own.filter((s) => !s.approved && !undecidedTake(s));
     out.generate = !own.length ? st("n/a", "no generated segment (supplied media, panels, recordings, motion design)")
@@ -138,7 +133,7 @@ export function videoStages(x: StagesInput): StagesView {
       : failed("generate") ?? (caps.length ? st("blocked", caps[0])
       : st("agent", running("generate") ? `running: ${running("generate")}` : `generating ${toMake.map((s) => s.name).join(", ")} (${usd(toMake.reduce((a, s) => a + (s.cost ?? 0), 0))} computed)`));
 
-    /* 5 Review takes, gate B: every segment, source and narration take review.py needs(), and each motion-designed render. */
+    /* 4 Review takes, gate B: every segment, source and narration take review.py needs(), and each motion-designed render. */
     const motions = p.segments.filter((s) => s.motion && !s.sharedFrom);
     const items = own.length + p.sources.length + p.narration.length + motions.length;
     const okItems = own.filter((s) => s.approved).length + p.sources.filter((s) => s.approved).length + p.narration.filter((s) => s.approved).length
@@ -158,7 +153,7 @@ export function videoStages(x: StagesInput): StagesView {
       : lastReject ? st("sent back", `${lastReject.name} rejected${quote(lastReject.gateB?.failure ?? lastReject.gateB?.words)}`)
       : failed("review") ?? st("agent", `${okItems} of ${items} approved; the rest have no take or file yet`);
 
-    /* 6 Composite: only with a phone segment. */
+    /* 5 Composite: only with a phone segment. */
     const pc = phones.find((s) => !s.compositeApproved && s.compositeClick?.current);
     out.composite = !phones.length ? st("n/a", "no app insertion in the plan")
       : phones.every((s) => s.compositeApproved) ? st("done", `${phones.length} composite${phones.length === 1 ? "" : "s"} approved`)
@@ -168,7 +163,7 @@ export function videoStages(x: StagesInput): StagesView {
       : phones.some((s) => s.approved && s.composite && !s.compositeApproved) ? st("you", `waiting for you: ${phones.filter((s) => s.approved && s.composite && !s.compositeApproved).map((s) => s.name).join(", ")}`)
       : failed("composite") ?? st("agent", `compositing ${phones.filter((s) => !s.composite).map((s) => s.name).join(", ")} (composite.sh)`);
 
-    /* 7 Assemble, gate C. */
+    /* 6 Assemble, gate C. */
     const ready7 = (out.review.state === "done" || out.review.state === "n/a") && (out.composite.state === "done" || out.composite.state === "n/a");
     const a = p.assembly;
     const cc = p.cutClick;
@@ -181,7 +176,7 @@ export function videoStages(x: StagesInput): StagesView {
       : st("you", "the cut waits for you");
   }
 
-  /* 8 Deliver: the delivered file, then the Atlas posting gate. */
+  /* 7 Deliver: the delivered file, then the Atlas posting gate. */
   out.deliver = x.final
     ? x.finalPoint.status === "approved" ? st("done", "approved for posting")
       : x.finalPoint.status === "sentback" ? st("sent back", `sent back${quote(x.finalPoint.note)}`)
@@ -191,7 +186,7 @@ export function videoStages(x: StagesInput): StagesView {
 
   const stages: Stage[] = NAMES.map(([key, name, short], i) => ({ n: i + 1, key, name, short, ...(out[key] ?? st("not reached", "")) }));
   const cur = stages.find((s) => s.state !== "done" && s.state !== "n/a");
-  const current = cur?.n ?? 8;
+  const current = cur?.n ?? 7;
   const who = !cur ? "done" : cur.state === "you" ? "you" : "agent";
   const now = !cur ? "Delivered and approved for posting." : `${cur.short}: ${cur.words}.`;
   return { stages, current, now, who, notes: p?.notes ?? [] };
@@ -200,6 +195,16 @@ export function videoStages(x: StagesInput): StagesView {
 /* --------------------------------------------------------------- the timeline */
 
 export type Picture = { kind: "image" | "video"; url: string; at: number | null; label: string };
+/** How the app is shown in a beat, and what the viewer reads, step by step (the plan's screen_story). */
+export type Story = {
+  /** How the picture comes: rebuilt in code and animated, a real recording, a real still, or not said. */
+  source: "motion_design" | "recording" | "still" | null;
+  reason: string | null;
+  screens: string[];
+  /** Each step: its time inside the beat, the action in words, the screen, and the strings new on screen at that step. */
+  steps: { at: number; what: string; screen: string; reads: string[] }[];
+};
+
 export type Checkpoint = {
   id: string;
   start: number;
@@ -211,6 +216,10 @@ export type Checkpoint = {
   text: { text: string; placement: string | null; range: string }[];
   sound: string;
   app: string;
+  /** The app beat's screen story, the hero string the viewer must read, and what the viewer must do (read, recognise). */
+  story: Story | null;
+  hero: string | null;
+  viewerMust: string | null;
   /** The picture of the stage reached, then the ones it replaced ("show the reference"). */
   picture: Picture | null;
   earlier: Picture[];
@@ -233,6 +242,25 @@ export type TimelineInput = {
   /** The delivered file, after gate C. */
   final: { url: string } | null;
 };
+
+const ACTION_WORDS: Record<string, string> = { appear: "the screen appears", tap: "a tap on", result: "the result shows", hold: "the screen holds", scroll: "a scroll", type: "typing", swipe: "a swipe" };
+
+/** The screen story of an app beat: the source in one word, and the steps with the strings that are new at each one. */
+function storyOf(b: any): Story {
+  const ss = b.screen_story ?? null;
+  const source: Story["source"] = b.demo_source === "motion_design" ? "motion_design" : b.demo_source === "still" ? "still" : b.demo_source === "recording" || (b.framing === "app_screen" && !b.demo_source) ? "recording" : null;
+  const steps: Story["steps"] = [];
+  let seen = new Set<string>();
+  for (const x of ss?.steps ?? []) {
+    const shows: string[] = (x.shows ?? []).map(String);
+    const reads = shows.filter((w) => !seen.has(w));
+    seen = new Set(shows);
+    const verb = ACTION_WORDS[x.action] ?? String(x.action ?? "");
+    const what = x.target ? `${verb} ${x.target}` : verb;
+    steps.push({ at: num(x.at_s) ?? 0, what, screen: String(x.screen ?? ""), reads });
+  }
+  return { source, reason: typeof b.demo_source_reason === "string" ? b.demo_source_reason : null, screens: (ss?.screens ?? []).map(String), steps };
+}
 
 /** The checkpoints of the strip: one per beat, in time order (§ 4.1). */
 export function timeline({ plan, source, production: p, final }: TimelineInput): Timeline {
@@ -280,6 +308,7 @@ export function timeline({ plan, source, production: p, final }: TimelineInput):
     const app = b.app_on_screen && b.screen_id ? `screen ${b.screen_id}${how}${hero ? `, “${hero}”` : ""}`
       : (b.source_asset_ids ?? []).length ? `supplied ${(b.source_asset_ids as string[]).join(", ")}`
       : b.app_on_screen ? "on screen (no screen named)" : "not on screen";
+    const story: Story | null = b.app_on_screen ? storyOf(b) : null;
 
     /* The pictures, from the latest stage down to the plan's (§ 4.1); every one a file on disk. */
     const pics: Picture[] = [];
@@ -325,7 +354,7 @@ export function timeline({ plan, source, production: p, final }: TimelineInput):
       : seg && (seg.type === "R" || seg.type === "P") ? "no picture yet: the screen recording is laid in at assembly"
       : seg?.type === "C" || (b.source_asset_ids ?? []).length ? "no picture: the supplied file is not on disk or not served"
       : "no picture: text only, or nothing on disk yet";
-    return { id, start, end, range: rangeOf(start, end), role: b.role && !/^<.*>$/.test(b.role) ? String(b.role) : null, segment: seg?.name ?? null, sees, text, sound, app, picture: pics[0] ?? null, earlier: pics.slice(1), noPicture,
+    return { id, start, end, range: rangeOf(start, end), role: b.role && !/^<.*>$/.test(b.role) ? String(b.role) : null, segment: seg?.name ?? null, sees, text, sound, app, story, hero: hero ? String(hero) : null, viewerMust: typeof b.viewer_must === "string" ? b.viewer_must : null, picture: pics[0] ?? null, earlier: pics.slice(1), noPicture,
       reaction: ref ? reactionCardOf(ref, planBeatsOf(plan, String(ref.id), num(ref.start_s) ?? 0)) : null };
   });
 

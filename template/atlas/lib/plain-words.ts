@@ -118,8 +118,7 @@ export function videoStatus(v: StagesView): Status {
   const w = s.words;
   switch (s.key) {
     case "plan":
-      return say("agent", /brief/.test(w) ? "The agent writes the brief." : /script/.test(w) ? "The agent writes the script." : "The agent writes the review of the plan.");
-    case "approval":
+      if (s.state === "agent") return say("agent", /brief/.test(w) ? "The agent writes the brief." : /script/.test(w) ? "The agent writes the script." : "The agent writes the review of the plan.");
       if (s.state === "blocked") { const k = n(w); return say("blocked", `${k} input${k === 1 ? " is" : "s are"} missing before the plan can be approved.`); }
       if (s.state === "clicked") return say("agent", "You approved the plan. The agent locks it next.");
       if (s.state === "sent back") return say("agent", "Sent back with your note. A new revision comes back here.");

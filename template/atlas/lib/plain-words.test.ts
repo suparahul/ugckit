@@ -41,15 +41,15 @@ test("roles and short lines", () => {
 });
 
 const view = (key: StagesView["stages"][number]["key"], state: StagesView["stages"][number]["state"], words: string, who: StagesView["who"] = state === "you" ? "you" : "agent"): StagesView => {
-  const keys = ["plan", "approval", "keyframes", "generate", "review", "composite", "cut", "deliver"] as const;
+  const keys = ["plan", "keyframes", "generate", "review", "composite", "cut", "deliver"] as const;
   const n = keys.indexOf(key) + 1;
   return { current: n, who, now: "", notes: [], stages: keys.map((k, i) => ({ n: i + 1, key: k, name: k, short: k, state: i + 1 < n ? "done" : i + 1 === n ? state : "not reached", words: i + 1 === n ? words : "" })) };
 };
 
 test("the status sentence: whose turn, what to do, in the user's words", () => {
-  assert.deepEqual(videoStatus(view("approval", "you", "read the plan; approve it, or send it back with a note")), { who: "you", head: "Waiting for you", text: "Approve the plan, or send it back with a note." });
-  assert.deepEqual(videoStatus(view("approval", "blocked", "4 blocking inputs: screen x: not in apps/a/screens/screens.json")), { who: "blocked", head: "Blocked", text: "4 inputs are missing before the plan can be approved." });
-  assert.equal(videoStatus(view("approval", "clicked", "you approved the plan: the agent locks it (video_plan.py lock --from-atlas)")).text, "You approved the plan. The agent locks it next.");
+  assert.deepEqual(videoStatus(view("plan", "you", "read the plan; approve it, or send it back with a note")), { who: "you", head: "Waiting for you", text: "Approve the plan, or send it back with a note." });
+  assert.deepEqual(videoStatus(view("plan", "blocked", "4 blocking inputs: screen x: not in apps/a/screens/screens.json")), { who: "blocked", head: "Blocked", text: "4 inputs are missing before the plan can be approved." });
+  assert.equal(videoStatus(view("plan", "clicked", "you approved the plan: the agent locks it (video_plan.py lock --from-atlas)")).text, "You approved the plan. The agent locks it next.");
   assert.equal(videoStatus(view("keyframes", "you", "the storyboard and $0.50 of first runs wait for you")).text, "Approve the storyboard and $0.50 of first runs, or send it back with a note.");
   assert.equal(videoStatus(view("keyframes", "agent", "keyframes being made: 01-x")).text, "The agent writes the shots and makes the keyframes.");
   assert.equal(videoStatus(view("generate", "agent", "generating 01-x ($0.50 computed)")).text, "The agent generates the takes ($0.50 computed).");

@@ -1,6 +1,6 @@
 /**
  * The stages of a character video (research/ai-ugc/ATLAS-VIDEO-STAGES-PLAN.md § 4,
- * research/ai-ugc/ATLAS-VIDEO-PAGE-CLEANUP.md § 3): the rail of the eight stages, each
+ * research/ai-ugc/ATLAS-VIDEO-PAGE-CLEANUP.md § 3): the rail of the seven stages, each
  * with a plain name and one state word; a click opens that stage's panel (?stage=N). The
  * segment table (one row per video.json segment, one cell per stage that works per
  * segment) is drawn in the folded Details of the page, not on the rail. Read only: every
