@@ -3,9 +3,10 @@
  *
  * The head says what this post is, what state it is in, and what happens next.
  * A slideshow keeps the decision beside that sentence; a video with its stages
- * read (research/ai-ugc/ATLAS-VIDEO-PAGE-CLEANUP.md) shows one plain status line
- * and carries the decision into the head of its stage panel (VideoView). Kill
- * this post is in the ⋯ menu of the meta line on both. The body follows the
+ * read (research/ai-ugc/ATLAS-VIDEO-PAGE-CLEANUP.md § 6) draws the breadcrumbs
+ * of its seven stages under the title and carries the status sentence and the
+ * decision into the sticky bar of its one-document body (VideoView). Kill this
+ * post is in the ⋯ menu of the meta line on both. The body follows the
  * state: the deck as written until the plan is approved, then the deck as it
  * will appear. The reference material (anatomy, rules, log) is folded closed
  * under the body.
@@ -18,7 +19,8 @@ import { notFound } from "next/navigation";
 import { DecisionLog, DecisionRail, KillMenu } from "@/components/production/Actions";
 import { Marks } from "@/components/production/Marks";
 import { StateWord } from "@/components/production/Board";
-import { AnatomyRail, curl, PlanningMode, ProducedMode, sourceLink, type VideoRail } from "@/components/production/PostViews";
+import { AnatomyRail, curl, PlanningMode, ProducedMode, sourceLink, type VideoBar } from "@/components/production/PostViews";
+import { StageCrumbs } from "@/components/production/VideoStages";
 import { SendStatusLine } from "@/components/production/Bridge";
 import { bridgeInfo, postingNotes, sendWarning, withStatusWords } from "@/lib/postbridge-flow";
 import { allStates, dateParts, findRow, getProduction, nextStep, outcomesOpenAt, postingStep, postPath, postState, primaryAction, validSlug } from "@/lib/production";
@@ -67,9 +69,9 @@ export default async function ProductionPost({ params, searchParams }: { params:
   const igAccount = identity?.accounts.find((a) => a.platform === "instagram") ?? null;
   const primary = primaryAction(state);
   const next = nextStep(state);
-  /* A video with its stages read: one status sentence in the head, and the decision rail in the head of the
-     stage panel whose action it is (the plan at stage 1, the delivered file and the posting at stage 7). No rail
-     during production (stages 2 to 6): each panel holds its own buttons. */
+  /* A video with its stages read: the status sentence and the decision rail go into the bar of the stage whose
+     action it is (the plan at stage 1, the delivered file and the posting at stage 7). No rail during production
+     (stages 2 to 6): the bar and the rows hold their own buttons. */
   const stages = state.video?.stages ?? null;
   const inProduction = !!state.video && state.stage === "final" && !state.video.final && !!state.video.lock;
   const videoStage = stages ? (state.stage === "idea" || state.stage === "plan" || state.stage === "planned" ? 1 : inProduction ? null : 7) : null;
@@ -101,8 +103,17 @@ export default async function ProductionPost({ params, searchParams }: { params:
     : state.stage === "final" && state.final.status === "sentback" ? state.final
     : null;
 
-  const videoRail: VideoRail | undefined = status
-    ? { rail: <DecisionRail state={state} primary={videoPrimary} outcomesOpen={outcomesOpenAt(state)} readOnly={next.who === "agent" || status.who === "agent"} bridge={bridge} warning={warning} zones={zones} noKill />, railStage: videoStage }
+  /* The body is the one-document VideoView when the brief or the review exists (else the idea brief): the bar is there. */
+  const videoBody = !!state.video && (mode !== "planning" || !!state.video.review || !!state.video.brief);
+  const openStage = stages ? (videoView.stage && videoView.stage >= 1 && videoView.stage <= 7 ? videoView.stage : stages.current) : 1;
+  const headNotes = notes.length || step === "sent" ? (
+    <ul className="next__notes post-head__notes">
+      {step === "sent" && state.sent ? <SendStatusLine post={row.key} sent={state.sent} video={!!state.video} /> : null}
+      {notes.map((n) => <li key={n}>{n}</li>)}
+    </ul>
+  ) : null;
+  const videoBar: VideoBar | undefined = status
+    ? { rail: <DecisionRail state={state} primary={videoPrimary} outcomesOpen={outcomesOpenAt(state)} readOnly={next.who === "agent" || status.who === "agent"} bridge={bridge} warning={warning} zones={zones} noKill />, railStage: videoStage, status, notes: headNotes }
     : undefined;
 
   return (
@@ -129,7 +140,8 @@ export default async function ProductionPost({ params, searchParams }: { params:
             {state.video && asPlan ? <Link className="menu__item" href={base}>Back to the video</Link> : null}
           </KillMenu>
         </div>
-        {status ? (
+        {stages && videoBody ? <StageCrumbs v={stages} base={base} stage={openStage} /> : null}
+        {status && !videoBody ? (
           <p className={`post-head__status is-${status.who}`}>
             <span className="post-head__turn">{status.head}</span>
             {status.text}
@@ -137,12 +149,7 @@ export default async function ProductionPost({ params, searchParams }: { params:
         ) : null}
         {two ? <Legs s={state} href={`${base}${slideNo > 1 ? `?slide=${slideNo}` : ""}`} view={view} /> : null}
         {status ? (
-          notes.length || step === "sent" ? (
-            <ul className="next__notes post-head__notes">
-              {step === "sent" && state.sent ? <SendStatusLine post={row.key} sent={state.sent} video={!!state.video} /> : null}
-              {notes.map((n) => <li key={n}>{n}</li>)}
-            </ul>
-          ) : null
+          !videoBody ? headNotes : null
         ) : (
           <div className="next" id="decision">
             <div className="next__left">
@@ -182,7 +189,7 @@ export default async function ProductionPost({ params, searchParams }: { params:
       </header>
 
       <div className="post-body">
-        {mode === "planning" ? <PlanningMode state={state} readOnly={asPlan} src={src} slideNo={slideNo} view={videoView} videoRail={videoRail} /> : <ProducedMode state={state} slideNo={slideNo} src={src} overlayOff={overlayOff} readOnly={next.who === "agent"} view={videoView} videoRail={videoRail} />}
+        {mode === "planning" ? <PlanningMode state={state} readOnly={asPlan} src={src} slideNo={slideNo} view={videoView} videoBar={videoBar} /> : <ProducedMode state={state} slideNo={slideNo} src={src} overlayOff={overlayOff} readOnly={next.who === "agent"} view={videoView} videoBar={videoBar} />}
         <AnatomyRail state={state} src={src} />
         <DecisionLog log={state.log} />
       </div>

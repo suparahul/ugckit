@@ -265,3 +265,12 @@ Static HTML with the real content of two videos, served on http://localhost:3212
 - `latte-keyframes.html`: Latte 10-21 AM at the keyframe stage (the real keyframe and the reference pose in the hook row, the two app parts quiet, the bar with the $0.50).
 
 The mockup source is in `research/ai-ugc/mockup/` (serve the folder with any static server). Screenshots at 1,440 px: `cleanup-screenshots/mockup/`. The Atlas code does not change until the mockup is approved.
+
+### 6.6 Built (2026-10-21)
+
+The mockup was approved with two changes, and the layout is in the Atlas on `atlas-video-page-cleanup`:
+
+- The stage indicator is its own row under the title: chevron breadcrumbs (Plan › Keyframes › Generate › Review › Composite › Cut › Deliver), each with its state word (done, your turn, agent, blocked, skipped, not yet), the current one filled in, each a link to that stage (`?stage=N`). `components/production/VideoStages.tsx` (StageCrumbs), drawn in the head of the post page.
+- At the review and composite stages the Approve and Reject buttons stay in each row; the bar only says what waits and links down to the first item.
+
+The files: `components/production/VideoView.tsx` (the bar, the rows, Details), `components/production/VideoProduction.tsx` (the media column per stage and the bar's buttons for the storyboard and the cut), `components/production/ReactionPickSlot.tsx` (the reaction in words, under the hook), `lib/plain-words.ts` (`stageLine`: the bar of a stage that is not the current one). The strip of beats (`Timeline.tsx`) is gone: the rows are the only list of the video's parts. Every decide line and every piece of data is unchanged. Screenshots at 1,440 px of every stage: `cleanup-screenshots/one-document/`.

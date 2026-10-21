@@ -1,32 +1,39 @@
 /**
- * A video post's body (research/ai-ugc/ATLAS-VIDEO-PAGE-CLEANUP.md § 3 and § 6): the rail of
- * the seven stages, then one panel for one stage (?stage=N; the current one by default) with
- * its decision in its head. The plan panel (stage 1) is the whole video in time order: the
- * problems that block the approval, the idea, then each beat with the words on screen, the
- * reaction, the app's screen story step by step, the result word for word, and the caption.
- * The other stages show the strip of beats (Timeline) under their panel. Then the caption,
- * and one folded Details block with everything the main view does not repeat: REVIEW.md as
- * written, the segments, the brief's lists, the files. The stage panels of a locked video
- * (keyframes, takes, composites, the cut) are VideoProduction's.
+ * A video post's body as one document (research/ai-ugc/ATLAS-VIDEO-PAGE-CLEANUP.md § 6): the
+ * video is read top to bottom, and every stage adds to it. The backbone is a vertical list of
+ * the video's parts in time order, one full-width row each: the time and the role on the left,
+ * what the viewer sees and reads in the middle (the words on screen in full, the reaction, the
+ * app's screen story step by step, the result word for word), and the media of the stage that
+ * is open on the right (VideoProduction: the reference clip at the plan, the keyframe at gate A,
+ * the take with Approve / Reject at gate B, the composite, the approved clip under the cut). One
+ * decision bar for the open stage, sticky at the top: one sentence, the cost, the buttons; when
+ * the decisions are per row (review, composite) the bar only says what waits. The breadcrumbs of
+ * the seven stages are drawn in the head of the page (VideoStages). The only fold is Details at
+ * the end: REVIEW.md as written, the segments, the brief, the files, the decisions as recorded.
  */
 
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 import Markdown from "@/components/Markdown";
-import { STATE_WORD, plainProblem, roleWord } from "@/lib/plain-words";
+import { STATE_WORD, plainProblem, roleWord, stageLine, type Status } from "@/lib/plain-words";
 import type { PostState } from "@/lib/production";
-import type { Checkpoint, StageKey, StagesView } from "@/lib/video-stages";
+import type { Checkpoint } from "@/lib/video-stages";
+import type { Segment } from "@/lib/video-production";
 import { SoundIcon } from "./Marks";
 import { ReactionPickSlot } from "./ReactionPickSlot";
-import { Timeline } from "./Timeline";
-import { CompositePanel, CutPanel, StoryboardPanel, TakesPanel } from "./VideoProduction";
-import { SegmentTable, StageRail } from "./VideoStages";
+import { BarActions, CutRow, NarrationReview, RowMedia, SourceReview } from "./VideoProduction";
+import { SegmentTable } from "./VideoStages";
 
-/** Which stage panel is open, and the segment card in it; base is the post page's path. */
+/** Which stage is open (?stage=N), and the segment to mark in it (?seg=<nn>-<type>); base is the post page's path. */
 export type VideoPanelView = { stage?: number; seg?: string; base?: string };
 
+/** The decision bar's parts from the page: the rail of the stage whose action it is, the status sentence of the current stage, the notes under it. */
+export type VideoBar = { rail: ReactNode; railStage: number | null; status: Status | null; notes: ReactNode };
+
 const secs = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+const usd = (n: number | null) => (n === null ? "an unknown amount" : `$${n.toFixed(2)}`);
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** A video whose hook is a reaction: the brief has a reference, the hook channel is reaction, or a segment is an X. */
 const hasReactionHook = (v: NonNullable<PostState["video"]>) => !!v.briefSummary?.reaction || !!v.briefSummary?.choices.some((c) => c.slot === "hook_channel" && c.value === "reaction") || !!v.timeline?.checkpoints.some((c) => c.segment?.endsWith("-x"));
@@ -35,163 +42,130 @@ const hasReactionHook = (v: NonNullable<PostState["video"]>) => !!v.briefSummary
 const planGated = (state: PostState) => !!state.video?.lock || state.plan.status === "approved" || state.plan.status === "stale";
 const hookJobOf = (b: NonNullable<NonNullable<PostState["video"]>["briefSummary"]>) => b.choices.find((c) => c.slot === "hook_job")?.value ?? null;
 
-/** The panel's title: the stage's action while it waits for the user, its name otherwise. */
-function panelTitle(s: StagesView["stages"][number]): string {
-  const you = s.state === "you" || s.state === "blocked" || s.state === "stale";
-  const T: Record<StageKey, [string, string]> = {
-    plan: [s.state === "stale" ? "Approve the plan again" : "Approve the plan", s.state === "done" ? "The plan is approved" : "The plan"],
-    keyframes: ["Approve the storyboard", "Shots and keyframes"],
-    generate: ["Generate the takes", "Generate the takes"],
-    review: ["Review the takes", "The takes"],
-    composite: ["Approve the composite", "The composite"],
-    cut: ["Approve the cut", "The cut"],
-    deliver: ["Approve for posting", "The delivered video"],
-  };
-  return T[s.key][you ? 0 : 1];
-}
+/* ------------------------------------------------------------------ the bar */
 
-/* ------------------------------------------------------------------ stage 1 */
-
-/** The problems, once: what stops the approval first, then what production still needs. */
+/** The problems, once, under the bar: what stops the approval first, then what production still needs. */
 function Problems({ state }: { state: PostState }) {
   const r = state.video!.ready;
-  if (!r) return <p className="sr__hint">The list of missing inputs is not written yet.</p>;
-  if (!r.current) return <p className="sr__hint">The list of missing inputs is for an older revision of the plan.</p>;
+  if (!r) return <p className="bar__hint">The list of missing inputs is not written yet.</p>;
+  if (!r.current) return <p className="bar__hint">The list of missing inputs is for an older revision of the plan.</p>;
   if (!r.blocking.length && !r.dependencies.length) return null;
   return (
-    <div className="problems">
-      {r.blocking.length ? (
-        <>
-          <h4 className="problems__h">Before the plan can be approved</h4>
-          <ul className="problems__list">{r.blocking.map((x, i) => <li key={i} className="is-bad">{plainProblem(x)}</li>)}</ul>
-        </>
-      ) : null}
-      {r.dependencies.length ? (
-        <>
-          <h4 className="problems__h">Before production</h4>
-          <ul className="problems__list">{r.dependencies.map((x, i) => <li key={i} className="is-warn">{plainProblem(x)}</li>)}</ul>
-        </>
-      ) : null}
+    <ul className="bar__notes">
+      {r.blocking.map((x, i) => <li key={`b${i}`} className="is-bad">Before the plan can be approved: {plainProblem(x)}</li>)}
+      {r.dependencies.map((x, i) => <li key={`d${i}`}>Before production: {plainProblem(x)}</li>)}
+    </ul>
+  );
+}
+
+/** Where a gate B item waits: the row of the beat its segment carries, else the item's own row. */
+function waitHref(item: string, beats: Checkpoint[]): string {
+  const name = item.replace(/ \(motion design\)$/, "");
+  const c = beats.find((x) => x.segment === name);
+  return c ? `#tl-${c.id}` : `#item-${name}`;
+}
+
+function DecisionBar({ state, stage, bar, beats, base }: { state: PostState; stage: number; bar?: VideoBar; beats: Checkpoint[]; base: string }) {
+  const v = state.video!;
+  const vs = v.stages!;
+  const s = vs.stages[stage - 1];
+  const p = v.production ?? null;
+  const current = stage === vs.current;
+  const st: Status = current && bar?.status ? bar.status : stageLine(vs, stage);
+  /* Gate B and the composite decide per row: the bar says what waits and points at the first. */
+  const waiting = (stage === 4 || stage === 5) && s.state === "you" ? s.words.replace(/^waiting for you: /, "").split(", ") : [];
+  const cost = stage === 2 && current && (s.state === "you" || s.state === "stale") && p && p.cost !== null && !/\$/.test(st.text) ? ` Approving starts the first runs: ${usd(p.cost)}.` : stage === 3 && p?.spent ? ` Spent so far: ${usd(p.spent)}.` : "";
+  const rail = bar && bar.railStage === stage ? bar.rail : null;
+  return (
+    <div className={`bar is-${st.who}`} id="decide" aria-label="The decision">
+      <div className="bar__row">
+        <span className="bar__turn">{st.head}</span>
+        <span className="bar__say">{st.text}{cost}</span>
+        {waiting.length ? <a className="bar__jump" href={waitHref(waiting[0], beats)}>Go to {waiting.length === 1 ? "it" : "the first"} ↓</a> : null}
+        {rail ? <div className="bar__act">{rail}</div> : null}
+        {!rail && current && p && (stage === 2 || stage === 6) ? <BarActions stage={stage} post={state.row.key} p={p} live={!state.killed} /> : null}
+        {!current ? <Link className="bar__now" href={`${base}?stage=${vs.current}#stages`}>Go to the current stage, {vs.stages[vs.current - 1].short}</Link> : null}
+      </div>
+      {bar?.notes}
+      {stage === 1 && v.review ? <Problems state={state} /> : null}
     </div>
   );
 }
 
+/* ------------------------------------------------------------------ the rows */
+
 const SOURCE_WORDS = {
-  motion_design: "Rebuilt from the app's real screens and animated, never filmed and never from a video model.",
-  recording: "A real screen recording.",
-  still: "A real still of the screen.",
+  motion_design: ["Rebuilt from the app's real screens and animated", ", never filmed and never from a video model."],
+  recording: ["A real screen recording", "."],
+  still: ["A real still of the screen", "."],
 };
-const MUST_WORDS: Record<string, string> = { read: "The viewer must read it.", recognise: "The viewer must recognise it.", recognize: "The viewer must recognise it." };
+const MUST_WORDS: Record<string, string> = { read: "the viewer must read it", recognise: "the viewer must recognise it", recognize: "the viewer must recognise it" };
 const quiet = (sound: string) => sound === "silent" || sound === "no line" || /^(silent|no line) · music:/.test(sound);
 
-/** One beat of the plan, open: the words on screen, what the viewer sees, the reaction, the app's story step by step, the result. */
-function PlanBeat({ c, overlays, reaction }: { c: Checkpoint; overlays: Checkpoint["text"]; reaction: ReactNode }) {
+/** One part of the video: the time, what the viewer sees and reads, the media of the open stage. */
+function BeatRow({ state, c, overlays, seg, first, stage, open, reaction }: { state: PostState; c: Checkpoint; overlays: Checkpoint["text"]; seg: Segment | null; first: boolean; stage: number; open: boolean; reaction: ReactNode }) {
+  const v = state.video!;
   const role = roleWord(c.role);
   const sees = c.sees === "not written" ? null : c.sees.replace(/ · framing: \w+$/, "");
   const story = c.story;
+  const kind = [role ? cap(role) : story ? "The app" : "A part", story?.screens.length ? story.screens.join(", ") : null].filter(Boolean).join(" · ");
+  const src = story ? (story.source ? SOURCE_WORDS[story.source] : null) : null;
   return (
-    <li className={`plan__beat${story ? " is-app" : ""}`}>
-      <p className="plan__range tabular"><b>{c.range}</b>{role ? <span> · {role.charAt(0).toUpperCase() + role.slice(1)}</span> : null}</p>
-      {overlays.map((t, i) => <p key={i} className="plan__overlay">“{t.text}”<small> on screen{t.placement ? `, ${t.placement}` : ""}, {t.range}</small></p>)}
-      {sees ? <p className="plan__sees">{sees}</p> : <p className="plan__sees is-blank">Nothing written yet.</p>}
-      {!quiet(c.sound) ? <p className="plan__sound">{c.sound}</p> : null}
-      {reaction}
-      {story ? (
-        <div className="plan__story">
-          <p className="plan__source">{story.source ? SOURCE_WORDS[story.source] : "How the app is shown is not said yet."}{story.screens.length ? ` Screen: ${story.screens.join(", ")}.` : ""}{c.viewerMust && MUST_WORDS[c.viewerMust] ? ` ${MUST_WORDS[c.viewerMust]}` : ""}</p>
-          {story.steps.length ? (
-            <ol className="plan__steps">
+    <li className={`row${open ? " is-open" : ""}${story ? " is-app" : ""}`} id={`tl-${c.id}`} data-seg={c.segment ?? undefined}>
+      <div className="row__t">
+        <b className="tabular">{c.range}</b>
+        {role ?? (story ? "the app" : null)}
+        {c.segment ? <span className="row__code">{c.segment}</span> : null}
+      </div>
+      <div className="row__c">
+        <p className="row__kind">{kind}{c.viewerMust && MUST_WORDS[c.viewerMust] ? <small>{MUST_WORDS[c.viewerMust]}</small> : null}</p>
+        {overlays.map((t, i) => <p key={i} className="row__on">“{t.text}”<small>on screen{t.placement ? `, ${t.placement}` : ""}, {t.range}</small></p>)}
+        {story ? <p className="row__src">{src ? <><b>{src[0]}</b>{src[1]}</> : "How the app is shown is not said yet."}</p> : null}
+        {sees ? <p className="row__sees">{sees}</p> : <p className="row__sees is-blank">Nothing written yet.</p>}
+        {!quiet(c.sound) ? <p className="row__sound">{c.sound}</p> : null}
+        {reaction}
+        {story ? (
+          story.steps.length ? (
+            <ol className="row__steps">
               {story.steps.map((x, i) => (
                 <li key={i}>
-                  <p className="plan__step tabular"><b>{secs(c.start + x.at)} s</b> · {x.what}</p>
-                  {x.reads.length ? <p className="plan__reads">{x.reads.map((w, j) => <span key={j} className="plan__read">“{w}”</span>)}</p> : null}
+                  <b className="tabular">{secs(c.start + x.at)} s</b>
+                  <div>
+                    <span>{x.what}</span>
+                    {x.reads.length ? <div className="row__reads">{x.reads.map((w, j) => <span key={j}>“{w}”</span>)}</div> : null}
+                  </div>
                 </li>
               ))}
             </ol>
-          ) : <p className="sr__hint">The screen story is not written yet.</p>}
-          {c.hero ? <p className="plan__hero">The result, word for word: <b>“{c.hero}”</b></p> : null}
-          {story.reason ? <details className="vprod__older"><summary>Why not a real recording</summary><p className="vprod__words">{story.reason}</p></details> : null}
-        </div>
-      ) : null}
+          ) : <p className="sr__hint">The screen story is not written yet.</p>
+        ) : null}
+        {c.hero ? <p className="row__hero">The result, word for word: <b>“{c.hero}”</b></p> : null}
+      </div>
+      <div className="row__m">
+        <RowMedia stage={stage} c={c} seg={seg} first={first} p={v.production ?? null} post={state.row.key} live={!state.killed} />
+      </div>
     </li>
   );
 }
 
-/** The caption, the tags and the sound, as the viewer reads them. */
-function Caption({ state }: { state: PostState }) {
+/** The caption, the tags and the sound, as the viewer reads them: the last row. */
+function CaptionRow({ state }: { state: PostState }) {
   const v = state.video!;
-  if (!v.plan) return null;
-  const caption = v.plan.caption && !/^<.*>$/.test(v.plan.caption) ? v.plan.caption : null;
+  const written = v.plan ?? v.timeline ?? null;
+  if (!written) return null;
+  const caption = written.caption && !/^<.*>$/.test(written.caption) ? written.caption : null;
   return (
-    <div className="tt vcaption">
-      <div className="tt__handle">{state.row.handle}</div>
-      <p className="tt__caption">
-        {caption ?? <span className="is-blank">no caption in the plan</span>}{" "}
-        {(state.row.tags ?? []).map((h) => <span key={h} className="tag">{h} </span>)}
-      </p>
-      <p className="tt__sound"><SoundIcon />{v.plan.music && !/^<.*>$/.test(v.plan.music) ? v.plan.music : "sound not chosen"}</p>
-    </div>
-  );
-}
-
-/** Stage 1, the plan: what blocks it, the idea, then the whole video in time order, open; the other hooks folded. */
-function PlanStage({ state }: { state: PostState }) {
-  const v = state.video!;
-  const b = v.briefSummary;
-  const beats = v.timeline?.checkpoints ?? [];
-  if (!b && !beats.length) return <p className="sr__hint">{v.manual ? "Made outside the pipeline: the brief was written by hand to show the delivered file." : "The brief is not written yet."}</p>;
-  const chosen = b?.hooks.find((h) => h.selected) ?? null;
-  const others = (b?.hooks ?? []).filter((h) => !h.selected);
-  const slot = b && hasReactionHook(v) && v.id ? (
-    <ReactionPickSlot video={v.id} app={state.row.slug} post={state.row.key} current={b.reaction} locked={planGated(state)} job={hookJobOf(b)}>
-      {b.reaction?.url ? <video className="vst__ref" src={`${b.reaction.url}#t=${(b.reaction.start ?? 0).toFixed(2)}`} controls preload="metadata" muted playsInline aria-label="The reaction reference" /> : undefined}
-    </ReactionPickSlot>
-  ) : null;
-  /* The reaction sits under the beat that reacts: the one with a reference, else the first. */
-  const reactionAt = beats.find((c) => c.reaction)?.id ?? beats[0]?.id ?? null;
-  /* Each overlay is shown once, under the first beat it is on screen in. */
-  const seen = new Set<string>();
-  return (
-    <div className="plan">
-      {v.review ? <Problems state={state} /> : null}
-      {b?.idea ? <p className="plan__idea"><b>The idea.</b> {b.idea}{b.viewerMoment ? <> <b>The viewer&apos;s moment.</b> {b.viewerMoment}</> : null}</p> : null}
-      {beats.length ? (
-        <ol className="plan__beats">
-          {beats.map((c) => {
-            const overlays = c.text.filter((t) => !seen.has(t.text));
-            overlays.forEach((t) => seen.add(t.text));
-            return <PlanBeat key={c.id} c={c} overlays={overlays} reaction={c.id === reactionAt ? slot : null} />;
-          })}
-        </ol>
-      ) : (
-        <>
-          {chosen ? <p className="plan__overlay">“{chosen.text}”<small> the hook</small></p> : null}
-          {slot}
-          <p className="sr__hint">The script is not written yet: the beats appear here when it is.</p>
-        </>
-      )}
-      <Caption state={state} />
-      {others.length ? (
-        <details className="vprod__older">
-          <summary>The other hooks considered ({others.length})</summary>
-          <ul className="vst__hooks">{others.map((h) => <li key={h.id}>“{h.text}”{h.note ? <small> — {h.note}</small> : null}</li>)}</ul>
-        </details>
-      ) : null}
-      {b?.missing.length ? <p className="sr__hint">To answer a question of the brief or pick another hook, send the plan back with a note.</p> : null}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ stage 7 */
-
-function DeliverStage({ state }: { state: PostState }) {
-  const v = state.video!;
-  if (!v.final) return <p className="sr__hint">Not delivered yet: the file appears here once the cut is approved.</p>;
-  return (
-    <div className="vdeliver">
-      <video className="vdeliver__video" src={v.final.url} controls playsInline preload="metadata" aria-label="The delivered video" data-cut-player />
-      <p className="sr__hint">Delivered{v.final.delivered ? ` ${v.final.delivered.slice(0, 10)}` : ""}{v.final.duration ? ` · ${secs(v.final.duration)} s` : ""}{v.manual ? " · made outside the pipeline, no gates ran" : ""}.</p>
-    </div>
+    <li className="row row--caption">
+      <div className="row__t"><b>Caption</b>what the viewer reads under the video</div>
+      <div className="row__c">
+        <p className="row__caption">
+          {caption ?? <span className="is-blank">no caption in the plan</span>}{" "}
+          {(state.row.tags ?? []).map((h) => <span key={h} className="tag">{h} </span>)}
+        </p>
+        <p className="row__music"><SoundIcon />{written.music && !/^<.*>$/.test(written.music) ? written.music : "sound not chosen"}</p>
+      </div>
+      <div className="row__m" />
+    </li>
   );
 }
 
@@ -202,14 +176,30 @@ function Details({ state, view, stage, seg }: { state: PostState; view?: VideoPa
   const b = v.briefSummary;
   const p = v.production ?? null;
   const base = view?.base ?? "";
+  const others = (b?.hooks ?? []).filter((h) => !h.selected);
   const rev = v.review ? `Revision ${v.review.revision ?? "?"}${v.lock ? (v.review.revision === v.lock.revision ? ", locked" : `, not locked (locked: revision ${v.lock.revision})`) : ", not locked"}` : "No review of the plan yet";
+  const keyed = p ? p.segments.filter((s) => s.generated && !s.sharedFrom && s.keyframe).length : 0;
+  const decisions = p ? [
+    p.gateA?.words ? `Gate A (${p.gateA.decision}): “${p.gateA.words}”${p.gateA.date ? ` (${p.gateA.date})` : ""}` : null,
+    ...p.segments.filter((s) => s.gateB?.words).map((s) => `Gate B, ${s.name} (${s.gateB!.decision}): “${s.gateB!.words}”${s.gateB!.failure ? ` · failed: ${s.gateB!.failure}` : ""}`),
+    ...p.segments.filter((s) => s.motion?.decision?.words).map((s) => `Gate B, ${s.name} motion design (${s.motion!.decision!.decision}): “${s.motion!.decision!.words}”`),
+    p.gateC?.words ? `Gate C (${p.gateC.decision}): “${p.gateC.words}”${p.gateC.date ? ` (${p.gateC.date})` : ""}` : null,
+  ].filter(Boolean) as string[] : [];
   return (
-    <details className="anatomy vdetails">
-      <summary>Details · the plan as written, the segments, the brief, the files</summary>
+    <details className="anatomy vdetails" id="details">
+      <summary>Details · the plan as written, the other hooks, the segments, the brief, the files, the decisions as recorded</summary>
+      {others.length ? (
+        <section className="vdetails__sec">
+          <h2>The other hooks considered</h2>
+          <ul className="vst__hooks">{others.map((h) => <li key={h.id}>“{h.text}”{h.note ? <small> — {h.note}</small> : null}</li>)}</ul>
+          {b?.missing.length ? <p className="sr__hint">To answer a question of the brief or pick another hook, send the plan back with a note.</p> : null}
+        </section>
+      ) : null}
       {p ? (
         <section className="vdetails__sec">
           <h2>The segments</h2>
           <SegmentTable p={p} tl={v.timeline ?? null} base={base} stage={stage} seg={seg} />
+          {keyed >= 2 && p.storyboard ? <p className="sr__hint"><a href={p.storyboard.url} target="_blank" rel="noreferrer">Open the storyboard sheet</a>: every keyframe on one page.</p> : null}
           {p.notes.length ? <ul className="vst__notes">{p.notes.map((n) => <li key={n}>{n}</li>)}</ul> : null}
         </section>
       ) : null}
@@ -232,10 +222,18 @@ function Details({ state, view, stage, seg }: { state: PostState; view?: VideoPa
           {v.id ? <div className="anatomy__row"><dt>Video</dt><dd><code>{v.id}</code></dd></div> : null}
           <div className="anatomy__row"><dt>Plan</dt><dd>{rev}{v.review?.digest ? <> · digest <code>{v.review.digest.slice(0, 12)}</code></> : null}{v.timeline?.source ? <> · from <code>{v.timeline.source}</code></> : null}</dd></div>
           {v.lock ? <div className="anatomy__row"><dt>Lock</dt><dd>revision {v.lock.revision}{v.lock.date ? ` · ${v.lock.date}` : ""} · <em>“{v.lock.words}”</em></dd></div> : null}
+          {p?.assembly ? <div className="anatomy__row"><dt>Cut</dt><dd><code>{p.assembly.file.replace(/^.*\//, "")}</code> · sha256 <code>{p.assembly.sha256.slice(0, 12)}</code>{p.assembly.sheet ? <> · <a href={p.assembly.sheet} target="_blank" rel="noreferrer">contact sheet</a></> : null}</dd></div> : null}
+          {p?.assembly?.checks.length ? <div className="anatomy__row"><dt>Checks of the cut</dt><dd>{p.assembly.checks.map((c) => `${c.name} ${c.result || "—"}${c.detail ? ` (${c.detail})` : ""}`).join(" · ")}</dd></div> : null}
           {v.final ? <div className="anatomy__row"><dt>Delivered</dt><dd><code>pipeline/character/{v.id}/final/{v.id}.mp4</code> · sha256 <code>{v.final.sha256.slice(0, 12)}</code></dd></div> : null}
           {p?.spent ? <div className="anatomy__row"><dt>Spent</dt><dd>${p.spent.toFixed(2)} so far</dd></div> : null}
         </dl>
       </section>
+      {decisions.length ? (
+        <section className="vdetails__sec">
+          <h2>The decisions as recorded</h2>
+          <ul className="vst__notes">{decisions.map((d) => <li key={d}>{d}</li>)}</ul>
+        </section>
+      ) : null}
       {v.stages ? (
         <section className="vdetails__sec">
           <h2>The stages, in the agent&apos;s words</h2>
@@ -256,50 +254,79 @@ function Details({ state, view, stage, seg }: { state: PostState; view?: VideoPa
 
 /* --------------------------------------------------------------------- view */
 
-export function VideoView({ state, view, rail, railStage }: { state: PostState; mode: "plan" | "produced"; view?: VideoPanelView; /** The decision rail, drawn in the head of the panel of `railStage`. */ rail?: ReactNode; railStage?: number | null }) {
+export function VideoView({ state, view, bar }: { state: PostState; mode: "plan" | "produced"; view?: VideoPanelView; bar?: VideoBar }) {
   const v = state.video!;
   const { row } = state;
   const base = view?.base ?? "";
   const stage = v.stages && view?.stage && view.stage >= 1 && view.stage <= 7 ? view.stage : v.stages?.current ?? 1;
   const seg = view?.seg ?? null;
   const p = v.production ?? null;
-  const live = !state.killed;
-  const s = v.stages?.stages[stage - 1] ?? null;
+  const b = v.briefSummary;
+  const beats = v.timeline?.checkpoints ?? [];
 
-  const panel = !s ? <p className="sr__hint">{v.review ? "The stages are not read yet." : "The plan is not written yet."}</p>
-    : stage === 1 ? <PlanStage state={state} />
-    : stage === 7 ? <DeliverStage state={state} />
-    : !p ? <p className="sr__hint">This stage starts once the plan is locked.</p>
-    : stage === 2 ? <StoryboardPanel post={row.key} p={p} live={live} seg={seg} tl={v.timeline ?? null} />
-    : stage === 5 ? <CompositePanel post={row.key} p={p} live={live} seg={seg} />
-    : stage === 6 ? <CutPanel post={row.key} p={p} live={live} />
-    : <TakesPanel post={row.key} p={p} live={live} seg={seg} tl={v.timeline ?? null} />;
+  if (!v.stages) return <p className="sr__hint">{v.review ? "The stages are not read yet." : v.manual ? "Made outside the pipeline: the brief was written by hand to show the delivered file." : "The brief is not written yet."}</p>;
+
+  /* The reaction, under the beat that reacts: the one with a reference, else the first. */
+  const reaction = b && hasReactionHook(v) && v.id ? <ReactionPickSlot video={v.id} app={row.slug} post={row.key} current={b.reaction} locked={planGated(state)} job={hookJobOf(b)} /> : null;
+  const reactionAt = beats.find((c) => c.reaction)?.id ?? beats[0]?.id ?? null;
+  /* Each overlay is shown once, under the first beat it is on screen in; each segment's media once, in its first row. */
+  const seen = new Set<string>();
+  const shown = new Set<string>();
+  const chosen = b?.hooks.find((h) => h.selected) ?? null;
+  /* Gate B items with no row of their own: narration takes, and supplied files no beat carries. */
+  const carried = new Set(beats.map((c) => (c.segment ? p?.segments.find((s) => s.name === c.segment)?.asset?.id ?? null : null)).filter(Boolean));
+  const extraSources = stage === 4 && p ? p.sources.filter((x) => !carried.has(x.id)) : [];
+  const narration = stage === 4 && p ? p.narration : [];
 
   return (
     <>
-      {v.stages ? <StageRail v={v.stages} base={base} stage={stage} /> : null}
-      <section className="vpanel" aria-label={s ? `Stage ${stage}: ${s.name}` : "The plan"}>
-        <div className="vpanel__head">
-          <h2 className="vpanel__h">
-            {s ? panelTitle(s) : "The plan"}
-            {s && STATE_WORD[s.state] && s.state !== "you" ? <small>{STATE_WORD[s.state]}</small> : null}
-            {stage === 1 && v.review ? <small>revision {v.review.revision ?? "?"}</small> : null}
-            {seg ? <small>segment {seg} · <Link href={`${base}?stage=${stage}#stages`}>show every segment</Link></small> : null}
-          </h2>
-          {rail && railStage === stage ? <div className="vpanel__rail">{rail}</div> : null}
-        </div>
-        {panel}
-      </section>
-
-      {stage !== 1 && v.timeline?.checkpoints.length ? (
-        <section className="vtl" aria-label="The video, beat by beat">
-          <h2 className="vtl__h">The video <small className="tabular">{v.timeline.length ? `${secs(v.timeline.length)} s · ` : ""}{v.timeline.checkpoints.length} beat{v.timeline.checkpoints.length === 1 ? "" : "s"}{!v.lock ? " · from the draft" : ""}</small></h2>
-          <Timeline tl={v.timeline} openSeg={seg} base={base} stage={stage} />
-        </section>
-      ) : null}
-
-      {stage !== 1 ? <Caption state={state} /> : null}
-
+      <DecisionBar state={state} stage={stage} bar={bar} beats={beats} base={base} />
+      <ol className="doc" id="doc" aria-label="The video, part by part">
+        {b?.idea || b?.viewerMoment ? (
+          <li className="row is-top">
+            <div className="row__t"><b>The idea</b></div>
+            <div className="row__c"><p className="row__sees">{b.idea}{b.viewerMoment ? <> <b>The viewer&apos;s moment.</b> {b.viewerMoment}</> : null}</p></div>
+          </li>
+        ) : null}
+        {(stage === 6 || stage === 7) && p ? (
+          <li className="row is-top is-cut">
+            <div className="row__t"><b>{stage === 7 && v.final ? "Delivered" : "The cut"}</b>{v.timeline?.length ? <span className="tabular">{secs(v.timeline.length)} s</span> : null}</div>
+            <div className="row__c"><CutRow p={p} final={stage === 7 ? v.final : null} /></div>
+          </li>
+        ) : null}
+        {beats.length ? beats.map((c, i) => {
+          const overlays = c.text.filter((t) => !seen.has(t.text));
+          overlays.forEach((t) => seen.add(t.text));
+          const sg = c.segment ? p?.segments.find((s) => s.name === c.segment) ?? null : null;
+          const first = c.segment ? !shown.has(c.segment) : !(beats[i - 1]?.story && c.story);
+          if (c.segment) shown.add(c.segment);
+          return <BeatRow key={c.id} state={state} c={c} overlays={overlays} seg={sg} first={first} stage={stage} open={!!seg && c.segment === seg} reaction={c.id === reactionAt ? reaction : null} />;
+        }) : (
+          <li className="row is-top">
+            <div className="row__t"><b>The hook</b></div>
+            <div className="row__c">
+              {chosen ? <p className="row__on">“{chosen.text}”<small>the hook</small></p> : null}
+              {reaction}
+              <p className="sr__hint">The script is not written yet: the parts of the video appear here when it is.</p>
+            </div>
+          </li>
+        )}
+        {extraSources.map((x) => (
+          <li key={x.id} className="row" id={`item-${x.id}`}>
+            <div className="row__t"><b>Supplied</b>{x.kind ?? "file"}<span className="row__code">{x.id}</span></div>
+            <div className="row__c"><p className="row__kind">A supplied file</p><p className="row__sees">{x.file ?? x.id}{x.range ? `, ${x.range.join("–")} s` : x.still !== null ? `, still at ${x.still} s` : ""}; used by {x.segments.join(", ") || "no segment"}.</p></div>
+            <div className="row__m"><SourceReview post={row.key} x={x} live={!state.killed} /></div>
+          </li>
+        ))}
+        {narration.map((x) => (
+          <li key={x.take} className="row" id={`item-${x.take}`}>
+            <div className="row__t"><b>Narration</b>{x.narrator ?? "the narrator"}<span className="row__code">{x.take}</span></div>
+            <div className="row__c"><p className="row__kind">The voice under {x.segments.join(", ") || "the video"}</p>{x.words.length ? <p className="row__sees">{x.words.map((w, i) => <span key={i}>“{w}” </span>)}</p> : <p className="row__sees is-blank">No line of the plan uses this take.</p>}</div>
+            <div className="row__m"><NarrationReview post={row.key} x={x} live={!state.killed} /></div>
+          </li>
+        ))}
+        <CaptionRow state={state} />
+      </ol>
       <Details state={state} view={view} stage={stage} seg={seg} />
     </>
   );

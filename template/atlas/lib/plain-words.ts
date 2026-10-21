@@ -197,3 +197,46 @@ export function purposeLine(beats: { role: string | null; sees: string }[]): str
   if (!head && !sees) return null;
   return [head, sees ? shortLine(sees, 140) : null].filter(Boolean).join(": ");
 }
+
+/* ------------------------------------------------------- the bar of a stage */
+
+const DONE_LINE: Record<Stage["key"], string> = {
+  plan: "The plan is approved and locked.",
+  keyframes: "The storyboard is approved.",
+  generate: "Every take is generated.",
+  review: "Every take is approved.",
+  composite: "Every composite is approved.",
+  cut: "The cut is approved.",
+  deliver: "Approved for posting.",
+};
+const SKIP_LINE: Record<Stage["key"], string> = {
+  plan: "Made outside the pipeline: no plan to approve.",
+  keyframes: "No keyframe was needed.",
+  generate: "Nothing to generate: no generated segment.",
+  review: "Nothing to review.",
+  composite: "No app insertion in the plan.",
+  cut: "Made outside the pipeline: no cut.",
+  deliver: "Nothing to deliver.",
+};
+const LATER: Record<string, string> = {
+  "the plan is not locked yet": "the plan is approved first",
+  "gate A first": "the storyboard is approved first",
+  "gate C first": "the cut is approved first",
+  "the plates are approved at gate B first": "the plates are approved at the review first",
+};
+
+/**
+ * The decision bar of a stage that is not the current one (ATLAS-VIDEO-PAGE-CLEANUP.md § 6.4):
+ * what the stage is now, in one sentence and with no button. A done stage says so (with its
+ * date when the agent wrote one), a skipped stage says why, a stage not reached says what
+ * comes first; any other state reads as if it were the current stage.
+ */
+export function stageLine(v: StagesView, n: number): Status {
+  const s: Stage | undefined = v.stages[n - 1];
+  if (!s) return videoStatus(v);
+  const date = s.words.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
+  if (s.state === "done") return { who: "done", head: "Done", text: date ? DONE_LINE[s.key].replace(/ is approved\./, ` was approved on ${date}.`) : DONE_LINE[s.key] };
+  if (s.state === "n/a") return { who: "done", head: "Skipped", text: SKIP_LINE[s.key] };
+  if (s.state === "not reached") return { who: "agent", head: "Not yet", text: `${s.short} starts later: ${LATER[s.words] ?? (s.words || "the stages before it come first")}.` };
+  return videoStatus({ ...v, current: n });
+}

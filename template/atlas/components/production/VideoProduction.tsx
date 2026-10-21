@@ -1,26 +1,24 @@
 "use client";
 
 /**
- * The stage panels of a locked video (research/ai-ugc/ATLAS-VIDEO-STAGES-PLAN.md § 5 and
- * § 6): shots and keyframes (gate A), generate and review takes (gate B, with the supplied
- * sources and the narration takes), composite, and the cut (gate C). One segment card for
- * every segment type; its data decides which panels it shows. Each control posts one line
- * to the log, as the slide actions do; the agent records the line (review.py ...
- * --from-atlas) and runs the next step. The Atlas never generates and never spends:
- * approving the storyboard, asking for a take again, or regenerating a segment from the cut
- * is the user's yes to the computed cost the agent then spends.
+ * The media column of the one-document video page (research/ai-ugc/ATLAS-VIDEO-PAGE-CLEANUP.md
+ * § 6.3), and the buttons of the decision bar. Each row of the document is one part of the
+ * video; the stage decides what its media column holds: the reference clip at the plan, the
+ * keyframe at gate A, the take with its checks and Approve / Reject at gate B, the composite,
+ * then the approved clip under the cut. A part the stage does not touch shows one quiet line
+ * saying why. The bar holds the stage's own decision (the storyboard and its cost, the cut).
+ * Each control posts one line to the log, as the slide actions do; the agent records the line
+ * (review.py ... --from-atlas) and runs the next step. The Atlas never generates and never
+ * spends: approving the storyboard, asking for a take again, or regenerating a segment from
+ * the cut is the user's yes to the computed cost the agent then spends.
  */
 
 import { useState } from "react";
 
 import { cutAccepts, motionAccepts } from "@/lib/accept-fail";
-import { purposeLine } from "@/lib/plain-words";
 import type { Click, Motion, Narration, Production, Segment, Source, Take } from "@/lib/video-production";
-import type { Timeline as TL } from "@/lib/video-stages";
+import type { Checkpoint, Picture } from "@/lib/video-stages";
 import { useDecide } from "./Actions";
-
-/** What a segment is for, in one line, from the beats of the plan it covers. */
-const purposeOf = (tl: TL | null | undefined, s: Segment) => purposeLine((tl?.checkpoints ?? []).filter((c) => c.segment === s.name));
 
 /* The identity gate passes a take: PASS, or NO FACE (no frame shows a face; the eye check decides). */
 const identityOk = (r: string | null | undefined) => r === "PASS" || r === "NO FACE";
@@ -29,6 +27,9 @@ const usd = (n: number | null) => (n === null ? "cost unknown" : `$${n.toFixed(2
 const stamp = (iso: string) => `${iso.slice(0, 10)} ${iso.slice(11, 16)}`;
 const base = (f: string) => f.replace(/^.*\//, "");
 const at = (url: string, t: number | null | undefined) => (t ? `${url.split("#")[0]}#t=${t.toFixed(2)}` : url);
+/** A paused video shows its first frame, not black: the player opens a hair after 0 s. */
+const frame = (url: string) => at(url, 0.05);
+const secs = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 const CHECK_WORDS: Record<string, string> = {
   identity: "the person is the character; any face in view is the character's",
@@ -44,8 +45,6 @@ const ROUTE_WORDS: Record<string, string> = {
   animate: "motion copy, animate route",
   guided: "motion copy, guided route (untested)",
 };
-/* What a type is, in words, for a segment that is not generated. */
-const BUILT: Record<string, string> = { C: "supplied media", M: "panels", R: "the screen recording", P: "the screen recording, picture in picture" };
 /* What a segment is, in words: "Shot 1", "Screen 2"; the code (01-x) stays beside it, small. */
 const KIND: Record<string, string> = { X: "Reaction shot", B: "Shot", T: "Talking head", O: "Shot", C: "Supplied clip", M: "Panels", R: "Screen", P: "Screen in the phone" };
 export function SegName({ s }: { s: Pick<Segment, "name" | "type"> }) {
@@ -53,12 +52,15 @@ export function SegName({ s }: { s: Pick<Segment, "name" | "type"> }) {
   return <><b>{KIND[s.type] ?? "Segment"} {n}</b> <span className="vprod__code">{s.name}</span></>;
 }
 
+/** One quiet line in the media column: why there is nothing to see or decide here. */
+const Quiet = ({ children }: { children: React.ReactNode }) => <p className="row__quiet">{children}</p>;
+
 function ClickLine({ c, what }: { c: Click | null; what: string }) {
   if (!c) return null;
   const word = c.kind.endsWith(".approve") ? "approved" : c.kind.endsWith(".reject") ? "rejected" : "sent back";
   return (
     <p className="vprod__click">
-      You {word} {what} in the Atlas {stamp(c.at)}{c.note ? <> — <em>“{c.note}”</em></> : null}.{" "}
+      You {word} {what} {stamp(c.at)}{c.note ? <> — <em>“{c.note}”</em></> : null}.{" "}
       {!c.current ? "The file changed since: decide again." : c.recorded ? "Recorded." : "The agent records it next."}
     </p>
   );
@@ -87,90 +89,87 @@ function Err({ e }: { e: string | null }) {
   return e ? <p className="rail__err" role="alert">{e}</p> : null;
 }
 
-/* ------------------------------------------------------------ stage 2: gate A */
-
-/** The segments that are not generated, in one quiet line: nothing to decide about them at this gate. */
-function BuiltLine({ rest, when }: { rest: Segment[]; when: string }) {
-  if (!rest.length) return null;
-  const words = rest.map((s) => `${KIND[s.type] ?? "Segment"} ${Number(s.name.slice(0, 2))} (${BUILT[s.type] ?? s.type})`);
-  return <p className="sr__hint">{words.join(", ")}: {rest.length === 1 ? "needs" : "need"} no keyframe. {when}</p>;
-}
-
-export function StoryboardPanel({ post, p, live, seg, tl }: { post: string; p: Production; live: boolean; seg: string | null; tl?: TL | null }) {
-  const [decide, busy] = useDecide();
-  const [err, setErr] = useState<string | null>(null);
-  const own = p.segments.filter((s) => s.generated && !s.sharedFrom);
-  const done = !own.length || (p.gateA?.decision === "approve" && p.gateA.current);
-  const run = (kind: "storyboard.approve" | "storyboard.sendback", note?: string, segments?: string[]) =>
-    decide({ post, kind, ...(note ? { note } : {}), data: (segments ? { segments } : {}) as any }).then((r) => { setErr(r); return r; });
-  /* The cards: the generated shots only; the segments built at the cut are one line. */
-  const gen = p.segments.filter((s) => s.generated);
-  const shown = seg ? gen.filter((s) => s.name === seg) : gen;
-  const rest = seg ? p.segments.filter((s) => s.name === seg && !s.generated) : p.segments.filter((s) => !s.generated);
-  const keyed = own.filter((s) => s.keyframe).length;
+/** A picture of the timeline (a still, or a paused frame of a video on disk), as a figure. */
+function Pic({ p, small, dim, caption }: { p: Picture; small?: boolean; dim?: boolean; caption?: string }) {
+  const src = p.kind === "video" && p.at !== null ? `${p.url.split("#")[0]}#t=${p.at.toFixed(2)}` : p.url;
   return (
-    <section className="vprod__stage" aria-label="Shots and keyframes, gate A">
-      <h3 className="vprod__h">Shots and keyframes
-        <span className={`vprod__tag${done ? " is-done" : ""}`}>{done ? "approved" : p.gateA?.decision && p.gateA.decision !== "approve" ? p.gateA.decision : p.gateA?.decision === "approve" ? "keyframe changed since" : "not approved"}</span>
-      </h3>
-      <ul className="vprod__cards">
-        {shown.map((s) => {
-          const purpose = purposeOf(tl, s);
-          return (
-            <li key={s.name} className="vprod__card">
-              <p className="vprod__segh tabular"><SegName s={s} />{` · ${usd(s.cost)} a run`}{s.sharedFrom ? ` · shared with ${s.sharedFrom}` : ""}</p>
-              {purpose ? <p className="vprod__purpose">{purpose}</p> : null}
-              <div className="vprod__media">
-                {s.keyframe ? <figure><a href={s.keyframe.url} target="_blank" rel="noreferrer"><img src={s.keyframe.url} alt={`Keyframe ${s.name}`} /></a><figcaption>the keyframe{s.keyframe.at ? ` · ${stamp(s.keyframe.at)}` : ""}</figcaption></figure>
-                  : <span className="vprod__nokey">{s.needsKeyframe ? "no keyframe yet" : "no keyframe: the clip leads"}</span>}
-                {s.endStill ? <figure><img src={s.endStill} alt={`End still ${s.name}`} /><figcaption>the end still</figcaption></figure> : null}
-                {s.poseFrame ? <figure className="is-small"><img src={s.poseFrame} alt={`Reference pose ${s.name}`} /><figcaption>Reference pose: the keyframe should match this pose</figcaption></figure> : null}
-              </div>
-              {s.continues ? <p className="vprod__words">Opens on the last frame of {s.continues}, taken at its gate B.</p> : null}
-              {live && s.generated && s.needsKeyframe && s.keyframe && !s.sharedFrom ? <SendBack label="Redo this keyframe…" busy={busy} placeholder="What to change in this keyframe." onSend={(n) => run("storyboard.sendback", n, [s.name])} /> : null}
-              <details className="vprod__older"><summary>About this shot</summary><ShotFacts s={s} /></details>
-            </li>
-          );
-        })}
-      </ul>
-      <BuiltLine rest={rest} when="It is laid in at the cut." />
-      {keyed >= 2 && p.storyboard && !seg ? <p className="sr__hint"><a href={p.storyboard.url} target="_blank" rel="noreferrer">Open the storyboard sheet</a>: every keyframe on one page.</p> : null}
-      {!own.length ? <p className="sr__hint">No generated segment: nothing to approve here.</p>
-        : done ? (p.spent ? <p className="vprod__cost tabular">Spent so far: {usd(p.spent)}.</p> : null)
-        : <p className="vprod__cost tabular">Approving starts the first runs: {usd(p.cost)} (list price × seconds){p.spent ? ` · spent so far ${usd(p.spent)}` : ""}.</p>}
-      {p.gateA?.words ? <details className="vprod__older"><summary>The decision as recorded</summary><p className="vprod__words">Gate A: “{p.gateA.words}”{p.gateA.date ? ` (${p.gateA.date})` : ""}</p></details> : null}
-      <ClickLine c={p.gateAClick} what="the storyboard" />
-      {live && own.length && !done ? (
-        <div className="sr__actions">
-          <button type="button" className="pill pill--go" disabled={busy || own.some((s) => s.needsKeyframe && !s.keyframe)} onClick={() => run("storyboard.approve")}>Approve storyboard and {usd(p.cost)}</button>
-          <SendBack label="Send back…" busy={busy} onSend={(n) => run("storyboard.sendback", n)} />
-        </div>
-      ) : null}
-      <Err e={err} />
-    </section>
+    <figure className={`${small ? "is-small" : ""}${dim ? " is-dim" : ""}`}>
+      {p.kind === "image" ? <img src={src} alt={p.label} loading="lazy" /> : <video src={src} preload="metadata" muted playsInline controls aria-label={p.label} />}
+      <figcaption>{caption ?? p.label}</figcaption>
+    </figure>
   );
 }
 
-/** The shot in words: framing, planned length, the words it speaks, its references and subjects. */
-function ShotFacts({ s }: { s: Segment }) {
-  const bits = [
-    s.start !== null && s.end !== null ? `${s.start.toFixed(1)}–${s.end.toFixed(1)} s in the plan` : null,
-    s.framing ? `framing ${s.framing}` : null,
-    s.seconds ? `${s.seconds} s generated` : null,
-    s.refCount ? `${s.refCount} reference${s.refCount === 1 ? "" : "s"}` : null,
-    s.subjects.length ? `subjects ${s.subjects.join(", ")}` : null,
-    s.expressionBeats ? `${s.expressionBeats} expression beat${s.expressionBeats === 1 ? "" : "s"}` : null,
-    s.audioFrom ? `sound from ${s.audioFrom}` : null,
-  ].filter(Boolean);
+/** The pictures of a beat whose label starts with a word: "reference", "supplied". */
+const picsOf = (c: Checkpoint, prefix: string) => [...(c.picture ? [c.picture] : []), ...c.earlier].filter((p) => p.label.startsWith(prefix));
+
+/* What a part is, when it is not a generated shot, and why there is nothing for it at a stage. */
+const laidIn = (s: Segment) =>
+  s.type === "C" ? "the supplied file is laid in at the cut"
+  : s.type === "M" ? "the panels are laid in at the cut"
+  : s.motion ? "the app screen is rebuilt in code and rendered locally, then laid in at the cut"
+  : "the screen recording is laid in at the cut";
+
+export type MediaProps = {
+  stage: number;
+  c: Checkpoint;
+  /** The segment that carries this part, and whether this is its first row (the media shows once per segment). */
+  seg: Segment | null;
+  first: boolean;
+  p: Production | null;
+  post: string;
+  live: boolean;
+};
+
+/** The media column of one row: what the current stage adds for this part. */
+export function RowMedia(props: MediaProps) {
+  const { stage, seg, first } = props;
+  if (stage === 1) return <PlanMedia {...props} />;
+  if (!seg) return <Quiet>No segment carries this part yet: the shots are written once the plan is locked.</Quiet>;
+  if (!first) return <Quiet>Same clip as the part above.</Quiet>;
+  if (seg.sharedFrom) return <Quiet>Shared with {seg.sharedFrom}: decided there.</Quiet>;
+  if (stage === 2) return <KeyframeMedia {...props} seg={seg} />;
+  if (stage === 3) return <GenerateMedia {...props} seg={seg} />;
+  if (stage === 4) return <ReviewMedia {...props} seg={seg} />;
+  if (stage === 5) return <CompositeMedia {...props} seg={seg} />;
+  return <CutMedia {...props} seg={seg} />;
+}
+
+/* --------------------------------------------------------------- stage 1: plan */
+
+function PlanMedia({ c, first }: MediaProps) {
+  const ref = picsOf(c, "reference")[0] ?? null;
+  const sup = picsOf(c, "supplied");
+  if (ref) {
+    const r = c.reaction;
+    return <Pic p={ref} caption={`The reference clip${r ? `, ${r.handle}, ${secs(r.start)}–${secs(r.end)} s` : ""}. The keyframe and the take come at the next stages.`} />;
+  }
+  if (sup.length) return <>{sup.map((p) => <Pic key={p.url + p.label} p={p} caption={`${p.label}: the file as supplied.`} />)}</>;
+  if (c.story) return <Quiet>{first ? "No picture yet. The app part is rendered from the app's screens once the plan is approved; it is checked at the review stage." : "No picture yet. Rendered with the part above."}</Quiet>;
+  return <Quiet>No picture at this stage.</Quiet>;
+}
+
+/* ------------------------------------------------------------ stage 2: gate A */
+
+function KeyframeMedia({ post, c, seg: s, live }: MediaProps & { seg: Segment }) {
+  const [decide, busy] = useDecide();
+  const [err, setErr] = useState<string | null>(null);
+  if (!s.generated) return <Quiet>{s.type === "C" ? "Supplied file: no keyframe." : `No keyframe: ${laidIn(s)}.`}</Quiet>;
+  const redo = (n: string) => decide({ post, kind: "storyboard.sendback", note: n, data: { segments: [s.name] } as any }).then((r) => { setErr(r); return r; });
   return (
     <>
-      {bits.length ? <p className="vprod__facts">{bits.join(" · ")}</p> : null}
-      {s.lines.length ? <p className="vprod__said">{s.lines.map((l, i) => <span key={i}>“{l}” </span>)}</p> : null}
+      {s.keyframe ? <figure><a href={s.keyframe.url} target="_blank" rel="noreferrer"><img src={s.keyframe.url} alt={`Keyframe ${s.name}`} /></a><figcaption>The keyframe{s.keyframe.at ? ` · ${stamp(s.keyframe.at)}` : ""}: the take starts from this picture.</figcaption></figure>
+        : <p className="vprod__nokey">{s.needsKeyframe ? "no keyframe yet" : "no keyframe: the clip leads"}</p>}
+      {s.endStill ? <figure className="is-small"><img src={s.endStill} alt={`End still ${s.name}`} /><figcaption>the end still</figcaption></figure> : null}
+      {s.poseFrame ? <figure className="is-small"><img src={s.poseFrame} alt={`Reference pose ${s.name}`} /><figcaption>Reference pose: the keyframe should match this pose</figcaption></figure> : null}
+      {s.continues ? <Quiet>Opens on the last frame of {s.continues}, taken at its gate B.</Quiet> : null}
+      {live && s.needsKeyframe && s.keyframe ? <div className="sr__actions"><SendBack label="Redo this keyframe…" busy={busy} placeholder="What to change in this keyframe." onSend={redo} /></div> : null}
+      {c.segment !== s.name ? null : <Err e={err} />}
     </>
   );
 }
 
-/* --------------------------------------------------- stages 3 and 4: gate B */
+/* --------------------------------------------------------------- stage 3: generate */
 
 /** The take in focus: the newest one nobody decided yet and that is newer than the approved one; else the approved one; else the newest. */
 const focusOf = (s: Segment): Take | null =>
@@ -178,7 +177,61 @@ const focusOf = (s: Segment): Take | null =>
 /** "take 2": the take's number, newest last. */
 const takeNo = (s: Segment, file: string) => { const i = s.takes.findIndex((x) => x.file === file); return i < 0 ? base(file) : `take ${s.takes.length - i}`; };
 
-function SegmentCard({ post, s, p, live, tl }: { post: string; s: Segment; p: Production; live: boolean; tl?: TL | null }) {
+function GenerateMedia({ seg: s, p }: MediaProps & { seg: Segment }) {
+  if (!s.generated) return <Quiet>{s.motion ? "No paid run: the app screen is rebuilt in code and rendered locally." : `Nothing to generate: ${laidIn(s)}.`}</Quiet>;
+  const t = focusOf(s);
+  if (s.approved) return <figure><video src={frame(s.approved.url)} controls playsInline preload="metadata" aria-label={`The approved take of ${s.name}`} /><figcaption>{takeNo(s, s.approved.file)}, approved.</figcaption></figure>;
+  if (t) return <figure><video src={frame(t.url)} controls playsInline preload="metadata" aria-label={`Take ${base(t.file)}`} /><figcaption>{takeNo(s, t.file)} · {stamp(t.at)}: review it at the next stage.</figcaption></figure>;
+  const running = p?.state?.stages.generate?.status === "running" ? p.state.stages.generate.note : null;
+  const failed = p?.state?.stages.generate?.status === "failed" ? p.state.stages.generate.note : null;
+  const words = failed ? `The last run failed: ${failed ?? "no note"}.` : running ? `Generating now: ${running}.` : `Generating… ${usd(s.cost)} computed for one run.`;
+  return s.keyframe ? <figure className="is-dim"><img src={s.keyframe.url} alt={`Keyframe ${s.name}`} /><figcaption>{words}</figcaption></figure> : <Quiet>{words}</Quiet>;
+}
+
+/* ------------------------------------------------------------ stage 4: gate B */
+
+function ReviewMedia(props: MediaProps & { seg: Segment }) {
+  const { seg: s, p, post, live } = props;
+  if (s.generated) return <TakeReview {...props} />;
+  if (s.motion) return <MotionDesign post={post} s={s} m={s.motion} live={live} />;
+  if (s.type === "C" && s.asset) {
+    const src = p?.sources.find((x) => x.id === s.asset!.id) ?? null;
+    return src ? <SourceReview post={post} x={src} live={live} /> : <Quiet>Supplied {s.asset.id}: not in the plan&apos;s assets.</Quiet>;
+  }
+  if (s.type === "M" && s.panels.length) return <Panels s={s} />;
+  return <Quiet>Nothing to review here: {laidIn(s)}. It is checked at the cut.</Quiet>;
+}
+
+/** The panels of a panel segment, laid in at the cut: their places in the frame. */
+function Panels({ s }: { s: Segment }) {
+  return (
+    <details className="vprod__older">
+      <summary>The panels in the frame ({s.panels.length}): laid in at the cut, checked there</summary>
+      <div className="vprod__panels" aria-label="The panels in the frame">
+        <div className="vprod__frame916">{s.panels.map((pn) => pn.rect && pn.rect.length === 4 ? <span key={pn.id} className="vprod__rect" style={{ left: `${pn.rect[0] * 100}%`, top: `${pn.rect[1] * 100}%`, width: `${pn.rect[2] * 100}%`, height: `${pn.rect[3] * 100}%` }}>{pn.id}</span> : null)}</div>
+        <ul className="vprod__plist">{s.panels.map((pn) => <li key={pn.id}><b>{pn.id}</b> · {pn.what}{pn.url ? <> · <a href={pn.url} target="_blank" rel="noreferrer">open</a></> : " · not served"}</li>)}</ul>
+      </div>
+    </details>
+  );
+}
+
+/** The shot in words: framing, planned length, the words it speaks, its references and subjects. */
+function ShotFacts({ s }: { s: Segment }) {
+  const bits = [
+    s.framing ? `framing ${s.framing}` : null,
+    s.seconds ? `${s.seconds} s generated` : null,
+    s.motionCopy ? ROUTE_WORDS[s.motionCopy.route] ?? s.motionCopy.route : null,
+    s.refCount ? `${s.refCount} reference${s.refCount === 1 ? "" : "s"}` : null,
+    s.subjects.length ? `subjects ${s.subjects.join(", ")}` : null,
+    s.expressionBeats ? `${s.expressionBeats} expression beat${s.expressionBeats === 1 ? "" : "s"}` : null,
+    s.audioFrom ? `sound from ${s.audioFrom}` : null,
+    s.cost !== null ? `${usd(s.cost)} a run` : null,
+  ].filter(Boolean);
+  return bits.length ? <p className="vprod__facts">{bits.join(" · ")}</p> : null;
+}
+
+/** A generated take at gate B: the take beside what it is judged against, the checks, Approve / Reject. */
+function TakeReview({ post, seg: s, p, live }: MediaProps & { seg: Segment }) {
   const [decide, busy] = useDecide();
   const [err, setErr] = useState<string | null>(null);
   const [ticked, setTicked] = useState<string[]>([]);
@@ -191,45 +244,35 @@ function SegmentCard({ post, s, p, live, tl }: { post: string; s: Segment; p: Pr
   const decided = !!t && ((t.file === s.gateB?.file && !pick) || (s.click?.current && s.click.file === t.file));
   const isApproved = !!t && s.approved?.file === t.file;
   const idOk = !s.motionCopy || identityOk(t?.identity?.result);
-  const status = s.sharedFrom ? `shared: decided on ${s.sharedFrom}`
-    : s.motion ? (s.motion.approved ? "motion design approved" : !s.motion.render ? "motion design: not rendered yet"
-      : !s.motion.gates ? "motion design: gates not run" : s.motion.failed.length ? `motion design: gates failed` : "motion design waiting for you")
-    : !s.generated ? `${BUILT[s.type] ?? s.type}: built at assembly`
-    : s.approved ? `approved: ${takeNo(s, s.approved.file)}`
+  const status = s.approved ? `approved: ${takeNo(s, s.approved.file)}`
     : !s.takes.length ? "no take yet"
     : decided ? (s.click?.kind === "take.reject" || (s.gateB && s.gateB.decision !== "approve") ? "rejected: a new take comes next" : "approved in the Atlas")
-    : "take waiting for you";
+    : "waiting for you";
   const send = (kind: "take.approve" | "take.reject", extra: Record<string, unknown>, note?: string) =>
     decide({ post, kind, ...(note ? { note } : {}), data: { segment: s.name, file: t!.file, ...extra } as any }).then((r) => { setErr(r); if (!r) setPick(null); return r; });
-  const src = s.asset ? p.sources.find((x) => x.id === s.asset!.id) : null;
-  const nar = s.audioFrom?.startsWith("narration:") ? p.narration.find((x) => x.take === s.audioFrom!.slice(10)) : null;
+  const nar = s.audioFrom?.startsWith("narration:") ? p?.narration.find((x) => x.take === s.audioFrom!.slice(10)) : null;
   return (
-    <li className="vprod__seg" id={`seg-${s.name}`}>
-      <p className="vprod__segh tabular">
-        <SegName s={s} />{s.motionCopy ? ` · ${ROUTE_WORDS[s.motionCopy.route] ?? s.motionCopy.route}` : ""}{s.continues ? ` · continues ${s.continues}` : ""}{s.generated ? ` · ${usd(s.cost)} a run` : ""}
-        <span className={`vprod__tag${s.approved || s.motion?.approved ? " is-done" : status === "take waiting for you" || status === "motion design waiting for you" ? " is-you" : ""}`}>{status}</span>
-      </p>
-      {purposeOf(tl, s) ? <p className="vprod__purpose">{purposeOf(tl, s)}</p> : null}
-      {/* The words of an open decision stay in view; a closed one folds. */}
+    <div className="take">
+      <p className="take__status"><span className={`vprod__tag${s.approved ? " is-done" : status === "waiting for you" ? " is-you" : ""}`}>{status}</span></p>
       {s.gateB?.words && !s.approved ? <p className="vprod__words">Gate B ({s.gateB.decision}{s.gateB.file ? `, ${base(s.gateB.file)}` : ""}): “{s.gateB.words}”{s.gateB.failure ? ` · failed: ${s.gateB.failure}` : ""}</p> : null}
-
-      {/* The take, beside what it is judged against: the reference clip, the approved keyframe, the seam. */}
       {t ? (
-        <div className="vprod__media">
+        <>
           <figure>
-            <video src={t.url} controls playsInline preload="metadata" aria-label={`Take ${base(t.file)}`} />
+            <video src={frame(t.url)} controls playsInline preload="metadata" aria-label={`Take ${base(t.file)}`} />
             <figcaption className="tabular">{takeNo(s, t.file)} · {stamp(t.at)}{isApproved ? " · approved" : ""}</figcaption>
           </figure>
-          {s.motionCopy?.reference ? <figure><video src={s.motionCopy.reference} controls playsInline preload="metadata" muted aria-label="The reference clip" /><figcaption>the reference clip: the take copies its motion</figcaption></figure> : null}
-          {s.keyframe ? <figure><img src={s.keyframe.url} alt={`Keyframe ${s.name}`} /><figcaption>the approved keyframe: the take starts here</figcaption></figure> : null}
-          {s.seam ? (
-            <figure>
-              {s.seam.lastFrame ? <img src={s.seam.lastFrame} alt={`Last frame of ${s.seam.from}`} /> : <span className="vprod__nokey">no last frame of {s.seam.from} yet</span>}
-              <figcaption>last frame of {s.seam.from}{s.seam.verified ? "" : " · UNVERIFIED"}</figcaption>
-            </figure>
-          ) : null}
-        </div>
-      ) : null}
+          <div className="take__beside">
+            {s.motionCopy?.reference ? <figure className="is-small"><video src={frame(s.motionCopy.reference)} controls playsInline preload="metadata" muted aria-label="The reference clip" /><figcaption>the reference clip: the take copies its motion</figcaption></figure> : null}
+            {s.keyframe ? <figure className="is-small"><img src={s.keyframe.url} alt={`Keyframe ${s.name}`} /><figcaption>the keyframe: the take starts here</figcaption></figure> : null}
+            {s.seam ? (
+              <figure className="is-small">
+                {s.seam.lastFrame ? <img src={s.seam.lastFrame} alt={`Last frame of ${s.seam.from}`} /> : <span className="vprod__nokey">no last frame of {s.seam.from} yet</span>}
+                <figcaption>last frame of {s.seam.from}{s.seam.verified ? "" : " · UNVERIFIED"}</figcaption>
+              </figure>
+            ) : null}
+          </div>
+        </>
+      ) : <Quiet>No take yet.</Quiet>}
       {s.seam ? <p className="vprod__words">Continuity seam: {s.seam.seedDiff !== null ? `the first frame differs from the last frame of ${s.seam.from} by ${s.seam.seedDiff} (0 to 255)` : `measured at gate B (review.py: checks.seed_diff)`}{s.seam.verified ? "" : "; the model's continuity input is not verified by a paid run yet"}.</p> : null}
       {t && s.motionCopy ? (
         <p className={`vprod__id${identityOk(t.identity?.result) ? " is-ok" : t.identity ? " is-bad" : ""}`}>
@@ -239,44 +282,29 @@ function SegmentCard({ post, s, p, live, tl }: { post: string; s: Segment; p: Pr
         </p>
       ) : null}
       {s.plateGates ? <p className={`vprod__id${s.plateGates === "pass" ? " is-ok" : " is-bad"}`}>Insertion gates of the plate (flat-on first): {s.plateGates}</p> : null}
-      {s.type === "T" ? <p className="sr__hint">Check the words against the frozen script above, and the voice against the character&apos;s voice reference.</p> : null}
+      {s.type === "T" ? <p className="sr__hint">Check the words against the frozen script, and the voice against the character&apos;s voice reference.</p> : null}
       {s.type === "B" ? <p className="sr__hint">The people rule: {s.framing === "subject_only" ? "no person in the picture" : s.framing === "hands_only" ? "hands only, no face" : "as the shot says"}; count the subjects{s.subjects.length ? ` (${s.subjects.join(", ")})` : ""}.</p> : null}
-
-      {/* The panels of a panel segment: laid in at the cut, so they fold. */}
-      {s.type === "M" && s.panels.length ? (
-        <details className="vprod__older">
-          <summary>The panels in the frame ({s.panels.length})</summary>
-          <div className="vprod__panels" aria-label="The panels in the frame">
-            <div className="vprod__frame916">{s.panels.map((pn) => pn.rect && pn.rect.length === 4 ? <span key={pn.id} className="vprod__rect" style={{ left: `${pn.rect[0] * 100}%`, top: `${pn.rect[1] * 100}%`, width: `${pn.rect[2] * 100}%`, height: `${pn.rect[3] * 100}%` }}>{pn.id}</span> : null)}</div>
-            <ul className="vprod__plist">{s.panels.map((pn) => <li key={pn.id}><b>{pn.id}</b> · {pn.what}{pn.url ? <> · <a href={pn.url} target="_blank" rel="noreferrer">open</a></> : " · not served"}</li>)}</ul>
-          </div>
-        </details>
-      ) : null}
-      {s.motion ? <MotionDesign post={post} s={s} m={s.motion} live={live} /> : null}
-      {nar ? <p className="vprod__words">Narration under it: take {nar.take} ({nar.approved ? "approved" : "its card is below"}).</p> : null}
-      {s.type === "C" && s.asset ? <p className="vprod__words">Supplied {s.asset.id}{s.asset.range ? `, ${s.asset.range.join("–")} s` : s.asset.still !== null ? `, still at ${s.asset.still} s` : ""}: {src ? (src.approved ? "approved at gate B" : "its source card is below") : "not in the plan's assets"}.</p> : null}
-
+      {nar ? <p className="vprod__words">Narration under it: take {nar.take} ({nar.approved ? "approved" : "its row is below"}).</p> : null}
       {s.takes.length > 1 ? (
         <details className="vprod__older">
           <summary>{s.takes.length} takes: look at another one</summary>
           <ul>{s.takes.map((x, i) => (
             <li key={x.file} className="tabular">
               take {s.takes.length - i} · <a href={x.url} target="_blank" rel="noreferrer">{base(x.file)}</a> · {stamp(x.at)}{x.file === s.gateB?.file ? ` · ${s.gateB.decision}` : ""}{x.identity ? ` · identity ${x.identity.result}` : ""}{" "}
-              {live && !s.sharedFrom && x.file !== t?.file ? <button type="button" className="rail__kill" onClick={() => { setPick(x.file); setTicked([]); }}>look at this take</button> : x.file === t?.file ? <em>in view</em> : null}
+              {live && x.file !== t?.file ? <button type="button" className="rail__kill" onClick={() => { setPick(x.file); setTicked([]); }}>look at this take</button> : x.file === t?.file ? <em>in view</em> : null}
             </li>
           ))}</ul>
         </details>
       ) : null}
       <ClickLine c={s.click} what={`a take of ${s.name}`} />
-      {s.generated ? (
-        <details className="vprod__older">
-          <summary>About this shot{t?.sheet ? ", and the contact sheet" : ""}{s.gateB?.words && s.approved ? ", and the decision as recorded" : ""}</summary>
-          <ShotFacts s={s} />
-          {s.gateB?.words && s.approved ? <p className="vprod__words">Gate B ({s.gateB.decision}{s.gateB.file ? `, ${base(s.gateB.file)}` : ""}): “{s.gateB.words}”{s.gateB.failure ? ` · failed: ${s.gateB.failure}` : ""}</p> : null}
-          {t?.sheet ? <div className="vprod__media"><figure className="is-wide"><a href={t.sheet} target="_blank" rel="noreferrer"><img src={t.sheet} alt="Contact sheet" className="is-sheet" /></a><figcaption>contact sheet of this take (qc.py, 1 fps)</figcaption></figure></div> : null}
-        </details>
-      ) : null}
-      {live && t && s.generated && !s.sharedFrom && !isApproved && !decided ? (
+      <details className="vprod__older">
+        <summary>About this shot{t?.sheet ? ", and the contact sheet" : ""}{s.gateB?.words && s.approved ? ", and the decision as recorded" : ""}</summary>
+        <ShotFacts s={s} />
+        {s.lines.length ? <p className="vprod__said">{s.lines.map((l, i) => <span key={i}>“{l}” </span>)}</p> : null}
+        {s.gateB?.words && s.approved ? <p className="vprod__words">Gate B ({s.gateB.decision}{s.gateB.file ? `, ${base(s.gateB.file)}` : ""}): “{s.gateB.words}”{s.gateB.failure ? ` · failed: ${s.gateB.failure}` : ""}</p> : null}
+        {t?.sheet ? <figure className="is-wide"><a href={t.sheet} target="_blank" rel="noreferrer"><img src={t.sheet} alt="Contact sheet" className="is-sheet" /></a><figcaption>contact sheet of this take (qc.py, 1 fps)</figcaption></figure> : null}
+      </details>
+      {live && t && !isApproved && !decided ? (
         <>
           {s.checks.length ? (
             <fieldset className="vprod__checks">
@@ -306,7 +334,7 @@ function SegmentCard({ post, s, p, live, tl }: { post: string; s: Segment; p: Pr
         </>
       ) : null}
       <Err e={err} />
-    </li>
+    </div>
   );
 }
 
@@ -321,7 +349,7 @@ const GATE_WORDS: Record<string, string> = {
   page: "the page ran with no error",
 };
 
-/** A motion-designed screen (demo_source motion_design): the story, the render, its gates, and gate B. */
+/** A motion-designed screen (demo_source motion_design): the render, its gates, and gate B. The story is in the row's content. */
 function MotionDesign({ post, s, m, live }: { post: string; s: Segment; m: Motion; live: boolean }) {
   const [decide, busy] = useDecide();
   const [err, setErr] = useState<string | null>(null);
@@ -336,28 +364,22 @@ function MotionDesign({ post, s, m, live }: { post: string; s: Segment; m: Motio
     <ul className="vprod__gates">{m.gates.map((g) => <li key={g.gate} className={g.result === "PASS" ? "is-ok" : g.result === "FAIL" ? "is-bad" : ""}><b>{g.result}</b> · {GATE_WORDS[g.gate] ?? g.gate}{g.detail ? ` — ${g.detail}` : ""}</li>)}</ul>
   ) : m.render ? <p className="sr__hint">The gates have not run on this render (motion_design.py check).</p> : null;
   const words = m.decision?.words ? <p className="vprod__words">Gate B ({m.decision.decision}): “{m.decision.words}”</p> : null;
+  const status = m.approved ? "approved" : !m.render ? "not rendered yet" : !m.gates ? "gates not run" : m.failed.length ? "gates failed" : pending ? "clicked: being recorded" : "waiting for you";
   return (
-    <div className="vprod__motion">
-      <p className="vprod__words">
-        The app part is a motion design: the app&apos;s real screens, rebuilt in code and animated, never by a video model.
-        {m.fit === "screen" ? " It is laid into the phone or the panel like a recording; a drawn screen in a filmed hand can look pasted on, so check the composite closely." : " It fills the frame, so it looks more like a promotion than a hand holding a phone."}
-      </p>
+    <div className="take">
+      <p className="take__status"><span className={`vprod__tag${m.approved ? " is-done" : status === "waiting for you" ? " is-you" : ""}`}>motion design: {status}</span></p>
       {m.render ? (
-        <div className="vprod__media">
-          <figure><video src={m.render.url} controls playsInline preload="metadata" muted aria-label={`Motion design of ${s.name}`} /><figcaption className="tabular">the render · {m.seconds} s · {stamp(m.render.at)}{m.approved ? " · approved" : ""}</figcaption></figure>
-        </div>
-      ) : <p className="sr__hint">Not rendered yet: the agent writes the page from the app&apos;s real screens, then renders and checks it.</p>}
+        <figure><video src={frame(m.render.url)} controls playsInline preload="metadata" muted aria-label={`Motion design of ${s.name}`} /><figcaption className="tabular">the render · {m.seconds} s · {stamp(m.render.at)}{m.approved ? " · approved" : ""}</figcaption></figure>
+      ) : <Quiet>Not rendered yet: the agent writes the page from the app&apos;s real screens, then renders and checks it.</Quiet>}
+      <p className="sr__hint">{m.fit === "screen" ? "It is laid into the phone or the panel like a recording; a drawn screen in a filmed hand can look pasted on, so check the composite closely." : "It fills the frame, so it looks more like a promotion than a hand holding a phone."}</p>
       {/* The gates and the decision's words stay in view while the decision is open; closed, they fold. */}
       {!m.approved ? gates : null}
       {!m.approved ? words : null}
       <details className="vprod__older">
-        <summary>How it was made: the screens, the story, the stills{m.approved ? ", the gates" : ""}</summary>
+        <summary>How it was made: the screens, the stills{m.approved ? ", the gates" : ""}</summary>
         {m.reason ? <p className="vprod__words">Why not a real recording: <em>{m.reason}</em></p> : null}
         <p className="sr__hint">Screens: {m.screens.join(", ") || "none named"} · rebuilt from {m.rebuiltFrom.join("; ") || "nothing named"} · fit {m.fit} · {m.seconds} s{m.hero ? ` · hero “${m.hero}”` : ""}</p>
-        <ol className="vprod__steps tabular" aria-label="The screen story">
-          {m.steps.map((x, i) => <li key={i}><b>{x.at.toFixed(1)} s</b> · {x.action}{x.target ? ` ${x.target}` : ""} · {x.screen}: {x.shows.map((w) => `“${w}”`).join(" ")}</li>)}
-        </ol>
-        {m.stills.length ? <div className="vprod__media">{m.stills.map((x, i) => <figure key={x.url} className="is-small"><img src={x.url} alt={`Step ${i + 1}`} /><figcaption className="tabular">step {i + 1} · {x.at.toFixed(1)} s</figcaption></figure>)}</div> : null}
+        {m.stills.length ? <div className="take__beside">{m.stills.map((x, i) => <figure key={x.url} className="is-small"><img src={x.url} alt={`Step ${i + 1}`} /><figcaption className="tabular">step {i + 1} · {x.at.toFixed(1)} s</figcaption></figure>)}</div> : null}
         {m.approved ? gates : null}
         {m.approved ? words : null}
       </details>
@@ -383,25 +405,22 @@ function MotionDesign({ post, s, m, live }: { post: string; s: Segment; m: Motio
   );
 }
 
-function SourceCard({ post, x, live }: { post: string; x: Source; live: boolean }) {
+/** A supplied file at gate B: the exact range, Approve / Reject. In the row of its part, or in a row of its own. */
+export function SourceReview({ post, x, live }: { post: string; x: Source; live: boolean }) {
   const [decide, busy] = useDecide();
   const [err, setErr] = useState<string | null>(null);
   const pending = x.click?.current && !x.click.recorded;
   const run = (kind: "source.approve" | "source.reject", note?: string) =>
     decide({ post, kind, ...(note ? { note } : {}), data: { asset_id: x.id } }).then((r) => { setErr(r); return r; });
   return (
-    <li className="vprod__seg">
-      <p className="vprod__segh tabular"><b>{x.id}</b> · supplied {x.kind ?? "file"}{x.origin ? ` · ${x.origin}` : ""} · used by {x.segments.join(", ")}
-        <span className={`vprod__tag${x.approved ? " is-done" : x.sha256 && !pending ? " is-you" : ""}`}>{x.approved ? "approved" : !x.sha256 ? "file not on disk" : pending ? "clicked: being recorded" : "waiting for you"}</span>
-      </p>
+    <div className="take">
+      <p className="take__status"><span className={`vprod__tag${x.approved ? " is-done" : x.sha256 && !pending ? " is-you" : ""}`}>{x.approved ? "approved" : !x.sha256 ? "file not on disk" : pending ? "clicked: being recorded" : "waiting for you"}</span></p>
       {x.url ? (
-        <div className="vprod__media">
-          <figure>{x.kind === "still" ? <img src={x.url} alt={x.id} /> : x.kind === "audio" ? <audio src={x.url} controls preload="metadata" /> : <video src={at(x.url, x.range?.[0])} controls playsInline preload="metadata" aria-label={x.id} />}
-            <figcaption className="tabular">{x.file}{x.range ? ` · range ${x.range.join("–")} s` : ""}{x.sha256 ? ` · sha256 ${x.sha256.slice(0, 12)}` : ""}</figcaption></figure>
-        </div>
-      ) : <p className="sr__hint">{x.file ? `${x.file}: not served to the Atlas (put supplied files in pipeline/character/<video>/supplied/).` : "No file in the plan."}</p>}
+        <figure>{x.kind === "still" ? <img src={x.url} alt={x.id} /> : x.kind === "audio" ? <audio src={x.url} controls preload="metadata" /> : <video src={at(x.url, x.range?.[0])} controls playsInline preload="metadata" aria-label={x.id} />}
+          <figcaption className="tabular">{x.id} · supplied {x.kind ?? "file"}{x.origin ? ` · ${x.origin}` : ""}{x.range ? ` · range ${x.range.join("–")} s` : ""} · used by {x.segments.join(", ")}</figcaption></figure>
+      ) : <Quiet>{x.file ? `${x.file}: not served to the Atlas (put supplied files in pipeline/character/<video>/supplied/).` : "No file in the plan."}</Quiet>}
       {x.decision?.words ? <p className="vprod__words">Gate B ({x.decision.decision}): “{x.decision.words}”</p> : null}
-      <p className="sr__hint">Look at the exact range. The agent checks the checksum, the permission and the range when it records your click (review.py source).</p>
+      {!x.approved ? <p className="sr__hint">Look at the exact range. The agent checks the checksum, the permission and the range when it records your click.</p> : null}
       <ClickLine c={x.click} what={`the source ${x.id}`} />
       {live && x.sha256 && !x.approved && !pending ? (
         <div className="sr__actions">
@@ -410,11 +429,12 @@ function SourceCard({ post, x, live }: { post: string; x: Source; live: boolean 
         </div>
       ) : null}
       <Err e={err} />
-    </li>
+    </div>
   );
 }
 
-function NarrationCard({ post, x, live }: { post: string; x: Narration; live: boolean }) {
+/** A narrator's take at gate B: the natural-voice check, Approve / Reject. In a row of its own. */
+export function NarrationReview({ post, x, live }: { post: string; x: Narration; live: boolean }) {
   const [decide, busy] = useDecide();
   const [err, setErr] = useState<string | null>(null);
   const [natural, setNatural] = useState(false);
@@ -422,12 +442,9 @@ function NarrationCard({ post, x, live }: { post: string; x: Narration; live: bo
   const run = (kind: "narration.approve" | "narration.reject", note?: string, accept?: string[]) =>
     decide({ post, kind, ...(note ? { note } : {}), data: { take: x.take, ...(kind === "narration.approve" ? { checks: natural ? ["natural_voice"] : [], ...(accept?.length ? { accept_fail: accept } : {}) } : {}) } as any }).then((r) => { setErr(r); return r; });
   return (
-    <li className="vprod__seg">
-      <p className="vprod__segh tabular"><b>narration {x.take}</b>{x.narrator ? ` · ${x.narrator}` : ""} · under {x.segments.join(", ")}
-        <span className={`vprod__tag${x.approved ? " is-done" : x.sha256 && !pending ? " is-you" : ""}`}>{x.approved ? "approved" : !x.sha256 ? `no narration/${x.take}.wav yet` : pending ? "clicked: being recorded" : "waiting for you"}</span>
-      </p>
-      {x.url ? <audio src={x.url} controls preload="metadata" className="vprod__audio" /> : <p className="sr__hint">The kit makes no voice: the take is put in pipeline/character/&lt;video&gt;/narration/ from the approved narrator voice.</p>}
-      {x.words.length ? <p className="vprod__said">{x.words.map((w, i) => <span key={i}>“{w}” </span>)}</p> : null}
+    <div className="take">
+      <p className="take__status"><span className={`vprod__tag${x.approved ? " is-done" : x.sha256 && !pending ? " is-you" : ""}`}>{x.approved ? "approved" : !x.sha256 ? `no narration/${x.take}.wav yet` : pending ? "clicked: being recorded" : "waiting for you"}</span></p>
+      {x.url ? <audio src={x.url} controls preload="metadata" className="vprod__audio" /> : <Quiet>The kit makes no voice: the take is put in pipeline/character/&lt;video&gt;/narration/ from the approved narrator voice.</Quiet>}
       {x.decision?.words ? <p className="vprod__words">Gate B ({x.decision.decision}): “{x.decision.words}”</p> : null}
       <ClickLine c={x.click} what={`the narration take ${x.take}`} />
       {live && x.sha256 && !x.approved && !pending ? (
@@ -444,63 +461,32 @@ function NarrationCard({ post, x, live }: { post: string; x: Narration; live: bo
         </>
       ) : null}
       <Err e={err} />
-    </li>
-  );
-}
-
-export function TakesPanel({ post, p, live, seg, tl }: { post: string; p: Production; live: boolean; seg: string | null; tl?: TL | null }) {
-  /* A card for every segment decided here: a generated take, a motion design, a panel frame. The rest is one line. */
-  const here = (s: Segment) => s.generated || !!s.motion || (s.type === "M" && s.panels.length > 0);
-  const all = seg ? p.segments.filter((s) => s.name === seg) : p.segments;
-  const segs = all.filter(here);
-  const rest = all.filter((s) => !here(s));
-  return (
-    <section className="vprod__stage" aria-label="Generate and review takes, gate B">
-      <h3 className="vprod__h">Generate and review takes
-        {p.spent ? <span className="vprod__tag tabular">spent so far {usd(p.spent)}</span> : null}
-      </h3>
-      {p.state?.stages.generate?.status === "running" ? <p className="vprod__words">Generating now: {p.state.stages.generate.note ?? "a run"} (state.json).</p> : null}
-      {p.state?.stages.generate?.status === "failed" ? <p className="rail__why is-bad">The last run failed: {p.state.stages.generate.note ?? "no note"} (state.json).</p> : null}
-      {segs.length ? <ol className="vprod__segs">{segs.map((s) => <SegmentCard key={s.name} post={post} s={s} p={p} live={live} tl={tl} />)}</ol>
-        : !rest.length ? <p className="sr__hint">The segments appear here once the shots are written.</p> : null}
-      <BuiltLine rest={rest} when="Nothing to decide here: it is checked at the cut." />
-      {!seg && p.sources.length ? (
-        <>
-          <h4 className="vprod__sub">Supplied sources</h4>
-          <ol className="vprod__segs">{p.sources.map((x) => <SourceCard key={x.id} post={post} x={x} live={live} />)}</ol>
-        </>
-      ) : null}
-      {!seg && p.narration.length ? (
-        <>
-          <h4 className="vprod__sub">Narration takes</h4>
-          <ol className="vprod__segs">{p.narration.map((x) => <NarrationCard key={x.take} post={post} x={x} live={live} />)}</ol>
-        </>
-      ) : null}
-    </section>
+    </div>
   );
 }
 
 /* ----------------------------------------------------------- stage 5: composite */
 
-function CompositeCard({ post, s, live }: { post: string; s: Segment; live: boolean }) {
+function CompositeMedia({ post, seg: s, live }: MediaProps & { seg: Segment }) {
   const [decide, busy] = useDecide();
   const [err, setErr] = useState<string | null>(null);
+  if (!s.phone) {
+    if (s.generated && s.approved) return <figure className="is-dim"><video src={frame(s.approved.url)} controls playsInline preload="metadata" muted aria-label={`The approved take of ${s.name}`} /><figcaption>The approved take. Nothing to composite: no app in this shot.</figcaption></figure>;
+    return <Quiet>Nothing to composite here: {s.generated ? "no app in this shot" : laidIn(s)}.</Quiet>;
+  }
   const c = s.composite;
   const pending = s.compositeClick?.current && s.compositeClick.kind === "composite.approve" && !s.compositeClick.recorded;
   const back = s.compositeClick?.current && s.compositeClick.kind === "composite.sendback";
+  const status = s.compositeApproved ? "approved" : !s.approved ? "the plate is approved at the review first" : !c ? "not made yet (composite.sh)" : pending ? "clicked: being recorded" : back ? "sent back" : "waiting for you";
   return (
-    <li className="vprod__seg">
-      <p className="vprod__segh tabular"><SegName s={s} /> · the app in the phone
-        <span className={`vprod__tag${s.compositeApproved ? " is-done" : c && !pending && !back ? " is-you" : ""}`}>{s.compositeApproved ? "approved" : !s.approved ? "the plate is approved at gate B first" : !c ? "not made yet (composite.sh)" : pending ? "clicked: being recorded" : back ? "sent back" : "waiting for you"}</span>
-      </p>
-      <div className="vprod__media">
-        {c ? <figure><video src={c.url} controls playsInline preload="metadata" aria-label={`Composite of ${s.name}`} /><figcaption className="tabular">the composite · gates {c.gates}</figcaption></figure> : null}
-        {s.approved ? <figure><video src={s.approved.url} controls playsInline preload="metadata" muted aria-label="The approved plate" /><figcaption>the approved take: the plate the app is put into</figcaption></figure> : null}
-      </div>
+    <div className="take">
+      <p className="take__status"><span className={`vprod__tag${s.compositeApproved ? " is-done" : status === "waiting for you" ? " is-you" : ""}`}>{status}</span></p>
+      {c ? <figure><video src={frame(c.url)} controls playsInline preload="metadata" aria-label={`Composite of ${s.name}`} /><figcaption className="tabular">The composite: the app in the phone · gates {c.gates}</figcaption></figure> : null}
+      {s.approved ? <figure className={c ? "is-small" : ""}><video src={frame(s.approved.url)} controls playsInline preload="metadata" muted aria-label="The approved plate" /><figcaption>the approved take: the plate the app is put into</figcaption></figure> : <Quiet>No plate yet: the take is approved at the review first.</Quiet>}
       {c?.sheets.length ? (
         <details className="vprod__older">
           <summary>The contact sheets ({c.sheets.length})</summary>
-          <div className="vprod__media">{c.sheets.map((x) => <figure key={x.url} className="is-wide"><a href={x.url} target="_blank" rel="noreferrer"><img src={x.url} alt={x.label} className="is-sheet" /></a><figcaption>{x.label}</figcaption></figure>)}</div>
+          {c.sheets.map((x) => <figure key={x.url} className="is-wide"><a href={x.url} target="_blank" rel="noreferrer"><img src={x.url} alt={x.label} className="is-sheet" /></a><figcaption>{x.label}</figcaption></figure>)}
         </details>
       ) : null}
       <ClickLine c={s.compositeClick} what={`the composite of ${s.name}`} />
@@ -512,97 +498,136 @@ function CompositeCard({ post, s, live }: { post: string; s: Segment; live: bool
         </div>
       ) : null}
       <Err e={err} />
-    </li>
+    </div>
   );
 }
 
-export function CompositePanel({ post, p, live, seg }: { post: string; p: Production; live: boolean; seg: string | null }) {
-  const phones = p.segments.filter((s) => s.phone && !s.sharedFrom && (!seg || s.name === seg));
+/* --------------------------------------------------------- stages 6 and 7: the cut */
+
+/** Jump the page's one player (the cut, the delivered file) to a time. */
+function playFrom(t: number) {
+  const el = document.querySelector<HTMLVideoElement>("video[data-cut-player]");
+  if (!el) return;
+  el.currentTime = t;
+  void el.play().catch(() => undefined);
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function CutMedia({ c, seg: s, p }: MediaProps & { seg: Segment }) {
+  const t = p?.assembly?.times[s.name]?.[0] ?? c.start;
+  const clip = s.compositeApproved && s.composite ? { url: s.composite.url, words: "The approved composite, as it is in the cut." }
+    : s.approved ? { url: s.approved.url, words: `${takeNo(s, s.approved.file)}, approved, as it is in the cut.` }
+    : s.motion?.render && s.motion.approved ? { url: s.motion.render.url, words: "The approved motion design, as it is in the cut." }
+    : null;
   return (
-    <section className="vprod__stage" aria-label="Composite">
-      <h3 className="vprod__h">Composite</h3>
-      {phones.length ? <ol className="vprod__segs">{phones.map((s) => <CompositeCard key={s.name} post={post} s={s} live={live} />)}</ol> : <p className="sr__hint">No app insertion in this plan: nothing to composite.</p>}
-    </section>
+    <>
+      {clip ? <figure className="is-dim"><video src={frame(clip.url)} controls playsInline preload="metadata" muted aria-label={`The clip of ${s.name}`} /><figcaption>{clip.words}</figcaption></figure>
+        : <Quiet>{s.generated ? "No approved take yet." : `In the cut: ${laidIn(s)}.`}</Quiet>}
+      {p?.assembly || !p ? <p className="row__play"><button type="button" className="rail__kill" onClick={() => playFrom(t ?? c.start)}>Play the cut from {secs(t ?? c.start)} s</button></p> : null}
+    </>
   );
 }
 
-/* ----------------------------------------------------------------- stage 6: the cut */
+/** The top row of the cut stage: the cut (or the delivered file), the checks that gate the approval, the hint. */
+export function CutRow({ p, final, grain }: { p: Production; final: { url: string; duration: number | null; delivered: string | null } | null; grain?: boolean }) {
+  const a = p.assembly;
+  const done = p.gateC?.decision === "approve" && p.gateC.current;
+  if (final) {
+    return (
+      <div className="cut">
+        <video className="cut__video" src={final.url} controls playsInline preload="metadata" aria-label="The delivered video" data-cut-player="" />
+        <p className="sr__hint">Delivered{final.delivered ? ` ${final.delivered.slice(0, 10)}` : ""}{final.duration ? ` · ${secs(final.duration)} s` : ""}. Every part below plays from its time in this file.</p>
+      </div>
+    );
+  }
+  if (!a) return <Quiet>The cut is assembled once every segment is approved.</Quiet>;
+  return (
+    <div className="cut">
+      <video className="cut__video" src={grain && a.grain ? a.grain : a.url} controls playsInline preload="metadata" aria-label="The assembled cut" data-cut-player="" />
+      <div className="cut__side">
+        <p className="sr__hint tabular">The cut{a.duration ? ` · ${a.duration.toFixed(1)} s` : ""}{a.stale ? " · assembled from another revision of the plan" : ""}. Every part below plays from its time in this file.</p>
+        {p.gateC?.words && !done ? <p className="vprod__words">Gate C ({p.gateC.decision}): “{p.gateC.words}”{p.gateC.date ? ` (${p.gateC.date})` : ""}</p> : null}
+        {/* The checks gate the approval, so they stay in view until it is given; then they are in Details. */}
+        {a.checks.length && !done ? (
+          <ul className="vprod__checklist">{a.checks.map((c) => <li key={c.name} className={c.result === "FAIL" ? "is-bad" : ""}><b>{c.name}</b> {c.result || "—"}{c.detail ? ` · ${c.detail}` : ""}</li>)}</ul>
+        ) : null}
+        {!done ? <p className="sr__hint">Watch it whole: the hero element and every overlay readable, the sound level, each cut, no green, no frame shown twice at a continuous cut.</p> : null}
+      </div>
+    </div>
+  );
+}
 
-export function CutPanel({ post, p, live }: { post: string; p: Production; live: boolean }) {
+/* ------------------------------------------------------------ the bar's buttons */
+
+/** The decision bar's buttons for the stages whose decision is one for the whole video: the storyboard (gate A) and the cut (gate C). */
+export function BarActions({ stage, post, p, live }: { stage: number; post: string; p: Production; live: boolean }) {
   const [decide, busy] = useDecide();
   const [err, setErr] = useState<string | null>(null);
   const [grain, setGrain] = useState(false);
   const [regen, setRegen] = useState<string>("");
   const [why, setWhy] = useState("");
-  const a = p.assembly;
-  const done = p.gateC?.decision === "approve" && p.gateC.current;
-  const pending = p.cutClick?.current && !p.cutClick.recorded;
   const own = p.segments.filter((s) => s.generated && !s.sharedFrom);
-  const open = own.filter((s) => !s.approved).map((s) => s.name);
-  const rs = own.find((s) => s.name === regen) ?? null;
-  /* review.py final: a changed supplied file always blocks; a failed overlay check may be approved anyway with a note. */
-  const { blocked: supplied, overlays } = cutAccepts(a?.failed ?? []);
-  return (
-    <section className="vprod__stage" aria-label="The cut, gate C">
-      <h3 className="vprod__h">The cut
-        <span className={`vprod__tag${done ? " is-done" : a && !pending ? " is-you" : ""}`}>{done ? "approved" : !a ? "not assembled yet" : a.stale ? "stale: assembled from another revision" : pending ? "clicked: being recorded" : "waiting for you"}</span>
-      </h3>
-      {p.gateC?.words && !done ? <p className="vprod__words">Gate C ({p.gateC.decision}): “{p.gateC.words}”{p.gateC.date ? ` (${p.gateC.date})` : ""}</p> : null}
-      {a ? (
-        <div className="vprod__media">
-          <figure className="is-wide">
-            <video src={grain && a.grain ? a.grain : a.url} controls playsInline preload="metadata" aria-label="The assembled cut" data-cut-player="" />
-            <figcaption className="tabular">the cut{a.duration ? ` · ${a.duration.toFixed(1)} s` : ""}{a.stale ? " · assembled from another revision" : ""}</figcaption>
-          </figure>
-        </div>
-      ) : <p className="sr__hint">The cut is assembled once every segment is approved.</p>}
-      {/* The checks gate the approval, so they stay in view until it is given; then they fold with the record. */}
-      {a?.checks.length && !done ? (
-        <ul className="vprod__checklist">{a.checks.map((c) => <li key={c.name} className={c.result === "FAIL" ? "is-bad" : ""}><b>{c.name}</b> {c.result || "—"}{c.detail ? ` · ${c.detail}` : ""}</li>)}</ul>
-      ) : null}
-      {a && !done ? <p className="sr__hint">Watch it whole: the hero element and every overlay readable, the sound level, each cut, no green, no frame shown twice at a continuous cut.</p> : null}
-      {a ? (
-        <details className="vprod__older">
-          <summary>The file{a.sheet ? ", the contact sheet" : ""}{done ? ", the checks and the decision as recorded" : ""}</summary>
-          <p className="vprod__words tabular">{base(a.file)} · sha256 {a.sha256.slice(0, 12)}</p>
-          {a.sheet ? <div className="vprod__media"><figure className="is-wide"><a href={a.sheet} target="_blank" rel="noreferrer"><img src={a.sheet} alt="Contact sheet of the cut" className="is-sheet" /></a><figcaption>contact sheet</figcaption></figure></div> : null}
-          {done && a.checks.length ? <ul className="vprod__checklist">{a.checks.map((c) => <li key={c.name} className={c.result === "FAIL" ? "is-bad" : ""}><b>{c.name}</b> {c.result || "—"}{c.detail ? ` · ${c.detail}` : ""}</li>)}</ul> : null}
-          {done && p.gateC?.words ? <p className="vprod__words">Gate C ({p.gateC.decision}): “{p.gateC.words}”{p.gateC.date ? ` (${p.gateC.date})` : ""}</p> : null}
-        </details>
-      ) : null}
-      <ClickLine c={p.cutClick} what={p.cutClick?.segment ? `the cut (regenerate ${p.cutClick.segment})` : "the cut"} />
-      {live && a && !done && !pending ? (
-        <>
-          <div className="sr__actions">
-            {a.grain ? <label className="vprod__again"><input type="checkbox" checked={grain} onChange={(e) => setGrain(e.target.checked)} /> deliver the grain export</label> : null}
-            <button type="button" className="pill pill--go" disabled={busy || a.stale || open.length > 0 || supplied.length > 0 || overlays.length > 0} onClick={() => decide({ post, kind: "cut.approve", data: { export: grain ? "grain" : "default" } }).then(setErr)}>Approve the cut</button>
-            {overlays.length && !supplied.length && !a.stale && !open.length ? <ApproveAnyway gates={overlays} busy={busy} onSend={(n) => decide({ post, kind: "cut.approve", note: n, data: { export: grain ? "grain" : "default", accept_fail: ["overlays"] } as any }).then((r) => { setErr(r); return r; })} /> : null}
-            {open.length ? <span className="rail__why">not every segment is approved: {open.join(", ")}</span> : null}
-            {supplied.length ? <span className="rail__why is-bad">the cut is not the plan&apos;s: {supplied.join(", ")}</span> : overlays.length ? <span className="rail__why is-bad">failed on the cut: {overlays.join(", ")}</span> : null}
-            <SendBack label="Send back…" busy={busy} onSend={(n) => decide({ post, kind: "cut.sendback", note: n, data: {} }).then((r) => { setErr(r); return r; })} />
-          </div>
-          {own.length ? (
-            <div className="vprod__form vprod__form--col">
-              <label className="vprod__again">Regenerate one segment:{" "}
-                <select value={regen} onChange={(e) => setRegen(e.target.value)} aria-label="The segment to regenerate">
-                  <option value="">choose…</option>
-                  {own.map((s) => <option key={s.name} value={s.name}>{s.name} ({usd(s.cost)})</option>)}
-                </select>
-              </label>
-              {rs ? (
-                <>
-                  <textarea className="note" rows={2} placeholder={`What failed in ${rs.name}.`} value={why} onChange={(e) => setWhy(e.target.value)} aria-label="What failed" />
-                  <span className="sr__actions">
-                    <button type="button" className="pill" disabled={busy || !why.trim()} onClick={() => decide({ post, kind: "cut.sendback", note: why, data: { segment: rs.name } }).then((r) => { setErr(r); if (!r) { setRegen(""); setWhy(""); } })}>Regenerate {rs.name} ({usd(rs.cost)})</button>
-                  </span>
-                  <p className="sr__hint">This is your yes to one more run of {rs.name} at {usd(rs.cost)}; the segment goes back to gate B.</p>
-                </>
+  if (stage === 2) {
+    const done = !own.length || (p.gateA?.decision === "approve" && p.gateA.current);
+    const run = (kind: "storyboard.approve" | "storyboard.sendback", note?: string) =>
+      decide({ post, kind, ...(note ? { note } : {}), data: {} as any }).then((r) => { setErr(r); return r; });
+    return (
+      <div className="bar__act">
+        {live && own.length && !done ? (
+          <>
+            <button type="button" className="btn" disabled={busy || own.some((s) => s.needsKeyframe && !s.keyframe)} onClick={() => run("storyboard.approve")}>Approve storyboard and {usd(p.cost)}</button>
+            <SendBack label="Send back…" busy={busy} onSend={(n) => run("storyboard.sendback", n)} />
+          </>
+        ) : null}
+        <ClickLine c={p.gateAClick} what="the storyboard" />
+        <Err e={err} />
+      </div>
+    );
+  }
+  if (stage === 6) {
+    const a = p.assembly;
+    const done = p.gateC?.decision === "approve" && p.gateC.current;
+    const pending = p.cutClick?.current && !p.cutClick.recorded;
+    const open = own.filter((s) => !s.approved).map((s) => s.name);
+    const rs = own.find((s) => s.name === regen) ?? null;
+    /* review.py final: a changed supplied file always blocks; a failed overlay check may be approved anyway with a note. */
+    const { blocked: supplied, overlays } = cutAccepts(a?.failed ?? []);
+    return (
+      <div className="bar__act bar__act--col">
+        {live && a && !done && !pending ? (
+          <>
+            <div className="sr__actions">
+              {a.grain ? <label className="vprod__again"><input type="checkbox" checked={grain} onChange={(e) => { setGrain(e.target.checked); const el = document.querySelector<HTMLVideoElement>("video[data-cut-player]"); if (el) { el.src = e.target.checked ? a.grain! : a.url; el.load(); } }} /> deliver the grain export (the player switches to it)</label> : null}
+              <button type="button" className="btn" disabled={busy || a.stale || open.length > 0 || supplied.length > 0 || overlays.length > 0} onClick={() => decide({ post, kind: "cut.approve", data: { export: grain ? "grain" : "default" } }).then(setErr)}>Approve the cut</button>
+              {overlays.length && !supplied.length && !a.stale && !open.length ? <ApproveAnyway gates={overlays} busy={busy} onSend={(n) => decide({ post, kind: "cut.approve", note: n, data: { export: grain ? "grain" : "default", accept_fail: ["overlays"] } as any }).then((r) => { setErr(r); return r; })} /> : null}
+              <SendBack label="Send back…" busy={busy} onSend={(n) => decide({ post, kind: "cut.sendback", note: n, data: {} }).then((r) => { setErr(r); return r; })} />
+              {own.length ? (
+                <label className="vprod__again">Regenerate one segment:{" "}
+                  <select value={regen} onChange={(e) => setRegen(e.target.value)} aria-label="The segment to regenerate">
+                    <option value="">choose…</option>
+                    {own.map((s) => <option key={s.name} value={s.name}>{s.name} ({usd(s.cost)})</option>)}
+                  </select>
+                </label>
               ) : null}
             </div>
-          ) : null}
-        </>
-      ) : null}
-      <Err e={err} />
-    </section>
-  );
+            {open.length ? <span className="rail__why">not every segment is approved: {open.join(", ")}</span> : null}
+            {supplied.length ? <span className="rail__why is-bad">the cut is not the plan&apos;s: {supplied.join(", ")}</span> : overlays.length ? <span className="rail__why is-bad">failed on the cut: {overlays.join(", ")}</span> : null}
+            {rs ? (
+              <div className="vprod__form vprod__form--col">
+                <textarea className="note" rows={2} placeholder={`What failed in ${rs.name}.`} value={why} onChange={(e) => setWhy(e.target.value)} aria-label="What failed" />
+                <span className="sr__actions">
+                  <button type="button" className="pill" disabled={busy || !why.trim()} onClick={() => decide({ post, kind: "cut.sendback", note: why, data: { segment: rs.name } }).then((r) => { setErr(r); if (!r) { setRegen(""); setWhy(""); } })}>Regenerate {rs.name} ({usd(rs.cost)})</button>
+                  <button type="button" className="rail__kill" onClick={() => setRegen("")}>cancel</button>
+                </span>
+                <p className="sr__hint">This is your yes to one more run of {rs.name} at {usd(rs.cost)}; the segment goes back to the review.</p>
+              </div>
+            ) : null}
+          </>
+        ) : null}
+        <ClickLine c={p.cutClick} what={p.cutClick?.segment ? `the cut (regenerate ${p.cutClick.segment})` : "the cut"} />
+        <Err e={err} />
+      </div>
+    );
+  }
+  return null;
 }

@@ -228,7 +228,9 @@ export type Checkpoint = {
   /** The reaction of a beat with a reaction reference, as its card (lib/reactions.ts). */
   reaction: ReactionCard | null;
 };
-export type Timeline = { length: number; checkpoints: Checkpoint[]; player: { url: string; label: string } | null; source: "plan.json" | "plan.draft.json" | null };
+export type Timeline = { length: number; checkpoints: Checkpoint[]; player: { url: string; label: string } | null; source: "plan.json" | "plan.draft.json" | null;
+  /** The caption and the music note of the plan the strip reads (the draft before the lock), as written. */
+  caption: string | null; music: string | null };
 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const secs = (n: number) => (Number.isInteger(n) ? `${n}.0` : n.toFixed(1));
@@ -361,5 +363,5 @@ export function timeline({ plan, source, production: p, final }: TimelineInput):
   /* Gate C and after: the whole strip plays the cut. */
   const a = p?.assembly;
   const player = final ? { url: final.url, label: "the delivered file" } : a && !a.stale ? { url: a.url, label: "the cut" } : null;
-  return { length, checkpoints, player, source };
+  return { length, checkpoints, player, source, caption: typeof plan?.publishing_note?.caption === "string" ? plan.publishing_note.caption : null, music: typeof plan?.publishing_note?.music_note === "string" ? plan.publishing_note.music_note : null };
 }

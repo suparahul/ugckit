@@ -1,10 +1,10 @@
 /**
  * The stages of a character video (research/ai-ugc/ATLAS-VIDEO-STAGES-PLAN.md § 4,
- * research/ai-ugc/ATLAS-VIDEO-PAGE-CLEANUP.md § 3): the rail of the seven stages, each
- * with a plain name and one state word; a click opens that stage's panel (?stage=N). The
- * segment table (one row per video.json segment, one cell per stage that works per
- * segment) is drawn in the folded Details of the page, not on the rail. Read only: every
- * decision is in the stage panel.
+ * research/ai-ugc/ATLAS-VIDEO-PAGE-CLEANUP.md § 6): one row of chevron breadcrumbs under
+ * the title, one step per stage, each with its plain name and one state word, the current
+ * one filled in; a click opens that stage (?stage=N). The segment table (one row per
+ * video.json segment, one cell per stage that works per segment) is drawn in the folded
+ * Details of the page. Read only: every decision is in the decision bar or in a row.
  */
 
 import Link from "next/link";
@@ -13,17 +13,14 @@ import { STATE_WORD } from "@/lib/plain-words";
 import type { Production, Segment } from "@/lib/video-production";
 import { rangeOf, undecidedTake, type StagesView, type Timeline } from "@/lib/video-stages";
 
-const MARK: Record<string, string> = { done: "✓", "n/a": "–", you: "●", clicked: "◐", "sent back": "↩", blocked: "✕", stale: "!", agent: "…", "not reached": "" };
-
-export function StageRail({ v, base, stage }: { v: StagesView; base: string; stage: number }) {
+export function StageCrumbs({ v, base, stage }: { v: StagesView; base: string; stage: number }) {
   return (
-    <ol className="vst__rail" id="stages" aria-label="The stages of the video">
+    <ol className="crumbs" id="stages" aria-label="The stages of the video">
       {v.stages.map((s) => (
-        <li key={s.key} className={`vst__step is-${s.state.replace(/[^a-z]+/g, "-")}${s.n === stage ? " is-open" : ""}${s.n === v.current ? " is-current" : ""}`}>
+        <li key={s.key} className={`crumb is-${s.state.replace(/[^a-z]+/g, "-")}${s.n === stage ? " is-open" : ""}${s.n === v.current ? " is-now" : ""}`}>
           <Link href={`${base}?stage=${s.n}#stages`} aria-current={s.n === stage ? "step" : undefined} title={`${s.name}: ${s.state || "not reached"} — ${s.words}`}>
-            <span className="vst__n tabular">{s.n}</span>
-            <span className="vst__name">{s.short}</span>
-            {STATE_WORD[s.state] ? <span className="vst__state">{MARK[s.state] ? `${MARK[s.state]} ` : ""}{STATE_WORD[s.state]}</span> : null}
+            <span className="crumb__name">{s.short}</span>
+            <span className="crumb__state">{s.n === v.current && s.state === "you" ? "your turn" : STATE_WORD[s.state] || "not yet"}</span>
           </Link>
         </li>
       ))}

@@ -19,7 +19,7 @@ import { formatText } from "@/lib/plan-parts";
 import { sourcesText } from "@/lib/outcome";
 import { dateParts, getProduction, outcomesOpenAt, postPath, type Deck, type DeckFile, type PostState, type SourceRef } from "@/lib/production";
 import { Deck as DeckView } from "./Deck";
-import { VideoView, type VideoPanelView } from "./VideoView";
+import { VideoView, type VideoBar, type VideoPanelView } from "./VideoView";
 
 export function sourceLink(src: { handle: string | null; id: string | null } | null): { href: string; label: string; inAtlas: boolean; cover: string | null } | null {
   if (!src || !src.handle) return null;
@@ -33,12 +33,12 @@ export function sourceLink(src: { handle: string | null; id: string | null } | n
 
 /* ---------------------------------------------------------------- planning */
 
-/** The decision rail of a video post, drawn in the head of one stage's panel (VideoView). */
-export type VideoRail = { rail: ReactNode; railStage: number | null };
+/** The decision bar of a video post (VideoView): the rail of the stage whose action it is, the status sentence, the notes under it. */
+export type { VideoBar } from "./VideoView";
 
-export function PlanningMode({ state, readOnly, src, slideNo, view, videoRail }: { state: PostState; readOnly?: boolean; src: ReturnType<typeof sourceLink>; slideNo: number; view?: VideoPanelView; videoRail?: VideoRail }) {
+export function PlanningMode({ state, readOnly, src, slideNo, view, videoBar }: { state: PostState; readOnly?: boolean; src: ReturnType<typeof sourceLink>; slideNo: number; view?: VideoPanelView; videoBar?: VideoBar }) {
   const { deck, deckFile } = state;
-  if (state.video) return state.video.review || state.video.brief ? <VideoView state={state} mode="plan" view={view} rail={videoRail?.rail} railStage={videoRail?.railStage} /> : <IdeaBrief state={state} />;
+  if (state.video) return state.video.review || state.video.brief ? <VideoView state={state} mode="plan" view={view} bar={videoBar} /> : <IdeaBrief state={state} />;
 
   if (!deck || !deckFile) return <IdeaBrief state={state} />;
 
@@ -261,8 +261,8 @@ export function IdeaBrief({ state }: { state: PostState }) {
 
 /* ---------------------------------------------------------------- produced */
 
-export function ProducedMode({ state, slideNo, src, overlayOff, readOnly, view, videoRail }: { state: PostState; slideNo: number; src: ReturnType<typeof sourceLink>; overlayOff?: boolean; readOnly?: boolean; view?: VideoPanelView; videoRail?: VideoRail }) {
-  if (state.video) return <VideoView state={state} mode="produced" view={view} rail={videoRail?.rail} railStage={videoRail?.railStage} />;
+export function ProducedMode({ state, slideNo, src, overlayOff, readOnly, view, videoBar }: { state: PostState; slideNo: number; src: ReturnType<typeof sourceLink>; overlayOff?: boolean; readOnly?: boolean; view?: VideoPanelView; videoBar?: VideoBar }) {
+  if (state.video) return <VideoView state={state} mode="produced" view={view} bar={videoBar} />;
   const { deck, deckFile } = state;
   if (!deck || !deckFile) return null;
   return <DeckView state={state} deck={deck} deckFile={deckFile} initial={slideNo} src={src ? { href: src.href, label: src.label, inAtlas: src.inAtlas } : null} overlayOff={!!overlayOff} readOnly={!!readOnly} />;

@@ -1164,17 +1164,6 @@
 .vprod__again { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
 
 /* The stages of a character video (VideoStages, ATLAS-VIDEO-STAGES-PLAN.md § 4): the "Now" line, the rail, the segment table. */
-.vst__rail { list-style: none; margin: 16px 0 0; padding: 0 0 4px; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: thin; }
-.vst__step { flex: 1 1 0; min-width: 84px; }
-.vst__step a { display: flex; flex-direction: column; gap: 1px; height: 100%; padding: 6px 9px; border: 1px solid var(--rule); border-radius: 5px; color: var(--ink-2); text-decoration: none; background: rgba(255, 253, 245, 0.35); }
-.vst__step a:hover { border-color: var(--rule-2); }
-.vst__step.is-open a { border-color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--ink-2); background: var(--paper-hi); }
-.vst__n { font-size: 10.5px; color: var(--ink-4); font-variant-numeric: tabular-nums; }
-.vst__name { font-size: 13px; font-weight: 600; color: var(--ink); }
-.vst__state { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
-.vst__step.is-not-reached a { opacity: 0.55; }
-.vst__step.is-done .vst__state { color: #2f6b3a; }
-.vst__step.is-you .vst__state, .vst__step.is-blocked .vst__state { color: var(--ember-deep); font-weight: 600; }
 .vst__notes { margin: 0; padding: 8px 12px 8px 26px; border: 1px dashed var(--rule-2); border-radius: 6px; font-size: 12.5px; color: var(--ink-2); }
 .vst__table { display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; font-size: 12.5px; }
 .vst__row { display: grid; grid-template-columns: 1.4fr 1.3fr repeat(4, 0.8fr) 1fr; gap: 8px; padding: 7px 10px; border-top: 1px solid var(--rule); color: var(--ink-2); align-items: baseline; }
@@ -1245,66 +1234,6 @@
 .menu__form .note { height: 32px; min-height: 0; }
 
 /* The stage panel: the stage's action in the head, its content under it. */
-.vpanel { margin-top: 14px; padding: 14px 16px 16px; border: 1px solid var(--rule); border-radius: 6px; background: rgba(255, 253, 245, 0.5); }
-.vpanel__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px; margin-bottom: 10px; }
-.vpanel__h { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
-.vpanel__h small { font-size: 12.5px; font-weight: 400; color: var(--ink-3); }
-.vpanel__h small a { color: var(--ember-deep); }
-.vpanel__rail { margin-left: auto; }
-.vpanel__rail .rail__row { justify-content: flex-end; }
-.vpanel .vprod__stage { padding-top: 0; border-top: 0; }
-.vpanel .vprod__h { display: none; }
-.vpanel .vst__slot { margin: 10px 0 0; }
-
-/* The problems, once: what stops the approval first, then what production still needs. */
-.problems { margin: 0 0 12px; }
-.problems__h { margin: 8px 0 4px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
-.problems__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; max-width: 72ch; }
-.problems__list li { position: relative; padding-left: 20px; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
-.problems__list li::before { position: absolute; left: 0; top: 0; font-weight: 700; }
-.problems__list li.is-bad::before { content: "✕"; color: var(--ember-deep); }
-.problems__list li.is-warn::before { content: "!"; color: var(--ember-deep); left: 5px; }
-.problems__list li.is-warn { color: var(--ink-2); }
-
-/* The delivered file at stage 8. */
-.vdeliver { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px; }
-.vdeliver__video { display: block; width: 240px; max-width: 100%; aspect-ratio: 9 / 16; background: #000; border: 1px solid var(--rule); border-radius: 4px; }
-
-/* The video, beat by beat: a strip of cards, left to right. */
-.vtl { margin-top: 24px; }
-.vtl__h { margin: 0 0 10px; font-size: 15px; font-weight: 600; color: var(--ink); }
-.vtl__h small { margin-left: 8px; font-size: 12.5px; font-weight: 400; color: var(--ink-3); }
-.tl { display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; color: var(--ink-2); }
-.tl__empty { margin: 0; font-size: 12.5px; color: var(--ink-3); }
-.tl__strip { position: relative; }
-.tl__marker { position: absolute; top: -6px; bottom: -2px; width: 0; border-left: 2px solid var(--ember); pointer-events: none; transition: left 0.2s linear; }
-.tl__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-.tl__cp { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px; border: 1px solid transparent; border-radius: 6px; }
-.tl__cp.is-open { border-color: var(--ink-2); background: var(--paper-hi); }
-.tl__pic { margin: 0; }
-.tl__pic img, .tl__pic video { display: block; width: 100%; max-width: 128px; aspect-ratio: 9 / 16; object-fit: cover; background: #000; border: 1px solid var(--rule); border-radius: 3px; }
-.tl__pic figcaption { margin-top: 3px; font-size: 10.5px; line-height: 1.3; color: var(--ink-4); overflow-wrap: anywhere; }
-.tl__pic.is-small img, .tl__pic.is-small video { max-width: 72px; }
-.tl__nopic { margin: 0; width: 100%; max-width: 128px; aspect-ratio: 9 / 16; display: grid; place-items: center; padding: 6px; border: 1px dashed var(--rule-2); border-radius: 3px; font-size: 10.5px; line-height: 1.35; text-align: center; color: var(--ink-3); }
-.tl__head { margin: 4px 0 0; font-size: 12.5px; color: var(--ink); }
-.tl__head b { font-weight: 700; }
-.tl__role { color: var(--ink-3); }
-.tl__time { padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-.tl__sees { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
-.tl__more { font-size: 12px; color: var(--ink-3); }
-.tl__more > summary { cursor: pointer; list-style: none; color: var(--ink-3); text-decoration: underline; text-underline-offset: 3px; }
-.tl__more > summary::-webkit-details-marker { display: none; }
-.tl__more > summary:hover { color: var(--ember-deep); }
-.tl__lines { margin: 6px 0 0; display: flex; flex-direction: column; gap: 4px; }
-.tl__lines div { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 6px; }
-.tl__lines dt { font-size: 10.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; padding-top: 1px; }
-.tl__lines dd { margin: 0; overflow-wrap: anywhere; line-height: 1.45; color: var(--ink-2); }
-.tl__lines a { color: var(--ember-deep); }
-.tl__text { display: block; }
-.tl__earlier { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-
-/* The caption card, once the plan is locked. */
-.vcaption { margin-top: 20px; max-width: 640px; }
 
 /* Details: the plan as written, the segments, the brief, the files. */
 .vdetails { margin-top: 24px; }
@@ -1317,40 +1246,118 @@
 .vdetails .vreview h1 code { font-size: 0.8em; }
 .vdetails .vst__table { max-width: 900px; }
 
-/* The stage panels, one pass (ATLAS-VIDEO-PAGE-CLEANUP.md § 5): the decision object, one line of purpose, the rest folded. */
-.vprod__purpose { margin: 0 0 6px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
-.vprod__media figure.is-small { width: 96px; }
-.vprod__older > :not(summary) { margin-top: 6px; }
-.vprod__older .vprod__media { margin-top: 8px; }
-/* The strip without pictures: a ribbon of beats while the panel shows the media. */
-.tl__cp { padding: 6px 8px; border: 0; border-left: 2px solid var(--rule); border-radius: 0; }
-.tl__cp.is-open { border-left-color: var(--ink-2); }
-.tl__beats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; line-height: 1.45; color: var(--ink-2); }
-.tl__beats b { font-weight: 600; color: var(--ink); }
-.tl__more > dl + dl { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--rule); }
+/* ------------------------------------------- the one-document video page (ATLAS-VIDEO-PAGE-CLEANUP.md § 6) */
 
-/* The plan panel (ATLAS-VIDEO-PAGE-CLEANUP.md § 6): the whole video in time order, each beat open. */
-.plan { font-size: 13.5px; line-height: 1.55; color: var(--ink-2); }
-.plan__idea { margin: 0 0 12px; max-width: 72ch; }
-.plan__idea b { color: var(--ink); font-weight: 600; }
-.plan__beats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.plan__beat { padding: 12px 0 12px 14px; border-left: 2px solid var(--rule); max-width: 80ch; }
-.plan__beat.is-app { border-left-color: var(--ink-3); }
-.plan__range { margin: 0 0 6px; font-size: 12.5px; color: var(--ink-3); }
-.plan__range b { color: var(--ink); font-weight: 700; }
-.plan__overlay { margin: 0 0 6px; font-size: 17px; line-height: 1.35; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
-.plan__overlay small { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 400; color: var(--ink-3); }
-.plan__sees { margin: 0 0 6px; }
-.plan__sees.is-blank { color: var(--ink-3); font-style: italic; }
-.plan__sound { margin: 0 0 6px; color: var(--ink-2); font-style: italic; }
-.plan__beat .vst__slot { margin: 8px 0 4px; }
-.plan__story { margin-top: 6px; }
-.plan__source { margin: 0 0 8px; color: var(--ink-2); }
-.plan__steps { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.plan__step { margin: 0; font-size: 13px; color: var(--ink-2); }
-.plan__step b { color: var(--ink); font-weight: 700; }
-.plan__reads { margin: 2px 0 0; display: flex; flex-wrap: wrap; gap: 4px 6px; }
-.plan__read { display: inline-block; padding: 1px 7px; border: 1px solid var(--rule); border-radius: 10px; background: var(--paper-hi); font-size: 12.5px; color: var(--ink); }
-.plan__hero { margin: 6px 0 4px; font-size: 14px; color: var(--ink-2); }
-.plan__hero b { color: var(--ink); font-weight: 600; }
-.plan .vcaption { margin-top: 14px; }
+/* The stages as chevron breadcrumbs, one row under the title (VideoStages.StageCrumbs). */
+.crumbs { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 0; }
+.crumb a { position: relative; display: flex; flex-direction: column; gap: 1px; padding: 6px 22px 6px 24px; margin-left: -10px; background: var(--paper-hi); color: var(--ink-2); text-decoration: none; clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%); }
+.crumb:first-child a { margin-left: 0; padding-left: 14px; clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%); }
+.crumb a:hover { background: var(--paper-lo); }
+.crumb__name { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.2; }
+.crumb__state { font-size: 11px; color: var(--ink-3); white-space: nowrap; line-height: 1.2; }
+.crumb.is-done .crumb__state { color: #2f6b3a; }
+.crumb.is-you .crumb__state, .crumb.is-blocked .crumb__state, .crumb.is-stale .crumb__state { color: var(--ember-deep); font-weight: 600; }
+.crumb.is-not-reached a { opacity: 0.6; }
+.crumb.is-n-a .crumb__name { text-decoration: line-through; color: var(--ink-3); }
+.crumb.is-now a { background: var(--ink); }
+.crumb.is-now .crumb__name { color: #fffdf5; }
+.crumb.is-now .crumb__state { color: rgba(255, 253, 245, 0.8); }
+.crumb.is-now.is-you .crumb__state, .crumb.is-now.is-blocked .crumb__state { color: #ffb48a; }
+.crumb.is-open:not(.is-now) a { box-shadow: inset 0 -3px 0 var(--ink-2); }
+.crumb a:focus-visible { outline: 2px solid var(--ember); outline-offset: -2px; }
+
+/* The decision bar: sticky, one sentence, the cost, the buttons; the notes and the problems under it. */
+.bar { position: sticky; top: 0; z-index: 6; margin: 0; padding: 12px 0; background: rgba(216, 201, 173, 0.96); backdrop-filter: blur(6px); border-top: 1px solid var(--rule-2); border-bottom: 1px solid var(--rule-2); }
+.bar__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; }
+.bar__turn { font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; }
+.bar.is-you .bar__turn, .bar.is-blocked .bar__turn { color: var(--ember-deep); }
+.bar__say { font-size: 15.5px; line-height: 1.4; color: var(--ink); max-width: 72ch; }
+.bar.is-agent .bar__say, .bar.is-done .bar__say { color: var(--ink-2); }
+.bar__jump, .bar__now { font-size: 13px; color: var(--ember-deep); white-space: nowrap; }
+.bar__now { margin-left: auto; }
+.bar__act { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.bar__act--col { flex-direction: column; align-items: flex-end; }
+.bar__act .rail__row { justify-content: flex-end; }
+.bar__act .vprod__click, .bar__act .rail__err, .bar__act .rail__why { width: 100%; text-align: right; margin: 0; }
+.bar__act .vprod__form--col { max-width: 420px; }
+.btn { font: inherit; font-size: 13.5px; font-weight: 600; padding: 7px 16px; border-radius: 999px; border: 1px solid var(--ink); background: var(--ink); color: #fffdf5; cursor: pointer; }
+.btn:hover { background: var(--ember-deep); border-color: var(--ember-deep); }
+.btn:disabled { background: rgba(23, 22, 18, 0.35); border-color: transparent; cursor: not-allowed; }
+.bar__notes { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; line-height: 1.5; color: var(--ink-2); max-width: 90ch; display: flex; flex-direction: column; gap: 3px; }
+.bar__notes li { position: relative; padding-left: 18px; }
+.bar__notes li::before { content: "!"; position: absolute; left: 4px; top: 0; font-weight: 700; color: var(--ember-deep); }
+.bar__notes li.is-bad { color: var(--ink); }
+.bar__notes li.is-bad::before { content: "✕"; left: 0; }
+.bar .next__notes { margin: 8px 0 0; }
+.bar__hint { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-3); }
+
+/* The rows: time | content | media. The only list of the video's parts. */
+.doc { margin: 0; padding: 0; list-style: none; }
+.row { display: grid; grid-template-columns: 110px minmax(0, 1fr) 300px; gap: 0 28px; padding: 22px 0; border-bottom: 1px solid var(--rule); min-width: 0; }
+.row.is-top { grid-template-columns: 110px minmax(0, 1fr); }
+.row.is-open { box-shadow: inset 3px 0 0 var(--ink-2); padding-left: 12px; }
+.row__t { font-size: 12.5px; line-height: 1.4; color: var(--ink-3); }
+.row__t b { display: block; font-size: 15px; color: var(--ink); font-weight: 700; }
+.row__t .row__code { display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px; color: var(--ink-4); }
+.row__t > .tabular:not(b) { display: block; margin-top: 2px; }
+.row__c { min-width: 0; max-width: 78ch; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
+.row__kind { margin: 0 0 6px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+.row__kind small { font-weight: 500; letter-spacing: 0; text-transform: none; margin-left: 8px; color: var(--ink-4); }
+.row__on { margin: 0 0 8px; font-size: 22px; line-height: 1.3; font-weight: 600; letter-spacing: -0.015em; color: var(--ink); }
+.row__on small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--ink-3); letter-spacing: 0; }
+.row__sees { margin: 0 0 10px; }
+.row__sees.is-blank { color: var(--ink-3); font-style: italic; }
+.row__sees b { color: var(--ink); font-weight: 600; }
+.row__src { margin: 0 0 10px; font-size: 13.5px; }
+.row__src b { color: var(--ink); font-weight: 600; }
+.row__sound { margin: 0 0 10px; font-style: italic; }
+.row__steps { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.row__steps li { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 10px; font-size: 13.5px; }
+.row__steps b { color: var(--ink); font-weight: 700; }
+.row__reads { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.row__reads span { display: inline-block; padding: 1px 8px; border: 1px solid var(--rule); border-radius: 10px; background: var(--paper-hi); font-size: 12.5px; color: var(--ink); }
+.row__hero { margin: 10px 0 0; font-size: 15px; }
+.row__hero b { color: var(--ink); font-weight: 600; }
+.row__caption { margin: 0; font-size: 14.5px; color: var(--ink); }
+.row__caption .tag { color: var(--ember-deep); }
+.row__caption .is-blank { color: var(--ink-4); font-style: italic; }
+.row__music { margin: 8px 0 0; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-3); }
+.row__music svg { width: 12px; height: 12px; }
+
+/* The reaction, compact, under the hook. */
+.rx { margin: 12px 0 10px; padding: 10px 12px; border: 1px dashed var(--rule-2); border-radius: 6px; font-size: 13px; color: var(--ink-2); }
+.rx__h { margin: 0 0 4px; font-size: 13px; color: var(--ink); }
+.rx__h b { font-weight: 600; }
+.rx__lead { margin: 2px 0 4px; }
+.rx .rx-beats { margin: 0 0 8px; font-size: 13px; }
+.rx .rx-switch { margin-top: 6px; }
+
+/* The media column: what the open stage adds for this part. */
+.row__m { min-width: 0; font-size: 12.5px; color: var(--ink-2); }
+.row__m figure { margin: 0 0 10px; }
+.row__m img, .row__m video { display: block; width: 100%; aspect-ratio: 9 / 16; object-fit: contain; border: 1px solid var(--rule); border-radius: 4px; background: #000; }
+.row__m figcaption { margin-top: 4px; font-size: 11.5px; line-height: 1.4; color: var(--ink-3); overflow-wrap: anywhere; }
+.row__m figure.is-small { width: 110px; }
+.row__m figure.is-dim img, .row__m figure.is-dim video { opacity: 0.8; }
+.row__m figure.is-wide { width: 100%; }
+.row__m img.is-sheet { aspect-ratio: auto; }
+.row__m audio { display: block; width: 100%; margin: 0 0 8px; }
+.row__quiet { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ink-4); padding-top: 4px; }
+.row__play { margin: 4px 0 0; }
+.take__status { margin: 0 0 8px; }
+.take__beside { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 6px; }
+.take .vprod__checks { margin: 8px 0; }
+.take .vprod__words, .take .vprod__click, .take .vprod__id, .take .sr__hint { margin: 4px 0; }
+.row__m .vprod__nokey { width: 100%; aspect-ratio: 9 / 16; font-size: 12px; }
+
+/* The cut at the top of stages 6 and 7: the player and the checks, side by side. */
+.cut { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; }
+.cut__video { display: block; width: 240px; max-width: 100%; aspect-ratio: 9 / 16; background: #000; border: 1px solid var(--rule); border-radius: 4px; }
+.cut__side { flex: 1 1 320px; min-width: 0; }
+.cut__side .vprod__checklist { margin: 6px 0; }
+
+@media (max-width: 900px) {
+  .row, .row.is-top { grid-template-columns: 1fr; gap: 10px 0; }
+  .row__m { max-width: 300px; }
+  .bar__act, .bar__now { margin-left: 0; }
+}

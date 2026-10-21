@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { groupBeats, plainBlock, plainProblem, purposeLine, roleWord, shortLine, videoStatus } from "./plain-words.ts";
+import { groupBeats, stageLine, plainBlock, plainProblem, purposeLine, roleWord, shortLine, videoStatus } from "./plain-words.ts";
 import type { StagesView } from "./video-stages.ts";
 
 test("ready.json lines read as plain sentences: no path, no backtick, what to do", () => {
@@ -76,4 +76,17 @@ test("the purpose line: the roles in words, then the first sentence the viewer s
   assert.equal(purposeLine([{ role: "use_reveal", sees: "Full screen: the Catwise reveal. · framing: app_screen" }, { role: "result", sees: "The card lands." }]), "The app appears, then the result: Full screen: the Catwise reveal.");
   assert.equal(purposeLine([{ role: "attention", sees: "not written" }]), "The hook");
   assert.equal(purposeLine([]), null);
+});
+
+test("the bar of a stage that is not the current one: done with its date, skipped, not yet, else as if current", () => {
+  const v = view("review", "you", "waiting for you: 01-x");
+  v.stages[1].words = "approved 2026-10-19";
+  assert.deepEqual(stageLine(v, 1), { who: "done", head: "Done", text: "The plan is approved and locked." });
+  assert.deepEqual(stageLine(v, 2), { who: "done", head: "Done", text: "The storyboard was approved on 2026-10-19." });
+  assert.deepEqual(stageLine(v, 6), { who: "agent", head: "Not yet", text: "cut starts later: the stages before it come first." });
+  v.stages[5].words = "every segment is approved first";
+  assert.equal(stageLine(v, 6).text, "cut starts later: every segment is approved first.");
+  v.stages[4] = { ...v.stages[4], state: "n/a", words: "no app insertion in the plan" };
+  assert.deepEqual(stageLine(v, 5), { who: "done", head: "Skipped", text: "No app insertion in the plan." });
+  assert.equal(stageLine(v, 4).text, "Review the take of 01-x.");
 });
