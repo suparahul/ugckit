@@ -410,7 +410,8 @@ def reaction(assemble_on):
     f = gen_file(v_, "01-x", "action")
     rel = os.path.relpath(f, sd)
     rv = [PY, f"{SC}/review.py", "segment", v_, "01-x", "--decision", "approve", "--file", rel, "--words", "Keep it."]
-    expect(f"{v_}: gate B refuses a reaction without its checks", rv, ok=False, contains="--check identity=pass")
+    warns(v_, "gate B records unticked checks as not claimed", rv,
+          "not claimed by the user: identity, hands, silent, performance")
     ok_checks = ["--check", "identity=pass", "--check", "hands=pass", "--check", "silent=pass",
                  "--check", "performance=pass"]
     short = os.path.join(sd, "generated", "01-x-short.mp4")
@@ -434,8 +435,8 @@ def reaction(assemble_on):
     mutate(v_, "a generation_input that is not motion_copy or written",
            plan_fn=lambda q: q["reaction_refs"][0].update(generation_input=True), cmd="plan",
            contains="'motion_copy' (the default) or 'written'")
-    mutate(v_, "the written fallback without the user's reason",
-           plan_fn=lambda q: q["reaction_refs"][0].pop("written_reason"), cmd="plan", contains="written_reason")
+    mutate(v_, "the written route chosen up front with no reason, with a note",
+           plan_fn=lambda q: q["reaction_refs"][0].pop("written_reason"), cmd="plan", ok=True, contains="chosen up front")
     mutate(v_, "a reaction with no reference post",
            plan_fn=lambda q: q["beats"][0]["reaction"].update(ref_id="r9"), cmd="plan", contains="not in reaction_refs")
     mutate(v_, "a reaction not found yet (null)", plan_fn=lambda q: q["beats"][0].update(reaction=None),
@@ -670,26 +671,25 @@ def motion_copy(assemble_on):
     rv = [PY, f"{SC}/review.py", "segment", v_, "01-x", "--decision", "approve", "--file",
           "generated/01-x-take1.mp4", "--words", "Keep it."]
     ok_checks = ["--check", "identity=pass", "--check", "no_source_identity=pass", "--check", "silent=pass"]
-    expect(f"{v_}: gate B refuses a motion copy without the no-trace check",
-           rv + ["--check", "identity=pass", "--check", "silent=pass"], ok=False, contains="no_source_identity")
+    warns(v_, "gate B records an unticked no-trace check as not claimed",
+          rv + ["--check", "identity=pass", "--check", "silent=pass"], "not claimed by the user: no_source_identity")
     dirty = os.path.join(sd, "generated", "01-x-dirty.mp4")
     ff("-ss", "0", "-to", "2.95", "-i", src, "-c:v", "libx264", "-pix_fmt", "yuv420p", dirty)
-    # The fixture's character pictures show no face: the real gate cannot run, and that refuses.
-    expect(f"{v_}: gate B refuses a take the identity gate could not run (no face in the fixture's pictures)",
-           rv + ok_checks, ok=False, contains="identity gate NOT RUN")
+    # The fixture's character pictures show no face: the real gate cannot run; a warning, recorded.
+    warns(v_, "gate B warns and records a take the identity gate could not run", rv + ok_checks,
+          "recorded: identity NOT RUN")
     # A take whose frames show no face: NO FACE lets the eye check decide (a visible face is
-    # not a requirement of motion copy), so the next gate, OCR, refuses this file.
+    # not a requirement of motion copy), so the next gate, OCR, reads the text: a warning.
     stub_identity("NO FACE")
-    expect(f"{v_}: gate B passes a take with no face to the next check (identity NO FACE)",
-           rv[:8] + ["generated/01-x-dirty.mp4"] + rv[9:] + ok_checks, ok=False, contains="OCR reads text")
+    warns(v_, "gate B passes a take with no face to the next check (identity NO FACE)",
+          rv[:8] + ["generated/01-x-dirty.mp4"] + rv[9:] + ok_checks, "OCR reads text")
     stub_identity("FAIL")
-    expect(f"{v_}: gate B refuses an identity FAIL, and names the override", rv + ok_checks, ok=False,
-           contains="--accept-fail identity")
+    warns(v_, "gate B warns and records an identity FAIL", rv + ok_checks, "recorded: identity FAIL")
     # Approve anyway (2026-10-21): the gate still runs; the user's words and the result are recorded.
     keep_ap = open(ap).read() if os.path.exists(ap) else None
     expect(f"{v_}: gate B approves an identity FAIL anyway, on the user's words",
            rv[:-1] + ["It is her; the light fooled the gate.", "--accept-fail", "identity"] + ok_checks,
-           contains="approved anyway on the user's words")
+           contains="approved anyway: identity")
     e = [x for x in rj(ap)["gate_b_segments"] if x.get("project") == f"{v_}.01-x"][-1]
     af = (e.get("accepted_failures") or [{}])[0]
     ok = e["decision"] == "approve" and af.get("gate") == "identity" and af.get("result") == "FAIL" \
@@ -705,14 +705,14 @@ def motion_copy(assemble_on):
                            "checks": {"identity": "pass", "no_source_identity": "pass", "silent": "pass"}},
           note="Keep it, the gate is wrong here.", at="2026-10-20T10:51:00.000Z")
     expect(f"{v_}: the Atlas approve-anyway line becomes --accept-fail identity", [PY, f"{SC}/review.py", "segment", v_,
-           "01-x", "--from-atlas"], contains="approved anyway on the user's words")
+           "01-x", "--from-atlas"], contains="approved anyway: identity")
     if keep_ap is None:
         os.remove(ap)
     else:
         open(ap, "w").write(keep_ap)
     stub_identity("PASS")
-    expect(f"{v_}: gate B refuses a file with the creator's caption and handle",
-           rv[:8] + ["generated/01-x-dirty.mp4"] + rv[9:] + ok_checks, ok=False, contains="--accept-fail ocr")
+    warns(v_, "gate B warns and records a file with the creator's caption and handle",
+          rv[:8] + ["generated/01-x-dirty.mp4"] + rv[9:] + ok_checks, "OCR reads text on the file")
     keep_ap = open(ap).read() if os.path.exists(ap) else None
     expect(f"{v_}: gate B approves it anyway with --accept-fail ocr",
            rv[:8] + ["generated/01-x-dirty.mp4"] + rv[9:] + ok_checks + ["--accept-fail", "ocr"], contains="ocr FAIL")
@@ -918,8 +918,8 @@ def guided_gate_b(v_, sd, sh, shp):
           "--check", "identity=pass", "--check", "no_source_identity=pass", "--check", "silent=pass"]
     g5 = os.path.join(sd, "generated", "01-x-guided.mp4")
     clip(g5, 5, "smptebars", 120, size="720x1280")
-    expect(f"{v_}: gate B refuses a guided take without follows_reference", rv + ["--file", "generated/01-x-guided.mp4"],
-           ok=False, contains="follows_reference")
+    warns(v_, "gate B records an unticked follows_reference as not claimed", rv + ["--file", "generated/01-x-guided.mp4"],
+          "not claimed by the user: follows_reference")
     g2 = os.path.join(sd, "generated", "01-x-short.mp4")
     clip(g2, 2, "smptebars", 120, size="720x1280")
     expect(f"{v_}: gate B refuses a guided take shorter than the clip",
@@ -1222,8 +1222,7 @@ def gate_c_anyway(video):
     man["checks"]["overlays readable"] = {"result": "FAIL", "detail": "the paragraph is up 1.2 s; it needs 2.4 s"}
     wj(os.path.join(vd, "assembly", "assembly.json"), man)
     fin = [PY, f"{SC}/review.py", "final", video, "--decision", "approve", "--words", "Fast is fine, it is a teaser."]
-    expect(f"{video}: gate C refuses a failed overlay check, and names the override", fin, ok=False,
-           contains="--accept-fail overlays")
+    warns(video, "gate C warns and records a failed overlay check", fin, "recorded: overlays FAIL")
     expect(f"{video}: gate C approves it anyway with --accept-fail overlays", fin + ["--accept-fail", "overlays"],
            contains="gate C: " + video + " approve")
     af = (rj(os.path.join(vd, "approval.json"))["gate_c_final"].get("accepted_failures") or [{}])[0]
@@ -1246,8 +1245,8 @@ def narration_anyway(video, take, text, lines):
     keep = open(ap).read() if os.path.exists(ap) else None
     base = [PY, f"{SC}/review.py", "narration", video, take, "--narrator", "calm", "--lines", lines, "--decision", "approve",
             "--words", "The flat read is the joke."]
-    expect(f"{video}: narration without the natural-voice check is refused, and names the override", base, ok=False,
-           contains="--accept-fail voice")
+    warns(video, "narration without the natural-voice check: recorded as not claimed", base,
+          "not claimed by the user: natural_voice")
     expect(f"{video}: narration approved anyway with --accept-fail voice", base + ["--accept-fail", "voice"],
            contains=f"gate B narration: {take}")
     row = rj(ap)["gate_b_narration"][-1]
@@ -1291,6 +1290,20 @@ def assemble(video, assemble_on):
         expect(f"{video}: gate C approve", [PY, f"{SC}/review.py", "final", video, "--decision", "approve",
                                             "--words", "Ship it."])
     return out
+
+
+def warns(video, label, cmd, contains):
+    """An approval over a failed gate or an unticked check (2026-10-21): it goes through with a
+    warning and a record. The video's JSON files are put back after, so the next test starts
+    from the same approvals."""
+    vd = p("pipeline", "character", video)
+    keep = {f: open(os.path.join(vd, f)).read() for f in os.listdir(vd) if f.endswith(".json")}
+    expect(f"{video}: {label}", cmd, contains=contains)
+    for f in os.listdir(vd):
+        if f.endswith(".json") and f not in keep:
+            os.remove(os.path.join(vd, f))
+    for f, t in keep.items():
+        open(os.path.join(vd, f), "w").write(t)
 
 
 def mutate(name, label, plan_fn=None, video_fn=None, cmd="validate", contains=None, relock=True, ok=False):
@@ -1373,12 +1386,12 @@ def motion_design_test(assemble_on):
     validate(v)
     expect(f"{v}: the plan check notes the library's recordings and the reason",
            [PY, f"{SC}/bridge.py", "plan", v], contains="motion design, while the screen library holds scan-result")
-    mutate(v, "motion design with no reason", plan_fn=lambda q: q["beats"][1].update(demo_source_reason=None),
-           cmd="plan", contains="needs demo_source_reason")
-    mutate(v, "motion design of a screen the library records",
+    mutate(v, "motion design with no reason, with a note", plan_fn=lambda q: q["beats"][1].update(demo_source_reason=None),
+           cmd="plan", ok=True, contains="no demo_source_reason")
+    mutate(v, "motion design of a screen the library records, with a note (the user's choice)",
            plan_fn=lambda q: (q["beats"][1].update(screen_id="scan-result"),
                               q["hero_strings"].update({"scan-result": "Relaxed tail"})),
-           cmd="plan", contains="real recording in the screen library")
+           cmd="plan", ok=True, contains="looks more like an advert")
     mutate(v, "a screen that PRODUCT-SCREENS.md does not describe",
            plan_fn=lambda q: q["beats"][1]["screen_story"].update(screens=["Tail Scanner"]),
            cmd="plan", contains="is not a heading of PRODUCT-SCREENS.md")
@@ -1413,8 +1426,8 @@ def motion_design_test(assemble_on):
         return
     expect(f"{v}: the gates refuse an invented interface line", [PY, f"{SC}/motion_design.py", "check", v, "02-r"],
            ok=False, contains="not in the story: ")
-    expect(f"{v}: gate B refuses the failed render, and names the override", [PY, f"{SC}/review.py", "motion", v, "02-r",
-           "--decision", "approve", "--words", "Looks good."], ok=False, contains="--accept-fail story_text")
+    warns(v, "gate B warns and records the failed render", [PY, f"{SC}/review.py", "motion", v, "02-r",
+          "--decision", "approve", "--words", "Looks good."], "recorded: story_text FAIL")
     eye = ["--check", "text=pass", "--check", "hero=pass"]
     expect(f"{v}: --accept-fail names a known gate", [PY, f"{SC}/review.py", "motion", v, "02-r", "--decision", "approve",
            "--words", "Keep it.", "--accept-fail", "vibes"] + eye, ok=False, contains="--accept-fail 'vibes'")
@@ -1450,7 +1463,7 @@ def motion_design_test(assemble_on):
     print(f"{'PASS' if ok else 'FAIL'}  {v}: ... and name the picture and the stale render")
     expect(f"{v}: a stale render is never approved anyway", [PY, f"{SC}/review.py", "motion", v, "02-r", "--decision",
            "approve", "--words", "Ship it.", "--accept-fail", "local_only", "--accept-fail", "assets"] + eye,
-           ok=False, contains="a stale render is never approved")
+           ok=False, contains="cannot approve: current failed")
     open(os.path.join(md, "index.html"), "w").write(keep)
     os.remove(os.path.join(md, "assets", "stray.png"))
     expect(f"{v}: the gates pass again", [PY, f"{SC}/motion_design.py", "check", v, "02-r"])
@@ -1502,6 +1515,25 @@ def md_render(v, seg, label):
     expect(f"{v}: gate B approves the {label} render", [PY, f"{SC}/review.py", "motion", v, seg, "--decision", "approve",
            "--words", "That is the app."] + eye, contains=f"gate B motion design: {seg} approve")
     return True
+
+
+def screens_recipe_test():
+    """The capture recipe of a screen recording is guidance (2026-10-21): screens.py check warns."""
+    sj = p("apps", "catapp", "screens", "screens.json")
+    keep = open(sj).read()
+    lib = json.loads(keep)
+    lib["screens"][0].update(expired=True, events=[{"t": 0.2, "gesture": "tap", "label": "a"},
+                                                    {"t": 0.4, "gesture": "tap", "label": "b"},
+                                                    {"t": 1.0, "gesture": "scroll", "label": "c"},
+                                                    {"t": 2.0, "gesture": "tap", "label": "d"},
+                                                    {"t": 5.5, "gesture": "tap", "label": "e"}])
+    wj(sj, lib)
+    out = expect("screens.py check warns on the capture recipe and an expired row, never refuses",
+                 [PY, f"{SC}/screens.py", "check", "catapp", "scan-result"])
+    ok = all(w in out for w in ("marked expired", "5 gestures", "stable frame 0.5 s", "holds 1 s", "pauses 0.4 s"))
+    RESULTS.append(("screens.py check names each recipe warning", ok))
+    print(f"{'PASS' if ok else 'FAIL'}  screens.py check names each recipe warning")
+    open(sj, "w").write(keep)
 
 
 def motion_phone_test(assemble_on):
@@ -1704,9 +1736,9 @@ def main():
     open(os.path.join(sd, "prompt.txt"), "w").write(B_PROMPT)
     atlas_narration("v2-hands-two-cats", "n1", pl["script"][0]["line"], "l1")
     narration_take("v2-hands-two-cats", "n2", pl["script"][1]["line"], "l2")
-    expect("v2-hands-two-cats: gate B refuses a take without the natural-voice check",
-           [PY, f"{SC}/review.py", "narration", "v2-hands-two-cats", "n1", "--narrator", "calm", "--lines", "l1",
-            "--decision", "approve", "--words", "ok"], ok=False, contains="natural-voice check")
+    warns("v2-hands-two-cats", "gate B records a take without the natural-voice check as not claimed",
+          [PY, f"{SC}/review.py", "narration", "v2-hands-two-cats", "n1", "--narrator", "calm", "--lines", "l1",
+           "--decision", "approve", "--words", "ok"], "not claimed by the user: natural_voice")
     for n in ("01-b", "02-b"):
         approve_segment("v2-hands-two-cats", n, gen_file("v2-hands-two-cats", n, "action"))
     assemble("v2-hands-two-cats", assemble_on)
@@ -1768,6 +1800,9 @@ def main():
                      "script_lines": [], "fit": "pad"}])
     validate("v2-split")
     approve_sources("v2-split", pl)
+    mutate("v2-split", "speech over the ceiling, with a note (the user's choice)",
+           plan_fn=lambda q: q["script"][0].update(line=" ".join(["word"] * 40)), cmd="plan", ok=True,
+           contains="it may sound rushed")
     narration_anyway("v2-split", "n1", pl["script"][0]["line"], "l1")
     narration_take("v2-split", "n1", pl["script"][0]["line"], "l1")
     assemble("v2-split", assemble_on)
@@ -1789,8 +1824,10 @@ def main():
     assemble("v2-diary", assemble_on)
     if assemble_on:
         gate_c_anyway("v2-diary")
-    mutate("v2-diary", "a paragraph too short to read",
-           plan_fn=lambda q: q["overlays"][2].update(end_s=8), cmd="plan", contains="to be read")
+    mutate("v2-diary", "a progress log with no day counter, with a note (the user's choice)",
+           plan_fn=lambda q: q.update(overlays=q["overlays"][1:]), cmd="plan", ok=True, contains="no day_counter overlay")
+    mutate("v2-diary", "a paragraph too short to read, with a note (the user's choice)",
+           plan_fn=lambda q: q["overlays"][2].update(end_s=8), cmd="plan", ok=True, contains="reading it takes")
     mutate("v2-diary", "a day counter that is not the series day",
            plan_fn=lambda q: q["overlays"][0].update(text="Day 11"), cmd="plan", contains="day 12")
     mutate("v2-diary", "a progress log without state facts",
@@ -1913,6 +1950,7 @@ def main():
     motion_design_test(assemble_on)
     motion_phone_test(assemble_on)
     motion_panel_test(assemble_on)
+    screens_recipe_test()
 
     print()
     bad = [l for l, ok in RESULTS if not ok]

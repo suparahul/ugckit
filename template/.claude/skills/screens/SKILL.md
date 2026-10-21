@@ -39,7 +39,8 @@ per row, from watching the recording with the user:
   `rect_source_px` `[x, y, w, h]` in the recording's own pixels, `t` the time it is on
   screen, and `needs`: `recognition`, `large type` or `body text`.
 - `mode` (`light` or `dark`), `app_version`, `date`. A recording expires when the app's UI
-  changes: set `"expired": true` and ask for a new one.
+  changes: set `"expired": true` and offer to record a new one (check warns; using it is
+  the user's choice).
 - For a finger shot (F): `stills.long` (a long screenshot, for a scroll) or `stills.start`
   and `stills.end` (for a swipe).
 - `patches`: regions to cover, such as a notification banner, in source pixels.
@@ -52,10 +53,11 @@ reviews.
 
     scripts/character/screens.py check <slug> [id ...]
 
-The capture recipe, as checks: at most three gestures; a stable first frame held 0.5 s
-before the first gesture; 0.4 s or more after each tap; the result held 1 s at the end;
-the hero rect inside the source; and the hero string read by OCR in the source. A row
-that fails is described again or recorded again. The recipe the user can follow, when
+The capture recipe, as warnings (2026-10-21: guidance, never a refusal): at most three
+gestures; a stable first frame held 0.5 s before the first gesture; 0.4 s or more after
+each tap; the result held 1 s at the end; an expired row. Checks: the hero rect inside the
+source, and the hero string read by OCR in the source. Say the trade-off of a warning
+(a fast tap is hard to follow); recording again is the user's choice. The recipe the user can follow, when
 they ask how to record:
 
 1. A demo account with real-looking, true data. Do Not Disturb on, full battery, no

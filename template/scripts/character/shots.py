@@ -580,17 +580,19 @@ def cmd_validate(video):
         elif not isinstance(dur, int) or not lo <= dur <= hi:
             bad(f"{name}: duration_seconds {dur!r}; the model takes whole seconds from {lo} to {hi}")
             dur = lo
-        if not fr and trim not in (None, "null") and not (isinstance(trim, (int, float)) and 3 <= trim < dur):
-            bad(f"{name}: trim_to_seconds {trim!r}; it is the planned length, 3 s or more and "
-                "under the generated length, or null")
+        # Under the generated length is a hard rule; the 3 s floor is guidance (2026-10-21), noted.
+        if not fr and trim not in (None, "null") and not (isinstance(trim, (int, float)) and 0 < trim < dur):
+            bad(f"{name}: trim_to_seconds {trim!r}; it is the planned length, under the generated length, or null")
             trim = None
+        elif not fr and isinstance(trim, (int, float)) and trim < 3:
+            note(f"{name}: trim_to_seconds {trim:g}, under 3 s: a very short cut (the user's choice)")
         planned = trim if isinstance(trim, (int, float)) else dur
         if not fr:
             total += planned
         words = sum(len(lines[l]["line"].split()) for l in sl if l in lines)
         if words and words / planned > MAX_WORDS_PER_S:
-            bad(f"{name}: {words} words in {planned} s is over {MAX_WORDS_PER_S} words a second "
-                "-- fewer words, or a longer segment")
+            note(f"{name}: {words} words in {planned} s is over {MAX_WORDS_PER_S} words a second: it may sound "
+                 "rushed and the lip sync may drift (the user's choice)")
         if t in ("H", "F") and sl:
             bad(f"{name}: an {t} segment speaks no line on camera; its audio is laid at assembly")
         if t == "X":

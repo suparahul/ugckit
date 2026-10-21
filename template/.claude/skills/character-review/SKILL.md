@@ -82,15 +82,16 @@ it.** The checklist (the user sees the same list):
   (OpenCV YuNet and SFace; 0.363 is "same person"). Only the frames that show a face are
   measured. PASS needs a median similarity to the character of 0.363 or more and the face
   closer to the character than to the clip's person in 75% of those frames. NO FACE (no
-  frame shows a face) measures nothing: your eye check decides alone. A FAIL is a reject,
-  whatever the face looks like at a glance: the retired edit route scored 0.18 to the
-  character and 0.90 to the reference. The face models (about 39 MB) are fetched once into
+  frame shows a face) measures nothing: your eye check decides alone. Recommend a reject on
+  a FAIL, whatever the face looks like at a glance: the retired edit route scored 0.18 to
+  the character and 0.90 to the reference. The decision is the user's. The face models (about 39 MB) are fetched once into
   `scripts/character/face-models/` and checked by sha256. `qc.py` prints the same gate, and
-  `review.py` runs it again and refuses an approval on a FAIL (or when it could not run),
-  unless the user approves it anyway: `--accept-fail identity` with their words (the Atlas:
-  "Approve anyway" with a note), recorded in approval.json. Then `review.py`
-  approves it only with
-  `--check identity=pass --check no_source_identity=pass --check silent=pass`. On the
+  `review.py` runs it again. An approval over a FAIL (or a gate that could not run) is the
+  user's (2026-10-21): it warns and records the gate, its result and their words in
+  approval.json (`--accept-fail identity` says so; the Atlas: "Approve anyway" with a
+  note). OCR text on the file is the same (`ocr`). The eye checks
+  `--check identity=pass --check no_source_identity=pass --check silent=pass` are the
+  user's claims: one not ticked is recorded as "not claimed", never refused. On the
   `motion`, `replace` and `animate` routes the file is within 0.25 s of the clip the model
   got (on the motion route, the range padded to 3.0 s; the take is trimmed to the range
   at assembly). On the `guided` route the
@@ -143,7 +144,7 @@ phone segment's composite: `review.py composite <video> <nn>-<type> --from-atlas
 the user picked from the older takes is approved the same way: the line names its file.
 The supplied sources and the narration takes have their own cards and lines:
 `review.py source <video> <asset-id> --from-atlas` and `review.py narration <video> <take>
---from-atlas` (the natural-voice check ticked); a motion-designed screen's render,
+--from-atlas` (the natural-voice check ticked, or recorded as not claimed); a motion-designed screen's render,
 `review.py motion <video> <nn>-<r|p> --from-atlas`. First, every session: `scripts/character/review.py pending <video>` lists each Atlas click
 that no file records yet, with the command that records it. Record those before you ask
 the user again.

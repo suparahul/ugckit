@@ -30,7 +30,8 @@ The folder is pipeline/character/<video>/segments/<seg>/motion/:
   render.json   what was rendered, from which page, assets and story (sha256 of each)
   gates.json    the gates of that render
 
-The gates (all must pass before review.py motion approves the render at gate B):
+The gates (review.py motion approves the render at gate B; current, format and page must
+pass; an approval over another failed gate is the user's, warned and recorded, 2026-10-21):
   current       render.json matches the page, the assets, assets.json and the plan's story now
   format        1080x1920 (fit screen: 1080 wide, the screen's own height), 30 fps, at least
                 the story's seconds

@@ -34,7 +34,7 @@ import { MAX_SLIDES, PLATFORM_NAME, linePlatform, platformOf, primaryOf, type Pl
 import { slotKey, slotTimes } from "./slots.ts";
 import { accountsOf, hasKey, legsPost, postBody, postBridge, sendStatusOf, type CreatePostInput, type PostBridgeClient, type RequestPreview, type Leg, type SentPost, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type AccountsFile, type PBAccount, type SendStatus, type SyncReport } from "./postbridge.ts";
 import { allStates, appendEvent, filesRoot, fileKey, getProduction, isSent, legsOfSent, postingStep, readLog, recordOutcome, storeOf, type Event, type PostState } from "./production.ts";
-import { checkVideoSend, directBlock, instagramBlock, videoReminders } from "./video-post.ts";
+import { checkVideoSend, musicDirectNote, musicInstagramNote, videoReminders } from "./video-post.ts";
 import { finalFileOf } from "./video.ts";
 import { findLinks, monidRuns, savedRunsFetch, type LinkReport } from "./tiktok-link.ts";
 import { keepRun } from "./monid-archive.ts";
@@ -77,12 +77,12 @@ export function accountFor(slug: string, handle: string, platform: Platform = "t
 }
 
 /** What the post page needs to draw the panel: the button's availability and why not. */
-export function bridgeInfo(state: PostState): { keySet: boolean; account: PBAccount | null; why: string | null; canSend: boolean; /** A video that cannot go as it is: the reason (no caption, not the approved file, a limit). */ videoSkip?: string | null; /** Why a direct post is refused (a video with a music note), or null. */ directBlock?: string | null } {
+export function bridgeInfo(state: PostState): { keySet: boolean; account: PBAccount | null; why: string | null; canSend: boolean; /** A video that cannot go as it is: the reason (no caption, not the approved file, a limit). */ videoSkip?: string | null; /** A video with a music note: the warning shown beside a direct post (never a stop), or null. */ musicNote?: string | null } {
   const { account, why } = accountFor(state.row.slug, state.row.handle);
   const keySet = hasKey();
   const finalOk = state.final.status === "approved" && ["ready", "posted", "read"].includes(state.stage);
   const videoSkip = state.video && finalOk && state.video.final ? videoCheck(state, "draft", state.platforms).check.skip : null;
-  return { keySet, account, why: !keySet ? "POST_BRIDGE_API_KEY is not set in .env" : why, canSend: keySet && !!account && !why && finalOk && !videoSkip, ...(state.video ? { videoSkip, directBlock: directBlock(state.video.plan?.music) } : {}) };
+  return { keySet, account, why: !keySet ? "POST_BRIDGE_API_KEY is not set in .env" : why, canSend: keySet && !!account && !why && finalOk && !videoSkip, ...(state.video ? { videoSkip, musicNote: musicDirectNote(state.video.plan?.music) } : {}) };
 }
 
 /** The one note line under the band's sentence. Never the cover text itself; the account warning sits under the button instead. */
@@ -100,7 +100,7 @@ export function sendWarning(state: PostState, info: ReturnType<typeof bridgeInfo
   if (!info.account) return `Connect ${state.row.handle} in Post Bridge to enable sending.`;
   if (info.why) return `Reconnect ${state.row.handle} in Post Bridge to enable sending.`;
   if (info.videoSkip) return `Not sendable: ${info.videoSkip}.`;
-  if (info.directBlock) return `No direct post: ${info.directBlock}.`;
+  if (info.musicNote) return info.musicNote;
   return null;
 }
 
@@ -198,8 +198,6 @@ export function selectSends(slug: string, sel: SendSelect): SendPlan[] {
         !account ? why
         : why ? `${why}; then run node scripts/postbridge-accounts.mjs`
         : sent ? `sent already (${leg!.sent!.at.slice(0, 16).replace("T", " ")}, Post Bridge post ${leg!.sent!.id}${leg!.sent!.mode === "direct" ? ", direct" : ""}${p === "tiktok" ? "" : `, ${PLATFORM_NAME[p]}`}); --force to send again`
-        /* A video with a music note: TikTok draft only; the founder posts it to Instagram himself. */
-        : p === "instagram" && s.video ? instagramBlock(s.video.plan?.music)
         : null;
       return { platform: p, account: account?.id ?? null, skip, sent };
     });
@@ -227,6 +225,9 @@ export function selectSends(slug: string, sel: SendSelect): SendPlan[] {
     const warnings: string[] = [];
     for (const l of legs) if (l.skip && !skip) warnings.push(`${PLATFORM_NAME[l.platform]} is left out: ${l.skip}`);
     if (!skip && vc) warnings.push(...vc.check.warnings);
+    /* A music note on the Instagram leg: the Reel goes with the file's own sound (the user's choice, 2026-10-21). */
+    const igMusic = s.video && legs.some((l) => l.platform === "instagram" && !l.skip) ? musicInstagramNote(s.video.plan?.music) : null;
+    if (!skip && igMusic) warnings.push(igMusic);
     if (!skip && open.some((l) => l.platform === "instagram") && mode === "draft") {
       /* Instagram has no drafts: the leg publishes when the send runs. Q3: at the slot time, with TikTok's. */
       const slotAt = slotInstant(slug, s.row.handle, s.row.date, s.row.slot);
@@ -338,7 +339,7 @@ export function videoRequest(slug: string, key: string, opts: { force?: boolean;
   const plan = selectSends(slug, { keys: [key], force: opts.force, mode: opts.mode, at: opts.at, only: opts.only, noKey: opts.noKey })[0];
   if (!plan) throw new Error(`No post ${key}.`);
   if (plan.skip) throw new Error(plan.skip);
-  if (!plan.video?.sha256 || !plan.video.caption || plan.video.bytes === null) throw new Error("The video is not ready to send.");
+  if (!plan.video?.sha256 || plan.video.caption === null || plan.video.bytes === null) throw new Error("The video is not ready to send.");
   const legs = plan.legs.filter((l) => !l.skip && l.account !== null).map((l) => ({ platform: l.platform, account: l.account! }));
   const caption = plan.video.caption;
   const input = (mediaId: string) => {
@@ -375,6 +376,8 @@ async function sendVideo(slug: string, key: string, opts: { force?: boolean; mod
   appendEvent(slug, { post: key, kind: "posting.sent", actor: "agent", data: {
     provider: "postbridge", id: post.id, media: media_id, account: first.account, status: post.status, mode: plan.mode, ...(direct ? { scheduledAt: plan.scheduledAt! } : {}),
     video: v.id, sha256: v.sha256!,
+    /* The user's choices the send went with (2026-10-21): a music note not applied, no caption. */
+    ...(plan.warnings.some((w) => /music note|No caption/.test(w)) ? { choices: plan.warnings.filter((w) => /music note|No caption/.test(w)).join(" | ") } : {}),
     ...(legs.length === 1 && first.platform === "tiktok" ? {} : {
       legs: legs.map((l) => ({ platform: l.platform, account: l.account, mode: plan.mode, scheduledAt: direct ? plan.scheduledAt : null, status: post.status })),
     }),

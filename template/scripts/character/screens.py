@@ -25,11 +25,18 @@ GESTURES = ("tap", "scroll", "swipe")
 TYPE_MODE = {"O": "over-shoulder", "G": "in-hand", "S": "show-to-camera", "H": "push", "F": "finger"}
 
 PROBLEMS = []
+WARNINGS = []
 
 
 def bad(msg):
     PROBLEMS.append(msg)
     print(f"  ✗ {msg}")
+
+
+def warn(msg):
+    """The capture recipe is guidance (2026-10-21): a row against it is noted, never refused."""
+    WARNINGS.append(msg)
+    print(f"  ! {msg}")
 
 
 def good(msg):
@@ -172,7 +179,8 @@ def cmd_check(slug, ids):
         before = len(PROBLEMS)
         p = os.path.join(sdir(slug), r["file"])
         if r.get("expired"):
-            bad(f"{r['id']}: marked expired (the app's UI changed) -- the user records it again")
+            warn(f"{r['id']}: marked expired (the app's UI changed): it may not show the app as it is now; "
+                 "recording it again is the user's choice")
         if not os.path.exists(p):
             bad(f"{r['id']}: {r['file']} is not on disk")
             continue
@@ -197,17 +205,18 @@ def cmd_check(slug, ids):
             else:
                 if any(e.get("gesture") not in GESTURES for e in ev):
                     bad(f"{r['id']}: an event's gesture is tap, scroll or swipe")
+                w0 = len(WARNINGS)
                 if len(gest) > 3:
-                    bad(f"{r['id']}: {len(gest)} gestures; one recording, one job, at most three gestures "
-                        "(more than that is an R cutaway, or two recordings)")
+                    warn(f"{r['id']}: {len(gest)} gestures; the recipe is one job, at most three gestures "
+                         "(more can be hard to follow)")
                 if ts and ts[0] < 0.5:
-                    bad(f"{r['id']}: the first gesture at {ts[0]} s; hold a stable frame 0.5 s first")
+                    warn(f"{r['id']}: the first gesture at {ts[0]} s; the recipe holds a stable frame 0.5 s first")
                 if ts and dur and dur - ts[-1] < 1.0:
-                    bad(f"{r['id']}: the last gesture at {ts[-1]} s of {dur} s; end on the result and hold 1 s")
+                    warn(f"{r['id']}: the last gesture at {ts[-1]} s of {dur} s; the recipe ends on the result and holds 1 s")
                 for a, b in zip(ev, ev[1:]):
                     if a.get("gesture") == "tap" and b["t"] - a["t"] < 0.4:
-                        bad(f"{r['id']}: only {b['t'] - a['t']:.2f} s after the tap at {a['t']} s; pause 0.4 s or more")
-                if ts and len(PROBLEMS) == before:
+                        warn(f"{r['id']}: only {b['t'] - a['t']:.2f} s after the tap at {a['t']} s; the recipe pauses 0.4 s")
+                if ts and len(PROBLEMS) == before and len(WARNINGS) == w0:
                     good(f"{len(gest)} gesture(s) in {dur} s, holds and pauses as the recipe asks")
             if (r.get("fps") or 0) and r["fps"] < 30:
                 print(f"  ! {r['fps']} fps; 60 fps when the phone offers it")

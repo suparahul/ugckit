@@ -184,13 +184,11 @@ function productionLine(state: PostState | undefined, kind: EventKind, sent: Rec
     const x = p.narration.find((s) => s.take === sent.take);
     if (!x) return { error: "No such narration take in this video." };
     if (!x.sha256 || !x.file) return { error: `No narration/${x.take}.wav yet.` };
+    /* The natural-voice check is the user's claim: unticked, review.py records it as not claimed. */
     const natural = Array.isArray(sent.checks) && sent.checks.map(String).includes("natural_voice");
-    if (kind === "narration.approve") {
-      if (!natural && !accepts.includes("voice")) return { error: "Tick the natural-voice check first, or approve anyway with your note." };
-      if (!x.lines.length || !x.narrator) return { error: "No voiceover line of the plan names this take's narrator." };
-    }
+    if (kind === "narration.approve" && (!x.lines.length || !x.narrator)) return { error: "No voiceover line of the plan names this take's narrator." };
     return { data: { video, take: x.take, file: x.file, sha256: x.sha256, narrator: x.narrator, lines: x.lines,
-      ...(kind === "narration.approve" ? (natural ? { checks: { natural_voice: "pass" } } : { accept_fail: ["voice"] }) : {}) } };
+      ...(kind === "narration.approve" && natural ? { checks: { natural_voice: "pass" } } : {}) } };
   }
   if (kind === "cut.approve" || kind === "cut.sendback") {
     const a = p.assembly;
@@ -221,9 +219,9 @@ function productionLine(state: PostState | undefined, kind: EventKind, sent: Rec
     if (!m.gates) return { error: "The gates have not run on this render: the agent runs motion_design.py check." };
     const ticked = Array.isArray(sent.checks) ? sent.checks.map(String) : [];
     const { stale, seen, accept: acc } = motionAccepts(m, ticked);
-    if (stale) return { error: "The render is not of the page and the story now: the agent renders and checks again." };
+    if (stale) return { error: "The render is stale, of the wrong format or had a page error: the agent renders and checks again." };
     const open = acc.filter((g) => !accepts.includes(g));
-    if (open.length) return { error: `Not passed: ${open.join(", ")}. Reject it, tick what you read on the stills, or approve anyway with your note.` };
+    if (open.length) return { error: `Failed gates: ${open.join(", ")}. Reject it, or approve anyway with your note.` };
     return { data: { video, segment: seg.name, file: "motion/render.mp4", sha256: m.render.sha256, ...(seen.length ? { checks: Object.fromEntries(seen.map((c) => [c, "pass"])) } : {}), ...(acc.length ? { accept_fail: acc } : {}) } };
   }
   if (kind === "composite.approve" || kind === "composite.sendback") {
@@ -241,9 +239,8 @@ function productionLine(state: PostState | undefined, kind: EventKind, sent: Rec
     if (!take.identity) return { error: "The identity gate has not run on this take: the agent runs scripts/character/identity.py first." };
     if (!identityOk(take.identity.result) && !accepts.includes("identity")) return { error: `The identity gate says ${take.identity.result}${take.identity.why ? `: ${take.identity.why}` : ""}. Reject this take, or approve anyway with your note.` };
   }
+  /* The eye checks are the user's claims: a ticked one is recorded as passed; review.py records an unticked one as not claimed. */
   const ticked = Array.isArray(sent.checks) ? sent.checks.map(String) : [];
-  const miss = seg.checks.filter((c) => !ticked.includes(c));
-  if (miss.length) return { error: `Tick every check first: ${miss.join(", ")}.` };
   const idFail = !!seg.motionCopy && !identityOk(take.identity?.result);
-  return { data: { video, segment: seg.name, file: take.file, sha256: take.sha256, checks: Object.fromEntries(seg.checks.map((c) => [c, "pass"])), ...(idFail ? { accept_fail: ["identity"] } : {}) } };
+  return { data: { video, segment: seg.name, file: take.file, sha256: take.sha256, checks: Object.fromEntries(seg.checks.filter((c) => ticked.includes(c)).map((c) => [c, "pass"])), ...(idFail ? { accept_fail: ["identity"] } : {}) } };
 }

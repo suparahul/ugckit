@@ -244,16 +244,16 @@ function SegmentCard({ post, s, p, live }: { post: string; s: Segment; p: Produc
         <>
           {s.checks.length ? (
             <fieldset className="vprod__checks">
-              <legend>Before you approve, check each one by eye</legend>
+              <legend>Check each one by eye; a box you leave empty is recorded as not claimed</legend>
               {s.checks.map((c) => (
                 <label key={c}><input type="checkbox" checked={ticked.includes(c)} onChange={(e) => setTicked(e.target.checked ? [...ticked, c] : ticked.filter((x) => x !== c))} /> {CHECK_WORDS[c] ?? c}</label>
               ))}
             </fieldset>
           ) : <p className="sr__hint">Look at the face, the hands, the mouth and the voice, the set and the light, and any text in the picture.</p>}
           <div className="sr__actions">
-            <button type="button" className="pill pill--go" disabled={busy || !idOk || s.checks.some((c) => !ticked.includes(c))} onClick={() => send("take.approve", { checks: ticked })}>Approve this take{pick ? ` (take ${s.takes.length - s.takes.findIndex((x) => x.file === pick)})` : ""}</button>
+            <button type="button" className="pill pill--go" disabled={busy || !idOk} onClick={() => send("take.approve", { checks: ticked })}>Approve this take{pick ? ` (take ${s.takes.length - s.takes.findIndex((x) => x.file === pick)})` : ""}</button>
             {!rejecting ? <button type="button" className="pill" disabled={busy} onClick={() => setRejecting(true)}>Reject…</button> : null}
-            {!idOk && t.identity ? <ApproveAnyway gates={["the identity gate"]} busy={busy || s.checks.some((c) => !ticked.includes(c))} onSend={(n) => send("take.approve", { checks: ticked, accept_fail: ["identity"] }, n)} /> : null}
+            {!idOk && t.identity ? <ApproveAnyway gates={["the identity gate"]} busy={busy} onSend={(n) => send("take.approve", { checks: ticked, accept_fail: ["identity"] }, n)} /> : null}
             {!idOk ? <span className="rail__why is-bad">{t.identity ? "the identity gate did not pass: reject the take, or approve anyway with your note" : "the identity gate has not run"}</span> : null}
           </div>
           {rejecting ? (
@@ -322,15 +322,15 @@ function MotionDesign({ post, s, m, live }: { post: string; s: Segment; m: Motio
         <>
           {need.length ? (
             <fieldset className="vprod__checks">
-              <legend>No OCR engine ran: read the stills yourself</legend>
+              <legend>No OCR engine ran: read the stills yourself (a box you leave empty is recorded as not claimed)</legend>
               {need.map((c) => <label key={c}><input type="checkbox" checked={eye.includes(c)} onChange={(e) => setEye(e.target.checked ? [...eye, c] : eye.filter((x) => x !== c))} /> {c === "text" ? "every step shows its strings, readable" : "the hero string is readable"}</label>)}
             </fieldset>
           ) : null}
           <div className="sr__actions">
-            <button type="button" className="pill pill--go" disabled={busy || !!m.failed.length || need.some((c) => !eye.includes(c))} onClick={() => run("motion.approve")}>Approve this motion design</button>
+            <button type="button" className="pill pill--go" disabled={busy || !!m.failed.length} onClick={() => run("motion.approve")}>Approve this motion design</button>
             <SendBack label="Reject…" busy={busy} placeholder="What is wrong: a screen, a word, the timing." onSend={(n) => run("motion.reject", n)} />
             {anyway.length ? <ApproveAnyway gates={anyway} busy={busy} onSend={(n) => run("motion.approve", n, anyway)} /> : null}
-            {m.failed.length ? <span className="rail__why">{stale ? "the render is not of the page and the story now: the agent renders and checks again" : `failed gates: ${m.failed.join(", ")}`}</span> : null}
+            {m.failed.length ? <span className="rail__why">{stale ? "the render is stale, of the wrong format or had a page error: the agent renders and checks again" : `failed gates: ${m.failed.join(", ")}`}</span> : null}
           </div>
         </>
       ) : null}
@@ -389,12 +389,11 @@ function NarrationCard({ post, x, live }: { post: string; x: Narration; live: bo
       {live && x.sha256 && !x.approved && !pending ? (
         <>
           <fieldset className="vprod__checks">
-            <legend>The natural-voice check</legend>
+            <legend>The natural-voice check (left empty, it is recorded as not claimed)</legend>
             <label><input type="checkbox" checked={natural} onChange={(e) => setNatural(e.target.checked)} /> natural breaths, varied pauses, room sound, no flat text-to-speech cadence</label>
           </fieldset>
           <div className="sr__actions">
-            <button type="button" className="pill pill--go" disabled={busy || !natural || !x.lines.length} onClick={() => run("narration.approve")}>Approve this take</button>
-            {!natural && x.lines.length ? <ApproveAnyway gates={["the natural-voice check"]} busy={busy} onSend={(n) => run("narration.approve", n, ["voice"])} /> : null}
+            <button type="button" className="pill pill--go" disabled={busy || !x.lines.length} onClick={() => run("narration.approve")}>Approve this take</button>
             <SendBack label="Reject…" busy={busy} placeholder="What is wrong with this take." onSend={(n) => run("narration.reject", n)} />
             {!x.lines.length ? <span className="rail__why">no voiceover line of the plan uses this take</span> : null}
           </div>

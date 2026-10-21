@@ -20,7 +20,7 @@ process.env.ATLAS_ROOT = WS;
 process.env.POST_BRIDGE_API_KEY = "pb_test_not_a_key";
 process.chdir(CWD);
 
-const { VIDEO_LIMITS, checkVideoSend, directBlock, videoCaption, videoReminders } = await import("./video-post.ts");
+const { VIDEO_LIMITS, checkVideoSend, musicDirectNote, videoCaption, videoReminders } = await import("./video-post.ts");
 const { legsPost, postBody, postBridge } = await import("./postbridge.ts");
 const { bridgeInfo, postingNotes, requestPreviews, selectSends, sendPosts, sendWarning } = await import("./postbridge-flow.ts");
 const { allStates, readLog } = await import("./production.ts");
@@ -104,7 +104,12 @@ test("checkVideoSend: the file must be the delivered and the approved one; capti
   assert.match(checkVideoSend({ ...ok, sha256: null }).skip!, /is missing/);
   assert.match(checkVideoSend({ ...ok, sha256: "c".repeat(64) }).skip!, /not the delivered file/);
   assert.match(checkVideoSend({ ...ok, approved: "d".repeat(64) }).skip!, /not the one approved/);
-  assert.match(checkVideoSend({ ...ok, caption: null }).skip!, /no publishing_note.caption/);
+  /* No caption (2026-10-21): a warning, never a stop; the post carries its tags, or nothing. */
+  const bare = checkVideoSend({ ...ok, caption: null });
+  assert.equal(bare.skip, null);
+  assert.equal(bare.caption, "");
+  assert.match(bare.warnings.join("\n"), /No caption .*an empty caption \(your choice\)/);
+  assert.equal(checkVideoSend({ ...ok, caption: null, tags: ["#cattok"] }).caption, "#cattok");
   assert.match(checkVideoSend({ ...ok, caption: "x".repeat(VIDEO_LIMITS.captionChars + 1) }).skip!, /2200/);
   assert.match(checkVideoSend({ ...ok, caption: Array.from({ length: 31 }, (_, i) => `#t${i}`).join(" ") }).skip!, /31 hashtags; Instagram takes 30/);
   assert.equal(checkVideoSend({ ...ok, caption: Array.from({ length: 31 }, (_, i) => `#t${i}`).join(" "), platforms: ["tiktok"] }).skip, null, "the hashtag limit is Instagram's");
@@ -113,11 +118,12 @@ test("checkVideoSend: the file must be the delivered and the approved one; capti
   assert.match(checkVideoSend({ ...ok, bytes: 301 * 1024 * 1024 }).skip!, /Reels through the API/);
 });
 
-test("checkVideoSend: the founder's rules — a music note means a TikTok draft only; the AI label and the reminders", () => {
+test("checkVideoSend: a music note warns on a direct post (the user's choice); the AI label and the reminders", () => {
   const base = { id: ID, caption: "c", sha256: SHA, delivered: SHA, approved: SHA, bytes: 1, duration: 15, platforms: ["tiktok", "instagram"] as ("tiktok" | "instagram")[] };
-  /* A music note: direct is refused, draft goes, with the sound reminder. */
-  assert.match(checkVideoSend({ ...base, music: "a soft piano", mode: "direct" }).skip!, /music note .*TikTok draft only.*add the sound on the phone/);
-  assert.match(checkVideoSend({ ...base, music: "a soft piano", mode: "direct", platforms: ["instagram"] }).skip!, /TikTok draft only/);
+  /* A music note: direct goes with a warning (2026-10-21); the draft goes with the sound reminder. */
+  const dm = checkVideoSend({ ...base, music: "a soft piano", mode: "direct" });
+  assert.equal(dm.skip, null);
+  assert.match(dm.warnings.join("\n"), /music note \(“a soft piano”\): a direct post plays the file's own sound only.*recorded on the send line/);
   const draft = checkVideoSend({ ...base, music: "a soft piano", mode: "draft" });
   assert.equal(draft.skip, null);
   const said = draft.warnings.join("\n");
@@ -132,7 +138,7 @@ test("checkVideoSend: the founder's rules — a music note means a TikTok draft 
   assert.match(direct.warnings.join("\n"), /AI-generated label is sent on/);
   assert.doesNotMatch(direct.warnings.join("\n"), /paste it|Add the sound/);
   assert.equal(checkVideoSend({ ...base, music: "<a note only>", mode: "direct" }).skip, null);
-  assert.equal(directBlock(null), null);
+  assert.equal(musicDirectNote(null), null);
   assert.deepEqual(videoReminders(null).length, 2);
 });
 
@@ -168,12 +174,12 @@ test("selectSends: an approved, delivered video is sendable on both legs, with i
   assert.equal(bridgeInfo(s).canSend, true);
 });
 
-test("selectSends: no caption, a file changed after delivery, or an approval of another file stops the send", () => {
+test("selectSends: no caption warns; a file changed after delivery, or an approval of another file stops the send", () => {
   ready({ caption: "<optional>" });
-  assert.match(selectSends(SLUG, { keys: [KEY] })[0].skip!, /no publishing_note.caption/);
-  const s = allStates(SLUG)[0];
-  assert.equal(bridgeInfo(s).canSend, false);
-  assert.match(bridgeInfo(s).videoSkip!, /caption/);
+  const nc = selectSends(SLUG, { keys: [KEY] })[0];
+  assert.equal(nc.skip, null);
+  assert.match(nc.warnings.join("\n"), /No caption in plan.json .*\(your choice\)/);
+  assert.equal(bridgeInfo(allStates(SLUG)[0]).canSend, true);
   ready();
   w(`${VD}/final/${ID}.mp4`, Buffer.from("another file"));
   assert.match(selectSends(SLUG, { keys: [KEY] })[0].skip!, /not the delivered file/);
@@ -245,42 +251,45 @@ test("a dry run sends nothing; the export still refuses a video", async () => {
   assert.ok(readFileSync(join(WS, VD, "final", `${ID}.mp4`)).equals(BYTES), "the delivered file is untouched");
 });
 
-test("a video with a music note: direct refused before any call, the draft goes, the page says why and what to do", async () => {
+test("a video with a music note: every send is offered with a warning, and the send line records the choice", async () => {
   ready({ music: "lofi under the voice" });
-  const { pb, calls } = mockPB();
-  const at = new Date(Date.now() + 86_400_000).toISOString();
-  const refused = await sendPosts(SLUG, { keys: [KEY], mode: "direct", at, pb });
-  assert.match(refused.plans[0].skip!, /TikTok draft only/);
-  assert.deepEqual(refused.results, []);
-  assert.equal(calls.length, 0, "nothing reached Post Bridge");
   const s = allStates(SLUG)[0];
   const info = bridgeInfo(s);
   assert.equal(info.canSend, true, "the draft is offered");
-  assert.match(info.directBlock!, /TikTok draft only/);
-  assert.match(sendWarning(s, info)!, /^No direct post: .*add the sound on the phone/);
+  assert.match(info.musicNote!, /direct post plays the file's own sound only/);
+  assert.match(sendWarning(s, info)!, /music note .*A TikTok draft lets you add it on the phone/);
   const { nextStep } = await import("./production.ts");
-  assert.match(nextStep(s).text, /TikTok drafts; it has a music note, so no direct post/);
+  assert.match(nextStep(s).text, /add the music on the phone, or schedule a direct post with the file's own sound/);
   assert.deepEqual(postingNotes(s), [
     "In TikTok, turn on the AI-generated label before you post: the draft may not carry it.",
     "TikTok's video inbox may not carry the caption: paste it from the caption block.",
     "Add the sound on the phone: “lofi under the voice”.",
   ]);
   const [plan] = selectSends(SLUG, { keys: [KEY] });
-  assert.deepEqual(plan.legs.map((l) => [l.platform, l.skip !== null]), [["tiktok", false], ["instagram", true]]);
-  assert.match(plan.warnings.join("\n"), /Instagram is left out: this video has a music note, so it stays off Instagram: post it there yourself/);
-  assert.match(selectSends(SLUG, { keys: [KEY], only: "instagram" })[0].skip!, /stays off Instagram/);
+  assert.deepEqual(plan.legs.map((l) => [l.platform, l.skip !== null]), [["tiktok", false], ["instagram", false]]);
+  assert.match(plan.warnings.join("\n"), /Instagram Reel plays the file's own sound, without it/);
+  assert.equal(selectSends(SLUG, { keys: [KEY], only: "instagram" })[0].skip, null);
+  const { pb, calls } = mockPB();
   const sent = await sendPosts(SLUG, { keys: [KEY], pb });
   assert.equal(sent.results[0].ok, true);
-  /* Off Instagram by default: one TikTok account, no Instagram configuration. */
-  assert.deepEqual(calls[2].body, { caption: "what the vet tech said #cattok #vettech", social_accounts: [7], media: ["mid_video"], platform_configurations: { tiktok: { draft: true, is_aigc: true } } });
+  /* Both legs: the one file on TikTok (draft) and Instagram (the Reel). */
+  assert.deepEqual((calls[2].body as { social_accounts: number[] }).social_accounts, [7, 8]);
+  const line = readFileSync(join(WS, `apps/${SLUG}/production/log.jsonl`), "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "posting.sent").pop();
+  assert.match(String(line.data.choices), /Instagram Reel plays the file's own sound/, "the send line records the choice");
   /* In the drafts: the reminders stay until it is marked posted. */
   assert.equal(postingNotes(allStates(SLUG)[0]).length, 3);
+  /* A direct post goes too, with the warning. */
+  ready({ music: "lofi under the voice" });
+  const at = new Date(Date.now() + 86_400_000).toISOString();
+  const direct = await sendPosts(SLUG, { keys: [KEY], mode: "direct", at, pb: mockPB().pb });
+  assert.equal(direct.plans[0].skip, null);
+  assert.equal(direct.results[0].ok, true);
 });
 
 test("a video with no music note may go direct; Instagram can be taken off per post", async () => {
   ready();
   const s = allStates(SLUG)[0];
-  assert.equal(bridgeInfo(s).directBlock, null);
+  assert.equal(bridgeInfo(s).musicNote, null);
   assert.equal(sendWarning(s, bridgeInfo(s)), null);
   w(`apps/${SLUG}/production/log.jsonl`, readFileSync(join(WS, `apps/${SLUG}/production/log.jsonl`), "utf8") + JSON.stringify({ at: "2026-10-05T12:00:00.000Z", post: KEY, kind: "leg.drop", data: { platform: "instagram" }, note: "not this one" }) + "\n");
   const { pb, calls } = mockPB();

@@ -127,5 +127,6 @@ with the user:
         --decision approve --words "<the user's words>" --check natural_voice=pass
 
 It refuses a take of a narrator that is not `original_synthetic`, lines that are not that
-narrator's voiceover lines, and an approval without the natural-voice check. P1 lays the
+narrator's voiceover lines. An approval without the natural-voice check goes through and
+records it as "not claimed" (2026-10-21). P1 lays the
 approved take under its segment with `audio_from: "narration:<take>"`.

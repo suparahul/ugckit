@@ -6,14 +6,16 @@
  */
 import type { Motion } from "./video-production.ts";
 
-/* The failed measured gates an approval may accept with the user's
- * note (review.py --accept-fail). The eye check of a gate not run is ticked; one left unticked is
- * accepted like a failure. A stale render (gate current) is never accepted. */
+/* The failed measured gates an approval may accept with the user's note (review.py
+ * --accept-fail). The eye check of a gate not run is the user's claim: ticked it is recorded
+ * as passed, unticked as not claimed; it never blocks. A stale render (current), a render of
+ * the wrong format and a page error (page) are hard: never accepted. */
 const eyeOf = (g: string) => (g === "text_read" ? "text" : g);
+export const MOTION_HARD = ["current", "format", "page"];
 export function motionAccepts(m: Pick<Motion, "failed" | "notRun">, ticked: string[]): { stale: boolean; accept: string[]; seen: string[] } {
-  const stale = m.failed.includes("current");
+  const stale = m.failed.some((g) => MOTION_HARD.includes(g));
   const seen = m.notRun.filter((g) => ticked.includes(eyeOf(g))).map(eyeOf);
-  return { stale, seen, accept: stale ? [] : [...m.failed, ...m.notRun.filter((g) => !ticked.includes(eyeOf(g)))] };
+  return { stale, seen, accept: stale ? [] : [...m.failed] };
 }
 /** The checks of the cut: the overlays not the plan's or a changed supplied file always block (the cut is
  * not the plan's); another failed overlay check (readable, clear, read back) may be approved anyway. */

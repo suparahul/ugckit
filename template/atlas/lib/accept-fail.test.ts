@@ -10,15 +10,16 @@ test("a failed motion-design gate may be approved anyway", () => {
   assert.deepEqual(r, { stale: false, seen: [], accept: ["story_text"] });
 });
 
-test("a stale render (gate current) is never accepted", () => {
-  const r = motionAccepts({ failed: ["current", "hero"], notRun: [] }, []);
-  assert.equal(r.stale, true);
-  assert.deepEqual(r.accept, []);
+test("a stale render, a wrong format or a page error is never accepted", () => {
+  for (const g of ["current", "format", "page"]) {
+    const r = motionAccepts({ failed: [g, "hero"], notRun: [] }, []);
+    assert.equal(r.stale, true);
+    assert.deepEqual(r.accept, []);
+  }
 });
 
-test("a gate not run: ticked by eye it passes, left unticked it is accepted like a failure", () => {
-  assert.deepEqual(motionAccepts({ failed: [], notRun: ["text_read", "hero"] }, ["text"]), { stale: false, seen: ["text"], accept: ["hero"] });
-  assert.deepEqual(motionAccepts({ failed: [], notRun: ["text_read"] }, ["text"]).accept, []);
+test("a gate not run: the eye check is a claim; unticked it never blocks", () => {
+  assert.deepEqual(motionAccepts({ failed: [], notRun: ["text_read", "hero"] }, ["text"]), { stale: false, seen: ["text"], accept: [] });
 });
 
 test("the cut: overlays not the plan's or a changed supplied file block; another failed overlay check may be accepted", () => {

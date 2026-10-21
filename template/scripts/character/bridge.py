@@ -539,7 +539,8 @@ def check_beats(plan, beats, lines, length, pins, subjects, sets, assets, narrat
             carried.setdefault(lid, tag)
         n_words = sum(words(lines[l].get("line")) for l in bl if l in lines)
         if n_words / (e - s) > MAX_WORDS_PER_S:
-            out.bad(f"{tag}: {n_words} words in {e - s:g} s is over {MAX_WORDS_PER_S} words a second")
+            out.note(f"{tag}: {n_words} words in {e - s:g} s is over {MAX_WORDS_PER_S} words a second: it may sound "
+                     "rushed and the lip sync may drift (the user's choice)")
         speakers = {lines[l].get("speaker") for l in bl if l in lines}
         nref = beat_narrator(plan, b)
         nar = narrators.get(nref) if nref else None
@@ -716,8 +717,8 @@ def check_reaction_refs(plan, out, verify_files=False):
         elif g not in (None, MOTION_COPY, WRITTEN):
             out.bad(f"reaction ref {rid}: generation_input is 'motion_copy' (the default) or 'written', not {g!r}")
         if g == WRITTEN and placeholder(r.get("written_reason")):
-            out.bad(f"reaction ref {rid}: 'written' is the user's fallback after a failed motion take; "
-                    "written_reason holds the user's words (motion copy is the default)")
+            out.note(f"reaction ref {rid}: 'written', chosen up front with no written_reason (the user's choice; "
+                     "video_plan.py pin stores a default reason; motion copy is the default)")
         if not (r.get("burned_in_text") is None or isinstance(r.get("burned_in_text"), str)):
             out.bad(f"reaction ref {rid}: burned_in_text is the visible text and where it is, or null")
         if ref_mode(r) != MOTION_COPY:
@@ -871,7 +872,8 @@ def check_overlays(plan, beats, length, assets, ed, out):
         # A segment's overlay that runs to its end continues in the parent video, checked there.
         if e - s < need - 1e-6 and not (plan.get("segment_of") is not None and length
                                         and abs(e - length) <= BEAT_TOL_S):
-            out.bad(f"{tag}: {words(o.get('text'))} words for {e - s:g} s; it needs {need:.1f} s to be read")
+            out.note(f"{tag}: {words(o.get('text'))} words for {e - s:g} s; reading it takes {need:.1f} s (the user's "
+                     "choice: some viewers will not finish it)")
         if norm(o.get("text")) in heroes:
             out.bad(f"{tag}: the text is a hero string; the app's real words come from the real screen, "
                     "never from an overlay")
@@ -883,11 +885,11 @@ def check_overlays(plan, beats, length, assets, ed, out):
             out.bad(f"{tag}: fact_refs is a list of fact ids")
         if o.get("role") == "day_counter":
             if not series:
-                out.bad(f"{tag}: a day counter belongs to a progress_log series")
+                out.note(f"{tag}: a day counter outside a progress_log series (the user's choice)")
             elif str(series.get("day")) not in re.findall(r"\d+", str(o.get("text"))):
                 out.bad(f"{tag}: the counter says {o.get('text')!r}; the series is at day {series.get('day')}")
     if series and not any(o.get("role") == "day_counter" for o in ovs):
-        out.bad("a progress_log series shows its day_counter overlay")
+        out.note("a progress_log series with no day_counter overlay (the user's choice)")
     # A third party's clip is credited while it is on screen.
     for b in beats:
         for aid in b.get("source_asset_ids") or []:

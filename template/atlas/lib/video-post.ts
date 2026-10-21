@@ -17,9 +17,11 @@
  * The founder's decisions of 2026-10-04: the AI-generated label is on for every
  * video (TikTok's `is_aigc`, in both modes; Instagram has no such field in Post
  * Bridge, so the page reminds); the cover frame is each platform's default (the
- * hook text is on frame 1); a video whose plan has a music note goes as a TikTok
- * draft only, so the sound is added on the phone, and direct mode is refused for
- * it; duet and stitch stay on; Instagram gets the Reel at once, as slides do.
+ * hook text is on frame 1); duet and stitch stay on; Instagram gets the Reel at
+ * once, as slides do. A music note (2026-10-21, the user's choice): a TikTok draft
+ * gets the sound on the phone; a direct post or the Instagram Reel plays the file's
+ * own sound, with a warning, and the send line records it. A video with no caption
+ * goes with a warning (its tags, or nothing); the platforms' hard limits stay.
  *
  * The limits below are the platforms' published ones for API posts (TikTok's
  * Content Posting API, Meta's Reels publishing); Post Bridge's API document
@@ -52,7 +54,7 @@ export function videoCaption(caption: string | null | undefined, tags: string[] 
 }
 
 export type VideoSendCheck = {
-  /** The caption the post carries, or null. */
+  /** The caption the post carries ("" when the plan has none: a warning, not a stop). */
   caption: string | null;
   /** Why the post is not sent, or null. */
   skip: string | null;
@@ -79,7 +81,7 @@ export function checkVideoSend(v: {
   platforms: ("tiktok" | "instagram")[];
 }): VideoSendCheck {
   const L = VIDEO_LIMITS;
-  const caption = videoCaption(v.caption, v.tags);
+  const caption = videoCaption(v.caption, v.tags) ?? (v.tags ?? []).join(" ");
   const tags = caption?.match(/#[\w]+/g)?.length ?? 0;
   const ig = v.platforms.includes("instagram");
   const tt = v.platforms.includes("tiktok");
@@ -89,16 +91,16 @@ export function checkVideoSend(v: {
     : !v.delivered ? "final/delivery.json has no sha256"
     : v.sha256 !== v.delivered ? `final/${v.id}.mp4 is not the delivered file (sha256 ${v.sha256.slice(0, 12)}, delivery.json says ${v.delivered.slice(0, 12)}): deliver it again (character-deliver)`
     : v.approved !== null && v.approved !== v.sha256 ? `the file is not the one approved for posting (sha256 ${v.sha256.slice(0, 12)}, approved ${v.approved.slice(0, 12)}): watch it and approve it again`
-    : !caption ? "plan.json has no publishing_note.caption: video-lock writes it; a video is not sent without one"
     : caption.length > L.captionChars ? `the caption is ${caption.length} characters; TikTok and Instagram take ${L.captionChars}`
     : ig && tags > L.igHashtags ? `the caption has ${tags} hashtags; Instagram takes ${L.igHashtags}`
     : v.duration !== null && v.duration < L.minSeconds ? `the video is ${v.duration} s; TikTok and Instagram take ${L.minSeconds} s at least`
     : v.duration !== null && v.duration > L.maxSeconds ? `the video is ${v.duration} s; TikTok through the API takes ${L.maxSeconds} s at most`
     : v.bytes !== null && v.bytes > L.maxBytes ? `the file is ${mb(v.bytes)}; Instagram Reels through the API take ${mb(L.maxBytes)} at most`
-    : v.mode === "direct" ? directBlock(v.music)
     : null;
   const warnings: string[] = [];
   if (!skip) {
+    if (placeholder(v.caption)) warnings.push(`No caption in plan.json publishing_note.caption: the post goes with ${caption ? `only its tags (“${caption}”)` : "an empty caption"} (your choice).`);
+    if (tt && v.mode === "direct" && musicDirectNote(v.music)) warnings.push(musicDirectNote(v.music)!);
     if (tt && v.mode === "draft") warnings.push(...videoReminders(v.music));
     if (tt && v.mode === "direct") warnings.push("A direct TikTok video plays its own sound only: TikTok adds no music. The AI-generated label is sent on.");
     if (ig) warnings.push(`On Instagram the video is a Reel, published at once with the file's own sound${!placeholder(v.music) ? ` (the music note “${v.music!.trim()}” is not applied there)` : ""}. Post Bridge has no AI label field for Instagram: turn on the AI label in the Instagram app.`);
@@ -106,14 +108,14 @@ export function checkVideoSend(v: {
   return { caption, skip, warnings };
 }
 
-/** Why direct mode is refused for this video, or null: a music note means the sound is added on the phone, so a TikTok draft only. */
-export function directBlock(music: string | null | undefined): string | null {
-  return placeholder(music) ? null : `this video has a music note (“${music!.trim()}”), so it goes as a TikTok draft only: send it to the drafts and add the sound on the phone`;
+/** The warning for a direct post of a video with a music note, or null: the sound is not added. */
+export function musicDirectNote(music: string | null | undefined): string | null {
+  return placeholder(music) ? null : `This video has a music note (“${music!.trim()}”): a direct post plays the file's own sound only, so the music is not added. A TikTok draft lets you add it on the phone. Your choice is recorded on the send line.`;
 }
 
-/** A video with a music note stays off Instagram (the founder, 2026-10-04): he posts it there himself, with a sound. Null otherwise. */
-export function instagramBlock(music: string | null | undefined): string | null {
-  return placeholder(music) ? null : "this video has a music note, so it stays off Instagram: post it there yourself, with the sound";
+/** The warning for the Instagram Reel of a video with a music note, or null: the Reel plays the file's own sound. */
+export function musicInstagramNote(music: string | null | undefined): string | null {
+  return placeholder(music) ? null : `This video has a music note (“${music!.trim()}”): the Instagram Reel plays the file's own sound, without it. Your choice is recorded on the send line.`;
 }
 
 /** What the user does on the phone with a TikTok draft of a video. Shown before the send and on the post page. */

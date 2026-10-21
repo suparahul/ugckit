@@ -12,9 +12,9 @@ three sources, the beat's `demo_source` (founder, 2026-10-19):
 
 A beat with no demo_source reads as before: the library row's kind (a still is `still`, else
 `recording`). A real recording is preferred: motion design fills the frame and looks more like
-a promotion than a hand holding a phone, so the plan names it only when no recording shows the
-screen, and says why in `demo_source_reason`. A motion-designed beat names a screen_id of its
-own, never a library row's (a library row is a real recording: use it).
+a promotion than a hand holding a phone, so the plan usually names it only when no recording
+shows the screen, and says why in `demo_source_reason`. Both are guidance (2026-10-21): motion
+design of a screen the library records, or with no reason, is the user's choice, noted.
 
 The beat's `screen_story` is what the render shows, and nothing else:
 
@@ -145,14 +145,15 @@ def check_beat(root, plan, b, rows, bad, note, screens=None):
         note(f"{tag}: motion design on a phone or in a panel (framing {b.get('framing')}), the user's choice: "
              "the render is laid into the phone's green screen or the panel like a recording; a drawn screen "
              "in a filmed hand can look pasted on, so check the composite closely")
+    # Recording first is guidance (2026-10-21): any reason, or none, and a screen the library
+    # records may be motion-designed; both are noted.
     if placeholder(b.get("demo_source_reason")):
-        bad(f"{tag}: motion design needs demo_source_reason: why no real recording shows this screen")
+        note(f"{tag}: motion design with no demo_source_reason (any reason is fine; it is recorded when given)")
     if placeholder(sid):
-        bad(f"{tag}: a motion-designed screen names its own screen_id")
+        bad(f"{tag}: a motion-designed screen names its screen_id")
     elif sid in rows:
-        bad(f"{tag}: screen {sid} is a real {rows[sid].get('kind') or 'recording'} in the screen library: "
-            f"demo_source {'still' if rows[sid].get('kind') == 'still' else 'recording'} (a real recording is "
-            "preferred to motion design)")
+        note(f"{tag}: screen {sid} is a real {rows[sid].get('kind') or 'recording'} in the screen library; motion "
+             "design instead is the user's choice: it looks more like an advert than the real recording")
     elif recordings(rows):
         note(f"{tag}: motion design, while the screen library holds {', '.join(recordings(rows))}; "
              f"the reason: {b.get('demo_source_reason')}")

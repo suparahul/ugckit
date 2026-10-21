@@ -84,6 +84,8 @@ Alias: `face_to_demo` is read as `hook_to_demo`. A POV opening is a hook framing
 
 Ordered semantic beats, not shots. Several beats can share one production segment; a 2-second hook does not need a 2-second generation. Roles in brackets are optional; `×n` repeats.
 
+The recipes' beat order, their lanes and formats are guidance (2026-10-21): a plan outside them is noted, and the brief's choices say why.
+
 | Recipe | Ordered beats | Lane and conditions |
 |---|---|---|
 | `pitch_proof` | callout → problem → mechanism → proof → close | pitch. The mechanism and the doubt come from facts. Paid may close on a product action |
@@ -101,7 +103,7 @@ Each beat has one job, a time interval, exact words if any, a visible action, it
 
 | Value | Rule |
 |---|---|
-| `10`, `15`, `20`, `30` seconds | planning bands |
+| `10`, `15`, `20`, `30` seconds | planning bands: guidance (2026-10-21); any length is allowed, with a note |
 | `35–60` seconds | education and long voice-over; assembled from several segments |
 | canvas | `9:16`, always |
 
@@ -233,8 +235,8 @@ Per beat: origin `generated`, `supplied`, `mixed`; layout `sequence`, `split_scr
 
 | Slot | Values | Rule |
 |---|---|---|
-| Performance per beat | `on_camera`, `voiceover`, `silent_action` | speech ceiling 15 words per 4 s; each spoken line belongs to one beat |
-| Overlay role | `hook`, `paragraph`, `step_label`, `comparison_label`, `day_counter`, `source_credit` | exact text, start and end; on screen for at least words ÷ 3 s; never the lower caption band; never the app's real words or a clinical result |
+| Performance per beat | `on_camera`, `voiceover`, `silent_action` | speech ceiling 15 words per 4 s (guidance: over it is a note, 2026-10-21); each spoken line belongs to one beat |
+| Overlay role | `hook`, `paragraph`, `step_label`, `comparison_label`, `day_counter`, `source_credit` | exact text, start and end; on screen for at least words ÷ 3 s (guidance: shorter is a note); never the lower caption band; never the app's real words or a clinical result |
 | Music | a publishing note only | the production file has no music |
 
 ---

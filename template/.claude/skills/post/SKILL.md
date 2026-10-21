@@ -71,7 +71,8 @@ A `Kind: video` row goes the same way, after **Approve for posting** on its deli
   The send hashes the file and refuses unless it is the file of `delivery.json` and of the
   user's approval; a file delivered again needs a new approval.
 - **The caption** is `plan.json` `publishing_note.caption`, then the row's `Tags` the
-  caption does not already carry. No caption, no send. 2,200 characters at most; on
+  caption does not already carry. No caption is a warning (the post goes with its tags, or
+  empty; 2026-10-21). 2,200 characters at most; on
   Instagram 30 hashtags at most. The video is 3 s to 600 s and 300 MB at most.
 - **The founder's rules (2026-10-04).**
   - **The AI-generated label is on for every video.** The send sets TikTok's `is_aigc: true`
@@ -80,16 +81,15 @@ A `Kind: video` row goes the same way, after **Approve for posting** on its deli
     tell the user to turn on the AI label in the Instagram app.
   - **The cover frame is each platform's default** (the hook text is on frame 1). Send
     no cover setting.
-  - **A plan with a music note goes as a TikTok draft only.** Direct mode is refused for
-    it before any call ("this video has a music note …"); the user adds the sound on the
-    phone. A video with no music note may go direct.
+  - **A music note** (2026-10-21: the user's choice, never refused). A TikTok draft lets
+    the user add the sound on the phone. A direct post plays the file's own sound only: the
+    send warns ("this video has a music note …") and the send line records it (`choices`).
   - **Duet and stitch stay on** (sent as `true` in direct mode).
   - **Instagram gets the Reel at once**, as slides do. "Do not post on Instagram" on the
     post page (`leg.drop`) keeps one post off it.
-  - **A music-note video stays off Instagram** (decided later the same day). It goes as a
-    TikTok draft only; the user posts it to Instagram by hand, with the sound. The dry run
-    says "Instagram is left out", `--only instagram` is refused, and the post page shows
-    "you post it" on Instagram.
+  - **A music-note video on Instagram**: the Reel plays the file's own sound, with a
+    warning on the dry run and the post page, recorded on the send line. To post it there
+    by hand with the sound, take Instagram off the post (`leg.drop`).
 - **Draft mode.** The video lands in the TikTok inbox. TikTok's inbox upload for a video
   may not carry the caption: tell the user to paste it from the post page. Read the
   page's reminders back: the AI label, the caption, and the sound when there is a music
@@ -97,7 +97,7 @@ A `Kind: video` row goes the same way, after **Approve for posting** on its deli
 - **Direct mode.** Public, comments on, duet and stitch on, the AI label on, the file's own
   sound only: TikTok adds no music to a video, and the file is music-free.
 - **Instagram** gets the file as a Reel, published when the post is processed, with the
-  file's own sound and Instagram's default cover; only a video with no music note.
+  file's own sound and Instagram's default cover (a music note is not applied: a warning).
 - `--request` (or `REQUEST_ONLY=1`) prints the upload request and the post body with a
   placeholder media id and sends nothing; it needs no key. Read it back before the first
   real video send of a workspace.

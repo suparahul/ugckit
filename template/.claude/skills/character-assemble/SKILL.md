@@ -82,7 +82,8 @@ supplied media: the files still match the plan's sha256. At each continuous cut:
 first clip ends at its last frame and the next starts at its second, with three numbers
 (0 to 255) for the eye: the two frames shown at the cut, the dropped first frame against
 the last frame, and the take's first frame against its seed. A FAIL marks P5 failed, and
-gate C refuses an approval while an overlay or supplied-file check fails.
+gate C refuses an approval while the overlays are not the plan's or a supplied file
+changed; another failed overlay check is a warning the user may approve over (recorded).
 
 Then **look**: the contact sheet, and the file at full size, at every join. The final
 checklist, for gate C: the face holds across every segment; the outfit and the set hold;

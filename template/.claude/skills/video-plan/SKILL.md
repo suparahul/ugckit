@@ -127,8 +127,12 @@ Lowercase, digits and hyphens. It is the folder name here and under `pipeline/ch
   the user's terms in `demo_source_reason` ("no recording of the reveal flow yet; recording
   it needs a real upload"). A missing recording that the user could make is still listed
   under missing inputs (owner `capture`), so the user can choose to record it instead.
-  `video_plan.py brief` refuses motion design without a reason, or for a screen the library
-  already has.
+  `video_plan.py brief` notes motion design without a reason, or for a screen the library
+  already has (2026-10-21: the user's choice, never refused).
+- **Guidance, not gates** (2026-10-21). Any length (the bands are guidance), a recipe
+  outside its listed lanes or formats (say why in the choices), more than three hook
+  alternatives or one outside the hook job: each is a note. At least one hook alternative
+  is still needed.
 - **Founder questions stay the founder's.** Where the plan leaves a decision open (face or
   hands, which cat, an identity), choose the option that needs the fewest new inputs, mark
   the choice `experiment` or `user`-pending with the recommendation, and list it under

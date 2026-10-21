@@ -392,6 +392,19 @@ what is missing (`ready`) and writes the lock. Free.
   screen and laid in like a recording.
   `video-script` writes its `screen_story`: every step and every in-app string, word for
   word, which is all the render may show.
+- **The kit never refuses a creative or format choice** (2026-10-21). Length bands, the
+  recipe's order and pairing, the number of hook alternatives, the speech ceiling (15 words
+  per 4 s), overlay reading time, a day counter, the recording-first rule, the capture
+  recipe of a screen recording, a music note and an empty caption are guidance: a check
+  notes the trade-off and the choice stands. An approval over a failed measured gate
+  (identity, OCR, motion-design gates, natural voice, the gate C overlay checks) is a
+  warning, recorded in approval.json with the user's words (`accepted_failures`); an eye
+  check the user did not tick is recorded as "not claimed". Hard checks stay: a missing or
+  changed file (sha256), a stale render, cut or plan, a render of the wrong format or with
+  a page error, the overlays not the plan's, a dry-run approval, spending money without a
+  yes, the platforms' hard limits, and the three kept rules below (the app is never in a
+  generated action; a reaction is silent; a reaction needs a reference clip, with the
+  written route as the fallback). `research/ai-ugc/BLOCKERS-AUDIT.md` in the kit lists them.
 - **A reaction is silent and real** (user decision, 2026-10-03). A reaction hook is never
   spoken: a silent face, the hook as text. Its performance is copied from a real reference
   reaction in the workspace's downloaded research (post id and time range, in
@@ -419,8 +432,10 @@ what is missing (`ready`) and writes the lock. Free.
   send (the `post` skill, "A video post": the one file, its checksum, `publishing_note.caption`
   and the row's tags) or Mark posted. Every video is sent with the AI-generated label on
   (TikTok's `is_aigc`; the page reminds for a draft and for Instagram); a plan with a music
-  note goes as a TikTok draft only, never direct and never to Instagram (the user posts it
-  there by hand, with the sound); covers are the platforms' defaults.
+  note may go any way the user picks (2026-10-21): a TikTok draft gets the sound on the
+  phone; a direct post or the Instagram Reel plays the file's own sound, with a warning,
+  and the send line records it (`choices`). A video with no caption goes with a warning;
+  the platforms' hard limits stay. Covers are the platforms' defaults.
 - **Later steps hook in here, not built yet:** a scheduling step that writes the dated rows
   planning reads; the setup-time video evidence (competitor and niche observations merged
   into `apps/<slug>/niche/video/patterns.json`) that `video-fit` and `video-plan` read
@@ -472,9 +487,10 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
   first two motion-designed posts (2026-10-14). It is never a video model, and it shows only
   the plan's `screen_story`: the screens it names, the strings it lists, nothing invented.
   A real recording is preferred: motion design fills the frame and looks more like a
-  promotion than a hand holding a phone, so the plan picks it only where no recording
-  shows the screen and says why (`demo_source_reason`); the bridge refuses it for a
-  screen the library records. On a phone plate or in a panel it is the user's choice
+  promotion than a hand holding a phone, so the plan usually picks it where no recording
+  shows the screen and says why (`demo_source_reason`). Both are guidance (2026-10-21):
+  motion design of a screen the library records, or with no reason, is the user's choice,
+  noted. On a phone plate or in a panel it is the user's choice
   (2026-10-21), noted: the render is the bare phone screen (fit `screen`), `motion_design.py
   fill` makes it the phone's insert source for `composite.sh`, and assembly lays it into an
   M panel; a drawn screen in a filmed hand can look pasted on. In a `live_use` video it is
@@ -496,9 +512,11 @@ its scripts are in `scripts/character/`, its Supagen template is `ugc-character`
   clip and one face picture. `animate` (Wan 2.2 Animate move) and `guided` (MiniMax H3)
   are fallbacks; `edit` (Wan 2.7 Edit Video) is retired. Every take passes the identity
   gate (`identity.py`: it measures the frames that show a face; a visible face is not
-  needed) before gate B approves it. `capabilities.json` `bridge.motion_copy` is true. The
-  written route (the expression beats, no clip) is only a fallback the user names after a
-  failed motion take (`generation_input` `written`, with `written_reason`). The names before
+  needed) before gate B approves it; a FAIL is a warning the user may approve over, recorded
+  with their words. `capabilities.json` `bridge.motion_copy` is true. The written route (the
+  expression beats, no clip) is the user's choice: after a failed motion take, or up front
+  (2026-10-21); `written_reason` holds their words, and `video_plan.py pin` stores a default
+  when it is empty. The names before
   2026-10-19 (`face_replace`, `none`, the kinds `face_replace_clip` and
   `face_replace_frame`, `bridge.face_replace`) are still read, and never rewritten. Production refuses a dry-run planning approval, a
   number on an overlay without `fact_refs`, and research footage attached to a generation.

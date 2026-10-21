@@ -77,11 +77,12 @@ reports every one.
 
 ## How to write it
 
-- **Beats are the recipe's roles, in order.** Several beats may share a role where the
+- **Beats are the recipe's roles, in order** (guidance: a structure the user wants is
+  noted, never refused, 2026-10-21). Several beats may share a role where the
   recipe repeats it; a beat is a semantic job, not a shot. Beats meet end to start, from 0
   to the length; simultaneous media are panels inside one beat.
-- **Exact words, a person's words.** Read every line aloud. At most 15 words per 4 s of its
-  beat; leave room for a breath where the delivery needs it. The voice profile's never-say
+- **Exact words, a person's words.** Read every line aloud. About 15 words per 4 s of its
+  beat at most (above it is a note: it may sound rushed); leave room for a breath where the delivery needs it. The voice profile's never-say
   words never appear. No filler closer.
 - **Every beat has an action**: what the viewer sees, concrete enough for P1 to cut and for a
   reviewer to check. Silent beats say what moves.
@@ -146,8 +147,9 @@ reports every one.
   the clip gives the motion and the timing. The expression beats are the gate-B checklist.
   A motion-copy beat lasts exactly `end_s - start_s`, has `set_id` null (its first frame is
   made from the clip's), and its `framing`, `camera_distance` and `camera` describe the clip
-  as it is. A visible face is not needed. Never write `"written"`: only the user names that
-  fallback, after a failed motion take, with their words in `written_reason`. With no reference, `reaction` is null and `ready` blocks the lock.
+  as it is. A visible face is not needed. Never write `"written"` yourself: only the user names
+  that route, after a failed motion take or up front, with their words in `written_reason`
+  (`video_plan.py pin` stores a default reason when it is empty). With no reference, `reaction` is null and `ready` blocks the lock.
 - **A reference from the reaction library** (the brief's `reaction_reference.library_id`):
   copy the entry (`library/reactions/reactions.json`) into `reaction_refs` with the same
   `library_id`, post, range and `video_sha256`; `library_differs` only when the brief has

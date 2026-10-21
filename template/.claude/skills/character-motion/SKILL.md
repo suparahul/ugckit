@@ -115,8 +115,10 @@ it at stage 5; `motion.approve` and `motion.reject` are their clicks). Record th
 
     review.py motion <video> <seg> --decision approve --words "<their words>" [--check text=pass --check hero=pass]
 
-or `--from-atlas`. A failed gate is the user's to accept: `--accept-fail <gate>` with their
-words (the Atlas: "Approve anyway" with a note); `current` (a stale render) never is. The
+or `--from-atlas`. A failed gate is the user's to accept: an approval over it warns and
+records the gate, its result and their words (`--accept-fail <gate>`; the Atlas: "Approve
+anyway" with a note). `current` (a stale render), `format` and `page` never are. An eye check
+left unticked (`text`, `hero`, with no OCR engine) is recorded as "not claimed". The
 approval is of this render's sha256; a new render needs a new
 approval. A reject says what to change: change the page (never the story) and render again.
 Assembly (`character-assemble`) lays the approved render in as it is, with the P bubble when

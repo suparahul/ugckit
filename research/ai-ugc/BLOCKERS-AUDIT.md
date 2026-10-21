@@ -33,6 +33,18 @@ gates of `review.py segment` already do. "remove": the rule has no integrity sid
 |---|---|
 | Motion design on a phone plate or in a panel (`demo.py` 134, `bridge.py` segment rule) | **Done.** A note. The render is the bare phone screen (fit `screen`); `motion_design.py fill` writes the phone's insert.json; `composite.sh` and assembly use the approved render; an M panel takes it at assembly. |
 | Approving a take that failed a measured gate (identity, OCR, motion-design gates, natural voice, gate C overlay checks) | **Done.** `review.py --accept-fail <gate>` with the user's words; the Atlas "Approve anyway" button with a required note. approval.json records the gate, its result and the words. Never accepted: a stale render (`current`), "overlays as planned", "supplied files unchanged", a stale cut. |
+| 1. Approval after a failed measured check (identity, OCR, motion-design gates, natural voice, gate C overlay checks) | **Done** (warn + record). `review.py` warns and records `accepted_failures` with or without `--accept-fail`; an unticked eye check (identity, hands, silent, performance, no_source_identity, follows_reference, natural_voice, the motion `text`/`hero` eye checks) is recorded as "not claimed". Atlas: the route takes unticked boxes; Approve stays enabled; "Approve anyway" with a note for a failed gate. Hard: `current`, `format`, `page`, "overlays as planned", "supplied files unchanged". |
+| 2. Recording first (`demo.py`, `video_plan.py` brief) | **Done** (note). Motion design of a screen the library records, and an empty `demo_source_reason`, are notes. |
+| 3. Length bands (`video_plan.py` brief) | **Done** (note). Any length > 0; the bands are guidance. The row's own length still binds the brief (the user's row). |
+| 4. Recipe structure (`video_plan.py` contract) | **Done** (note): a repeated role, a role outside the recipe, the order, a missing role. |
+| 5. Recipe pairing with lane and format (brief and contract) | **Done** (note, "say why in the choices"). |
+| 6. Hook choices | **Done**: at least one alternative (hard); more than three, or outside the hook job, is a note. |
+| 7. Written reaction chosen up front (`video_plan.py`, `bridge.py`) | **Done** (note). `video_plan.py pin` stores the default reason "the user chose the written route" when it is empty. |
+| 8. Speed limits (`bridge.py`, `video_plan.py`, `shots.py`) | **Done** (note): the speech ceiling, the overlay reading time, a trim under 3 s. A trim at or above the generated length stays hard. |
+| 9. Day counter | **Done**: a series without a day counter, and a day counter outside a series, are notes. A counter that says another day than the series stays a check. |
+| 10. Music note (Atlas `video-post.ts`, `postbridge-flow.ts`, `Bridge.tsx`, `Actions.tsx`, `Legs.tsx`) | **Done**: the direct post and the Instagram leg are offered with a warning; the `posting.sent` line records `choices`. |
+| 11. No caption (`video-post.ts`) | **Done** (warning): the post goes with its tags, or empty. The caption length, hashtag count, duration and size limits stay hard. |
+| 12. Screen recording rules (`screens.py check`) | **Done** (warning): more than three gestures, the 0.5 s first hold, the 1 s end hold, the 0.4 s pause after a tap, an expired row. |
 | The app is never shown in a generated action (T, B, X) | **Kept by decision** (2026-10-21). |
 | A reaction is silent (`bridge.py` 746, 748, 801, 804, 1165; `shots.py` 594) | **Kept by decision** (2026-10-21). |
 | A reaction needs a reference clip, with the written route as the fallback (`bridge.py` 758) | **Kept by decision** (2026-10-21). |

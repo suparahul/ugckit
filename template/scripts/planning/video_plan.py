@@ -54,6 +54,8 @@ except ImportError:  # the character pipeline is not installed: its check runs t
 MAX_WORDS_PER_S = 15 / 4        # the speech ceiling
 READ_WORDS_PER_S = 3.0          # an overlay stays up words / 3 s
 MIN_OVERLAY_S = 1.0
+# The reason pin stores for a written reaction chosen with none (2026-10-21: the user's choice up front).
+WRITTEN_DEFAULT = "the user chose the written route"
 TOL = 0.05
 EDITORIAL_KEYS = ["objective", "distribution", "lane", "filming_format", "hook", "recipe_id",
                   "product", "app_presence", "proof", "close", "cast_kind", "narrator_ref",
@@ -196,10 +198,11 @@ def check_brief(b, out):
     if not rp or rp["kind"] != "recipe":
         out.no(f"anatomy.recipe_id {a.get('recipe_id')!r} is not one of the eight recipes")
     else:
+        # The pairing is guidance (2026-10-21): the user's pick stands, with its reason in the choices.
         if a.get("lane") not in rp["allowed_lanes"]:
-            out.no(f"recipe {rp['id']} is for lanes {rp['allowed_lanes']}, not {a.get('lane')!r}")
+            out.note(f"recipe {rp['id']} is listed for lanes {rp['allowed_lanes']}, not {a.get('lane')!r}; say why in the choices")
         if ff not in rp["allowed_formats"]:
-            out.no(f"recipe {rp['id']} is for formats {rp['allowed_formats']}, not {ff!r}")
+            out.note(f"recipe {rp['id']} is listed for formats {rp['allowed_formats']}, not {ff!r}; say why in the choices")
     pr = a.get("product") or {}
     if pr.get("role") not in S["product_role"] or pr.get("timing") not in S["product_timing"]:
         out.no("anatomy.product role or timing outside the controlled values")
@@ -210,19 +213,25 @@ def check_brief(b, out):
     cast = a.get("cast") or {}
     if cast.get("kind") not in S["cast_kind"]:
         out.no("anatomy.cast.kind outside human, mascot, none")
+    # Any length (2026-10-21): the bands are guidance, noted.
     lb = str(a.get("length_band"))
-    if lb not in S["length_band"]:
-        out.no(f"anatomy.length_band {lb!r}; one of {S['length_band']}")
     ln = a.get("length_s")
-    lo, hi = (35, 60) if lb == "35-60" else ((float(lb), float(lb)) if lb in S["length_band"] else (0, 0))
-    if not num(ln) or not (lo - TOL <= ln <= hi + TOL):
-        out.no(f"anatomy.length_s {ln!r} is outside the band {lb}")
+    if not num(ln) or ln <= 0:
+        out.no(f"anatomy.length_s {ln!r}: the video's length in seconds")
+    elif lb not in S["length_band"]:
+        out.note(f"anatomy.length_band {lb!r} is not one of the guidance bands {S['length_band']}; the length is {ln:g} s")
+    else:
+        lo, hi = (35, 60) if lb == "35-60" else (float(lb), float(lb))
+        if not (lo - TOL <= ln <= hi + TOL):
+            out.note(f"anatomy.length_s {ln:g} is outside the band {lb} (guidance)")
     alts = b.get("hook_alternatives") or []
-    if not 1 <= len(alts) <= 3:
-        out.no(f"{len(alts)} hook alternatives; one to three, within the chosen hook job")
+    if not alts:
+        out.no("no hook alternative: at least one, the selected hook")
+    elif len(alts) > 3:
+        out.note(f"{len(alts)} hook alternatives; three or fewer keep the choice clear")
     for h in alts:
         if h.get("job_id") != hook.get("job_id"):
-            out.no(f"hook alternative {h.get('id')}: job {h.get('job_id')!r}; alternatives stay within {hook.get('job_id')!r}")
+            out.note(f"hook alternative {h.get('id')}: job {h.get('job_id')!r}, outside {hook.get('job_id')!r} (the user's choice)")
     if hook.get("channel") == "reaction":
         for h in alts:
             if h.get("channel") != "reaction":
@@ -267,10 +276,10 @@ def check_brief(b, out):
             out.no(f"screen {sid}: demo_source {ds!r}; recording, still or motion_design")
         elif ds == "motion_design":
             if not str(sn.get("demo_source_reason") or "").strip():
-                out.no(f"screen {sid}: motion design needs demo_source_reason (why no real recording)")
+                out.note(f"screen {sid}: motion design with no demo_source_reason (any reason is fine)")
             if sid in rows:
-                out.no(f"screen {sid} is a real {rows[sid].get('kind') or 'recording'} in the library: use it, "
-                       "not motion design")
+                out.note(f"screen {sid} is a real {rows[sid].get('kind') or 'recording'} in the library; motion design "
+                         "instead is the user's choice (it looks more like an advert than the recording)")
     tv, cd = catalogue(b.get("app"))
     if b.get("taxonomy_version") != tv or b.get("catalogue_digest") != cd:
         out.no(f"the brief pins taxonomy {b.get('taxonomy_version')} / {str(b.get('catalogue_digest'))[:19]}…; "
@@ -375,7 +384,8 @@ def check_contract(plan, out, brief=None):
         out.no(f"editorial.recipe_id {ed.get('recipe_id')!r} is not a recipe")
         rp = None
     elif ed.get("lane") not in rp["allowed_lanes"] or ff not in rp["allowed_formats"]:
-        out.no(f"recipe {rp['id']} does not take lane {ed.get('lane')!r} with format {ff!r}")
+        out.note(f"recipe {rp['id']} is listed for other lanes or formats than {ed.get('lane')!r} with {ff!r} "
+                 "(the user's choice; the brief's choices say why)")
     pr = ed.get("product") or {}
     if pr.get("role") not in S["product_role"]:
         out.no(f"editorial.product.role {pr.get('role')!r}")
@@ -488,7 +498,7 @@ def check_contract(plan, out, brief=None):
             carried.setdefault(lid, bid)
         n = sum(words(lines[l]["line"]) for l in bl if l in lines)
         if n / (e - s) > MAX_WORDS_PER_S + 1e-9:
-            out.no(f"beat {bid}: {n} words in {e - s:g} s, over 15 words per 4 s")
+            out.note(f"beat {bid}: {n} words in {e - s:g} s, over 15 words per 4 s: it may sound rushed (the user's choice)")
         elif n and n / (e - s) > 3.4:
             out.note(f"beat {bid}: {n} words in {e - s:g} s is near the ceiling; no room for a pause")
         if perf == "silent_action" and bl:
@@ -535,7 +545,7 @@ def check_contract(plan, out, brief=None):
         if lid not in carried:
             out.no(f"line {lid} is in no beat")
 
-    # The recipe, in order.
+    # The recipe, in order: guidance (2026-10-21), noted; the user's structure stands.
     if rp:
         order = [s_["role"] for s_ in rp["slots"]]
         rep = {s_["role"] for s_ in rp["slots"] if s_.get("repeat")}
@@ -543,20 +553,20 @@ def check_contract(plan, out, brief=None):
         for r in roles:
             if comp and comp[-1] == r:
                 if r not in rep:
-                    out.no(f"role {r} repeats; {rp['id']} has one {r} beat")
+                    out.note(f"role {r} repeats; {rp['id']} has one {r} beat")
                 continue
             comp.append(r)
         last = -1
         for r in comp:
             if r not in order:
-                out.no(f"role {r!r} is not a beat of {rp['id']} ({' → '.join(order)})")
+                out.note(f"role {r!r} is not a beat of {rp['id']} ({' → '.join(order)})")
                 continue
             if order.index(r) <= last:
-                out.no(f"role {r} is out of the order of {rp['id']} ({' → '.join(order)})")
+                out.note(f"role {r} is out of the order of {rp['id']} ({' → '.join(order)})")
             last = max(last, order.index(r))
         for s_ in rp["slots"]:
             if s_["required"] and s_["role"] not in comp:
-                out.no(f"{rp['id']} needs a {s_['role']} beat")
+                out.note(f"{rp['id']} usually has a {s_['role']} beat; this plan has none")
 
     # The app and its name.
     pres = ed.get("app_presence")
@@ -606,14 +616,15 @@ def check_contract(plan, out, brief=None):
             continue
         need = max(MIN_OVERLAY_S, words(o.get("text")) / READ_WORDS_PER_S)
         if e - s < need - 1e-6:
-            out.no(f"overlay {oid}: {words(o.get('text'))} words for {e - s:g} s; it needs {need:.1f} s")
+            out.note(f"overlay {oid}: {words(o.get('text'))} words for {e - s:g} s; reading it takes {need:.1f} s "
+                     "(the user's choice: some viewers will not finish it)")
         if norm(o.get("text")) in hero_norm:
             out.no(f"overlay {oid}: the app's real words come from the real screen, never an overlay")
         if re.search(r"\d", str(o.get("text"))) and o.get("role") not in ("day_counter", "step_label") \
                 and not o.get("fact_refs"):
             out.no(f"overlay {oid}: a number on screen needs fact_refs")
         if o.get("role") == "day_counter" and not series:
-            out.no(f"overlay {oid}: a day counter belongs to a progress_log series")
+            out.note(f"overlay {oid}: a day counter outside a progress_log series (the user's choice)")
     if (str(hook.get("channel", "")).startswith("text") or hook.get("channel") == "reaction") and beats and not any(
             o.get("role") == "hook" and num(o.get("start_s")) and o["start_s"] < (beats[0].get("end_s") or 0)
             for o in ovs):
@@ -720,8 +731,8 @@ def check_reaction(plan, beats, hook, ck, out):
             out.no(f"reaction ref {rid}: generation_input is \"motion_copy\" (the default, founder "
                    "2026-10-19) or \"written\"")
         elif r.get("generation_input") == "written" and not r.get("written_reason"):
-            out.no(f"reaction ref {rid}: \"written\" is only the user's fallback after a failed motion take; "
-                   "written_reason holds the user's words. Motion copy is the default")
+            out.note(f"reaction ref {rid}: \"written\", chosen up front with no written_reason: `pin` stores "
+                     f"{WRITTEN_DEFAULT!r}. Motion copy is the default")
         check_library_ref(f"reaction ref {rid}", r, r.get("video_path"), out)
     if hook.get("channel") == "reaction" and beats:
         b0 = beats[0]
@@ -1298,10 +1309,15 @@ def pin(draft_path):
             if obj.get(sha) != h:
                 obj[sha] = h
                 n += 1
+    for r in plan.get("reaction_refs") or []:
+        if r.get("generation_input") == "written" and not r.get("written_reason"):
+            r["written_reason"] = WRITTEN_DEFAULT
+            n += 1
+            print(f"  {r.get('id')}: written_reason {WRITTEN_DEFAULT!r} (the written route, chosen with no reason)")
     if n:
         tmp = atomic_write(os.path.abspath(draft_path), plan)
         os.replace(tmp, os.path.abspath(draft_path))
-    print(f"{n} checksum(s) written; digest now {digest(plan)[:12]}… (write REVIEW.md again)")
+    print(f"{n} checksum(s) or reason(s) written; digest now {digest(plan)[:12]}… (write REVIEW.md again)")
 
 
 def atomic_write(path, data):

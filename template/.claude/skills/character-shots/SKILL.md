@@ -34,7 +34,7 @@ app insertion as the plan says.
 **A v2 plan** (`schema_version` 2) is also checked by the production bridge
 (`scripts/character/bridge.py plan <video>`, run by `check`): its approval matches the
 digest of this exact revision (`planning-approval.json`), the editorial values, beats in
-order that cover the length, at most 15 words per 4 s per beat, every voiceover beat
+order that cover the length, the speech ceiling of 15 words per 4 s (a note above it), every voiceover beat
 bound to a narrator, every supplied asset on disk with its checksum, permission and
 range, overlays long enough to read, a source credit over a third party's clip, the live
 pairing of an input clip and its app recording. A v2 plan may pin no character
@@ -54,8 +54,9 @@ Mark the cut points on the frozen script first, then give each segment its lines
   is a visible change: another segment type, or the same set reframed by about 10%. The
   one exception is a continuous take (below): its join is not seen, so it is not reframed.
 - **Length.** The model takes whole seconds from 5 to 15 (`models.json`). A segment
-  planned at 3 or 4 s is generated at 5 s with `trim_to_seconds` set; nothing is planned
-  under 3 s. At most 15 words per 4 s of the planned length.
+  planned at 3 or 4 s is generated at 5 s with `trim_to_seconds` set (always under the
+  generated length; under 3 s is a note, the user's choice). The speech ceiling, 15 words
+  per 4 s of the planned length, is guidance: above it is a note.
 - **One set and one light state per segment**; one outfit for the whole video.
 - **The types.** T (talk) for every spoken line on camera. With `app_insertion` true, a
   beat that shows the app becomes O, G, S, H or F (a plate with a green phone, inserted
@@ -129,9 +130,9 @@ Mark the cut points on the frozen script first, then give each segment its lines
   is **retired**: it kept the reference person's face in every frame, and `shots.py
   validate` and `generate.sh` refuse it.
 
-  **The written fallback** (`generation_input` `written`) only when the user names it
-  after a failed motion take, with their words in the plan's `written_reason`; never
-  choose it yourself. There is no clip and no `motion_copy` block: framing_kind `face`,
+  **The written route** (`generation_input` `written`) only when the user names it, after a
+  failed motion take or up front (2026-10-21), with their words in the plan's
+  `written_reason` (a default when empty); never choose it yourself. There is no clip and no `motion_copy` block: framing_kind `face`,
   and the prompt's PERFORMANCE writes each expression beat's face, eyes and head word for
   word, with its time from the segment's start ("At 0.8 s, ..."), and says "No lip sync"
   and "She does not speak". The reference gives the performance only: never name its

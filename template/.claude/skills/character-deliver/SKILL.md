@@ -37,8 +37,11 @@ its computed cost: that is the user's yes to one more run of that segment; gener
 recorded yet.
 
 For a v2 plan an approval is refused when the file was assembled from another revision
-of the plan, or when an overlay or supplied-file check failed in `assembly.json`:
-assemble again, or take the problem back to P1 or to planning.
+of the plan, when the overlays are not the plan's, or when a supplied file changed
+(`assembly.json`): assemble again, or take the problem back to P1 or to planning. A failed
+overlay check (readable, clear, read back) is a warning: the user may approve over it, and
+gate_c_final records `accepted_failures` with their words (`--accept-fail overlays`; the
+Atlas "Approve anyway" with a note).
 
 A regenerate goes back to that segment alone: `character-generate` (a paid run, with its
 own yes), `character-review`, then P4 and P5 again. A reject stops the video; say why in

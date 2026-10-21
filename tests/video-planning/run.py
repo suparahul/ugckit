@@ -139,9 +139,10 @@ assert "scan-result" in notes and "Biscuit is calm" in notes, notes
 expect("the library's recordings and the reason are named", lambda: demo_check(md_beat()), contains="the reason: no recording")
 expect("the post's own words not in PRODUCT-SCREENS.md are named for the review",
        lambda: demo_check(md_beat()), contains="'Biscuit is calm'")
-expect("no reason: refused", lambda: demo_check(md_beat(demo_source_reason="")), ok=False, contains="demo_source_reason")
-expect("a screen the library records: refused (a recording first)",
-       lambda: demo_check(md_beat(screen_id="scan-result")), ok=False, contains="real recording in the screen library")
+expect("no reason: a note, never a refusal (any reason is fine)",
+       lambda: demo_check(md_beat(demo_source_reason="")), contains="no demo_source_reason")
+expect("a screen the library records: motion design is the user's choice, noted",
+       lambda: demo_check(md_beat(screen_id="scan-result"), hero="Relaxed tail"), contains="looks more like an advert")
 expect("a screen PRODUCT-SCREENS.md does not describe: refused",
        lambda: demo_check(md_beat(screen_story={**md_beat()["screen_story"], "screens": ["Tail Scanner"]})),
        ok=False, contains="not a heading")
@@ -171,6 +172,42 @@ st = vp.demo.segment_story({"beats": [{"id": "b1", "start_s": 0, "end_s": 4}, md
                            ["b2"])
 expect("the segment's story: 5 s, the steps from its start, the hero",
        lambda: (st["seconds"], [x["at_s"] for x in st["steps"]], st["hero"]), contains="(5, [0.0, 1.5, 2.5], 'Relaxed tail')")
+
+# ------------------------------------------------------------------ the user's choices are notes (2026-10-21)
+def noted(fn, obj, *want):
+    """The messages of one check: each `want` is among the notes and in no refusal."""
+    out = vp.Out(quiet=True)
+    try:
+        fn(obj, out)
+    except Exception:
+        pass        # a partial brief or plan; only the named messages matter here
+    for w in want:
+        if any(w in m for m in out.bad):
+            sys.exit(f"refused: {[m for m in out.bad if w in m]}")
+        if not any(w in m for m in out.notes):
+            sys.exit(f"no note with {w!r}: {out.notes}")
+    return "noted"
+
+
+BRIEF = {"anatomy": {"filming_format": "before_after", "lane": "conversion", "recipe_id": "discovery_demo",
+                     "hook": {"job_id": "gratitude_discovery", "channel": "spoken"}, "length_band": "25", "length_s": 25},
+         "hook_alternatives": [{"id": f"h{i}", "job_id": "imminent_need"} for i in range(1, 6)], "selected_hook": "h1"}
+expect("any length: a band outside the guidance is a note", lambda: noted(vp.check_brief, BRIEF, "guidance bands"))
+expect("recipe pairing with lane and format: a note", lambda: noted(vp.check_brief, BRIEF, "is listed for lanes", "is listed for formats"))
+expect("five hook alternatives, outside the hook job: notes", lambda: noted(vp.check_brief, BRIEF, "three or fewer", "outside 'gratitude_discovery'"))
+expect("no hook alternative at all is still refused",
+       lambda: noted(vp.check_brief, {**BRIEF, "hook_alternatives": []}, "no hook alternative"), ok=False, contains="refused")
+PLAN = {"schema_version": 2, "editorial": {"recipe_id": "discovery_demo", "lane": "conversion", "filming_format": "talking_head",
+                                           "hook": {"job_id": "in_progress", "channel": "text_visual"}},
+        "format": {"length_s": 10}, "script": [{"id": "l1", "line": "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen"}],
+        "beats": [{"id": "b1", "role": "result", "start_s": 0, "end_s": 4, "lines": ["l1"], "performance": "on_camera", "framing": "face", "action": "x"},
+                  {"id": "b2", "role": "result", "start_s": 4, "end_s": 10, "lines": [], "performance": "silent_action", "framing": "subject_only", "action": "y"}],
+        "overlays": [{"id": "o1", "role": "day_counter", "text": "a very long overlay with far too many words to read", "placement": "upper_band", "start_s": 0, "end_s": 1}],
+        "reaction_refs": [{"id": "r1", "generation_input": "written", "written_reason": ""}]}
+expect("the speech ceiling, the reading time and a day counter outside a series: notes",
+       lambda: noted(vp.check_contract, PLAN, "over 15 words per 4 s", "reading it takes", "day counter outside a progress_log series"))
+expect("the recipe's structure: notes", lambda: noted(vp.check_contract, PLAN, "repeats", "usually has"))
+expect("a written reaction chosen up front with no reason: a note", lambda: noted(vp.check_contract, PLAN, "chosen up front"))
 
 print(f"\n{sum(RESULTS)} of {len(RESULTS)} expectations met")
 sys.exit(0 if all(RESULTS) else 1)
