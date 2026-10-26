@@ -6,6 +6,7 @@
  * Review buttons open the post page; they do not move a phase.
  */
 
+import { TemplateTag } from "@/components/production/TemplatePick";
 import Link from "next/link";
 
 import type { Handle } from "@/lib/handles";
@@ -64,7 +65,7 @@ export function WaitCard({ s, handle }: { s: PostState; handle: Handle | null })
       <span className="wait__under"><Marks state={s} /><span className={`state${who === "you" ? " is-waiting" : ""}${sched ? " is-sched" : ""}`}>{s.sentence}</span></span>
       <span className="wait__who"><Face src={handle?.profile ?? null} name={s.row.handle} />{s.row.handle}<small>· {when}</small></span>
       <span className="wait__topic"><Link href={href}>{s.row.topic}</Link></span>
-      <span className="wait__format">{s.row.format}{slides ? ` · ${slides} slides` : ""} · {s.dimension}</span>
+      <span className="wait__format">{s.row.format}{slides ? ` · ${slides} slides` : ""} · {s.dimension}{s.template.current || s.template.rewrite ? <> <TemplateTag t={s.template} /></> : null}</span>
       <span className="wait__src">{src}</span>
       <span className="wait__act">{pill ? <Link className={`pill${who === "you" ? "" : " pill--quiet"}`} href={href}>{pill}</Link> : <span className="state">agent’s turn</span>}</span>
     </article>

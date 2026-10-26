@@ -1,0 +1,100 @@
+{
+  "template": "hub",
+  "version": 1,
+  "size": [
+    1080,
+    1920
+  ],
+  "style": {},
+  "content": {
+    "title": [
+      "What it",
+      "looks like"
+    ],
+    "definition": [
+      [
+        "Word",
+        " = what it means, in one line"
+      ]
+    ],
+    "center": "",
+    "items": [
+      {
+        "asset": "",
+        "label": [
+          "Sign",
+          "one"
+        ]
+      },
+      {
+        "asset": "",
+        "label": [
+          "Sign",
+          "two"
+        ]
+      },
+      {
+        "asset": "",
+        "label": [
+          "Sign",
+          "three"
+        ]
+      },
+      {
+        "asset": "",
+        "label": [
+          "Sign",
+          "four"
+        ]
+      },
+      {
+        "asset": "",
+        "label": [
+          "Sign",
+          "five"
+        ]
+      },
+      {
+        "asset": "",
+        "label": [
+          "Sign",
+          "six"
+        ]
+      },
+      {
+        "asset": "",
+        "label": [
+          "Sign",
+          "seven"
+        ]
+      },
+      {
+        "asset": "",
+        "label": [
+          "Sign",
+          "eight"
+        ]
+      }
+    ],
+    "bubble": "Save this for later"
+  },
+  "nudge": {},
+  "params": {
+    "titleSize": 78,
+    "titleTop": 196,
+    "titleLeading": 90,
+    "defSize": 33,
+    "defGap": 46,
+    "gridGap": 120,
+    "rowGap": 60,
+    "colInset": 220,
+    "iconSize": 116,
+    "labelSize": 29,
+    "labelGap": 17,
+    "centerSize": 262,
+    "centerDrop": 22,
+    "bubbleSize": 36,
+    "bubbleGap": 16,
+    "doodles": true
+  }
+}

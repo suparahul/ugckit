@@ -20,7 +20,7 @@ The slideshow path, when the user has an app to grow (AGENTS.md § The slideshow
 `product`, the research above, then `apps-learnings`, `niche-search`, `niche-hunt`,
 `niche-fetch`, `niche-read`, `niche-curate` (the page's marks, after every search and refresh), `account-architecture`, `handles` (`persona-identity`),
 `app-fit`, `plan`, and per post `deck`, `slideshow-review` (pass 1, then the user's go-ahead),
-`images`, `callout`, `render`, `slideshow-review` (pass 2), `post`
+`images` (or `infographic` for a design template: a poster, a chart, a card, a text wall), `callout`, `render`, `slideshow-review` (pass 2), `post`
 (`posting-provider` once), `sync`; per week `read`.
 
 Video planning (AGENTS.md § Video planning), from one finalised video idea to the locked

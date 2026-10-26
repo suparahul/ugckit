@@ -27,7 +27,8 @@ export function legWord(s: PostState, p: Platform): Word {
   return { text: "waiting for the final" };
 }
 
-export function Legs({ s, href, view }: { s: PostState; href: string; view: View }) {
+/** `hasVideo`: the post has a finished video of its own (a design template's, or a slideshow's reel): Instagram gets it as a Reel. */
+export function Legs({ s, href, view, hasVideo = false }: { s: PostState; href: string; view: View; hasVideo?: boolean }) {
   const platforms = PLATFORMS.filter((p) => (s.platforms ?? ["tiktok"]).includes(p) || s.legs?.[p]);
   if (!platforms.some((p) => p !== "tiktok")) return null;
   const words: Partial<Record<Platform, Word>> = {};
@@ -38,7 +39,7 @@ export function Legs({ s, href, view }: { s: PostState; href: string; view: View
   /* A music note: the Reel goes with the file's own sound, the user's choice (2026-10-21). */
   /* A slideshow goes to Instagram as its reel unless the post page says slideshow (lib/production.ts legFormat). */
   const igFormat = [...s.log].reverse().find((e) => e.kind === "leg.format" && e.data?.platform === "instagram")?.data?.format;
-  const igAsReel = !s.video && slides > 1 && igFormat !== "slideshow";
+  const igAsReel = !s.video && ((slides > 1 && igFormat !== "slideshow") || (slides <= 1 && hasVideo));
   const igTrack = [...s.log].reverse().find((e) => e.kind === "music.set")?.data?.track;
   const igMusic = !ig?.sent && !ig?.posted && !!s.video && !!musicInstagramNote(s.video.plan?.music);
   const note = ig?.failed

@@ -37,6 +37,8 @@ export function MusicPick({ app, post, tracks, current, hasReel, readOnly = fals
         <span className="music__k">Music</span>
         <select value={sel} disabled={busy || readOnly} onChange={(e) => { setSel(e.target.value); setDone(false); setErr(null); }}>
           <option value="none">No music</option>
+          {/* A track chosen earlier that is no longer in the library (moved or renamed) stays listed, so the field says what is in the reel. */}
+          {applied !== "none" && !tracks.some((t) => t.file === applied) ? <option value={applied} disabled>{`${applied} (not in assets/music)`}</option> : null}
           {groups.map((g) => (
             <optgroup key={g} label={g.charAt(0).toUpperCase() + g.slice(1)}>
               {tracks.filter((t) => t.group === g).map((t) => <option key={t.file} value={t.file}>{t.label}</option>)}
@@ -44,7 +46,7 @@ export function MusicPick({ app, post, tracks, current, hasReel, readOnly = fals
           ))}
         </select>
       </label>
-      {sel !== "none" ? <audio className="music__preview" controls preload="none" src={`/api/production/music?track=${encodeURIComponent(sel)}`} /> : null}
+      {sel !== "none" && tracks.some((t) => t.file === sel) ? <audio className="music__preview" controls preload="none" src={`/api/production/music?track=${encodeURIComponent(sel)}`} /> : null}
       <button type="button" className="pill pill--go" disabled={busy || readOnly || sel === applied} onClick={apply}>{busy ? "Adding the music…" : "Apply music"}</button>
       {done && sel === applied ? <small className="music__note">{hasReel ? (sel === "none" ? "The reel is silent again." : "Applied: the reel above plays it (unmute the player).") : "Saved: the reel carries it when it is cut."}</small> : null}
       {err ? <span className="rail__err" role="alert">{err}</span> : null}

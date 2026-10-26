@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /*
- * Lay a sound under a post's reel: a track of the music library, a sound effect, a voiceover. Free, local, ffmpeg only.
- * The post page's Music dropdown calls it, and so does photo-reel.mjs when a track or a group is set.
+ * Lay a sound under a post's video: a slideshow's reel (photo-reel.mjs) or a design template's video (compose-final.mp4,
+ * lib/infographic-store.ts). A track of the music library, a sound effect, a voiceover. Free, local, ffmpeg only.
+ * The post page's Music dropdown calls it, and so do photo-reel.mjs and the template export when a track or a group is set.
  *
  *   node scripts/add-audio.mjs <slug> <post key> [--audio <file|folder|none>] [--pool <group>] [--start 0] [--volume 0.8] [--fade 0] [--loop]
  *
@@ -10,7 +11,8 @@
  * of the post key, so the same post always gets the same track and different posts spread across the library. A track
  * picked that way is written down as a `music.set` line (actor agent), so the post page shows what is in the reel.
  *
- * The first run keeps the silent render as video/reel-silent.mp4 and every run mixes from that copy, so another track or
+ * The first run keeps the silent render as video/reel-silent.mp4 (the newest silent one: a fresh reel, or a template's
+ * compose-final.mp4) and every run mixes from that copy, so another track or
  * volume never stacks audio. The audio is trimmed to the video (no fade-out unless --fade is given; TikTok and Instagram
  * play the sound to the last frame), and --loop repeats a clip shorter than the video. The video stream is copied, not
  * re-encoded. Writes video/reel-final.mp4. --audio none goes back to the silent render.
@@ -56,11 +58,14 @@ let audio = opt("--audio", null);
 if (!audio) { const t = chosen(); audio = t === "none" ? "none" : t ? join(MUSIC, t) : pool ? join(MUSIC, pool) : MUSIC; }
 
 const vdir = join(ROOT, "apps", slug, "production", "files", post.replace(/\//g, "-"), "video");
-const final = join(vdir, "reel-final.mp4"), silent = join(vdir, "reel-silent.mp4");
+const final = join(vdir, "reel-final.mp4"), silent = join(vdir, "reel-silent.mp4"), composed = join(vdir, "compose-final.mp4");
 const hasAudioStream = (f) => execFileSync("ffprobe", ["-v", "error", "-select_streams", "a", "-show_entries", "stream=codec_type", "-of", "csv=p=0", f], { stdio: ["ignore", "pipe", "pipe"] }).toString().trim() !== "";
-/* The silent source: a fresh reel-final with no audio (photo-reel just ran), else the silent copy an earlier run kept. */
-if (existsSync(final) && !hasAudioStream(final)) copyFileSync(final, silent);
-if (!existsSync(silent)) { console.error(`no silent reel in ${vdir}; run photo-reel first (node scripts/photo-reel.mjs ${slug} ${post})`); process.exit(1); }
+/* The silent source: the newest of a fresh reel-final with no audio (photo-reel just ran), a template's compose-final
+ * (drawn silent), and the silent copy an earlier run kept. */
+const mtime = (f) => statSync(f).mtimeMs;
+const fresh = [final, composed].filter((f) => existsSync(f) && !hasAudioStream(f)).sort((a, b) => mtime(b) - mtime(a))[0];
+if (fresh && (!existsSync(silent) || mtime(fresh) > mtime(silent))) copyFileSync(fresh, silent);
+if (!existsSync(silent)) { console.error(`no silent video in ${vdir}; run photo-reel (node scripts/photo-reel.mjs ${slug} ${post}) or export the design first`); process.exit(1); }
 
 const probe = (f, entry) => execFileSync("ffprobe", ["-v", "error", "-show_entries", entry, "-of", "default=nw=1:nk=1", f], { stdio: ["ignore", "pipe", "pipe"] }).toString().trim();
 const dur = Number(probe(silent, "format=duration"));

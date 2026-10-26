@@ -20,6 +20,7 @@ import { BIG_FROM, FONT_SIZE_BY, frameOf } from "@/lib/layout";
 import { cardKind, isScreenBlock, phoneLabel, phoneOf, shownCards, type PhoneSlot } from "@/lib/callout";
 import { CrossIcon, LockIcon } from "./Marks";
 import { CAMERA, cameraLines, cameraTexts, cameraZoom } from "@/lib/camera-cover";
+import { appFromPath } from "./scope";
 
 /** A camera cover (lib/camera-cover.ts): the grid, the zoom buttons and the stacked hook, as the compositor draws them. */
 function CameraCover({ slide, dimension }: { slide: Slide; dimension: Dimension }) {
@@ -126,8 +127,13 @@ export function freeBlockProps(b: Layout["blocks"][number]) {
   };
 }
 
-/** The inline style of the hand-placed card; shared by the replica and the editor. The height follows the card's 139:34 ratio. */
-export function freeCardStyle(c: LayoutCard) {
+/** An app screenshot of the brand's asset library by its id: apps/<slug>/brand/assets/<id>.png. */
+export function screenSrc(id: string, app: string = appFromPath()) {
+  return `/media/apps/${encodeURIComponent(app)}/brand/assets/${encodeURIComponent(id)}.png`;
+}
+
+/** The inline style of the hand-placed card (or screenshot); shared by the replica and the editor. A card's height follows its 139:34 ratio. */
+export function freeCardStyle(c: { x: number; y: number; w: number }) {
   return { left: `${c.x}%`, top: `${c.y}%`, width: `${c.w}%` } as const;
 }
 
@@ -171,11 +177,14 @@ export function Replica({
   text = "on",
   layout = null,
   dimension = "3:4",
+  app,
 }: {
   slide: Slide;
   state: SlideState;
   cards: CardState[];
   total: number;
+  /** The app's slug, for the screenshot's address; read from the page's address when absent. */
+  app?: string;
   /** on: the text as it will be burned in. ghost: 30%. off: hidden. */
   text?: "on" | "ghost" | "off";
   /** A saved layout (a `slide.layout` line) draws the blocks where Rahul put them; null draws the deck's default stacks. */
@@ -206,10 +215,13 @@ export function Replica({
       {layout ? <span className="frame__lock" role="img" aria-label="saved layout" title="saved layout"><LockIcon /></span> : null}
       {/* The slide's picture holds the phone once it exists; the slot shows only before. */}
       {phone && !state.current ? <PhoneCallout slot={phone} held={null} alt="" /> : null}
-      {hasCards && firstShown && layout?.card && (state.cardFile ?? cards.find((k) => k.index === 1)?.file) ? (
-        /* The card where Rahul locked it, with the post's own strings when the layout carries them. */
+      {/* An app screenshot placed by hand (the App callout field), over the picture. */}
+      {layout?.screen ? <img className="frame__screen" src={screenSrc(layout.screen.id, app)} alt="App screenshot" style={freeCardStyle(layout.screen)} draggable={false} /> : null}
+      {layout?.noCard ? null : (hasCards ? firstShown : true) && layout?.card && (state.cardFile ?? cards.find((k) => k.index === 1)?.file) ? (
+        /* The card where the user placed it, with the post's own strings when the layout carries them; on a slide with no
+           Cards line, the banner chosen in the App callout field. */
         <div className="frame__card is-free" data-card="" style={freeCardStyle(layout.card)}>
-          <img src={fileUrl(state.cardFile ?? cards.find((k) => k.index === 1)!.file!)} alt={`Product callout image 1: ${slide.cards[0]}${state.cardFile ? " (this post's own words)" : ""}`} />
+          <img src={fileUrl(state.cardFile ?? cards.find((k) => k.index === 1)!.file!)} alt={`Product callout image 1: ${slide.cards[0] ?? "the app callout"}${state.cardFile ? " (this post's own words)" : ""}`} />
         </div>
       ) : hasCards ? (
         <div className="frame__cards">

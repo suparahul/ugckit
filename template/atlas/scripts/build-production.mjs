@@ -23,6 +23,8 @@
  *
  * Decisions, uploads and outcomes are NOT here: they are the user's own and live
  * in ../production/ (see lib/production.ts). This file is the authored truth.
+ * One exception, for the skills: a row's latest `template.set` line is copied
+ * in as `templateSet` (the studio's template dropdown; lib/template.ts).
  *
  *   node scripts/build-production.mjs [--verbose]
  */
@@ -32,6 +34,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync,
 import { basename, join, resolve } from "node:path";
 import { parseCoverStyle } from "../lib/camera-cover.ts";
 import { parsePlatforms } from "../lib/platform.ts";
+import { FORMATS, lineTemplate, readTemplateCell, recipeFor, recipeOf, stylesWith } from "../lib/template.ts";
 import { brainValues, columnsOf, isRecreation, kindOf, tagsOf, videoIdIn, videoIdeaOf } from "../lib/video-row.ts";
 
 const REPO = process.env.ATLAS_ROOT ? resolve(process.env.ATLAS_ROOT) : resolve(process.cwd(), "..");
@@ -247,6 +250,9 @@ function formatPartsOf(cell) {
 
 /* ---------------------------------------------------------------- plan */
 
+/* Per row key: the raw Template and Kind cells, read in readPlan and resolved in build(). */
+const TEMPLATE_CELLS = new Map();
+
 function readPlan() {
   if (!existsSync(PLAN_FILE)) {
     warn(`plan: ${PLAN_FILE} not found`);
@@ -320,15 +326,21 @@ function readPlan() {
   /* The posts table: the first table whose header starts with | Day | Date |. */
   const rows = [];
   let inTable = false;
-  /* The optional `Platforms` column, found by its header (the last column, after Kind). */
-  let platIdx = -1;
+  /* The optional `Platforms` and `Template` columns, found by their headers (after Kind). */
+  let platIdx = -1, tplIdx = -1;
   /* Kind, Tags and the optional video columns, found by their headers (lib/video-row.ts); absent in an old plan. */
   let cols = {};
   const brainFile = join(REPO, "brain", "video-patterns.json");
   const brain = existsSync(brainFile) ? brainValues(JSON.parse(readFileSync(brainFile, "utf8"))) : null;
   let recreation = 0;
   for (const l of lines) {
-    if (/^\|\s*Day\s*\|\s*Date\s*\|/.test(l)) { inTable = true; platIdx = cells(l).findIndex((x) => /^platforms?$/i.test(strip(x))); cols = columnsOf(cells(l)); continue; }
+    if (/^\|\s*Day\s*\|\s*Date\s*\|/.test(l)) {
+      inTable = true;
+      platIdx = cells(l).findIndex((x) => /^platforms?$/i.test(strip(x)));
+      tplIdx = cells(l).findIndex((x) => /^template$/i.test(strip(x.replace(/\*\*/g, ""))));
+      cols = columnsOf(cells(l));
+      continue;
+    }
     if (inTable) {
       if (!isRow(l)) { if (rows.length) break; continue; }
       const c = cells(l);
@@ -365,6 +377,8 @@ function readPlan() {
       /* Written only when the row names its platforms; blank means the head line's. */
       const rowPlatforms = platIdx >= 0 ? parsePlatforms(c[platIdx]) : null;
       if (rowPlatforms) rows[rows.length - 1].platforms = rowPlatforms;
+      /* The template cell (`<format> · <style>`) and the Kind, read in build() once the handle's recipes are known. */
+      TEMPLATE_CELLS.set(rows[rows.length - 1].key, { template: tplIdx >= 0 && c[tplIdx] ? strip(c[tplIdx]) : "", kind });
       /* A video row: its idea fields, its tags, and the id an old plan wrote in Format / variation. Slideshow rows stay as they were. */
       if (kind === "video") {
         const { idea, warnings } = videoIdeaOf(c, cols, brain);
@@ -481,6 +495,9 @@ function parseSlide(heading, body, postTextSize) {
       if (!slide.cover) warn(`deck: slide ${n} cover style "${text}" is not one the compositor draws (camera)`);
     } else if (/^why this slide/i.test(rawLabel)) {
       slide.why = text;
+    } else if (/^layout$/i.test(rawLabel)) {
+      /* The template and spec a slide is drawn from (the infographic skill): a note for the reader, never on-image text. */
+      slide.design = text;
     } else if (/^cards/i.test(rawLabel)) {
       /* handled above */
     } else {
@@ -724,6 +741,34 @@ function build(slug) {
   plan = readPlan();
   const deckFiles = existsSync(DECKS_DIR) ? readdirSync(DECKS_DIR).filter((f) => f.endsWith(".md") && !/^EXAMPLE/i.test(f)).sort() : [];
   const decks = deckFiles.map((f) => readDeck(join(DECKS_DIR, f))).filter(Boolean);
+
+  /* The template of each row (lib/template.ts): the plan's cell, format · style, and the handle's format file that
+     makes it (`recipe`, for the deck skill); the latest `template.set` line of the log at build time as `templateSet`.
+     The log is the user's; it is read here only so a skill reading the index sees the override. The studio reads it live.
+     The styles are the kit's and the app's own (apps/<slug>/brand/style.json "styles", lib/brand.ts). */
+  let brandStyles = null;
+  try { brandStyles = JSON.parse(readFileSync(join(APPS, slug, "brand", "style.json"), "utf8")).styles ?? null; } catch { /* no brand file */ }
+  const styles = stylesWith(brandStyles);
+  const logFile = join(prod, "log.jsonl");
+  const sets = existsSync(logFile)
+    ? readFileSync(logFile, "utf8").split("\n").filter((l) => l.includes('"template.set"')).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter((e) => e && e.kind === "template.set" && e.post && lineTemplate(e, styles))
+    : [];
+  for (const r of plan.rows) {
+    const dir = join(APPS, slug, "handles", r.handle.replace(/^@/, ""), "formats");
+    const recipes = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith(".md") && !f.startsWith(".")).sort().map((f) => recipeOf(f.slice(0, -3), readFileSync(join(dir, f), "utf8"), styles)).filter(Boolean) : [];
+    const cell = TEMPLATE_CELLS.get(r.key) ?? { template: "", kind: "" };
+    const read = readTemplateCell(cell.template, recipes, styles);
+    if (cell.template && !read) warn(`plan: ${r.key} template "${cell.template}" is not <format> · <style> (${FORMATS.map((f) => `${f}: ${styles[f].map((o) => o.label.toLowerCase()).join(", ")}`).join("; ")})`);
+    if (read) r.template = read.template;
+    const e = sets.filter((x) => x.post === r.key).pop();
+    if (e) r.templateSet = { ...lineTemplate(e, styles), from: typeof e.data.from === "string" ? e.data.from : "", at: e.at, ...(e.hash ? { hash: e.hash } : {}) };
+    const eff = e ? lineTemplate(e, styles) : read?.template ?? null;
+    const recipe = recipeFor(eff, recipes, read?.recipe ?? null);
+    if (recipe) r.recipe = recipe;
+    /* A reel made by the video pipeline is a video row: the Kind cell saying slideshow is flagged, nothing else. */
+    if (eff?.format === "reel" && eff.style === "other" && cell.kind === "slideshow") warn(`plan: ${r.key} Kind says slideshow, but its template is a reel made by the video pipeline (reel · other)`);
+  }
+  TEMPLATE_CELLS.clear();
 
   const deckByKey = {};
   for (const d of decks) for (const p of d.posts) {

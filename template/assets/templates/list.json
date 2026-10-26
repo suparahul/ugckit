@@ -1,0 +1,43 @@
+{
+  "template": "list",
+  "version": 1,
+  "size": [
+    1080,
+    1440
+  ],
+  "style": {},
+  "content": {
+    "heading": "A heading that names the list",
+    "sub": "a short tag",
+    "items": [
+      {
+        "title": "First item",
+        "line": "one line about it"
+      },
+      {
+        "title": "Second item",
+        "line": "one line about it"
+      },
+      {
+        "title": "Third item",
+        "line": "one line about it"
+      },
+      {
+        "title": "Fourth item",
+        "line": "one line about it"
+      }
+    ],
+    "art": "",
+    "screen": "",
+    "footer": ""
+  },
+  "nudge": {},
+  "params": {
+    "badge": 1
+  },
+  "anim": {
+    "kind": "none",
+    "duration": 6,
+    "stagger": 0.12
+  }
+}

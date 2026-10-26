@@ -15,7 +15,7 @@ import { Readable } from "node:stream";
 import { promisify } from "node:util";
 
 import { AUDIO_TYPE, isTrack, MUSIC_DIR } from "@/lib/music";
-import { allStates, appendEvent, reelVideo, validSlug } from "@/lib/production";
+import { allStates, appendEvent, postVideo, validSlug } from "@/lib/production";
 import { ROOT } from "@/lib/root";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   const state = allStates(slug).find((s) => s.row.key === post);
   if (!state) return NextResponse.json({ error: "No such post." }, { status: 404 });
   if (state.posted || state.sent) return NextResponse.json({ error: "This post has already gone out; its sound is what went with it." }, { status: 400 });
-  if (reelVideo(slug, post)) {
+  if (postVideo(slug, post)) {
     try {
       await run("node", [join(ROOT, "scripts", "add-audio.mjs"), slug, post, "--audio", track === "none" ? "none" : join(MUSIC_DIR, track)], { cwd: ROOT, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, ATLAS_ROOT: ROOT } });
     } catch (e) {
@@ -47,5 +47,5 @@ export async function POST(request: NextRequest) {
     }
   }
   appendEvent(slug, { post, kind: "music.set", actor: "user", data: { track } });
-  return NextResponse.json({ ok: true, track, mixed: !!reelVideo(slug, post) });
+  return NextResponse.json({ ok: true, track, mixed: !!postVideo(slug, post) });
 }

@@ -1,0 +1,84 @@
+{
+  "template": "cube",
+  "version": 1,
+  "size": [
+    1080,
+    1920
+  ],
+  "style": {},
+  "content": {
+    "title": [
+      "Six things",
+      "to know"
+    ],
+    "pill": "by category",
+    "unit": "",
+    "cubes": [
+      {
+        "n": "First thing",
+        "label": [],
+        "asset": "",
+        "unit": "Category"
+      },
+      {
+        "n": "Second thing",
+        "label": [],
+        "asset": "",
+        "unit": "Category"
+      },
+      {
+        "n": "Third thing",
+        "label": [],
+        "asset": "",
+        "unit": "Category"
+      },
+      {
+        "n": "Fourth thing",
+        "label": [],
+        "asset": "",
+        "unit": "Category"
+      },
+      {
+        "n": "Fifth thing",
+        "label": [],
+        "asset": "",
+        "unit": "Category"
+      },
+      {
+        "n": "Sixth thing",
+        "label": [],
+        "asset": "",
+        "unit": "Category"
+      }
+    ]
+  },
+  "nudge": {},
+  "params": {
+    "titleSize": 71,
+    "titleTop": 184,
+    "titleLeading": 76,
+    "pillSize": 32,
+    "gridGap": 136,
+    "margin": 72,
+    "gap": 27,
+    "cubeHeight": 220,
+    "depth": 31,
+    "rowGap": 126,
+    "numberSize": 60,
+    "unitSize": 24,
+    "labelSize": 28,
+    "babySize": 128,
+    "babySink": 14,
+    "cols": 3,
+    "milestoneSize": 26,
+    "unitGap": 136,
+    "labelGap": 6,
+    "labelLeading": 128,
+    "unitInline": 1
+  },
+  "anim": {
+    "kind": "float",
+    "duration": 6,
+    "stagger": 0.12
+  }
+}

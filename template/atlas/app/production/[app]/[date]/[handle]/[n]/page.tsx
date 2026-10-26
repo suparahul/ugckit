@@ -23,7 +23,7 @@ import { AnatomyRail, curl, PlanningMode, ProducedMode, sourceLink, type VideoBa
 import { StageCrumbs } from "@/components/production/VideoStages";
 import { SendStatusLine } from "@/components/production/Bridge";
 import { bridgeInfo, postingNotes, sendWarning, withStatusWords } from "@/lib/postbridge-flow";
-import { allStates, dateParts, fileAbs, findRow, getProduction, legFormat, nextStep, outcomesOpenAt, postingStep, postPath, postState, primaryAction, reelVideo, validSlug } from "@/lib/production";
+import { allStates, dateParts, fileAbs, findRow, getProduction, legFormat, nextStep, outcomesOpenAt, postingStep, postPath, postState, primaryAction, postVideo, validSlug } from "@/lib/production";
 import { statSync } from "node:fs";
 import { listTracks } from "@/lib/music";
 import { reelHolds } from "@/lib/reel";
@@ -31,6 +31,7 @@ import { PLATFORM_NAME } from "@/lib/platform";
 import { LegFormat } from "@/components/production/LegFormat";
 import { MusicPick } from "@/components/production/MusicPick";
 import { RebuildReel } from "@/components/production/RebuildReel";
+import { TemplatePick } from "@/components/production/TemplatePick";
 import { getZones } from "@/lib/when";
 import { plainBlock, videoStatus } from "@/lib/plain-words";
 import { handleByShort } from "@/lib/handles";
@@ -98,15 +99,18 @@ export default async function ProductionPost({ params, searchParams }: { params:
 
   /* A slideshow of two or more slides can also go out as a reel (lib/reel.ts): its video, its music, its seconds and,
      per platform, slideshow or reel. A video post has its own file and none of this. */
-  const reelable = !state.video && !!state.deck && state.deck.slides.length > 1 && !state.killed;
-  const reel = reelable ? reelVideo(app, row.key) : null;
+  const slideshow = !state.video && !!state.deck && state.deck.slides.length > 1 && !state.killed;
+  /* A one-card design template exported as a video (the design editor's "Save and export video") is that video everywhere. */
+  const oneCard = !state.video && !!state.deck && state.deck.slides.length === 1 && !state.killed && !!postVideo(app, row.key);
+  const reelable = slideshow || oneCard;
+  const reel = reelable ? postVideo(app, row.key) : null;
   /* The file's time in the player's address, so a new cut or mix loads in place. */
   const reelV = reel ? (() => { try { return Math.round(statSync(fileAbs(reel) ?? "").mtimeMs); } catch { return 0; } })() : 0;
   const reelUrl = reel ? `/api/production/file/${reel.split("/").map(encodeURIComponent).join("/")}` : "";
   const tracks = reelable ? listTracks(identity?.music ?? null) : [];
   const musicNow = [...state.log].reverse().find((e) => e.kind === "music.set")?.data?.track;
   const holds = reelHolds(state.log);
-  const reelLegs = reelable ? (state.platforms ?? ["tiktok"]).filter((p) => !state.legs?.[p]?.dropped) : [];
+  const reelLegs = slideshow ? (state.platforms ?? ["tiktok"]).filter((p) => !state.legs?.[p]?.dropped) : [];
   const gone = !!state.sent || !!state.posted;
 
   /* prev / next walk the day's posts in board order. */
@@ -160,6 +164,7 @@ export default async function ProductionPost({ params, searchParams }: { params:
             {state.video && asPlan ? <Link className="menu__item" href={base}>Back to the video</Link> : null}
           </KillMenu>
         </div>
+        {!state.video ? <p className="post-head__meta"><TemplatePick post={row.key} t={state.template} hasDeck={!!state.deck} readOnly={!!state.killed || !!state.posted} /></p> : null}
         {stages && videoBody ? <StageCrumbs v={stages} base={base} stage={openStage} /> : null}
         {status && !videoBody ? (
           <p className={`post-head__status is-${status.who}`}>
@@ -167,7 +172,7 @@ export default async function ProductionPost({ params, searchParams }: { params:
             {status.text}
           </p>
         ) : null}
-        {two ? <Legs s={state} href={`${base}${slideNo > 1 ? `?slide=${slideNo}` : ""}`} view={view} /> : null}
+        {two ? <Legs s={state} href={`${base}${slideNo > 1 ? `?slide=${slideNo}` : ""}`} view={view} hasVideo={!!reel} /> : null}
         {status ? (
           !videoBody ? headNotes : null
         ) : (
@@ -209,16 +214,17 @@ export default async function ProductionPost({ params, searchParams }: { params:
       </header>
 
       {reelable && (reel || mode !== "planning") ? (
-        <section className="post-reel" aria-label="The reel of this slideshow">
+        <section className="post-reel" aria-label={oneCard ? "The video of this post" : "The reel of this slideshow"}>
           {reel ? <video key={reelV} className="post-reel__video" src={`${reelUrl}?v=${reelV}`} controls muted loop playsInline /> : null}
           <div className="post-reel__side">
             <p className="post-reel__head">
-              <strong>{reel ? "The reel." : "No reel yet."}</strong>{" "}
-              {reel ? <>These slides cut into one video, with the cover text burned in. <a href={reelUrl} download>Download the mp4</a></> : <>Instagram gets this slideshow as a reel; the send cuts it, or make it now to see it first.</>}
+              <strong>{oneCard ? "The video." : reel ? "The reel." : "No reel yet."}</strong>{" "}
+              {oneCard ? <>The design drawn as a video: every platform gets it. Export it again from Edit design after a change. <a href={reelUrl} download>Download the mp4</a></>
+                : reel ? <>These slides cut into one video, with the cover text burned in. <a href={reelUrl} download>Download the mp4</a></> : <>Instagram gets this slideshow as a reel; the send cuts it, or make it now to see it first.</>}
             </p>
             {reelLegs.length ? <LegFormat slug={app} post={row.key} rows={reelLegs.map((p) => ({ platform: p, name: PLATFORM_NAME[p], format: legFormat(state.log, p, true), locked: !!(state.legs?.[p]?.sent || state.legs?.[p]?.posted) }))} /> : null}
             {tracks.length ? <MusicPick app={app} post={row.key} tracks={tracks} current={typeof musicNow === "string" ? musicNow : "none"} hasReel={!!reel} readOnly={gone} /> : null}
-            {!gone ? <RebuildReel slug={app} post={row.key} slides={state.deck!.slides.length} hasProduct={state.deck!.slides.some((x, i) => x.isProduct && i > 0)} hasReel={!!reel} {...holds} /> : null}
+            {!gone && slideshow ? <RebuildReel slug={app} post={row.key} slides={state.deck!.slides.length} hasProduct={state.deck!.slides.some((x, i) => x.isProduct && i > 0)} hasReel={!!reel} {...holds} /> : null}
           </div>
         </section>
       ) : null}

@@ -33,7 +33,7 @@ import { identitiesOf } from "./accounts.ts";
 import { MAX_SLIDES, PLATFORM_NAME, linePlatform, platformOf, primaryOf, type Platform } from "./platform.ts";
 import { slotKey, slotTimes } from "./slots.ts";
 import { accountsOf, hasKey, legsPost, postBody, postBridge, sendStatusOf, type CreatePostInput, type PostBridgeClient, type RequestPreview, type Leg, type SentPost, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type AccountsFile, type PBAccount, type SendStatus, type SyncReport } from "./postbridge.ts";
-import { allStates, appendEvent, filesRoot, fileKey, getProduction, isSent, legFormat, legsOfSent, postingStep, readLog, recordOutcome, reelVideo, storeOf, type Event, type PostState } from "./production.ts";
+import { allStates, appendEvent, filesRoot, fileKey, getProduction, isSent, legFormat, legsOfSent, postingStep, readLog, recordOutcome, postVideo, storeOf, type Event, type PostState } from "./production.ts";
 import { makeReel } from "./reel.ts";
 import { checkVideoSend, musicDirectNote, musicInstagramNote, videoReminders } from "./video-post.ts";
 import { finalFileOf } from "./video.ts";
@@ -299,13 +299,14 @@ export async function sendPost(slug: string, key: string, opts: { compose?: bool
   const nn = (n: number) => String(n).padStart(2, "0");
   /* Each platform as the slideshow or as the reel (legFormat: a `leg.format` line from the post page, else TikTok the
    * slideshow and Instagram the reel). A leg that goes as the reel gets it cut again now, from the slides just
-   * rendered, with the post's music. */
+   * rendered, with the post's music. A one-card post with a video (a design template's) sends that video everywhere. */
   const slides = state.deck.slides.length;
-  const wantsReel = (p: Platform) => slides > 1 && legFormat(state.log, p, !!reelVideo(slug, key) || p === "instagram") === "reel";
+  const oneCardVideo = slides <= 1 && !!postVideo(slug, key);
+  const wantsReel = (p: Platform) => oneCardVideo || (slides > 1 && legFormat(state.log, p, !!postVideo(slug, key) || p === "instagram") === "reel");
   const ttReel = tt && wantsReel("tiktok"), igReel = ig && wantsReel("instagram");
-  if ((ttReel || igReel) && opts.compose !== false) await makeReel(slug, state);
-  const reel = ttReel || igReel ? reelVideo(slug, key) : null;
-  if ((ttReel || igReel) && !reel) throw new Error("The reel could not be made: video/reel-final.mp4 is missing.");
+  if ((ttReel || igReel) && !oneCardVideo && opts.compose !== false) await makeReel(slug, state);
+  const reel = ttReel || igReel ? postVideo(slug, key) : null;
+  if ((ttReel || igReel) && !reel) throw new Error("The video could not be made: video/reel-final.mp4 is missing.");
   const reelAbs = reel ? join(filesRoot(slug), reel.slice(slug.length + 1)) : "";
   const ttFiles = tt ? (ttReel ? [reelAbs] : state.deck.slides.map((s) => need(join(dir, `slide-${nn(s.n)}.png`)))) : [];
   /* One caption for both platforms, hashtags included. */

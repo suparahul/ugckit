@@ -24,6 +24,7 @@ import { calloutWhy, dropsAppStoreCard } from "@/lib/callout";
 import { BOX_FONT_SIZE, FONT_SIZE_BY, type Layout } from "@/lib/layout";
 import { PhoneTick, SlideActions, SlideNote, SlideTextFlag, useDecide } from "./Actions";
 import { Replica, Sketch } from "./Frame";
+import { ComposeEditor } from "./ComposeEditor";
 import { LayoutEditor } from "./LayoutEditor";
 import { CheckIcon, Diamond, SoundIcon } from "./Marks";
 
@@ -40,7 +41,9 @@ export function Deck({ state, deck, deckFile, initial, src, overlayOff, readOnly
   const frameWrap = useRef<HTMLDivElement>(null);
   const [decide, busy] = useDecide();
   const [lockErr, setLockErr] = useState<string | null>(null);
-  useEffect(() => { setDraft(null); setLockErr(null); }, [n]);
+  /* The design editor of a template slide (a spec under files/<post>/compose/) is open. */
+  const [composing, setComposing] = useState(false);
+  useEffect(() => { setDraft(null); setLockErr(null); setComposing(false); }, [n]);
 
   /* The default layout, read off the replica as drawn: each block's box in
    * percent of the frame. That is the starting point for hand placement. */
@@ -201,6 +204,9 @@ export function Deck({ state, deck, deckFile, initial, src, overlayOff, readOnly
             ) : null}
           </div>
         </div>
+      ) : composing && ss.compose ? (
+        /* The design editor takes the whole slide view: the live frame on the left, its panel on the right. */
+        <ComposeEditor post={row.key} slide={n} cardFile={slide.cards.length ? ss.cardFile ?? state.cards.find((k) => k.index === 1)?.file ?? null : state.cards.find((k) => k.index === 1)?.file ?? null} card0={ss.layout?.card ?? null} screen0={ss.layout?.screen ?? null} noCard0={!!ss.layout?.noCard} onClose={() => setComposing(false)} />
       ) : (
 
       <div className="rep__body">
@@ -208,9 +214,27 @@ export function Deck({ state, deck, deckFile, initial, src, overlayOff, readOnly
           {draft ? (
             <LayoutEditor post={row.key} slide={slide} state={ss} cards={state.cards} total={total} layout={draft} onChange={setDraft} dimension={state.dimension} onSave={lock} onCancel={() => setDraft(null)} busy={busy} error={lockErr} />
           ) : (
-            <Replica slide={slide} state={ss} cards={state.cards} total={total} text={illustrated || !overlay || (slide.composed && ss.current) ? "off" : "on"} layout={illustrated ? null : ss.layout} dimension={state.dimension} />
+            /* An illustrated slide has no text layer, but its App callout (a card, a screenshot, or none) is still the layout's. */
+            <Replica slide={slide} state={ss} cards={state.cards} total={total} app={row.slug} text={illustrated || !overlay || (slide.composed && ss.current) ? "off" : "on"}
+              layout={illustrated && !ss.compose ? (ss.layout?.card || ss.layout?.screen || ss.layout?.noCard ? { blocks: [], ...(ss.layout.card ? { card: ss.layout.card } : {}), ...(ss.layout.screen ? { screen: ss.layout.screen } : {}), ...(ss.layout.noCard ? { noCard: true } : {}) } : null) : ss.layout} dimension={state.dimension} />
           )}
-          {canDecide && ss.text === "baked" && !draft && !illustrated ? (
+          {ss.compose && !readOnly && !state.killed && !composing ? (
+            <p className="rep__lockrow">
+              <span className="rep__lockhint">A design template: its sizes, spacing and words are editable.</span>
+              <button type="button" className="pill pill--go" onClick={() => setComposing(true)}>Edit design</button>
+            </p>
+          ) : null}
+          {/* An illustrated slide has no text layer to move, but its App callout (a banner or a screenshot) is placed by hand:
+            * the layout editor opens with no blocks, the App callout field first, as on every other post. */}
+          {canDecide && illustrated && !ss.compose && !draft ? (
+            <p className="rep__lockrow">
+              <span className="rep__lockhint">{ss.layout?.card || ss.layout?.screen ? "App callout placed: the final is drawn from it." : "The text is in the picture; set the App callout here."}</span>
+              <button type="button" className="rail__kill" disabled={busy} onClick={() => { const c = ss.layout?.card ?? (slide.cards.length ? layoutFromDom(slide)?.card ?? null : null); setDraft({ blocks: [], ...(c ? { card: c } : {}), ...(ss.layout?.screen ? { screen: ss.layout.screen } : {}), ...(ss.layout?.noCard ? { noCard: true } : {}) }); }}>Edit app callout</button>
+              {ss.layout?.card || ss.layout?.screen ? <button type="button" className="rail__kill" disabled={busy} onClick={() => decide({ post: row.key, kind: "slide.unlock", slide: n }).then((r) => setLockErr(r))}>Reset to default</button> : null}
+              {lockErr ? <span className="rail__err" role="alert">{lockErr}</span> : null}
+            </p>
+          ) : null}
+          {canDecide && ss.text === "baked" && !draft && !illustrated && !ss.compose ? (
             <p className="rep__lockrow">
               {ss.layout ? (
                 <>
