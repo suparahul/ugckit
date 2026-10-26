@@ -227,6 +227,13 @@ ok "scripts, skills, docs and the atlas"
 for f in AGENTS.md CLAUDE.md ugckit; do copy_managed "$f"; done
 ok "AGENTS.md, CLAUDE.md, ugckit"
 
+# The music library a reel can carry (assets/music/<group>/). Tracks the user added are not in the
+# manifest and are never touched.
+( cd "$SRC" && find assets/music -type f ! -name .DS_Store -print ) | not_ignored | while read -r rel; do
+  copy_managed "$rel"
+done
+ok "assets/music"
+
 # Codex reads skills from .agents/skills (the repo-level folder of codex-cli 0.154), not
 # from .claude/skills. One link, so there is one copy of every skill to maintain. A real
 # folder already there is the user's; it is left alone and said.

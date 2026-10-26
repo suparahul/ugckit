@@ -23,7 +23,14 @@ import { AnatomyRail, curl, PlanningMode, ProducedMode, sourceLink, type VideoBa
 import { StageCrumbs } from "@/components/production/VideoStages";
 import { SendStatusLine } from "@/components/production/Bridge";
 import { bridgeInfo, postingNotes, sendWarning, withStatusWords } from "@/lib/postbridge-flow";
-import { allStates, dateParts, findRow, getProduction, nextStep, outcomesOpenAt, postingStep, postPath, postState, primaryAction, validSlug } from "@/lib/production";
+import { allStates, dateParts, fileAbs, findRow, getProduction, legFormat, nextStep, outcomesOpenAt, postingStep, postPath, postState, primaryAction, reelVideo, validSlug } from "@/lib/production";
+import { statSync } from "node:fs";
+import { listTracks } from "@/lib/music";
+import { reelHolds } from "@/lib/reel";
+import { PLATFORM_NAME } from "@/lib/platform";
+import { LegFormat } from "@/components/production/LegFormat";
+import { MusicPick } from "@/components/production/MusicPick";
+import { RebuildReel } from "@/components/production/RebuildReel";
 import { getZones } from "@/lib/when";
 import { plainBlock, videoStatus } from "@/lib/plain-words";
 import { handleByShort } from "@/lib/handles";
@@ -88,6 +95,19 @@ export default async function ProductionPost({ params, searchParams }: { params:
   const bridge = step ? bridgeInfo(state) : undefined;
   const notes = step ? postingNotes(state) : [];
   const warning = bridge ? sendWarning(state, bridge) : null;
+
+  /* A slideshow of two or more slides can also go out as a reel (lib/reel.ts): its video, its music, its seconds and,
+     per platform, slideshow or reel. A video post has its own file and none of this. */
+  const reelable = !state.video && !!state.deck && state.deck.slides.length > 1 && !state.killed;
+  const reel = reelable ? reelVideo(app, row.key) : null;
+  /* The file's time in the player's address, so a new cut or mix loads in place. */
+  const reelV = reel ? (() => { try { return Math.round(statSync(fileAbs(reel) ?? "").mtimeMs); } catch { return 0; } })() : 0;
+  const reelUrl = reel ? `/api/production/file/${reel.split("/").map(encodeURIComponent).join("/")}` : "";
+  const tracks = reelable ? listTracks(identity?.music ?? null) : [];
+  const musicNow = [...state.log].reverse().find((e) => e.kind === "music.set")?.data?.track;
+  const holds = reelHolds(state.log);
+  const reelLegs = reelable ? (state.platforms ?? ["tiktok"]).filter((p) => !state.legs?.[p]?.dropped) : [];
+  const gone = !!state.sent || !!state.posted;
 
   /* prev / next walk the day's posts in board order. */
   const day = allStates(app).filter((s) => s.row.date === row.date);
@@ -188,6 +208,20 @@ export default async function ProductionPost({ params, searchParams }: { params:
         {state.killed ? <p className="band">Killed {stamp(state.killed.at)} — <em>“{state.killed.note}”</em>. The page is read-only.</p> : null}
       </header>
 
+      {reelable && (reel || mode !== "planning") ? (
+        <section className="post-reel" aria-label="The reel of this slideshow">
+          {reel ? <video key={reelV} className="post-reel__video" src={`${reelUrl}?v=${reelV}`} controls muted loop playsInline /> : null}
+          <div className="post-reel__side">
+            <p className="post-reel__head">
+              <strong>{reel ? "The reel." : "No reel yet."}</strong>{" "}
+              {reel ? <>These slides cut into one video, with the cover text burned in. <a href={reelUrl} download>Download the mp4</a></> : <>Instagram gets this slideshow as a reel; the send cuts it, or make it now to see it first.</>}
+            </p>
+            {reelLegs.length ? <LegFormat slug={app} post={row.key} rows={reelLegs.map((p) => ({ platform: p, name: PLATFORM_NAME[p], format: legFormat(state.log, p, true), locked: !!(state.legs?.[p]?.sent || state.legs?.[p]?.posted) }))} /> : null}
+            {tracks.length ? <MusicPick app={app} post={row.key} tracks={tracks} current={typeof musicNow === "string" ? musicNow : "none"} hasReel={!!reel} readOnly={gone} /> : null}
+            {!gone ? <RebuildReel slug={app} post={row.key} slides={state.deck!.slides.length} hasProduct={state.deck!.slides.some((x, i) => x.isProduct && i > 0)} hasReel={!!reel} {...holds} /> : null}
+          </div>
+        </section>
+      ) : null}
       <div className="post-body">
         {mode === "planning" ? <PlanningMode state={state} readOnly={asPlan} src={src} slideNo={slideNo} view={videoView} videoBar={videoBar} /> : <ProducedMode state={state} slideNo={slideNo} src={src} overlayOff={overlayOff} readOnly={next.who === "agent"} view={videoView} videoBar={videoBar} />}
         <AnatomyRail state={state} src={src} />

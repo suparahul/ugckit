@@ -49,11 +49,18 @@ differs:
   AM post by hand): the TikTok draft reaches the phone when the send runs, and Instagram
   publishes at that same moment. So send an AM post **at its slot time**, not earlier;
   the dry run says how many minutes early a send would be.
-- **No music.** The kit sends no audio for Instagram. Once the post is live, the user
-  adds the music by hand in the Instagram app: Edit, then Replace Audio, from
-  Instagram's own library. Say this after the send, every time.
-- **Its own slides and text.** The 4:5 JPEG set (the `render` skill), the cover text
-  burned in, and the same caption as TikTok, tags included. There is no first comment.
+- **A Reel by default.** A slideshow of two or more slides goes to Instagram as its reel
+  (the `render` skill, § The reel): the send cuts it from the slides it sends and uploads
+  the one video. TikTok gets the slideshow. The post page's switch sets either platform to
+  the slideshow or the reel (`leg.format`); when the two differ, the send makes two Post
+  Bridge posts, one per format, each on its own `posting.sent` line.
+- **Music.** The reel carries the track chosen on the post page (`music.set`), else one of
+  the handle's `Music:` group, else none: say which after the send. A carousel carries
+  none: once it is live, the user adds the music by hand in the Instagram app (Edit, then
+  Replace Audio). Say this after a carousel send, every time.
+- **Its own slides and text.** As a carousel, the 4:5 JPEG set (the `render` skill), the
+  cover text burned in. Either way the same caption as TikTok, tags included, and no first
+  comment.
 - **10 slides at most.** A deck over 10 on a two-platform handle is not sent: the dry
   run says "cut the deck (the deck skill), or send TikTok alone with --only tiktok".
   Ask the user which; do not cut slides yourself.

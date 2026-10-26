@@ -53,6 +53,8 @@ export type Handle = {
   postingZone: string | null;
   cadence: string | null;
   sound: string | null;
+  /** The `Music:` line: the folder of assets/music a reel of this handle picks its track from (calm, upbeat …). */
+  music: string | null;
   warmup: string | null;
   persona: string | null;
   bio: string | null;
@@ -199,7 +201,7 @@ function readHandle(slug: string, dir: string, log: Event[], accounts: AccountsF
   return {
     slug, dir, handle, short,
     platform: head["Platform"] ?? null, role: head["Role"] ?? null, tier: head["Tier"] ?? null, created: head["Created"] ?? null,
-    format: head["Format"] ?? null, dimension, slots: head["Slots"] ?? null, postingZone: head["Posting zone"] ?? null, cadence: head["Cadence"] ?? null, sound: head["Sound"] ?? null, warmup: head["Warm-up"] ?? null,
+    format: head["Format"] ?? null, dimension, slots: head["Slots"] ?? null, postingZone: head["Posting zone"] ?? null, cadence: head["Cadence"] ?? null, sound: head["Sound"] ?? null, music: head["Music"]?.trim().split(/\s+/)[0]?.toLowerCase() || null, warmup: head["Warm-up"] ?? null,
     persona: personaBody, bio: bioQuote, bioRule, references, defaults: defaultsRows,
     stylePrefix, identityRule: sectionOf(md, /^Identity rule/i), postProcess: sectionOf(md, /^Post-process/i),
     profile: profileRef?.url ?? null, connected, connection: connected ? `connected${connectedAt ? ` ${connectedAt}` : ""}${acct?.provider || acct?.platform ? ` · ${acct.provider ?? "Post Bridge"}` : ""}` : acct ? "needs a reconnect" : "connects at the first send", account: acct ? { provider: acct.provider ?? (acct.platform ? "Post Bridge" : "unknown"), id: acct.id ?? null, username: acct.username ?? null } : null,

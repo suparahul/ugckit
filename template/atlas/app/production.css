@@ -1374,3 +1374,30 @@
   .row__m { max-width: 300px; }
   .bar__act, .bar__now { margin-left: 0; }
 }
+
+/* A slideshow's reel on the post page (lib/reel.ts): the video, how each platform gets the post, its music, its seconds. */
+.post-reel { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; margin: 0 0 24px; }
+.post-reel__video { width: min(300px, 100%); aspect-ratio: 9 / 16; border-radius: 12px; background: #000; }
+.post-reel__side { flex: 1 1 320px; min-width: 0; max-width: 58ch; display: grid; gap: 14px; }
+.post-reel__head { margin: 0; }
+.legfmt { display: grid; gap: 6px; }
+.legfmt__row { display: flex; align-items: center; gap: 10px; }
+.legfmt__name { min-width: 7.5em; font-size: 13px; }
+.legfmt__seg { display: inline-flex; border: 1px solid var(--rule-2); border-radius: 999px; overflow: hidden; }
+.legfmt__seg button { font: inherit; font-size: 12px; padding: 4px 12px; border: 0; background: transparent; color: var(--ink-2); cursor: pointer; }
+.legfmt__seg button.is-on { background: var(--ink); color: #fffdf5; cursor: default; }
+.legfmt__seg button:disabled:not(.is-on) { opacity: 0.4; cursor: default; }
+.legfmt__note { color: var(--ink-3); }
+.music { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.music__field { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 220px; }
+.music__k { font-size: 13px; font-weight: 600; }
+.music__field select { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 4px 6px; }
+.music__preview { height: 30px; max-width: 100%; }
+.music__note { flex-basis: 100%; color: var(--ink-2); }
+.reel { display: grid; gap: 8px; justify-items: start; }
+.reel__fields { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 13px; }
+.reel__field input { width: 4.2rem; font: inherit; }
+.reel__field input[aria-invalid="true"] { border-color: var(--ember); }
+.reel__len { color: var(--ink-2); }
+.reel__hint, .reel__done { margin: 0; font-size: 12.5px; color: var(--ink-2); }
+.reel__done { color: #2f6b3a; }
