@@ -47,7 +47,7 @@ for l in open(sys.argv[1]):
     if len(c) < 2 or not c[0].isdigit(): continue
     what, src, note = c[1].strip("`"), (c[2] if len(c) > 2 else ""), (c[3] if len(c) > 3 else "")
     kind = "post" if re.search(r"tiktok\.com/.*/(photo|video)/\d+", what) else "short" if re.search(r"tiktok\.com/t/|vm\.tiktok\.com|vt\.tiktok\.com", what) else "handle" if re.match(r"^@[\w.]+$", what) else "screenshot" if re.search(r"\.(png|jpe?g|webp)$", what, re.I) else "unknown"
-    print("\t".join([c[0], kind, what, src, note]))
+    print("\t".join(x or "-" for x in [c[0], kind, what, src, note]))  # "-" for empty: `read` folds two tabs into one
 PY
 RES="$B/resolved.tsv"; touch "$RES"
 resolve() {  # short url -> full url, cached in resolved.tsv
@@ -77,6 +77,7 @@ done < "$B/.rows.tsv"
 # handles named in a screenshot row's note ("@handle ...") are fetched too
 while IFS=$'\t' read -r N KIND WHAT SRC NOTE; do
   [ "$KIND" = screenshot ] || continue
+  [ "$NOTE" = - ] && NOTE=""
   H=$(printf '%s' "$NOTE" | grep -o '@[A-Za-z0-9._]*' | head -1 | tr -d '@' || true)
   [ -n "$H" ] && HANDLES+=("$H")
 done < "$B/.rows.tsv"
@@ -138,7 +139,7 @@ if os.path.exists(p):
     except Exception: print("posts.raw.json is not JSON", file=sys.stderr)
 shots = []
 for l in open(os.path.join(b, ".rows.tsv")):
-    n, kind, what, src, note = (l.rstrip("\n").split("\t") + [""] * 5)[:5]
+    n, kind, what, src, note = [("" if x == "-" else x) for x in (l.rstrip("\n").split("\t") + [""] * 5)[:5]]
     if kind == "screenshot": shots.append((what, note))
 def words(t): return set(w for w in re.findall(r"[a-z0-9']+", (t or "").lower()) if len(w) > 2)
 for h in handles:
@@ -164,13 +165,16 @@ off = {l.split("\t")[0] for l in open(dp) if l.strip()} if os.path.exists(dp) el
 for pid, (u, r, why) in rows.items():
     if pid in off: continue
     imgs = [i.get("url") for i in (r.get("images") or []) if isinstance(i, dict) and i.get("url")]
-    print("\t".join([u, pid, "photo" if imgs else "video", str(r.get("views") or 0), ((r.get("video") or {}).get("url") or ""), "\x1f".join(imgs), why, ((r.get("video") or {}).get("cover") or "")]))
+    # An empty field is written "-": a tab is whitespace to `read`, and two in a row fold into one and shift every field after.
+    print("\t".join(x or "-" for x in [u, pid, "photo" if imgs else "video", str(r.get("views") or 0), ((r.get("video") or {}).get("url") or ""), "\x1f".join(imgs), why, ((r.get("video") or {}).get("cover") or "")]))
 PY
 
 # ---------------------------------------------------------------- 4 and 5. comments, slides, videos, sheets, transcripts
 NREAD=$(wc -l < "$B/.read.tsv" | tr -d ' ')
 echo "== $NREAD posts to read =="
-while IFS=$'\t' read -r H ID KIND VIEWS VURL IMGS WHY COVER; do
+# The rows are read on fd 3: monid, ffmpeg, ffprobe and whisper in the body must not reach them.
+while IFS=$'\t' read -r -u 3 H ID KIND VIEWS VURL IMGS WHY COVER; do
+  [ "$VURL" = - ] && VURL=""; [ "$IMGS" = - ] && IMGS=""; [ "$WHY" = - ] && WHY=""; [ "$COVER" = - ] && COVER=""
   P="$B/$H/$ID"; mkdir -p "$P"
   echo "  -- @$H $ID  $KIND  $VIEWS views  ($WHY)"
   # post.json: the raw record of this post, from whichever file holds it
@@ -198,7 +202,7 @@ PY
     done
     IFS=$OLDIFS
     NS=$(ls "$P"/slide-*.jpg 2>/dev/null | wc -l | tr -d ' ' || true)
-    BAD=0; for f in "$P"/slide-*.jpg; do [ -e "$f" ] || continue; ffprobe -v error "$f" >/dev/null 2>&1 || { BAD=$((BAD + 1)); rm -f "$f"; }; done
+    BAD=0; for f in "$P"/slide-*.jpg; do [ -e "$f" ] || continue; ffprobe -v error "$f" </dev/null >/dev/null 2>&1 || { BAD=$((BAD + 1)); rm -f "$f"; }; done
     echo "     ${NS:-0} slides$([ "$BAD" -gt 0 ] && echo ", $BAD not a real image and removed")"
     [ "${NS:-0}" -gt 0 ] || echo "     no slides downloaded -- the urls have expired or the CDN host is blocked (rule 12)"
   else
@@ -223,7 +227,7 @@ PY
     fi
     echo "     video.mp4 + $(ls "$P"/sheet-*.jpg 2>/dev/null | wc -l | tr -d ' ') sheet(s)$([ -s "$P/transcript.txt" ] && echo ' + transcript')"
   fi
-done < "$B/.read.tsv"
+done 3< "$B/.read.tsv"
 
 # ---------------------------------------------------------------- 6. posts.raw.json: every post read, once
 python3 "$SCRIPTS/niche-raw.py" merge "$B/posts.raw.json" "$B"/*/*/post.json

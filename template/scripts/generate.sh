@@ -110,7 +110,7 @@ for kind in ("video", "audio", "image"):
     for f in spec.get(kind) or []:
         print(kind, f)
 REFLIST
-  while read -r KIND FILE; do
+  while read -r -u 3 KIND FILE; do
     [ -n "$KIND" ] || continue
     ABS="$PROJ/$FILE"
     [ -f "$ABS" ] || { echo "missing reference $ABS" >&2; exit 1; }
@@ -121,7 +121,7 @@ REFLIST
       || { echo "upload failed: $UP" >&2; exit 1; }
     echo "  $KIND $FILE -> $FID"
     echo "$KIND $FID" >> "$IDS"
-  done < "$OUT/reflist-$STAMP.txt"
+  done 3< "$OUT/reflist-$STAMP.txt"
 fi
 
 python3 - "$REQ" "$SLUG" "$PROMPT" "$IDS" <<'BUILD'

@@ -28,7 +28,7 @@ if [ "$WHO" = "--rank" ]; then
     > "$DIR/deep.tsv" || true
   [ -s "$DIR/deep.tsv" ] || { echo "nothing harvested yet — run: scripts/harvest.sh $NAME $APP" >&2; exit 1; }
   I=0
-  while IFS=$'\t' read -r H _APP VIEWS REST; do
+  while IFS=$'\t' read -r -u 3 H _APP VIEWS REST; do
     I=$((I + 1))
     if [ "$I" -le "$TOPN" ]; then
       python3 "$STATE" handle-set "$NAME" "$APP" "$H" deep yes >/dev/null
@@ -36,7 +36,7 @@ if [ "$WHO" = "--rank" ]; then
     else
       printf '  %2d. %-28s %12s\n' "$I" "$H" "$VIEWS"
     fi
-  done < "$DIR/deep.tsv"
+  done 3< "$DIR/deep.tsv"
   echo
   echo "next: scripts/deepen.sh $NAME $APP --deep"
   exit 0
@@ -96,7 +96,8 @@ with open(os.path.join(h, "shortlist.tsv"), "w") as f:
 print(f"  {len(rows)} posts, {len(photos)} of them photo posts")
 PY
 
-  while IFS=$'\t' read -r ID KIND VIEWS VURL IMGS; do
+  # The rows are read on fd 3: a command in the body that reads stdin (ffmpeg, claude -p) would swallow the next row.
+  while IFS=$'\t' read -r -u 3 ID KIND VIEWS VURL IMGS; do
     P="$H/$ID"
     mkdir -p "$P"
     echo "  -- $ID  $KIND  $VIEWS views"
@@ -167,7 +168,7 @@ why this one worked, in two or three sentences, grounded in what you can actuall
 Add a '## Problems' section only if something is unreadable or missing."
     if command -v claude >/dev/null 2>&1; then
       echo "     writing notes.md ($HOOK_MODEL)"
-      claude --model "$HOOK_MODEL" --allowedTools "Read,Write,Glob" -p "$PROMPT" >/dev/null 2>&1 \
+      claude --model "$HOOK_MODEL" --allowedTools "Read,Write,Glob" -p "$PROMPT" </dev/null >/dev/null 2>&1 \
         || echo "     notes failed — re-run to retry"
     else
       # No claude CLI: the agent running this does the reading itself. The sheets stay
@@ -177,7 +178,7 @@ Add a '## Problems' section only if something is unreadable or missing."
     fi
     # The frames were scaffolding. The mp4 and the slides are the asset and stay.
     [ -s "$NOTES" ] && rm -f "$P"/sheet_*.png "$P/notes.todo"
-  done < "$H/shortlist.tsv"
+  done 3< "$H/shortlist.tsv"
 done
 
 echo

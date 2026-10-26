@@ -17,7 +17,7 @@ import { day7Rows } from "./findings";
 import { listHandles } from "./handles";
 import { allStates, getProduction, readLog, today } from "./production";
 import { readPlanText } from "./plan";
-import { appDir, exists, listDirs, listFiles, mtimeOf, newestIn, readJson, readText, RESEARCH_DIR, STATE_FILE } from "./root";
+import { appDir, exists, listDirs, listFiles, listHandleDirs, mtimeOf, newestIn, readJson, readText, RESEARCH_DIR, STATE_FILE } from "./root";
 
 export type PhaseKey = "setup" | "app" | "apps" | "niche" | "accounts" | "handles" | "fit" | "production";
 export type PhaseState = "done" | "now" | "todo";
@@ -160,7 +160,7 @@ export function canvasOf(slug: string): Canvas {
   const nicheStarted = exists(ndir) && (nSearchFiles > 0 || batches.length > 0 || exists(join(ndir, "NICHE.md")) || trio.length > 0);
   /* The day-7 rows of ours in the post table: added by production, not a change to the findings. anatomy.md's
      mtime is left out of the phase's time once they exist, so nothing downstream reads "changed upstream" from them. */
-  const ownRows = day7Rows(slug, listDirs(join(dir, "handles")).map((h) => (h.startsWith("@") ? h : `@${h}`)));
+  const ownRows = day7Rows(slug, listHandleDirs(join(dir, "handles"), (d) => exists(join(d, "HANDLE.md"))).map((h) => (h.startsWith("@") ? h : `@${h}`)));
   const nicheAt = ownRows.length
     ? Math.max(mtimeOf(ndir), ...listFiles(ndir).filter((f) => f !== "anatomy.md").map((f) => mtimeOf(join(ndir, f))), ...listDirs(ndir).map((d) => newestIn(join(ndir, d))))
     : Math.max(newestIn(ndir), newestIn(join(ndir, "batches")));

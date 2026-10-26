@@ -51,7 +51,7 @@ The slideshow path's pages, the rest of the Organic Factory UI, read `apps/<slug
 9. `/app/<slug>/strategy` — the account set and the app fit (phases 5 and 7).
 10. `/app/<slug>/handles`, `/app/<slug>/handle/<handle>` — the identities and their
     steps (phase 6); the ticks and approvals are made here.
-11. `/production/<slug>` — the studio, the board of the plan; `/app/<slug>/post/<date>-<short>-<n>`
+11. `/production/<slug>` — the studio, the board of the plan; `/production/<slug>/<date>/<short>/<n>`
     — one post: the deck, the candidates, the approvals, the send, the read (phase 8).
     A `Kind: video` row of the plan is a video post on the same page: its idea fields, then
     `REVIEW.md` (Approve plan, or Send back), then the locked plan's beats and prompts beside

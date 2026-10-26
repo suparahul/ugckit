@@ -12,7 +12,7 @@ import { declaredAccounts, handleOf, type DeclaredAccount } from "./accounts";
 import { PLATFORM_NAME, type Platform } from "./platform";
 import { accountsOf, type AccountsFile } from "./postbridge";
 import { getProduction, readLog, storeOf, type Event } from "./production";
-import { appDir, exists, headLines, listDirs, listFiles, readJson, readText, sectionOf, tableRows } from "./root";
+import { appDir, exists, headLines, listDirs, listFiles, listHandleDirs, readJson, readText, sectionOf, tableRows } from "./root";
 
 export type Reference = { file: string; role: string; what: string; use: string; exists: boolean; url: string | null; approved: string | null; rejected: string | null };
 export type StepState = "done" | "you" | "agent" | "open";
@@ -214,7 +214,7 @@ export function listHandles(slug: string): Handle[] {
   const log = readLog(slug);
   const accounts = readAccounts(slug);
   const planShorts = Object.keys(getProduction(slug).plan.handles ?? {});
-  return listDirs(join(appDir(slug), "handles"))
+  return listHandleDirs(join(appDir(slug), "handles"), (d) => exists(join(d, "HANDLE.md")))
     .filter((d) => !/^EXAMPLE$/i.test(d))
     .map((d) => readHandle(slug, d, log, accounts, planShorts))
     .filter((h): h is Handle => !!h);

@@ -161,7 +161,7 @@ frame_from_video() {
   [ -n "$url" ] && [ "$url" != "null" ] || return 1
   host=$(_host_of "$url")
   case " $DEAD_HOSTS " in *" $host "*) return 1 ;; esac
-  ffmpeg -v error -y -rw_timeout 15000000 -user_agent "Mozilla/5.0" \
+  ffmpeg -nostdin -v error -y -rw_timeout 15000000 -user_agent "Mozilla/5.0" \
          -headers $'Referer: https://www.tiktok.com/\r\n' \
          -i "$url" -frames:v 1 -q:v 3 "$out" 2>/dev/null && [ -s "$out" ]
 }
@@ -171,7 +171,7 @@ frame_from_video() {
 verify_video() {
   local f="$1"
   if ffprobe -v error -select_streams v:0 -show_entries stream=codec_type \
-       -of csv=p=0 "$f" 2>/dev/null | grep -q video; then
+       -of csv=p=0 "$f" </dev/null 2>/dev/null | grep -q video; then
     return 0
   fi
   echo "  no video stream in $(basename "$f") — deleting it (photo post? see RULE 10)" >&2
@@ -180,9 +180,11 @@ verify_video() {
 }
 
 # ffmpeg, not sips: sips is macOS only and ffmpeg is already a hard dependency.
+# Every ffmpeg here runs with -nostdin: these helpers are called from `while read` loops, and an
+# ffmpeg that reads stdin swallows the next row (post ids lost their first digits).
 to_jpg() {
   local src="$1" dst="$2" w="${3:-700}"
-  ffmpeg -y -loglevel error -i "$src" -vf "scale='min($w,iw)':-2" -q:v 3 "$dst" 2>/dev/null
+  ffmpeg -nostdin -y -loglevel error -i "$src" -vf "scale='min($w,iw)':-2" -q:v 3 "$dst" 2>/dev/null
 }
 
 spend() {
