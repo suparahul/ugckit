@@ -1,0 +1,49 @@
+{
+  "template": "clips",
+  "version": 1,
+  "size": [
+    1080,
+    1920
+  ],
+  "style": {},
+  "content": {
+    "title": "3 short clips",
+    "items": [],
+    "intro": {
+      "tag": "",
+      "title": "3 short\\nclips",
+      "line": "",
+      "bold": "one line on what they show"
+    },
+    "outro": {
+      "title": "Where to find more",
+      "line": "one line"
+    }
+  },
+  "nudge": {},
+  "params": {
+    "margin": 56,
+    "titleTop": 152,
+    "titleSize": 46,
+    "stepSize": 30,
+    "labelSize": 52,
+    "labelBottom": 760,
+    "capSize": 41,
+    "capGap": 22,
+    "shade": 38,
+    "secs": 0,
+    "frame": 1,
+    "winTop": 290,
+    "winH": 1040,
+    "winMargin": 90,
+    "barTop": 150,
+    "barH": 104,
+    "introSecs": 3,
+    "outroSecs": 3.5,
+    "hook": 1,
+    "hookTitleSize": 90,
+    "hookTitleLift": 70,
+    "hookShade": 66,
+    "hookLineSize": 48
+  }
+}

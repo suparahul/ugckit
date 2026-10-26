@@ -34,6 +34,10 @@ case "${1:-help}" in
   codex-images) shift; exec "$PROJ/scripts/codex-images.sh" "$@" ;;
   callout)  shift; exec node "$PROJ/scripts/render-callout.mjs" "$@" ;;
   render)   shift; exec node "$PROJ/scripts/render-slides.mjs" "$@" ;;
+  reel)     shift; exec node "$PROJ/scripts/photo-reel.mjs" "$@" ;;
+  music)    shift; exec node "$PROJ/scripts/add-audio.mjs" "$@" ;;
+  compose)  shift; exec node "$PROJ/scripts/compose.mjs" "$@" ;;
+  assets)   shift; exec "$PROJ/scripts/codex-assets.sh" "$@" ;;
   posting-accounts) shift; exec node "$PROJ/scripts/posting-accounts.mjs" "$@" ;;
   post)     shift; exec node "$PROJ/scripts/posting-send.mjs" "$@" ;;
   sync)     shift; exec node "$PROJ/scripts/posting-sync.mjs" "$@" ;;
@@ -98,6 +102,10 @@ ugckit — a niche or a reference video in, a recreation out.
   ugckit images <slug> <post> | ugckit codex-images <slug> <post>   the pictures
   ugckit callout <slug> <post> [--template appstore|feature|custom]
   ugckit render <slug> <post>                    the finished slides
+  ugckit reel <slug> <post> [--music <group>]    the slideshow cut into a 9:16 reel (render --reel first)
+  ugckit music <slug> <post> [--audio <file>]    a sound under the reel; assets/music/<group>/ is the library
+  ugckit compose <slug> <post> <n> [--from hub|cube|card|page|wall|list|clips] [--video]   a design template slide
+  ugckit assets <slug> [sheet ...]               draw the asset library's art sheets with Codex, then cut them
   ugckit posting-accounts <slug>                 map handles to the posting service
   ugckit post <slug> --post <key> [--send]       send to every platform of the handle (dry run without --send;
                                                  --only tiktok|instagram for one)

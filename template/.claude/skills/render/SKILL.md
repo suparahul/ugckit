@@ -10,6 +10,8 @@ description: Phase 8, the compositor — the finished slides of one post, text b
     node scripts/render-slides.mjs <slug> --date <date>         every post of the day whose pictures are all approved
     node scripts/render-slides.mjs <slug> <post> --burn-cover   slide 1 with its text, for a direct (scheduled) send
     node scripts/render-slides.mjs <slug> <post> --instagram    also the Instagram set (the send adds it when the post has an Instagram leg)
+    node scripts/render-slides.mjs <slug> <post> --reel         only the reel's frames, in reel/ (the cover text burned in)
+    node scripts/photo-reel.mjs <slug> <post> [--music <group>]  the reel itself, from reel/ (below)
 
 Writes `files/<post>/final/slide-NN.png` at the post's dimension (3:4 → 1080×1440,
 9:16 → 1080×1920; a picture of another shape is centre-cropped and the line says so),
@@ -52,8 +54,22 @@ cut. No new picture is generated. The cover always carries its text in this set,
 whatever the TikTok mode: Instagram is always published directly and nobody types on
 it. The caption is `caption.txt`, the same as TikTok's, hashtags included; there is no
 first comment. A deck over 10 slides is written with a warning: Instagram takes 10, and the send stops.
-The Instagram post has no music: the user adds it by hand in the Instagram app (Edit,
-then Replace Audio) once it is live.
+A carousel on Instagram has no music: the user adds it by hand in the Instagram app (Edit,
+then Replace Audio) once it is live. The reel below carries its own.
+
+**The reel.** A slideshow of two or more slides can also go out as one 9:16 video: by
+default Instagram gets it as a Reel (a carousel reaches few people there) and TikTok the
+slideshow; the post page's TikTok / Instagram switch changes either (`leg.format`).
+`--reel` renders the frames into `files/<post>/reel/` with the cover text always burned
+in, and `scripts/photo-reel.mjs` cuts them into `video/reel-final.mp4`, 1080×1920: 4 s a
+slide, 5 s on the hook and the product slide (the post page sets them, a `reel.set`
+line), a 3:4 slide fitted whole on its own page colour (`--pad auto`). The sound is the
+track chosen in the post page's Music dropdown (`music.set`), else one of the handle's
+`Music:` group in `assets/music/<group>/`, else none. The send cuts the reel again from
+the slides it sends, so you never run this before a send; run it when the user wants to
+see the reel first, or use the post page's "Make the reel" button. Open it and look:
+the hook readable for its whole hold, the product slide's card readable, the music
+there when one was chosen.
 
 Text-free slides (the words typed in TikTok) are the post page's export control
 (`slide.text` = overlay); the compositor reads it from the log.

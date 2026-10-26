@@ -24,6 +24,8 @@ import { cardTextOf, parseLayout, type CardText, type Dimension, type Layout } f
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { appDir } from "./root.ts";
+import { readBrand } from "./brand.ts";
+import { recipeOf, templateOf, type Recipe, type StyleSet, type Template, type TemplateState } from "./template.ts";
 import { fmtBoth, setZones } from "./when.ts";
 import { declaredPlatforms } from "./accounts.ts";
 import { PLATFORMS, PLATFORM_NAME, linePlatform, platformOf, primaryOf, slideLimit, type Platform } from "./platform.ts";
@@ -67,6 +69,12 @@ export type PlanRow = {
   video?: VideoIdea;
   /** A video row's tags, from the Tags column. */
   tags?: string[];
+  /** The row's own `Template` cell, read (format · style), when it has one. A `template.set` line overrides it (lib/template.ts). */
+  template?: Template;
+  /** The latest `template.set` line at build time, for the skills; the studio reads the log live. */
+  templateSet?: Template & { from: string; at: string; hash?: string };
+  /** The handle's format file that makes the template at build time, for the deck skill. */
+  recipe?: string;
   /** The video id an old plan wrote in Format / variation; else lib/video.ts finds it from the brief. */
   videoId?: string | null;
 };
@@ -140,6 +148,8 @@ export type Slide = {
   prompt: string | null;
   position: string | null;
   why: string | null;
+  /** The deck's `Layout` line: the design template and spec the slide is drawn from (the infographic skill), when it is one. */
+  design?: string;
   cards: string[];
   /** The words come from a "Composition spec" paragraph: the slide is composed in HTML, so a picture of it already holds the text. */
   composed?: boolean;
@@ -314,6 +324,15 @@ export type EventKind =
   /* A leg taken off a post, or put back (data.platform, note). */
   | "leg.drop"
   | "leg.add"
+  /* A slideshow cut into a reel (scripts/photo-reel.mjs): how each platform gets it, set on the post page (data.platform,
+   * data.format "slideshow" | "reel"; legFormat), the seconds a slide is held (data.hold, data.hookHold,
+   * data.productHold), and the track laid under it (data.track: a path under assets/music, or "none"). */
+  | "leg.format"
+  | "reel.set"
+  | "music.set"
+  /* The post's template chosen in the studio: data.format, data.style, data.from; hash is the deck's at the time, when
+   * one existed. It overrides the plan's Template cell (lib/template.ts). */
+  | "template.set"
   | "outcome.check"
   | "export"
   /* Identity events (the handle pages): the same log, `handle` instead of `post`. */
@@ -418,6 +437,34 @@ export function fileAbs(rel: string): string | null {
   return abs.startsWith(root + "/") ? abs : null;
 }
 
+/**
+ * A post's finished video as a file address: the newest of video/reel-final.mp4 (a slideshow's reel, scripts/photo-reel.mjs,
+ * or any video with its music laid in, scripts/add-audio.mjs) and video/compose-final.mp4 (a design template's video,
+ * lib/infographic-store.ts). Null when there is none. A video post's own file is lib/video.ts's, not this.
+ */
+export function postVideo(slug: string, key: string): string | null {
+  const dir = join(filesRoot(slug), fileKey(key), "video");
+  const names = ["reel-final.mp4", "compose-final.mp4"].filter((f) => existsSync(join(dir, f)));
+  if (!names.length) return null;
+  const pick = names.sort((x, y) => statSync(join(dir, y)).mtimeMs - statSync(join(dir, x)).mtimeMs)[0];
+  return `${slug}/${fileKey(key)}/video/${pick}`;
+}
+
+/**
+ * How a platform gets a slideshow that was also cut into a reel: the last `leg.format` line for that platform, else
+ * the default: TikTok takes the slideshow (a photo carousel), Instagram the reel (a carousel reaches few people there,
+ * and a reel carries the music). Without a reel, a slideshow is a slideshow everywhere.
+ */
+export type LegFormat = "slideshow" | "reel";
+export function legFormat(log: Event[], platform: Platform, hasReel: boolean, slides = 2): LegFormat {
+  if (!hasReel) return "slideshow";
+  /* A one-card post with a video (a template's video) has no slideshow to send instead. */
+  if (slides <= 1) return "reel";
+  const f = last(log.filter((e) => e.kind === "leg.format" && platformOf(e.data?.platform) === platform))?.data?.format;
+  if (f === "slideshow" || f === "reel") return f;
+  return platform === "instagram" ? "reel" : "slideshow";
+}
+
 export function uploadedFiles(slug: string, key: string, sub: string): string[] {
   const dir = join(filesRoot(slug), fileKey(key), sub);
   if (!existsSync(dir)) return [];
@@ -481,6 +528,8 @@ export type SlideState = {
   hash: string;
   /** The slide's text changed after the plan was approved. Shown, never re-asked before the final click. */
   changed: boolean;
+  /** The slide is drawn from a design spec (files/<post>/compose/slide-NN.json, lib/infographic.ts): the post page offers its design editor. */
+  compose: boolean;
 };
 
 /** One product callout image: the post's default file, and for the App Store card (index 1) its default strings, the editor's starting point for a rewrite. */
@@ -551,6 +600,8 @@ export type PostState = {
   platforms: Platform[];
   /** A video row's files (lib/video.ts); null for a slideshow. */
   video: VideoState | null;
+  /** What the post is made with: the latest `template.set` line, else the plan's Template cell (lib/template.ts). */
+  template: TemplateState;
   /** The leg whose state is `sent`, `posted`, `link` and `synced`: TikTok when the post goes there. */
   primary: Platform;
   legs: Partial<Record<Platform, LegState>>;
@@ -626,7 +677,8 @@ function slideStates(slug: string, deck: Deck, key: string, events: Event[], cha
     const lockEv = last(ev.filter((e) => e.kind === "slide.layout" || e.kind === "slide.unlock"));
     const layout = lockEv && lockEv.kind === "slide.layout" ? parseLayout(lockEv.data?.layout) : null;
     const cardFile = layout?.card ? customCardFile(slug, key, cardTextOf(layout.card)) : null;
-    return { n: s.n, status, current, approved, candidates: files, note, at, text, layout, cardFile, hash: slideHash(s), changed: changedSlides.has(s.n) };
+    const compose = existsSync(join(filesRoot(slug), fileKey(key), "compose", `slide-${String(s.n).padStart(2, "0")}.json`));
+    return { n: s.n, status, current, approved, candidates: files, note, at, text, layout, cardFile, hash: slideHash(s), changed: changedSlides.has(s.n), compose };
   });
 }
 
@@ -647,7 +699,11 @@ const isCustomCard = (f: string) => /-[0-9a-f]{10}\.png$/.test(f);
 
 function cardStates(slug: string, deck: Deck, key: string): CardState[] {
   const product = deck.slides.find((s) => s.isProduct && s.cards.length);
-  if (!product) return [];
+  /* No Cards row in the deck: the banner chosen in the App callout field (cards/1-custom.png), if any, is the post's card. */
+  if (!product) {
+    const f = last(uploadedFiles(slug, key, "cards").filter((x) => /\/cards\/1-custom\.png$/.test(x)));
+    return f ? [{ index: 1, file: f }] : [];
+  }
   /* Callout style E (the full-height phone): the slide's picture holds the phone and the card, so no card file is waited for. */
   if (/full-height phone/i.test(product.cards[0] ?? "")) return [];
   const files = uploadedFiles(slug, key, "cards").filter((f) => !isCustomCard(f));
@@ -780,6 +836,7 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
   const deckFile = prod.decks.find((d) => d.posts.some((p) => p.key === row.key)) ?? null;
   const deck = deckFile ? deckFile.posts.find((p) => p.key === row.key) ?? null : null;
   const log = all.filter((e) => e.post === row.key);
+  const brand = readBrand(slug);
   const platforms = platformsOf(row, prod.plan);
   const primary = primaryOf(platforms);
 
@@ -908,7 +965,17 @@ export function postState(row: PlanRow, all: Event[] = readLog(row.slug)): PostS
     checks: deck && deckFile ? checksFor(row, deck, deckFile, appPattern(prod.plan.app), platforms) : [],
     dimension: video ? "9:16" : deck?.dimension ?? "3:4",
     platforms, primary, legs, video,
+    template: templateOf(row, log, deck?.hash ?? null, handleRecipes(slug, row.handle, brand.styles), brand.styles),
   };
+}
+
+/** The format files of a handle, apps/<slug>/handles/<handle>/formats/*.md, as recipes (lib/template.ts recipeOf). */
+export function handleRecipes(slug: string, handle: string, styles?: StyleSet): Recipe[] {
+  const h = handle.replace(/^@/, "");
+  if (!validSlug(slug) || !/^[\w.-]+$/.test(h)) return [];
+  const dir = join(appDir(slug), "handles", h, "formats");
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).filter((f) => f.endsWith(".md") && !f.startsWith(".")).sort().map((f) => recipeOf(f.slice(0, -3), readFileSync(join(dir, f), "utf8"), styles)).filter((p): p is Recipe => !!p);
 }
 
 export function allStates(slug: string): PostState[] {

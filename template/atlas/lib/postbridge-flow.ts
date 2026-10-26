@@ -33,7 +33,8 @@ import { identitiesOf } from "./accounts.ts";
 import { MAX_SLIDES, PLATFORM_NAME, linePlatform, platformOf, primaryOf, type Platform } from "./platform.ts";
 import { slotKey, slotTimes } from "./slots.ts";
 import { accountsOf, hasKey, legsPost, postBody, postBridge, sendStatusOf, type CreatePostInput, type PostBridgeClient, type RequestPreview, type Leg, type SentPost, syncOutcomesWith, tiktokDirectPost, tiktokDraftPost, type AccountsFile, type PBAccount, type SendStatus, type SyncReport } from "./postbridge.ts";
-import { allStates, appendEvent, filesRoot, fileKey, getProduction, isSent, legsOfSent, postingStep, readLog, recordOutcome, storeOf, type Event, type PostState } from "./production.ts";
+import { allStates, appendEvent, filesRoot, fileKey, getProduction, isSent, legFormat, legsOfSent, postingStep, readLog, recordOutcome, postVideo, storeOf, type Event, type PostState } from "./production.ts";
+import { makeReel } from "./reel.ts";
 import { checkVideoSend, musicDirectNote, musicInstagramNote, videoReminders } from "./video-post.ts";
 import { finalFileOf } from "./video.ts";
 import { findLinks, monidRuns, savedRunsFetch, type LinkReport } from "./tiktok-link.ts";
@@ -296,34 +297,55 @@ export async function sendPost(slug: string, key: string, opts: { compose?: bool
   const need = (f: string) => { if (!existsSync(f)) throw new Error(`${f.slice(dir.length + 1)} is missing in final/.`); return f; };
   const text = (f: string, what: string) => { const t = readFileSync(need(f), "utf8").trim(); if (!t && what) throw new Error(`The ${what} is empty.`); return t; };
   const nn = (n: number) => String(n).padStart(2, "0");
-  const ttFiles = tt ? state.deck.slides.map((s) => need(join(dir, `slide-${nn(s.n)}.png`))) : [];
+  /* Each platform as the slideshow or as the reel (legFormat: a `leg.format` line from the post page, else TikTok the
+   * slideshow and Instagram the reel). A leg that goes as the reel gets it cut again now, from the slides just
+   * rendered, with the post's music. A one-card post with a video (a design template's) sends that video everywhere. */
+  const slides = state.deck.slides.length;
+  const oneCardVideo = slides <= 1 && !!postVideo(slug, key);
+  const wantsReel = (p: Platform) => oneCardVideo || (slides > 1 && legFormat(state.log, p, !!postVideo(slug, key) || p === "instagram") === "reel");
+  const ttReel = tt && wantsReel("tiktok"), igReel = ig && wantsReel("instagram");
+  if ((ttReel || igReel) && !oneCardVideo && opts.compose !== false) await makeReel(slug, state);
+  const reel = ttReel || igReel ? postVideo(slug, key) : null;
+  if ((ttReel || igReel) && !reel) throw new Error("The video could not be made: video/reel-final.mp4 is missing.");
+  const reelAbs = reel ? join(filesRoot(slug), reel.slice(slug.length + 1)) : "";
+  const ttFiles = tt ? (ttReel ? [reelAbs] : state.deck.slides.map((s) => need(join(dir, `slide-${nn(s.n)}.png`)))) : [];
   /* One caption for both platforms, hashtags included. */
   const caption = text(join(dir, "caption.txt"), "caption");
-  const igFiles = ig ? state.deck.slides.map((s) => need(join(dir, "instagram", `slide-${nn(s.n)}.jpg`))) : [];
+  const igFiles = ig ? (igReel ? [reelAbs] : state.deck.slides.map((s) => need(join(dir, "instagram", `slide-${nn(s.n)}.jpg`)))) : [];
 
-  /* 2. and 3. */
+  /* 2. and 3. The same reel goes to both legs as one upload. */
   const pb = opts.pb ?? postBridge();
-  const media: string[] = [];
-  for (const f of ttFiles) media.push((await pb.uploadMedia({ path: f })).media_id);
-  const igMedia: string[] = [];
-  for (const f of igFiles) igMedia.push((await pb.uploadMedia({ path: f })).media_id);
-  const post = await pb.createPost(legsPost({
-    legs, mode: plan.mode, scheduledAt: plan.scheduledAt,
-    ...(tt ? { tiktok: { caption, media } } : {}),
-    ...(ig ? { instagram: { caption, media: igMedia } } : {}),
-  }));
+  const upload = async (files: string[]) => { const ids: string[] = []; for (const f of files) ids.push((await pb.uploadMedia({ path: f })).media_id); return ids; };
+  const media = await upload(ttFiles);
+  const igMedia = ttReel && igReel ? media : await upload(igFiles);
+  /* A slideshow on one platform and the reel on the other are two Post Bridge posts, one per format: one post carries one
+   * kind of media. Each is logged on its own line. */
+  const groups = tt && ig && ttReel !== igReel ? [legs.filter((l) => l.platform === "tiktok"), legs.filter((l) => l.platform === "instagram")] : [legs];
+  const results: SendReport[] = [];
+  for (const g of groups) {
+    const gtt = g.some((l) => l.platform === "tiktok"), gig = g.some((l) => l.platform === "instagram");
+    const asReel = gtt ? ttReel : igReel;
+    const post = await pb.createPost(legsPost({
+      legs: g, mode: plan.mode, scheduledAt: plan.scheduledAt, ...(asReel ? { kind: "video" as const } : {}),
+      ...(gtt ? { tiktok: { caption, media } } : {}),
+      ...(gig ? { instagram: { caption, media: igMedia } } : {}),
+    }));
 
-  /* 4. One line for the send. TikTok alone: the line as it always was. */
-  const first = legs[0];
-  const lineMedia = tt ? media : igMedia;
-  appendEvent(slug, { post: key, kind: "posting.sent", actor: "agent", data: {
-    provider: "postbridge", id: post.id, media: lineMedia.join(" "), account: first.account, status: post.status, mode: plan.mode, ...(direct ? { scheduledAt: plan.scheduledAt! } : {}),
-    ...(legs.length === 1 && first.platform === "tiktok" ? {} : {
-      ...(ig && tt ? { igMedia: igMedia.join(" ") } : {}),
-      legs: legs.map((l) => ({ platform: l.platform, account: l.account, mode: plan.mode, scheduledAt: direct ? plan.scheduledAt : null, status: post.status })),
-    }),
-  } });
-  return { id: post.id, media: lineMedia, account: first.account, status: post.status, warnings: [...plan.warnings, ...(post.warnings ?? [])] };
+    /* 4. One line for the send. TikTok alone: the line as it always was. */
+    const first = g[0];
+    const lineMedia = gtt ? media : igMedia;
+    appendEvent(slug, { post: key, kind: "posting.sent", actor: "agent", data: {
+      provider: "postbridge", id: post.id, media: lineMedia.join(" "), account: first.account, status: post.status, mode: plan.mode, ...(direct ? { scheduledAt: plan.scheduledAt! } : {}),
+      ...(ttReel || igReel ? { reel: reel!, formats: legs.map((l) => `${l.platform} ${(l.platform === "tiktok" ? ttReel : igReel) ? "reel" : "slideshow"}`).join(" · ") } : {}),
+      ...(g.length === 1 && first.platform === "tiktok" ? {} : {
+        ...(gig && gtt ? { igMedia: igMedia.join(" ") } : {}),
+        legs: g.map((l) => ({ platform: l.platform, account: l.account, mode: plan.mode, scheduledAt: direct ? plan.scheduledAt : null, status: post.status })),
+      }),
+    } });
+    results.push({ id: post.id, media: lineMedia, account: first.account, status: post.status, warnings: post.warnings ?? [] });
+  }
+  const head = results[0];
+  return { ...head, warnings: [...plan.warnings, ...results.flatMap((r) => r.warnings)] };
 }
 
 /**

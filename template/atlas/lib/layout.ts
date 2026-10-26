@@ -22,7 +22,10 @@ export type LayoutBlock = { x: number; y: number; w: number; fs: number; text: s
  * card's own three strings. Without the strings the default card is drawn.
  */
 export type LayoutCard = { x: number; y: number; w: number; name?: string; subtitle?: string; button?: string };
-export type Layout = { blocks: LayoutBlock[]; card?: LayoutCard | null };
+/** An app screenshot pasted on a slide (a brand asset, phone-* or screen-sim-*), placed by hand: x, y, w in % of the frame; the height follows the picture. */
+export type LayoutScreen = { id: string; x: number; y: number; w: number };
+/** noCard: "None" was chosen in the App callout field: no card is pasted, even on a slide whose deck lists one. */
+export type Layout = { blocks: LayoutBlock[]; card?: LayoutCard | null; screen?: LayoutScreen | null; noCard?: boolean };
 export type CardText = { name: string; subtitle: string; button: string };
 
 /** The card's own strings when the layout carries them (all three), else null: the default card. */
@@ -114,7 +117,9 @@ export function parseLayout(raw: unknown): Layout | null {
       const name = str(c.name), subtitle = str(c.subtitle), button = str(c.button);
       if (name !== null && subtitle !== null && button !== null) Object.assign(card, { name, subtitle, button });
     }
-    return card ? { blocks, card } : { blocks };
+    const sc = j.screen;
+    const screen: LayoutScreen | null = sc && typeof sc.id === "string" && /^[\w-]{1,80}$/.test(sc.id) && [sc.x, sc.y, sc.w].every((v) => typeof v === "number" && Number.isFinite(v)) ? { id: sc.id, x: sc.x, y: sc.y, w: sc.w } : null;
+    return { blocks, ...(card ? { card } : {}), ...(screen ? { screen } : {}), ...(j.noCard === true && !card ? { noCard: true } : {}) };
   } catch {
     return null;
   }

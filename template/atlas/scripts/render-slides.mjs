@@ -14,6 +14,9 @@
  *                                                                flag reads "baked" for this render only; the log is not touched.
  *   node scripts/render-slides.mjs <key> --instagram             also the Instagram set, in final/instagram/ (below). The TikTok
  *                                                                set is written as always, with or without --burn-cover.
+ *   node scripts/render-slides.mjs <key> --reel                  only the frames of the post's reel, in reel/: the slides with the
+ *                                                                cover text burned in, which scripts/photo-reel.mjs cuts into
+ *                                                                video/reel-final.mp4. final/ is not touched.
  *
  * A deck whose item table says `| Slide style | illustrated |` has its text drawn into the
  * picture by the image generator: no text layer on any slide, --burn-cover included; the
@@ -363,7 +366,10 @@ async function renderPost(key, { force = false, override = {}, burnCover = false
     const cropped = meta.width && meta.height && Math.abs(meta.width / meta.height - W / H) > 0.02 ? `${meta.width}×${meta.height} centre-cropped to ${FR.dimension}` : "";
     const base = sharp(srcPath).resize(W, H, { fit: "cover", position: "centre" });
     const layers = [];
-    const hasCard = !!cardPath && showsCard(slide, FR.dimension);
+    /* The App callout field (one per slide): "None" (layout.noCard) pastes nothing; a banner placed by hand (layout.card) is
+     * pasted on any slide, with or without a Cards row in the deck; a deck's Cards row keeps its default card. */
+    const lay = layoutOf(slide.n, events);
+    const hasCard = !!cardPath && !lay?.noCard && (showsCard(slide, FR.dimension) || !!lay?.card);
     /* Direct mode: the cover carries its text, in the deck's slide-1 style (or its locked layout), since no hand types it.
      * An illustrated deck (the item row `Slide style: illustrated`) has its text drawn into the picture by the generator:
      * no text layer on any slide, the callout card still on the product slide. An absent row, or `photo`, is today's path. */
@@ -381,7 +387,9 @@ async function renderPost(key, { force = false, override = {}, burnCover = false
     if (hasCard) {
       /* The card: where the locked layout put it (x, y, w in % of the frame; the height follows the 139:34 ratio), or the
        * default of production.css .frame__cards: 80% wide, centred, its bottom edge on the safe-area limit. Alone on the photo with a soft shadow. */
-      const layout = flag === "baked" ? layoutOf(slide.n, events) : null;
+      /* The card's place: the layout's, when its words are burned or the card was placed by hand (an illustrated slide has
+       * no text layer, but its card is placed by the App callout field). */
+      const layout = flag === "baked" || lay?.card ? lay : null;
       const { path, note } = await cardFor(key, layout, cardPath);
       cardNote = note;
       const lc = layout?.card;
@@ -392,6 +400,23 @@ async function renderPost(key, { force = false, override = {}, burnCover = false
       const shadow = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><defs><filter id="b" x="-10%" y="-20%" width="120%" height="150%"><feGaussianBlur stdDeviation="${1.5 * cq}"/></filter></defs><rect x="${cardLeft}" y="${cardTop + 1.2 * cq}" width="${cw}" height="${ch}" rx="${3.6 * cq}" fill="rgba(0,0,0,0.28)" filter="url(#b)"/></svg>`;
       layers.push({ input: Buffer.from(shadow), top: 0, left: 0 });
       layers.push({ input: card, top: cardTop, left: cardLeft });
+    }
+    /* An app screenshot placed by hand on the slide (Layout.screen: a brand asset, x, y, w in % of the frame; the height
+     * follows the picture), drawn on top, on any slide style. It may hang past the frame's edge: what falls outside is cropped. */
+    const shot = lay?.screen;
+    if (shot && typeof shot.id === "string" && /^[\w-]{1,80}$/.test(shot.id)) {
+      const f = join(WORKSPACE, "apps", SLUG, "brand", "assets", `${shot.id}.png`);
+      if (existsSync(f)) {
+        const sw = Math.round((shot.w / 100) * W);
+        let img = await sharp(f).resize({ width: sw }).png().toBuffer();
+        const { height: sh = 0 } = await sharp(img).metadata();
+        const left = Math.round((shot.x / 100) * W), top = Math.round((shot.y / 100) * H);
+        const cl = Math.max(0, -left), ct = Math.max(0, -top), cw = Math.min(sw - cl, W - Math.max(0, left)), ch = Math.min(sh - ct, H - Math.max(0, top));
+        if (cw > 0 && ch > 0) {
+          if (cl || ct || cw < sw || ch < sh) img = await sharp(img).extract({ left: cl, top: ct, width: cw, height: ch }).png().toBuffer();
+          layers.push({ input: img, top: Math.max(0, top), left: Math.max(0, left) });
+        }
+      } else console.warn(`${key}: slide ${slide.n}: screenshot ${shot.id} is not in apps/${SLUG}/brand/assets`);
     }
     const out = join(outDir, `slide-${String(slide.n).padStart(2, "0")}.png`);
     await base.composite(layers).png().toFile(out);
@@ -428,6 +453,9 @@ async function instagramSet(key, deck, outDir, { force, override, burned }) {
   }
   const nn = (n) => String(n).padStart(2, "0");
   for (const slide of deck.slides) {
+    /* A design template slide with its own 4:5 layout (lib/infographic-store.ts renderInstagram) is taken as drawn, callout included. */
+    const own = join(FILES, fileKey(key), "compose", `slide-${nn(slide.n)}.instagram.png`);
+    if (existsSync(own)) { writeFileSync(join(igDir, `slide-${nn(slide.n)}.jpg`), await sharp(own).flatten({ background: "#ffffff" }).jpeg({ quality: 90, mozjpeg: true }).toBuffer()); continue; }
     const png = join(from, `slide-${nn(slide.n)}.png`);
     if (!existsSync(png)) continue;
     writeFileSync(join(igDir, `slide-${nn(slide.n)}.jpg`), await toInstagram(readFileSync(png), FR.dimension));
@@ -446,6 +474,13 @@ const instagram = args.includes("--instagram");
 const override = Object.fromEntries(args.filter((a) => /^--slide\d+=/.test(a)).map((a) => { const m = a.match(/^--slide(\d+)=(.+)$/); return [Number(m[1]), m[2]]; }));
 const dateI = args.indexOf("--date");
 const keys = dateI >= 0 ? prod.rows.filter((r) => r.date === args[dateI + 1]).map((r) => r.key) : args.filter((a) => !a.startsWith("--"));
-if (!keys.length) { console.error("usage: node scripts/render-slides.mjs <app slug> <post key> [--force] [--slideN=<file>] | --date YYYY-MM-DD"); process.exit(1); }
+if (!keys.length) { console.error("usage: node scripts/render-slides.mjs <app slug> <post key> [--force] [--burn-cover] [--instagram] [--reel] [--slideN=<file>] | --date YYYY-MM-DD"); process.exit(1); }
 if (Object.keys(override).length && keys.length !== 1) { console.error("--slideN=<file> works with one post key only"); process.exit(1); }
-for (const k of keys) await renderPost(k, { force, override, burnCover, instagram });
+const reel = args.includes("--reel");
+for (const k of keys) {
+  if (!reel) { await renderPost(k, { force, override, burnCover, instagram }); continue; }
+  /* The reel's frames: the cover always carries its text, since a video has no editor to type it in. */
+  const into = join(FILES, fileKey(k), "reel");
+  rmSync(into, { recursive: true, force: true });
+  if (await renderPost(k, { force, override, burnCover: true, outDir: into })) for (const f of ["cover-text.txt", "caption.txt"]) rmSync(join(into, f), { force: true });
+}

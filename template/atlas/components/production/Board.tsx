@@ -15,6 +15,7 @@ import { firstPicture } from "@/components/factory/Wait";
 import { Dot, Marks } from "./Marks";
 import { CellText } from "./CellText";
 import { cardText } from "@/lib/plan-parts";
+import { TemplatePick, TemplateTag } from "./TemplatePick";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -159,6 +160,7 @@ function WeekPost({ s }: { s: PostState }) {
       {pic ? <img className="week__thumb" src={pic} alt="" /> : null}
       <span className="week__slot">{s.row.slot}</span>
       <span className={`week__topic${s.stage === "killed" ? " is-killed" : ""}`}>{s.row.topic}</span>
+      {s.template.current || s.template.rewrite ? <TemplateTag t={s.template} /> : null}
       <span className="week__state">{nb ? <span className="state"><b>{n(nb.views)}</b> views</span> : <><Marks state={s} /><StateWord s={s} /></>}</span>
       <LegSplit s={s} className="week__split" />
     </Link>
@@ -246,6 +248,7 @@ export function ListView({ states, sort, dir, hrefForSort }: { states: PostState
     { k: "account", label: "account" },
     { k: "topic", label: "topic" },
     { k: "format", label: "format" },
+    { k: null, label: "template" },
     { k: null, label: "arm" },
     { k: "state", label: "state" },
     { k: null, label: "last note" },
@@ -274,6 +277,7 @@ export function ListView({ states, sort, dir, hrefForSort }: { states: PostState
                 <td>{s.row.handle}</td>
                 <td className={`plist__topic${s.stage === "killed" ? " is-killed" : ""}`}><Link href={postHref(s)}>{s.row.topic}</Link></td>
                 <td className="plist__muted">{s.row.format}</td>
+                <td className="plist__tpl">{s.video ? null : <TemplatePick post={s.row.key} t={s.template} compact hasDeck={!!s.deck} readOnly={!!s.killed || !!s.posted} />}</td>
                 <td className="plist__muted">{s.row.arm}</td>
                 <td><span className="week__state"><Marks state={s} /><StateWord s={s} /></span></td>
                 <td className="plist__note">{lastNote ? `“${lastNote}”` : ""}</td>
@@ -282,7 +286,7 @@ export function ListView({ states, sort, dir, hrefForSort }: { states: PostState
             );
           })}
           {!states.length ? (
-            <tr><td colSpan={9} className="plist__none">No post matches these filters in this period.</td></tr>
+            <tr><td colSpan={10} className="plist__none">No post matches these filters in this period.</td></tr>
           ) : null}
         </tbody>
       </table>

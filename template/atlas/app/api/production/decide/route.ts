@@ -42,6 +42,8 @@
  * (research/ai-ugc/ATLAS-VIDEO-STAGES-PLAN.md § 7).
  */
 
+import { readBrand } from "@/lib/brand";
+import { sameTemplate, templateLabel, templateWord, validTemplate } from "@/lib/template";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { isPlatform } from "@/lib/platform";
@@ -56,12 +58,16 @@ const KINDS = new Set<EventKind>([
   "slide.choose", "slide.approve", "slide.reject", "slide.note", "slide.text", "slide.layout", "slide.unlock", "posted", "outcomes", "kill", "unkill", "task.tick", "task.untick",
   /* One leg of a post taken off, or put back: data.platform names it. */
   "leg.drop", "leg.add",
+  /* How one platform gets a slideshow that has a reel: data.platform, data.format "slideshow" | "reel". */
+  "leg.format",
+  /* The post's template chosen on the board or the post page: data.format and data.style, a valid pair (lib/template.ts). */
+  "template.set",
   /* Identity events, from the handle page: `handle` instead of `post`. account.connect may name data.platform (TikTok when absent). */
   "persona.approve", "persona.sendback", "reference.approve", "reference.reject", "bio.approve", "defaults.approve", "task.done", "account.connect",
 ]);
 const IDENTITY = new Set<EventKind>(["persona.approve", "persona.sendback", "reference.approve", "reference.reject", "bio.approve", "defaults.approve", "task.done", "account.connect"]);
 /* The kinds whose data.platform must name a platform: required on a leg line, optional on account.connect. */
-const LEG = new Set<EventKind>(["leg.drop", "leg.add"]);
+const LEG = new Set<EventKind>(["leg.drop", "leg.add", "leg.format"]);
 
 const NEEDS_NOTE = new Set<EventKind>(["idea.sendback", "plan.sendback", "final.sendback", "storyboard.sendback", "take.reject", "cut.sendback", "composite.sendback", "source.reject", "narration.reject", "motion.reject", "slide.reject", "slide.note", "kill", "persona.sendback", "reference.reject"]);
 
@@ -84,7 +90,7 @@ export async function POST(request: NextRequest) {
   if (NEEDS_NOTE.has(body.kind) && !note) return NextResponse.json({ error: "Say what to change." }, { status: 400 });
 
   const actor = typeof body.actor === "string" && body.actor && body.actor !== "demo" ? body.actor.slice(0, 40) : undefined;
-  const state = body.kind.startsWith("slide.") || body.kind === "plan.approve" || body.kind === "plan.sendback" || body.kind === "final.approve" || PRODUCTION.has(body.kind) ? allStates(slug).find((x) => x.row.key === body.post) : undefined;
+  const state = body.kind.startsWith("slide.") || body.kind === "plan.approve" || body.kind === "plan.sendback" || body.kind === "final.approve" || body.kind === "leg.format" || body.kind === "template.set" || PRODUCTION.has(body.kind) ? allStates(slug).find((x) => x.row.key === body.post) : undefined;
 
   /* A slide approval belongs to a picture: the line always names the file. The
    * client sends the candidate in view; when it does not, the current one. */
@@ -117,6 +123,25 @@ export async function POST(request: NextRequest) {
     const r = productionLine(state, body.kind, data ?? {}, note);
     if ("error" in r) return NextResponse.json({ error: r.error }, { status: 400 });
     data = r.data;
+  }
+  if (body.kind === "leg.format") {
+    if (!state?.deck || state.deck.slides.length < 2) return NextResponse.json({ error: "Only a slideshow of two or more slides can go as a reel." }, { status: 400 });
+    const format = data?.format;
+    if (format !== "slideshow" && format !== "reel") return NextResponse.json({ error: "data.format must be slideshow or reel." }, { status: 400 });
+    const p = data!.platform as "tiktok" | "instagram";
+    if (state.legs?.[p]?.sent || state.legs?.[p]?.posted) return NextResponse.json({ error: `This post has already gone to ${p === "tiktok" ? "TikTok" : "Instagram"}, as it was.` }, { status: 400 });
+    data = { platform: p, format };
+  }
+  if (body.kind === "template.set") {
+    if (!state) return NextResponse.json({ error: "No such post." }, { status: 400 });
+    const styles = readBrand(slug).styles;
+    const to = { format: data?.format, style: data?.style };
+    if (!validTemplate(to, styles)) return NextResponse.json({ error: `Pick a valid template: ${(["slideshow", "reel", "image"] as const).map((f) => `${f} (${styles[f].map((o) => o.label.toLowerCase()).join(", ")})`).join(", ")}.` }, { status: 400 });
+    if (sameTemplate(to, state.template.current)) return NextResponse.json({ error: `The template is already ${templateLabel(to, styles)}.` }, { status: 400 });
+    if (state.posted) return NextResponse.json({ error: "This post is already posted; its template is what went out." }, { status: 400 });
+    /* The deck's hash at the change: while the deck keeps it, the deck was written for the old template (lib/template.ts). */
+    if (state.deck) hash = state.deck.hash;
+    data = { format: to.format, style: to.style, from: templateWord(state.template.current) };
   }
   if (body.kind === "slide.layout") {
     if (typeof body.slide !== "number" || !parseLayout(data?.layout)) return NextResponse.json({ error: "slide and data.layout (JSON) are required." }, { status: 400 });
