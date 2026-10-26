@@ -43,8 +43,9 @@ case "$STATUS" in
 esac
 
 # ---------------------------------------------------------------- the job
-"$SCRIPTS/images.sh" "$SLUG" "$KEY" "$@" > "$POSTDIR.instruction.tmp" || { rm -f "$POSTDIR.instruction.tmp"; exit 1; }
+# The post's folder first: on a post's first run, its parent (production/files/) may not exist yet either.
 mkdir -p "$POSTDIR"
+"$SCRIPTS/images.sh" "$SLUG" "$KEY" "$@" > "$POSTDIR.instruction.tmp" || { rm -f "$POSTDIR.instruction.tmp"; exit 1; }
 head -1 "$POSTDIR.instruction.tmp"
 # The instruction is everything after the "== instruction" line.
 sed -n '/^== instruction/,$p' "$POSTDIR.instruction.tmp" | tail -n +2 > "$POSTDIR/images-instruction.txt"
@@ -63,12 +64,21 @@ CODEX_MODEL="${CODEX_MODEL:-gpt-6-luna}"; CODEX_EFFORT="${CODEX_EFFORT:-medium}"
 echo "model: $CODEX_MODEL; reasoning effort: $CODEX_EFFORT"
 START=$(date +%s)
 codex exec -C "$ROOT" -s workspace-write --skip-git-repo-check --ephemeral --json -m "$CODEX_MODEL" -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
-  -o "$POSTDIR/images-result.md" "${IARGS[@]}" - \
+  -o "$POSTDIR/images-result.md" ${IARGS[@]+"${IARGS[@]}"} - \
   < "$POSTDIR/images-instruction.txt" > "$POSTDIR/images-events.jsonl" 2> "$POSTDIR/images-stderr.txt"
 RC=$?
 echo "codex exec exited $RC after $(( $(date +%s) - START )) s"
-if ! grep -q '"turn.completed"' "$POSTDIR/images-events.jsonl" 2>/dev/null; then
-  echo "the event stream ended without turn.completed -- the last 20 events:" >&2
+# `codex exec` exits 0 even when the turn fails (a usage limit, an auth error), and the verify alone passes on the
+# pictures of an earlier run. So the run counts only when the event stream completed the turn AND every slide asked for
+# has a picture newer than this run's start (below).
+FAILED=0
+if grep -q '"turn.failed"' "$POSTDIR/images-events.jsonl" 2>/dev/null \
+   || ! grep -q '"turn.completed"' "$POSTDIR/images-events.jsonl" 2>/dev/null; then
+  FAILED=1
+  echo "FAILED: codex did not complete the turn." >&2
+  MSG=$(grep -o '"message":"[^"]*"' "$POSTDIR/images-events.jsonl" 2>/dev/null | tail -1 | cut -d'"' -f4)
+  [ -n "$MSG" ] && echo "codex says: $MSG" >&2
+  echo "the last 20 events:" >&2
   tail -20 "$POSTDIR/images-events.jsonl" | cut -c1-300 >&2
   grep -v 'rmcp::transport' "$POSTDIR/images-stderr.txt" | tail -5 >&2
 fi
@@ -111,9 +121,26 @@ PY
 echo "== verify =="
 "$SCRIPTS/images.sh" "$SLUG" "$KEY" --verify
 VRC=$?
-if [ "$VRC" -ne 0 ] || [ "$RC" -ne 0 ]; then
-  echo "the last 20 events:" >&2
-  tail -20 "$POSTDIR/images-events.jsonl" | cut -c1-300 >&2
+# Every slide of this job must have a new picture (made after START); the ones of an earlier run do not count.
+MISSING=$(python3 - "$JOB" "$POSTDIR" "$START" <<'PY'
+import json, os, sys
+job, d, start = json.load(open(sys.argv[1])), sys.argv[2], int(sys.argv[3])
+miss = []
+for sl in job["slides"]:
+    sub = os.path.join(d, "slide-%02d" % sl["n"])
+    files = [os.path.join(sub, f) for f in os.listdir(sub)] if os.path.isdir(sub) else []
+    if not any(f.lower().endswith((".png", ".jpg", ".jpeg", ".webp")) and os.path.getmtime(f) >= start for f in files):
+        miss.append(str(sl["n"]))
+print(",".join(miss))
+PY
+)
+if [ -n "$MISSING" ]; then
+  FAILED=1
+  echo "FAILED: no new picture this run for slide(s) $MISSING; what the verify listed for them is from an earlier run." >&2
+  echo "re-run: scripts/codex-images.sh $SLUG $KEY --only $MISSING" >&2
+fi
+if [ "$FAILED" -ne 0 ] || [ "$VRC" -ne 0 ] || [ "$RC" -ne 0 ]; then
+  [ "$FAILED" -ne 0 ] || { echo "the last 20 events:" >&2; tail -20 "$POSTDIR/images-events.jsonl" | cut -c1-300 >&2; }
   exit 1
 fi
-echo "done: look at them on the post page, http://localhost:3210/app/$SLUG/post/$(printf '%s' "$KEY" | tr '/' '-')"
+echo "done: look at them on the post page, http://localhost:3210/production/$SLUG/$KEY"

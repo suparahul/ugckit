@@ -35,10 +35,23 @@ def spread(vals):
     return f"p25 {fmt(q(.25))} · p50 {fmt(q(.5))} · p75 {fmt(q(.75))} · p90 {fmt(q(.9))} · max {fmt(v[-1])}"
 
 
+def post_files(base):
+    """base/<handle>/<id>/post.json, for every handle: a TikTok handle may start with a dot (.chloeclayton), and glob's *
+    skips dot folders (include_hidden needs Python 3.11)."""
+    out = []
+    for h in os.scandir(base) if os.path.isdir(base) else []:
+        if not h.is_dir():
+            continue
+        for p in os.scandir(h.path):
+            if p.is_dir() and os.path.isfile(os.path.join(p.path, "post.json")):
+                out.append(os.path.join(p.path, "post.json"))
+    return out
+
+
 def batch(slug, date):
     b = os.path.join(ROOT, "apps", slug, "niche", "batches", date)
     rows = []
-    for pj in sorted(glob.glob(os.path.join(b, "*", "*", "post.json"))):
+    for pj in sorted(post_files(b)):
         d = os.path.dirname(pj)
         try:
             r = json.load(open(pj))

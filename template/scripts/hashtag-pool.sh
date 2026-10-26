@@ -34,7 +34,8 @@ for f in glob.glob(os.path.join(d, "searches", "*.json")):
     for it in items or []:
         if not isinstance(it, dict): continue
         for t in tags_of(it.get("desc") or it.get("title") or ""): c[t] += 1
-for f in glob.glob(os.path.join(d, "batches", "*", "*", "*", "post.json")):
+# batches/<date>/<handle>/<id>/post.json; os.walk, since glob's * skips a handle that starts with a dot (.chloeclayton).
+for f in [os.path.join(r, "post.json") for r, _, fs in os.walk(os.path.join(d, "batches")) if "post.json" in fs and r.count(os.sep) - os.path.join(d, "batches").count(os.sep) == 3]:
     try: r = json.load(open(f))
     except Exception: continue
     for t in tags_of(r.get("title") or ""): c[t] += 1

@@ -118,6 +118,7 @@ function readLedger() {
         blurb: row.note || row.evidence || null,
         own,
         ledgerHandles: Object.keys(handles).length,
+        ledgerHandleNames: Object.keys(handles),
         accent: PALETTE[cfg.order.length % PALETTE.length],
         ...readAppJson(join(MEDIA, project, app)),
       };
@@ -160,6 +161,19 @@ function isDir(p) {
 function listDirs(p) {
   try {
     return readdirSync(p).filter((n) => !n.startsWith(".") && isDir(join(p, n)));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The handle folders of an app: like listDirs, but a TikTok handle may start with a dot (`.chloeclayton`), so a dot
+ * folder is kept when it holds posts.json or the ledger names it. `.git`, `.DS_Store` and other dot entries stay out.
+ */
+function listHandleDirs(p, ledger = []) {
+  const known = new Set(ledger);
+  try {
+    return readdirSync(p).filter((n) => !NOT_A_HANDLE.has(n) && isDir(join(p, n)) && (!n.startsWith(".") || known.has(n) || existsSync(join(p, n, "posts.json"))));
   } catch {
     return [];
   }
@@ -684,7 +698,7 @@ function buildBrand(brandId) {
   const brandDir = cfg.dir;
   const rel = brandDir.slice(MEDIA.length + 1); // <project>/<app>
 
-  const handles = listDirs(brandDir).filter((d) => !NOT_A_HANDLE.has(d));
+  const handles = listHandleDirs(brandDir, cfg.ledgerHandleNames);
   cfg.handleRules = conventionRules(handles);
   const accounts = [];
   for (const handle of handles) {
@@ -705,7 +719,7 @@ function buildBrand(brandId) {
   const appStoreCapture = readdirSync(brandDir).find((f) => /^appstore.*\.(png|jpg)$/i.test(f));
   const logo = fetchBrandLogo(brandId, brandDir, cfg);
 
-  const { dir: _dir, handleRules: _hr, ledgerHandles: _lh, ...pub } = cfg;
+  const { dir: _dir, handleRules: _hr, ledgerHandles: _lh, ledgerHandleNames: _lhn, ...pub } = cfg;
   return {
     id: brandId,
     ...pub,
@@ -1014,7 +1028,7 @@ function main() {
       if (NOT_AN_APP.has(app)) continue;
       const dir = join(MEDIA, project, app);
       if (brandIds.some((id) => brandsConfig.brands[id].dir === dir)) continue;
-      const hasPosts = listDirs(dir).some((h) => existsSync(join(dir, h, "posts.json")));
+      const hasPosts = listHandleDirs(dir).some((h) => existsSync(join(dir, h, "posts.json")));
       if (!hasPosts) continue;
       const id = brandsConfig.brands[app] ? `${project}-${app}` : app;
       brandsConfig.brands[id] = {

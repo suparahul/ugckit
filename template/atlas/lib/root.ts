@@ -38,6 +38,18 @@ export function listDirs(p: string): string[] {
   }
 }
 
+/**
+ * The handle folders under a folder: like listDirs, but a TikTok handle may start with a dot (`.chloeclayton`), so a
+ * dot folder is kept when `isHandle` says it is one (it holds HANDLE.md, or post folders). Other dot entries stay out.
+ */
+export function listHandleDirs(p: string, isHandle: (dir: string) => boolean): string[] {
+  try {
+    return readdirSync(p).filter((n) => isDir(join(p, n)) && (!n.startsWith(".") || isHandle(join(p, n)))).sort();
+  } catch {
+    return [];
+  }
+}
+
 export function listFiles(p: string): string[] {
   try {
     return readdirSync(p).filter((n) => !n.startsWith(".") && !isDir(join(p, n))).sort();

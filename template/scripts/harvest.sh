@@ -72,7 +72,8 @@ print(f"  {len(rows)} posts -> index.tsv")
 PY
 
   GOT=0; MISS=0; FRAMES=0
-  while IFS=$'\t' read -r RANK URL VURL; do
+  # On fd 3: ffmpeg in the body (to_jpg, frame_from_video) must not reach the rows.
+  while IFS=$'\t' read -r -u 3 RANK URL VURL; do
     OUTJ="$H/covers/$RANK.jpg"
     [ -s "$OUTJ" ] && { GOT=$((GOT + 1)); continue; }
     if [ -n "$URL" ] && fetch_cdn "$URL" "$H/covers/$RANK.src" && \
@@ -86,7 +87,7 @@ PY
       MISS=$((MISS + 1))
     fi
     rm -f "$H/covers/$RANK.src"
-  done < "$H/covers.tsv"
+  done 3< "$H/covers.tsv"
   echo "  covers: $GOT downloaded, $MISS missing"
   [ "$FRAMES" -gt 0 ] && echo "  ($FRAMES are first frames from the video, because the cover CDN did not answer)"
   if [ "$MISS" -gt 0 ] && [ -n "$DEAD_HOSTS" ]; then
@@ -131,7 +132,7 @@ End the file with an '## Observations' section: two or three sentences on what t
 of this batch have in common."
     if [ "$HEADLESS" = 1 ]; then
       echo "  reading batch $N ($HOOK_MODEL)"
-      claude --model "$HOOK_MODEL" --allowedTools "Read,Write,Glob" -p "$PROMPT" >/dev/null 2>&1 \
+      claude --model "$HOOK_MODEL" --allowedTools "Read,Write,Glob" -p "$PROMPT" </dev/null >/dev/null 2>&1 \
         || echo "  batch $N failed — re-run to retry"
     else
       { echo "### batch $N -> $HB"; echo; echo "$PROMPT"; echo; } >> "$H/hooks.todo"

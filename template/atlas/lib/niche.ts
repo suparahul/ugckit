@@ -17,7 +17,7 @@ import { join } from "node:path";
 
 import { batchKindOf, batchMediaOf, batchSlideCount, nicheDetailOf, scrollDetailOf, type NicheDetail, type NichePost } from "./niche-posts";
 import type { Platform } from "./platform";
-import { appDir, exists, listDirs, listFiles, mtimeOf, readJson, readText, tableOf } from "./root";
+import { appDir, exists, listDirs, listFiles, listHandleDirs, mtimeOf, readJson, readText, tableOf } from "./root";
 
 export type { NichePost } from "./niche-posts";
 
@@ -135,7 +135,7 @@ function readBatch(slug: string, date: string): Batch {
   }
   /* A batch with no table and no raw file: the folders themselves. */
   if (!posts.size) {
-    for (const h of listDirs(dir)) for (const id of listDirs(join(dir, h))) {
+    for (const h of listHandleDirs(dir, (d) => listDirs(d).some((id) => /^\d+$/.test(id)))) for (const id of listDirs(join(dir, h))) {
       const m = batchMediaOf(listFiles(join(dir, h, id)), `${base}/${encodeURIComponent(h)}/${id}`);
       posts.set(id, { handle: h, id, date: null, views: 0, likes: 0, comments: 0, shares: 0, saves: 0, slideCount: m.slides.length, caption: "", sound: null, slides: m.slides, video: null, url: `https://www.tiktok.com/@${h}/photo/${id}`, kind: "slideshow" });
     }
