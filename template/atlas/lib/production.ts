@@ -314,6 +314,12 @@ export type EventKind =
   /* A leg taken off a post, or put back (data.platform, note). */
   | "leg.drop"
   | "leg.add"
+  /* A slideshow cut into a reel (scripts/photo-reel.mjs): how each platform gets it, set on the post page (data.platform,
+   * data.format "slideshow" | "reel"; legFormat), the seconds a slide is held (data.hold, data.hookHold,
+   * data.productHold), and the track laid under it (data.track: a path under assets/music, or "none"). */
+  | "leg.format"
+  | "reel.set"
+  | "music.set"
   | "outcome.check"
   | "export"
   /* Identity events (the handle pages): the same log, `handle` instead of `post`. */
@@ -416,6 +422,24 @@ export function fileAbs(rel: string): string | null {
   const root = resolve(filesRoot(slug));
   const abs = resolve(root, rest.join("/"));
   return abs.startsWith(root + "/") ? abs : null;
+}
+
+/** A slideshow's reel (video/reel-final.mp4, scripts/photo-reel.mjs) as a file address, or null when none was cut. */
+export function reelVideo(slug: string, key: string): string | null {
+  return existsSync(join(filesRoot(slug), fileKey(key), "video", "reel-final.mp4")) ? `${slug}/${fileKey(key)}/video/reel-final.mp4` : null;
+}
+
+/**
+ * How a platform gets a slideshow that was also cut into a reel: the last `leg.format` line for that platform, else
+ * the default: TikTok takes the slideshow (a photo carousel), Instagram the reel (a carousel reaches few people there,
+ * and a reel carries the music). Without a reel, a slideshow is a slideshow everywhere.
+ */
+export type LegFormat = "slideshow" | "reel";
+export function legFormat(log: Event[], platform: Platform, hasReel: boolean): LegFormat {
+  if (!hasReel) return "slideshow";
+  const f = last(log.filter((e) => e.kind === "leg.format" && platformOf(e.data?.platform) === platform))?.data?.format;
+  if (f === "slideshow" || f === "reel") return f;
+  return platform === "instagram" ? "reel" : "slideshow";
 }
 
 export function uploadedFiles(slug: string, key: string, sub: string): string[] {

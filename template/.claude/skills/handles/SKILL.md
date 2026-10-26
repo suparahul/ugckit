@@ -115,7 +115,9 @@ photo; 109 of 191 cat-niche covers were 3:4), `Slots:` with `Posting zone:` (two
 the first 9 AM–1 PM, the last 3–8 PM in the audience's zone, 5–7 hours apart; the kit's
 default pair is 11 AM by hand and 7 PM scheduled; measured on 16,165 posts, 2026-09-16,
 cross-niche), `Cadence:`, `Sound:` (one library track kept across the account, or an
-uploaded clip; never the brand's own sound), `Warm-up:` (as the user states it; "not
+uploaded clip; never the brand's own sound), `Music:` (optional: the folder of
+`assets/music/` the handle's reels take a track from, `calm` or `upbeat` as shipped, or one
+the user added; without it a reel is silent until a track is chosen on the post page), `Warm-up:` (as the user states it; "not
 recorded" is fine), `Slide style:` (`photo`, the default: the compositor burns the
 text; or `illustrated`: the image generator draws the text as part of the picture and
 the compositor burns nothing but the callout. The value alone, no fields; the look lives

@@ -36,13 +36,19 @@ export function Legs({ s, href, view }: { s: PostState; href: string; view: View
   const slides = s.deck?.slides.length ?? 0;
   const over = slides > 10 && !ig?.dropped;
   /* A music note: the Reel goes with the file's own sound, the user's choice (2026-10-21). */
+  /* A slideshow goes to Instagram as its reel unless the post page says slideshow (lib/production.ts legFormat). */
+  const igFormat = [...s.log].reverse().find((e) => e.kind === "leg.format" && e.data?.platform === "instagram")?.data?.format;
+  const igAsReel = !s.video && slides > 1 && igFormat !== "slideshow";
+  const igTrack = [...s.log].reverse().find((e) => e.kind === "music.set")?.data?.track;
   const igMusic = !ig?.sent && !ig?.posted && !!s.video && !!musicInstagramNote(s.video.plan?.music);
   const note = ig?.failed
     ? <>Instagram refused it ({ig.failed.at.slice(0, 16).replace("T", " ")} UTC): <em>“{ig.failed.error}”</em> TikTok is not touched. To send it again: <code>node scripts/posting-send.mjs {s.row.slug} --post {s.row.key} --only instagram --send</code></>
     : over ? <>{slides} slides: Instagram takes 10. Cut the deck, or take Instagram off this post.</>
-    : ig?.posted && !ig.synced ? (s.video ? <>Live on Instagram as a Reel. Turn on its AI label in the Instagram app, if it is not on.</> : <>Live on Instagram. Add the music in the Instagram app: Edit, then Replace Audio.</>)
+    : ig?.posted && !ig.synced ? (s.video ? <>Live on Instagram as a Reel. Turn on its AI label in the Instagram app, if it is not on.</> : igAsReel ? <>Live on Instagram as a Reel.</> : <>Live on Instagram. Add the music in the Instagram app: Edit, then Replace Audio.</>)
     : igMusic && !ig?.dropped ? <>This video has a music note: the Instagram Reel goes with the file&rsquo;s own sound, without the music. Take Instagram off this post to post it there yourself, with the sound.</>
-    : !ig?.sent && !ig?.dropped ? (s.video ? <>Instagram publishes the video directly as a Reel, at the same time as TikTok, with the file&rsquo;s own sound. Post Bridge cannot set Instagram&rsquo;s AI label: turn it on in the Instagram app.</> : <>Instagram publishes directly, at the same time as TikTok, with no music: add it in the Instagram app afterwards.</>)
+    : !ig?.sent && !ig?.dropped ? (s.video ? <>Instagram publishes the video directly as a Reel, at the same time as TikTok, with the file&rsquo;s own sound. Post Bridge cannot set Instagram&rsquo;s AI label: turn it on in the Instagram app.</>
+      : igAsReel ? <>Instagram publishes this slideshow directly as a Reel, at the same time as TikTok, {igTrack && igTrack !== "none" ? <>with the music chosen below.</> : <>silent: pick its music below, or add it in the Instagram app afterwards.</>}</>
+      : <>Instagram publishes directly, at the same time as TikTok, with no music: add it in the Instagram app afterwards.</>)
     : null;
   return (
     <div className="legs">

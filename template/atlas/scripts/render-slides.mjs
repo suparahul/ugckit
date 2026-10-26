@@ -14,6 +14,9 @@
  *                                                                flag reads "baked" for this render only; the log is not touched.
  *   node scripts/render-slides.mjs <key> --instagram             also the Instagram set, in final/instagram/ (below). The TikTok
  *                                                                set is written as always, with or without --burn-cover.
+ *   node scripts/render-slides.mjs <key> --reel                  only the frames of the post's reel, in reel/: the slides with the
+ *                                                                cover text burned in, which scripts/photo-reel.mjs cuts into
+ *                                                                video/reel-final.mp4. final/ is not touched.
  *
  * A deck whose item table says `| Slide style | illustrated |` has its text drawn into the
  * picture by the image generator: no text layer on any slide, --burn-cover included; the
@@ -446,6 +449,13 @@ const instagram = args.includes("--instagram");
 const override = Object.fromEntries(args.filter((a) => /^--slide\d+=/.test(a)).map((a) => { const m = a.match(/^--slide(\d+)=(.+)$/); return [Number(m[1]), m[2]]; }));
 const dateI = args.indexOf("--date");
 const keys = dateI >= 0 ? prod.rows.filter((r) => r.date === args[dateI + 1]).map((r) => r.key) : args.filter((a) => !a.startsWith("--"));
-if (!keys.length) { console.error("usage: node scripts/render-slides.mjs <app slug> <post key> [--force] [--slideN=<file>] | --date YYYY-MM-DD"); process.exit(1); }
+if (!keys.length) { console.error("usage: node scripts/render-slides.mjs <app slug> <post key> [--force] [--burn-cover] [--instagram] [--reel] [--slideN=<file>] | --date YYYY-MM-DD"); process.exit(1); }
 if (Object.keys(override).length && keys.length !== 1) { console.error("--slideN=<file> works with one post key only"); process.exit(1); }
-for (const k of keys) await renderPost(k, { force, override, burnCover, instagram });
+const reel = args.includes("--reel");
+for (const k of keys) {
+  if (!reel) { await renderPost(k, { force, override, burnCover, instagram }); continue; }
+  /* The reel's frames: the cover always carries its text, since a video has no editor to type it in. */
+  const into = join(FILES, fileKey(k), "reel");
+  rmSync(into, { recursive: true, force: true });
+  if (await renderPost(k, { force, override, burnCover: true, outDir: into })) for (const f of ["cover-text.txt", "caption.txt"]) rmSync(join(into, f), { force: true });
+}
